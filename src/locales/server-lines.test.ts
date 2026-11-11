@@ -792,7 +792,9 @@ describe('lines the server writes for a person', () => {
     const code = SCANNED.flatMap((top) => [...sources(join(ROOT, top))])
       .map((path) => readFileSync(path, 'utf8'))
       .join('\n');
-    expect(keys.filter((key) => !code.includes(`"${key}"`))).toEqual([]);
+    expect(keys.filter((key) => !code.includes(`"${key}"`) && !code.includes(`'${key}'`))).toEqual(
+      [],
+    );
   });
 
   it('only server-lines.ts (English) and server-line-packs.ts (the rest) read the language packs on the server', () => {
@@ -802,7 +804,7 @@ describe('lines the server writes for a person', () => {
     expect(readers.sort()).toEqual(['server/server-line-packs.ts', 'server/server-lines.ts']);
     // The server loads the other languages when it starts; without them every line reads in English.
     expect(readFileSync(join(ROOT, 'server/index.ts'), 'utf8')).toMatch(
-      /(?:^|;\s*)import "\.\/server-line-packs\.ts";/m,
+      /(?:^|;\s*)import ['"]\.\/server-line-packs\.ts['"];/m,
     );
   });
 

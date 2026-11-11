@@ -220,7 +220,7 @@ describe('live-call-record.ts', () => {
   it('imports nothing but a pure shared leaf at runtime', () => {
     const source = readFileSync(new URL('./live-call-record.ts', import.meta.url), 'utf8');
     const runtimeImports = [
-      ...source.matchAll(/^import\s+(?!type\b)(?:[^;"]*?\sfrom\s+)?"([^"]+)"/gm),
+      ...source.matchAll(/^import\s+(?!type\b)(?:[^;"']*?\sfrom\s+)?["']([^"']+)["']/gm),
     ].map((match) => match[1]);
     expect(runtimeImports).toEqual(['../shared/live-call.ts']);
   });

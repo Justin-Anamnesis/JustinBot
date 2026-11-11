@@ -129,7 +129,7 @@ function internalDispatch(factory: string): {
     enclosing &&
     !(
       ts.isIfStatement(enclosing) &&
-      enclosing.expression.getText(source) === 'path.startsWith("/api/internal/")'
+      enclosing.expression.getText(source) === "path.startsWith('/api/internal/')"
     )
   )
     enclosing = enclosing.parent;

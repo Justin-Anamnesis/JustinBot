@@ -59,7 +59,7 @@ describe('ChatErrorBanner', () => {
       const text = source(file);
       expect(text).toContain('<ChatErrorBanner');
       expect(text).toContain('message={state.error}');
-      expect(text).toContain('dispatch({ type: "error", message: null })');
+      expect(text).toMatch(/dispatch\(\{\s*type: ['"]error['"],\s*message: null,?\s*\}\)/);
     }
     const store = source('state/store.tsx');
     expect(store).toContain('useChatErrorClear(state.error, clearChatError)');

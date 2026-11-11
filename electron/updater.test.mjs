@@ -39,7 +39,7 @@ function mainRule() {
     '\n',
   );
   const start = source.indexOf('function myCloud() {'),
-    end = source.indexOf('const savedWorkspace = id =>', start);
+    end = source.indexOf('const savedWorkspace = (id) =>', start);
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
   expect(

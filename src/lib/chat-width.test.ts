@@ -70,8 +70,10 @@ describe('chat width', () => {
     );
     for (const f of ['ChatView', 'GroupView']) {
       const source = readFileSync(join(root, 'components', `${f}.tsx`), 'utf8');
-      expect(source, f).toMatch(/className="glass-scroller-content chat-column /);
-      expect(source, f).toMatch(/ref=\{composerDockRef\} className="[^"]* chat-column-dock"/);
+      expect(source, f).toMatch(/className=['"]glass-scroller-content chat-column /);
+      expect(source, f).toMatch(
+        /ref=\{composerDockRef\}\s+className=(['"])[^'"]* chat-column-dock\1/,
+      );
     }
   });
 

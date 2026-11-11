@@ -327,7 +327,14 @@ describe('a refusal the preload words before main is asked', () => {
 
   it("is the preload's own sentence", () => {
     const preload = readFileSync(new URL('../../electron/preload.cjs', import.meta.url), 'utf8');
-    for (const key of keys) expect(preload, key).toContain(`new Error(${JSON.stringify(en[key])})`);
+    for (const key of keys) {
+      const sentence = en[key];
+      expect(
+        preload.includes(`new Error(${JSON.stringify(sentence)})`) ||
+          preload.includes(`new Error('${sentence}')`),
+        key,
+      ).toBe(true);
+    }
   });
 
   it('each one shown on a page reads in pt-BR', () => {

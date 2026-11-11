@@ -14,7 +14,7 @@ const driverSwitch = source.slice(
   source.indexOf('export function PresetProviderMark('),
 );
 const DRIVERS = [
-  ...[...driverSwitch.matchAll(/case "([^"]+)":/g)].map((match) => match[1]!),
+  ...[...driverSwitch.matchAll(/case ['"]([^'"]+)['"]:/g)].map((match) => match[1]!),
   'anEngineWithNoMark',
 ];
 const coloured = (html: string) => /#[0-9a-f]{3,8}\b|url\(#/i.test(html);

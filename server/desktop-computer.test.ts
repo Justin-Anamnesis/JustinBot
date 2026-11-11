@@ -163,7 +163,7 @@ describe("this computer, only for the desktop app's own server", () => {
     expect(uses('desktopComputer.receive(')).toEqual(['server/index.ts']);
     const index = readFileSync(join(ROOT, 'server/index.ts'), 'utf8');
     const listener = index.slice(
-      index.indexOf('utilityParentPort?.on("message"'),
+      index.indexOf("utilityParentPort?.on('message'"),
       index.indexOf('const quickFallback'),
     );
     expect(listener).toContain('desktopComputer.receive(message)');

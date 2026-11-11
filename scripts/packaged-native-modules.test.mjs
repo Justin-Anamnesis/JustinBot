@@ -26,7 +26,7 @@ function nativelyRequired() {
   for (const file of readdirSync(join(root, 'server'), { recursive: true })) {
     if (!file.endsWith('.ts') || file.endsWith('.test.ts')) continue;
     for (const [, name] of readFileSync(join(root, 'server', file), 'utf8').matchAll(
-      /nativeRequire\([^)]*\)\(\s*"([^"]+)"\s*\)/g,
+      /nativeRequire\([^)]*\)\(\s*["']([^"']+)["']\s*\)/g,
     ))
       names.add(name);
   }

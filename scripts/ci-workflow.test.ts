@@ -211,7 +211,7 @@ describe('CI concurrency', () => {
     });
     // The script reads ci.yml's gate by its job name.
     expect(readFileSync(new URL('./release-ci.mjs', import.meta.url), 'utf8')).toContain(
-      `job.name === "${workflow.jobs.gate.name}"`,
+      `job.name === '${workflow.jobs.gate.name}'`,
     );
     // The release lane is a branch, so its runs get their own concurrency group.
     expect(workflow.on).toHaveProperty('workflow_dispatch');
@@ -230,7 +230,7 @@ describe('CI concurrency', () => {
       .filter(Boolean);
     const imports = [
       ...readFileSync(new URL('./release-ci.mjs', import.meta.url), 'utf8').matchAll(
-        /^import .* from "\.\/([^"]+)";$/gm,
+        /^import .* from '\.\/([^']+)';$/gm,
       ),
     ].map((match) => `scripts/${match[1]}`);
     expect(imports).toContain('scripts/ci-scope.mjs');
@@ -300,7 +300,7 @@ describe('CI concurrency', () => {
       expect(step.env?.OMB_VITEST_RETRY_LOG).toBe('${{ runner.temp }}/vitest-retries.jsonl');
     }
     expect(readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8')).toContain(
-      'runner: "./scripts/testing/ci-retry-runner.ts"',
+      "runner: './scripts/testing/ci-retry-runner.ts'",
     );
   });
 

@@ -240,13 +240,16 @@ describe('one name per thing', () => {
   it('copy that points at a control names it exactly as the control is labelled', () => {
     const e = en as Record<string, string>;
     const source = (file: string) => readFileSync(join(ROOT, file), 'utf8');
-    const myCloud = /CLOUD_HOME_NAME = "([^"]+)"/.exec(source('electron/cloud-home.mjs'))?.[1];
-    const thisComputer = /id: "workspace-local", label: t\("([^"]+)"\)/.exec(
+    const myCloud = /CLOUD_HOME_NAME = ['"]([^'"]+)['"]/.exec(
+      source('electron/cloud-home.mjs'),
+    )?.[1];
+    const thisComputer = /id: ['"]workspace-local['"],\s*label: t\(['"]([^'"]+)['"]\)/.exec(
       source('electron/environments.cjs'),
     )?.[1];
-    const serverMenuLocal = /\{ label: t\("([^"]+)"\), type: "radio", checked: !active/.exec(
-      source('electron/menu.mjs'),
-    )?.[1];
+    const serverMenuLocal =
+      /\{\s*label: t\(['"]([^'"]+)['"]\),\s*type: ['"]radio['"],\s*checked: !active/.exec(
+        source('electron/menu.mjs'),
+      )?.[1];
     expect([myCloud, thisComputer, serverMenuLocal]).toEqual([
       e['cloudSetup.myCloud'],
       'place.local',

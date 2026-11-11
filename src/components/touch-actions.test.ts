@@ -95,8 +95,8 @@ function classLiterals(): Literal[] {
   const found: Literal[] = [];
   for (const path of sourceFiles(srcRoot)) {
     const source = readFileSync(path, 'utf8');
-    for (const match of source.matchAll(/"([^"\n]*)"|`([^`]*)`/g)) {
-      const text = match[1] ?? match[2] ?? '';
+    for (const match of source.matchAll(/"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g)) {
+      const text = match[1] ?? match[2] ?? match[3] ?? '';
       if (!/group-hover(?:\/[\w-]+)?:/.test(text)) continue;
       found.push({
         file: relative(srcRoot, path).split('\\').join('/'),

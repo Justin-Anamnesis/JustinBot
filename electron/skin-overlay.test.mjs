@@ -25,7 +25,7 @@ function cssToken(skin, name) {
 describe('skin overlay chrome', () => {
   it('covers exactly the skins the renderer ships', () => {
     // SKIN_IDS (src/lib/skins.ts) is the source of truth: a skin without a chrome entry keeps the previous caption colour.
-    const registered = [...skinIds.matchAll(/"([a-z-]+)"/g)]
+    const registered = [...skinIds.matchAll(/["']([a-z-]+)["']/g)]
       .map(([, id]) => id)
       .filter((id) => css.includes(`[data-skin="${id}"]`));
     expect(new Set(registered)).toEqual(new Set(Object.keys(SKIN_CHROME)));

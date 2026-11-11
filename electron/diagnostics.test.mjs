@@ -24,7 +24,7 @@ describe('credential env parity with server/credential-env.ts', () => {
     const config = readFileSync(new URL('../server/credential-env.ts', import.meta.url), 'utf8');
     const match = config.match(/WORKSPACE_CREDENTIAL_ENV = \[([\s\S]*?)\] as const/);
     expect(match).not.toBeNull();
-    const names = [...match[1].matchAll(/"([A-Z0-9_]+)"/g)].map((m) => m[1]);
+    const names = [...match[1].matchAll(/["']([A-Z0-9_]+)["']/g)].map((m) => m[1]);
     expect(CREDENTIAL_ENV_NAMES).toEqual(names);
   });
 });

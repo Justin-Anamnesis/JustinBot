@@ -22,7 +22,9 @@ it('keeps no Data string that nothing reads', () => {
     .filter((key) => key.startsWith('data.'))
     .filter((key) => {
       const parent = key.slice(0, key.lastIndexOf('.') + 1);
-      return !code.includes(`"${key}"`) && !code.includes(`\`${parent}\${`);
+      return (
+        !code.includes(`"${key}"`) && !code.includes(`'${key}'`) && !code.includes(`\`${parent}\${`)
+      );
     });
   expect(unread).toEqual([]);
 });

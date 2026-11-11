@@ -23,6 +23,10 @@ const EXCLUDED_DIRECTORIES = [
   'justin',
 ];
 
+// 生成器的产物：上游测试会重跑生成器并与仓里的文件逐字比对（scripts/mascot-bodies/*.test.mjs），
+// 格式化后对不上，所以保持生成器的原始输出。
+const EXCLUDED_FILES = ['shared/mascot-bodies.ts', 'shared/carved-bodies.ts'];
+
 // prettier 单次运行不保证收敛（2026-11-11 实测：第一遍后仍有 57 个文件会再变），第二遍稳定；留一遍余量。
 const MAX_PASSES = 3;
 
@@ -40,6 +44,7 @@ function didPrettierPass(directory: string, mode: '--check' | '--write'): boolea
       'warn',
       `**/*.{${CODE_EXTENSIONS.join(',')}}`,
       ...EXCLUDED_DIRECTORIES.map((excluded) => `!${excluded}/**`),
+      ...EXCLUDED_FILES.map((excluded) => `!${excluded}`),
     ],
     { cwd: directory, stdio: 'inherit' },
   );
@@ -56,7 +61,10 @@ function protectDirectives(directory: string): number {
   });
   let insertedCount = 0;
   for (const relativePath of codeFiles) {
-    if (EXCLUDED_DIRECTORIES.some((excluded) => relativePath.startsWith(`${excluded}/`))) {
+    if (
+      EXCLUDED_FILES.includes(relativePath) ||
+      EXCLUDED_DIRECTORIES.some((excluded) => relativePath.startsWith(`${excluded}/`))
+    ) {
       continue;
     }
     const filePath = path.join(directory, relativePath);

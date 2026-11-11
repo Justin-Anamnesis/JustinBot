@@ -83,7 +83,7 @@ describe('RawMarkdownView', () => {
 
   it('remounts the message boundary when toggling away from a failed renderer', () => {
     const source = readFileSync(new URL('./ChatView.tsx', import.meta.url), 'utf8');
-    expect(source).toContain('<MessageBoundary key={viewRaw ? "raw" : "rendered"}');
+    expect(source).toMatch(/<MessageBoundary\s+key=\{viewRaw \? ['"]raw['"] : ['"]rendered['"]\}/);
     expect(source).toContain('<RawMarkdownView text={text} />');
   });
 });

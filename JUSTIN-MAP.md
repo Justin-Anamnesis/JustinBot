@@ -129,6 +129,9 @@
 | 2026-11-11 | `AGENTS.md` | 末尾加一行指向本文 | 各 harness 的会话自动读到 |
 | 2026-11-11 | `justin/` | 新增格式化工具目录（prettier 配置 + 格式化脚本 + 自带锁文件） | 全仓格式化与每次同步上游后的重新生成都靠它；不进根 `package.json`，免得同步时冲突 |
 | 2026-11-11 | 全仓 5952 个代码文件 | 按我们的 prettier 配置重排，由 `justin/scripts/format-source-tree.ts` 机器生成，经 `main-fmt` 分支进入 | 明昊定：项目代码用 eslint-config 的格式；不手改，每次同步上游后重新生成 |
+| 2026-11-11 | 28 个 `*.test.*` 文件 | 查找源码文本的字符串与正则改成能匹配格式化后的写法 | 上游测试把源码当文本读，格式化后 49 个失败；清单见 `git log` 里的 `test: match formatted source text` 提交 |
+| 2026-11-11 | `scripts/testing/file-size-ratchet.test.ts` | `LINES` 表按格式化后的行数重算（30 → 103 个文件） | 折行使行数增加；同步上游时这张表必冲突，重算即可 |
+| 2026-11-11 | `shared/mascot-bodies.ts`、`shared/carved-bodies.ts` | 不格式化，保持上游原样 | 生成器产物，上游测试逐字比对 |
 
 ## 常用命令
 

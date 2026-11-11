@@ -55,7 +55,9 @@ describe('every credential has one home on the keys page', () => {
 
   it('covers every key the desktop keeps in its encrypted store, saving the ones with a row through that store', () => {
     const stored = [
-      ...electron('workspace-credentials.mjs').matchAll(/name: "(\w+)", env: "(\w+)"/g),
+      ...electron('workspace-credentials.mjs').matchAll(
+        /name: ['"](\w+)['"],\s*env: ['"](\w+)['"]/g,
+      ),
     ].map(([, name, env]) => ({ name: name!, env: env! }));
     const patched = [
       ...electron('credential-patch.mjs').matchAll(/^ {2}(\w+): \(value\) =>/gm),

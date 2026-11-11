@@ -8,7 +8,7 @@ function expectDirAuto(file: string, marker: string) {
   const at = text.indexOf(marker);
   expect(at, `${file} missing ${marker}`).toBeGreaterThan(-1);
   const window = text.slice(Math.max(0, at - 280), at + marker.length);
-  expect(window, `${file} near ${marker}`).toContain('dir="auto"');
+  expect(window, `${file} near ${marker}`).toMatch(/dir=['"]auto['"]/);
 }
 
 describe("chat text follows the writer's direction", () => {
@@ -17,7 +17,7 @@ describe("chat text follows the writer's direction", () => {
     expectDirAuto('AskCard.tsx', 'value={value}');
     expectDirAuto('CitationUI.tsx', 'value={comment}');
     expectDirAuto('ChatFindBar.tsx', 'value={query}');
-    expectDirAuto('RawMarkdownToggle.tsx', 'data-testid="raw-markdown-view"');
+    expectDirAuto('RawMarkdownToggle.tsx', "data-testid='raw-markdown-view'");
     expectDirAuto('RoomBulletin.tsx', 'value={bulletin.draft}');
     expectDirAuto('RoomBulletin.tsx', 'group.bulletin.split');
     expectDirAuto('room-panel/RoomPanel.tsx', 'value={bulletin.draft}');
@@ -26,10 +26,10 @@ describe("chat text follows the writer's direction", () => {
     expectDirAuto('SearchResults.tsx', 'line-clamp-2');
 
     const quotes =
-      source('CitationUI.tsx').match(/<pre dir="auto"[^>]*>\{citation\.quote\}/g) ?? [];
+      source('CitationUI.tsx').match(/<pre\s+dir=['"]auto['"][^>]*>\s*\{citation\.quote\}/g) ?? [];
     expect(quotes).toHaveLength(2);
     const pins = [source('ChatPinnedBanner.tsx'), source('GroupView.tsx')].map((text) =>
-      text.includes('dir="auto" className="truncate text-[13px] text-ink-secondary"'),
+      /dir=['"]auto['"]\s+className=['"]truncate text-\[13px\] text-ink-secondary['"]/.test(text),
     );
     expect(pins).toEqual([true, true]);
   });

@@ -58,7 +58,7 @@ const hostedSource = readFileSync(
 // Only constants named in the public handler's accepted-path guard are routes.
 // Outbound post("/api/handoff/...") calls belong to the identity service, not us.
 const hostedConstants = new Map(
-  [...hostedSource.matchAll(/const ([A-Z_]+) = "(\/api\/[^"\n]+)";/g)].map((match) => [
+  [...hostedSource.matchAll(/const ([A-Z_]+) = ["'](\/api\/[^"'\n]+)["'];/g)].map((match) => [
     match[1]!,
     match[2]!,
   ]),
@@ -119,11 +119,16 @@ describe('docs/verification recipes cite things that exist', () => {
       const segments = path.split('/').slice(1);
       const literal = segments.findIndex((segment) => PLACEHOLDER.test(segment));
       if (literal === -1)
-        return source.includes(`"${path}"`) || routePatterns.some((pattern) => pattern.test(path));
+        return (
+          source.includes(`"${path}"`) ||
+          source.includes(`'${path}'`) ||
+          routePatterns.some((pattern) => pattern.test(path))
+        );
       // a placeholder path is known by its first two segments
       const prefix = `/${segments.slice(0, Math.min(2, literal)).join('/')}`;
       return (
         source.includes(`"${prefix}`) ||
+        source.includes(`'${prefix}`) ||
         source.includes(`${prefix}/`) ||
         routePatterns.some((pattern) =>
           pattern.test(

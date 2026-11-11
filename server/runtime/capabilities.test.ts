@@ -144,7 +144,8 @@ describe('replaysTranscriptNatively', () => {
     const text = readFileSync(file, 'utf8');
     if (!text.includes('createOpenAIChatRuntime(')) return [];
     const kind =
-      /driverKind: "([^"]+)"/.exec(text)?.[1] ?? /DRIVER_KIND = "([^"]+)"/.exec(text)?.[1];
+      /driverKind: ["']([^"']+)["']/.exec(text)?.[1] ??
+      /DRIVER_KIND = ["']([^"']+)["']/.exec(text)?.[1];
     expect(
       kind,
       `${file} calls createOpenAIChatRuntime but declares no readable driverKind`,

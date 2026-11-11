@@ -53,8 +53,8 @@ describe('host setup', () => {
       new URL('../../../src/lib/browser-stream-client.ts', import.meta.url),
       'utf8',
     );
-    expect(viewer).toContain(`"${SANDBOX_STEPS_URL}"`);
-    expect(viewer).toContain(`"${LIBRARIES_COMMAND}"`);
+    expect(viewer).toContain(`'${SANDBOX_STEPS_URL}'`);
+    expect(viewer).toContain(`'${LIBRARIES_COMMAND}'`);
     expect(LIBRARIES_COMMAND).toBe('sudo openmausbot browser install --with-deps');
     expect(new BrowserHostError('libraries', ['libnss3.so']).message).toContain(LIBRARIES_COMMAND);
     expect(

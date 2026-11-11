@@ -833,8 +833,8 @@ function importClosure(entries: string[]) {
 describe("the repository's import graph", () => {
   it('lists every renderer file the server, Electron, the companion, evals, the workers or the macOS frame smoke load', () => {
     const frameSmoke = readFileSync(join(ROOT, 'scripts/smoke-app-frames.mjs'), 'utf8');
-    expect(frameSmoke).toContain('resolveDir: join(ROOT, "src/components/app")');
-    expect(frameSmoke).toContain('from \\"./app-frame-host.ts\\"');
+    expect(frameSmoke).toContain("resolveDir: join(ROOT, 'src/components/app')");
+    expect(frameSmoke).toContain('from "./app-frame-host.ts"');
     const runtime = [
       'server',
       'shared',

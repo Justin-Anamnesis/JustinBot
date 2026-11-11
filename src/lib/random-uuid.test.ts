@@ -40,11 +40,12 @@ describe('browser code', () => {
         else if (/\.tsx?$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
           readFileSync(path, 'utf8')
             .split('\n')
-            .forEach((line, index) => {
-              if (
-                /(?<![?.])\bcrypto\.randomUUID\(\)/.test(line) &&
-                !/typeof crypto\?\.randomUUID/.test(line)
-              )
+            .forEach((line, index, lines) => {
+              // A formatter may put the typeof guard on the line(s) above the call.
+              const guarded = lines
+                .slice(Math.max(0, index - 2), index + 1)
+                .some((near) => /typeof crypto\?\.randomUUID/.test(near));
+              if (/(?<![?.])\bcrypto\.randomUUID\(\)/.test(line) && !guarded)
                 offenders.push(`${path.slice(src.length + 1)}:${index + 1}`);
             });
         }
