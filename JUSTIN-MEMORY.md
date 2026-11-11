@@ -17,12 +17,16 @@
 | 分支 | 用途 | 规则 |
 | --- | --- | --- |
 | `main` | 跟上游同步 | 只做 fast-forward，不放任何我们的提交 |
-| `main-fmt` | 上游代码按我们的格式重排后的镜像 | 只放机器生成的提交，不手改；worktree 在 `/Users/mac/Desktop/Study/.tmp/worktrees/JustinBot/main-fmt` |
-| `justin-main` | 我们的改造主线 | 所有改动在这里；上游的变化只从 `main-fmt` 合进来，取不取由我们定 |
+| `main-fmt` | 适配层：上游代码按我们的格式重排，加上与需求无关的适配 | 放格式化提交、格式化工具（`justin/`）、地图与记忆文件、工程配置类适配；worktree 在 `/Users/mac/Desktop/Study/.tmp/worktrees/JustinBot/main-fmt` |
+| `justin-main` | 需求改造主线 | 只放需求改动；从 `main-fmt` 合入，取不取上游的变化由我们定 |
 
-（明昊，2026-11-11：「保留 main 用于 sync fork 最新的变化，justin-main 我们实际确定用不用这些变化」；同日批准全仓格式化与 `main-fmt` 中间分支）
+（明昊，2026-11-11：「保留 main 用于 sync fork 最新的变化，justin-main 我们实际确定用不用这些变化」；同日批准全仓格式化与 `main-fmt` 中间分支；同日定：适配直接在 `main-fmt` 做好，让 `justin-main` 只关注需求）
+
+一处改动放哪边：不依赖任何需求、换一个需求也照样要有的（格式、工具、文档、工程配置）放 `main-fmt`；为某个需求改的放 `justin-main`。
 
 为什么要 `main-fmt`：全仓代码按我们的 prettier 配置重排后，直接把 `main` 合进 `justin-main` 会让每个文件都冲突。先把上游的新代码也重排成同一格式再合，冲突只剩两边真正改到同一处的地方。
+
+`main-fmt` 上有手改的提交，所以同步时不能直接用上游内容覆盖它。做法是另生成一个「纯格式化提交」（只含上游代码重排，父提交是上一个纯格式化提交），再把它合进 `main-fmt`。纯格式化提交不单独建分支，sha 记在下面的同步表里。
 
 同步上游，分三步。
 
@@ -35,17 +39,22 @@ git merge --ff-only upstream/main
 git push origin main
 ```
 
-第二步，在 `main-fmt` 的 worktree 里生成「新上游的格式化版」。提交要以上一个 `main-fmt` 提交为父，这样下一步合并的基准才是格式化过的旧代码：
+第二步，在 `main-fmt` 的 worktree 里生成新的纯格式化提交，再合进 `main-fmt`。新提交以上一个纯格式化提交（同步表最后一行）为父，合并的基准才是格式化过的旧上游代码：
 
 ```
 cd /Users/mac/Desktop/Study/.tmp/worktrees/JustinBot/main-fmt
+git switch --detach <上一个纯格式化提交>
 git merge -s ours --no-commit main          # 记下 main 为父提交，暂不取内容
 git read-tree -u --reset main               # 工作区与暂存区换成 main 的内容
 node /Users/mac/Desktop/Study/JustinBot/justin/scripts/format-source-tree.ts "$PWD"
 git add -A && git commit -m "style: format upstream <短 sha> (generated)"
+git rev-parse --short HEAD                  # 新的纯格式化提交，记进同步表
+git switch main-fmt && git merge <新的纯格式化提交>
 ```
 
-第三步，看新增了什么，决定取到哪个提交，再合进 `justin-main`：
+格式化脚本从主工作区（`/Users/mac/Desktop/Study/JustinBot`，依赖装在那里的 `justin/node_modules`）调用；主工作区所在分支要含 `justin/`。
+
+第三步，看新增了什么，再合进 `justin-main`：
 
 ```
 git log --oneline justin-main..main-fmt
@@ -54,7 +63,7 @@ git switch justin-main && git merge main-fmt
 
 第二步的命令是按 git 语义写的，第一次真实同步时要验证一遍（2026-11-11 只做过从零生成，没做过增量同步）。上游提交很密（2026-11-07 到 11-10 发了 5 个版本），逐个 cherry-pick 不现实；Justin 的建议是按「合并到某个上游提交为止」来取，并在下表记下取到哪。
 
-| 日期 | `justin-main` 已含上游到 | 对应 `main-fmt` 提交 | 备注 |
+| 日期 | 上游提交 | 纯格式化提交 | 备注 |
 | --- | --- | --- | --- |
 | 2026-11-11 | `2e1ff4bc0` | `097ce520b` | 首次全仓格式化 |
 
@@ -65,7 +74,14 @@ git switch justin-main && git merge main-fmt
 - 现状：我们的 ESLint 预设目前只对 `justin/` 下的代码强制通过。上游代码只做了格式化，没有做 `eslint --fix`，也没有清 lint 错误。
 - 上游自己的 `pnpm lint`（oxlint）仍留在仓里，格式化后的代码能过（2026-11-11 实测退出码 0）。上游文件里的 `eslint-disable-next-line` / `oxlint-disable-next-line` 指令上方都加了 `// prettier-ignore`，否则折行后指令失效（实测会多出 17 条警告）。
 
-首次格式化的验证（2026-11-11）：5952 个文件逐个比对格式化前后的语法树，5949 个完全一致；另 3 个的差异是去掉一个空语句和把 `a ?? (b ?? c)` 写成 `a ?? b ?? c`，语义相同。没验证的：全量依赖没装，上游的 `pnpm typecheck` 与测试没跑。
+首次格式化的验证（2026-11-11）：5952 个文件逐个比对格式化前后的语法树，5949 个完全一致；另 3 个的差异是去掉一个空语句和把 `a ?? (b ?? c)` 写成 `a ?? b ?? c`，语义相同。
+
+装全量依赖后的验证（2026-11-11，`node_modules` 2.3G；安装时带 `OMB_SKIP_HOOKS=1`，否则上游的 prepare 脚本会把本仓 `core.hooksPath` 改成 `scripts/git-hooks`，盖掉明昊的全局 hooks）：
+
+- 上游 `pnpm typecheck` 通过，`pnpm lint` 通过。
+- 单元测试（排除 e2e，2238 个文件 32270 个测试，`OMB_VITEST_WORKERS=4`，约 16 分钟）：61 个失败。同一批文件在未格式化的 `main` 上有 13 个失败（与格式无关，属本机环境）。差出来的 49 个测试分布在 32 个文件，是格式化造成的：上游有一类测试把源码当文本读，用字符串或正则查找特定写法（双引号、单行），格式化后对不上。抽查 17 个，16 个属此类，1 个是超时。清单在 `/tmp/overview-review/fail-caused.txt`（临时位置）。怎么处理待明昊定。
+- e2e 测试（378 个文件）没跑。上游默认一次只跑一个文件，全量串行要 2 小时以上。
+- 未格式化的基线 worktree 在 `/Users/mac/Desktop/Study/.tmp/worktrees/JustinBot/main`，`node_modules` 软链到主工作区，用来对照「格式化前是否就失败」。
 
 ## 改动约定
 
