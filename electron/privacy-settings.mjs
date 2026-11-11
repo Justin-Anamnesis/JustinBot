@@ -1,10 +1,10 @@
 // macOS's own privacy permissions: asking for the microphone, and the System Settings pane for each permission.
 
 const PANES = Object.freeze({
-  mic: "Privacy_Microphone",
-  screen: "Privacy_ScreenCapture",
-  speech: "Privacy_SpeechRecognition",
-  accessibility: "Privacy_Accessibility",
+  mic: 'Privacy_Microphone',
+  screen: 'Privacy_ScreenCapture',
+  speech: 'Privacy_SpeechRecognition',
+  accessibility: 'Privacy_Accessibility',
 });
 
 /** A permission's pane in System Settings → Privacy & Security, or the section itself for any other name: macOS never
@@ -12,7 +12,7 @@ const PANES = Object.freeze({
 export function openPrivacySettings(pane, { available, openExternal }) {
   if (!available) return false;
   // Own-property lookup: "__proto__" or "constructor" must not resolve up the prototype chain.
-  const anchor = Object.hasOwn(PANES, pane) ? PANES[pane] : "Privacy";
+  const anchor = Object.hasOwn(PANES, pane) ? PANES[pane] : 'Privacy';
   return openExternal(`x-apple.systempreferences:com.apple.preference.security?${anchor}`);
 }
 
@@ -20,7 +20,7 @@ export function openPrivacySettings(pane, { available, openExternal }) {
 export async function askForMicrophone({ available, systemPreferences }) {
   if (!available) return false;
   try {
-    return await systemPreferences.askForMediaAccess("microphone");
+    return await systemPreferences.askForMediaAccess('microphone');
   } catch {
     return false;
   }

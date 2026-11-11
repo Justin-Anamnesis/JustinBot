@@ -1,7 +1,11 @@
-import nativeText from "./native-text.cjs";
+import nativeText from './native-text.cjs';
 
 export function updateWords(key, params) {
-  return { message: nativeText.englishText.t(key, params), messageKey: key, ...(params ? { messageParams: params } : {}) };
+  return {
+    message: nativeText.englishText.t(key, params),
+    messageKey: key,
+    ...(params ? { messageParams: params } : {}),
+  };
 }
 
 export function installDetail(key, params) {
@@ -10,5 +14,10 @@ export function installDetail(key, params) {
 }
 
 export function detailFields(result) {
-  return result?.detailKey ? { messageKey: result.detailKey, ...(result.detailParams ? { messageParams: result.detailParams } : {}) } : {};
+  return result?.detailKey
+    ? {
+        messageKey: result.detailKey,
+        ...(result.detailParams ? { messageParams: result.detailParams } : {}),
+      }
+    : {};
 }

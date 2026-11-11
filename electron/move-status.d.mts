@@ -1,6 +1,17 @@
-import type { MoveFailureCode, MoveFailurePhase } from "./move-failure.mjs";
+import type { MoveFailureCode, MoveFailurePhase } from './move-failure.mjs';
 
-export type MovePhase = "none" | "copy" | "wait" | "freeze" | "final" | "check" | "switch" | "done" | "keeping" | "home-again" | "back";
+export type MovePhase =
+  | 'none'
+  | 'copy'
+  | 'wait'
+  | 'freeze'
+  | 'final'
+  | 'check'
+  | 'switch'
+  | 'done'
+  | 'keeping'
+  | 'home-again'
+  | 'back';
 /**
  * What holds the move now. Before any move starts (phase `none`, or `back` from an earlier one): `signed_out` (no MausBot
  * Cloud sign-in), `not_verified` (signed in, but the Admin's word on it isn't current: unreachable, expired or ended),
@@ -14,8 +25,24 @@ export type MovePhase = "none" | "copy" | "wait" | "freeze" | "final" | "check" 
  * goes again at `retryAt`), `waiting_quiet` (someone used this computer in the last 30 s), `waiting_busy` (work under way
  * here holds the freeze: `busy` says what kind), and the start reasons that can stop one under way.
  */
-export type MoveReason = "signed_out" | "not_verified" | "no_cloud" | "team_only" | "cloud_not_ready" | "cloud_ended" | "moves_off" | "keep_here" | "other_account"
-  | "frozen_without_move" | "local_unavailable" | "already_moved" | "cloud_outdated" | "thaw_failed" | "retry_wait" | "waiting_quiet" | "waiting_busy";
+export type MoveReason =
+  | 'signed_out'
+  | 'not_verified'
+  | 'no_cloud'
+  | 'team_only'
+  | 'cloud_not_ready'
+  | 'cloud_ended'
+  | 'moves_off'
+  | 'keep_here'
+  | 'other_account'
+  | 'frozen_without_move'
+  | 'local_unavailable'
+  | 'already_moved'
+  | 'cloud_outdated'
+  | 'thaw_failed'
+  | 'retry_wait'
+  | 'waiting_quiet'
+  | 'waiting_busy';
 
 /** POST /api/cloud/desktop/move-status's body: epoch ms throughout, null for "not known" or "not now". */
 export interface MoveStatusReport {
@@ -32,18 +59,25 @@ export interface MoveStatusReport {
   passes: number | null;
   retryAt: number | null;
   /** With `waiting_busy`: the kind of work that holds the freeze, never its name. */
-  busy: "bot" | "room" | "sign-in" | "other" | null;
+  busy: 'bot' | 'room' | 'sign-in' | 'other' | null;
   /** The Cloud's state as this app's session reads it ("ready", "provisioning", "stopped", …); null without a Cloud. */
   cloudState: string | null;
   /** The move's last failed pass, until it is done: where (null for a journal from before failures had codes), why, the
    * journal's sentence with names, quotes, paths, addresses and tokens taken out, how many and since when. */
-  failure: { phase: MoveFailurePhase | null; code: MoveFailureCode; message: string | null; count: number; since: number | null; at: number | null } | null;
+  failure: {
+    phase: MoveFailurePhase | null;
+    code: MoveFailureCode;
+    message: string | null;
+    count: number;
+    since: number | null;
+    at: number | null;
+  } | null;
 }
 
 export declare const MOVE_STATUS_VERSION: 1;
 export declare const MOVE_PHASES: readonly MovePhase[];
 export declare const MOVE_REASONS: readonly MoveReason[];
-export declare const MOVE_BUSY: readonly ("bot" | "room" | "sign-in" | "other")[];
+export declare const MOVE_BUSY: readonly ('bot' | 'room' | 'sign-in' | 'other')[];
 export declare const MOVE_STATUS_HEARTBEAT_MS: number;
 export declare const MOVE_STATUS_SETTLE_MS: number;
 export declare const MOVE_STATUS_GAP_MS: number;

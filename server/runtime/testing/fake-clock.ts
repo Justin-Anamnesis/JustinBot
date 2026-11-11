@@ -1,4 +1,4 @@
-import type { Clock } from "../types.ts";
+import type { Clock } from '../types.ts';
 
 export class FakeClock implements Clock {
   #now: number;

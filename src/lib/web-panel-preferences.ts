@@ -1,8 +1,8 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import { parseWebPanels, type WebPanel } from "./web-panels";
+import { parseWebPanels, type WebPanel } from './web-panels';
 
-export const WEB_PANELS_KEY = "omb-web-panels";
+export const WEB_PANELS_KEY = 'omb-web-panels';
 
 // Same shape as thread-preferences: a renderer preference that survives
 // blocked storage for this session and follows other windows' edits.
@@ -50,10 +50,12 @@ function onStorage(event: StorageEvent) {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (listeners.size === 1 && typeof window !== "undefined") window.addEventListener("storage", onStorage);
+  if (listeners.size === 1 && typeof window !== 'undefined')
+    window.addEventListener('storage', onStorage);
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && typeof window !== "undefined") window.removeEventListener("storage", onStorage);
+    if (listeners.size === 0 && typeof window !== 'undefined')
+      window.removeEventListener('storage', onStorage);
   };
 }
 

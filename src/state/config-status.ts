@@ -1,20 +1,37 @@
 // What GET /api/config tells the app about the server and its settings (re-exported by store.tsx).
-import type { EffortLevel, LiveSettings } from "../../shared/wire";
-import type { ImageProvider } from "../../shared/image-generation";
-import type { OnboardingStatus } from "@/lib/onboarding";
-import type { ModelSelection } from "./store";
+import type { EffortLevel, LiveSettings } from '../../shared/wire';
+import type { ImageProvider } from '../../shared/image-generation';
+import type { OnboardingStatus } from '@/lib/onboarding';
+import type { ModelSelection } from './store';
 
 /** A saved credential: whether it is set and, for admins, its last four characters. The key itself never comes back. */
-export interface SavedKey { configured: boolean; last4?: string }
+export interface SavedKey {
+  configured: boolean;
+  last4?: string;
+}
 
-export type NestedKeyName = "ttsKey" | "fishAudioKey" | "geminiTtsKey" | "jevApiKey" | "openrouterDeciderKey" | "workersAiToken" | "openaiImageApiKey" | "customImageApiKey" | "openaiLiveKey" | "geminiImageApiKey";
+export type NestedKeyName =
+  | 'ttsKey'
+  | 'fishAudioKey'
+  | 'geminiTtsKey'
+  | 'jevApiKey'
+  | 'openrouterDeciderKey'
+  | 'workersAiToken'
+  | 'openaiImageApiKey'
+  | 'customImageApiKey'
+  | 'openaiLiveKey'
+  | 'geminiImageApiKey';
 
-export interface ImageSlotStatus { provider: ImageProvider; model: string; configured: boolean }
+export interface ImageSlotStatus {
+  provider: ImageProvider;
+  model: string;
+  configured: boolean;
+}
 
 /** GET /api/config — configured flags only; secrets are never echoed. */
 export interface ConfigStatus {
   /** The workspace's banner picture (GET /api/workspace/banner), by a version that changes with it; null without one. */
-  workspaceBanner?: import("@/lib/place-banner").BannerSummary | null;
+  workspaceBanner?: import('@/lib/place-banner').BannerSummary | null;
   xai?: SavedKey;
   mistral?: SavedKey;
   cerebras?: SavedKey;
@@ -39,15 +56,21 @@ export interface ConfigStatus {
    * `license` reaches admins only, and only while the key is inside its
    * warning window or grace period. */
   edition?: {
-    edition: "oss" | "enterprise";
+    edition: 'oss' | 'enterprise';
     features: string[];
     license?: { expiresAt: string; expiresInDays: number; graceEndsAt?: string };
   };
   /** a fleet agent exists on this server (Settings → Workspaces) */
   fleet?: { available: boolean };
   budgets?: { monthlyUsd?: number; warnAtPercent?: number };
-  billing?: { currency?: string; prices?: Record<string, { inputPerMillion: number; outputPerMillion: number; cachedInputPerMillion?: number }> };
-  composio: SavedKey & { mode?: "managed" | "self-hosted" | "unavailable" };
+  billing?: {
+    currency?: string;
+    prices?: Record<
+      string,
+      { inputPerMillion: number; outputPerMillion: number; cachedInputPerMillion?: number }
+    >;
+  };
+  composio: SavedKey & { mode?: 'managed' | 'self-hosted' | 'unavailable' };
   /** `included`: cloud computers come with Cloud Pro, no key is saved. */
   box: SavedKey & { included?: boolean };
   vps: { configured: boolean; sshAlias: string };
@@ -64,16 +87,30 @@ export interface ConfigStatus {
   /** A task on this Cloud is waiting for memory right now. */
   waitingForRoom?: boolean;
   /** On Starter: the turns it runs at once and the hand-offs it holds waiting, and when work was last refused for a limit. */
-  planTurns?: { running: number; waiting: number; refusedAt?: number; refused?: "tasks" | "paused" };
+  planTurns?: {
+    running: number;
+    waiting: number;
+    refusedAt?: number;
+    refused?: 'tasks' | 'paused';
+  };
   /** On Starter: how many bots stay awake; absent when every bot does. */
   awakeLimit?: number;
   /** Bots paused for the plan's limit: kept, but taking no turns. */
   pausedBots?: string[];
-  threads?: { maxConcurrentPerBot: number; eventLogMaxBytes?: number; eventLogRetentionDays?: number };
+  threads?: {
+    maxConcurrentPerBot: number;
+    eventLogMaxBytes?: number;
+    eventLogRetentionDays?: number;
+  };
   automaticRecovery?: { enabled: boolean; backup?: ModelSelection };
   /** Prompt-cache keep-warm for idle Claude threads. Absent from older servers. */
   cacheKeepWarm?: { enabled: boolean; windowMinutes: number };
-  localVm: { mode: "shared" | "per-bot" | "pool"; maxInstances: number; idleTimeoutMinutes?: number; preserveInstalledApps?: boolean };
+  localVm: {
+    mode: 'shared' | 'per-bot' | 'pool';
+    maxInstances: number;
+    idleTimeoutMinutes?: number;
+    preserveInstalledApps?: boolean;
+  };
   /** `providerKeys`: names of the keys saved for OpenCode's other
    * providers, never the keys. */
   opencodeGo?: SavedKey & { providerKeys?: string[] };
@@ -85,13 +122,13 @@ export interface ConfigStatus {
     configured: boolean;
     ready: boolean;
     voice: string;
-    provider?: "elevenlabs" | "fish" | "system" | "chatterbox" | "xai" | "gemini" | "openai";
+    provider?: 'elevenlabs' | 'fish' | 'system' | 'chatterbox' | 'xai' | 'gemini' | 'openai';
     baseUrl?: string;
     model?: string;
     /** Voice note with every reply, for every bot without its own choice. Absent from older servers. */
     everyReply?: boolean;
     /** Fish Audio speech model; present only while Fish is the provider. */
-    fishModel?: "s2.1-pro" | "s2.1-pro-free";
+    fishModel?: 's2.1-pro' | 's2.1-pro-free';
     /** ElevenLabs voice comes with Cloud Pro; no key is saved. */
     included?: boolean;
   };
@@ -101,11 +138,11 @@ export interface ConfigStatus {
    * saved. OpenRouter only: `keySource` says which key is in use (its own, or
    * the one under Settings → API keys); `sharedKey`: that one is on file. */
   decider?: {
-    provider: "jev" | "workersai" | "openrouter";
+    provider: 'jev' | 'workersai' | 'openrouter';
     /** The OpenRouter model in use; present only while OpenRouter is the provider. */
     model?: string;
     configured: boolean;
-    keySource?: "own" | "shared";
+    keySource?: 'own' | 'shared';
     sharedKey?: boolean;
     included?: boolean;
     enabled: boolean;
@@ -116,7 +153,11 @@ export interface ConfigStatus {
     own: { jev: boolean; workersAi: boolean; openrouter: boolean };
     sharedKey?: boolean;
     workersAiAccountId?: string;
-    extraction: { provider?: "jev" | "workersai" | "openrouter"; included?: boolean; ready: boolean };
+    extraction: {
+      provider?: 'jev' | 'workersai' | 'openrouter';
+      included?: boolean;
+      ready: boolean;
+    };
   };
   /** Live calls (OpenAI GPT-Live): configured-or-not, never the key. */
   live?: LiveSettings;
@@ -147,7 +188,21 @@ export interface ConfigStatus {
   /** What a paired phone calls this computer; "" uses the default. */
   computerName?: string;
   /** Opt-in flags. Absent means off. */
-  features?: { skillAuthoring: boolean; skillReview?: boolean; skillReviewSteps?: number; showToolCalls?: boolean; browser?: boolean; sharedComputers?: boolean; claudeUserMcp?: boolean; llmThreadTitles?: boolean; skillsLibrary?: boolean; shareLearnedSkills?: "off" | "ask" | "auto"; roomMemoryCapture?: boolean; savedSteps?: boolean; savedStepsHere?: boolean };
+  features?: {
+    skillAuthoring: boolean;
+    skillReview?: boolean;
+    skillReviewSteps?: number;
+    showToolCalls?: boolean;
+    browser?: boolean;
+    sharedComputers?: boolean;
+    claudeUserMcp?: boolean;
+    llmThreadTitles?: boolean;
+    skillsLibrary?: boolean;
+    shareLearnedSkills?: 'off' | 'ask' | 'auto';
+    roomMemoryCapture?: boolean;
+    savedSteps?: boolean;
+    savedStepsHere?: boolean;
+  };
   /** First-run progress: whether the welcome tour was finished and which
    * one-time hints were dismissed. Server-owned so it follows the workspace. */
   onboarding?: OnboardingStatus;
@@ -171,7 +226,7 @@ export interface ManagedPolicySummary {
   organizationName: string;
   version: number;
   companyModelsOnly: boolean;
-  allowedEngines: "all" | string[];
+  allowedEngines: 'all' | string[];
   mcp: { allowCustom: boolean; allowlist: string[] };
   computers: { thisComputer: boolean; localVm: boolean; box: boolean; vps: boolean };
   remoteAccess: boolean;
@@ -182,7 +237,7 @@ export interface ManagedPolicySummary {
 }
 
 export interface BrowserEngineSummary {
-  kind: "engine" | "unavailable";
+  kind: 'engine' | 'unavailable';
   reason?: string;
   installable?: boolean;
   version?: string;
@@ -195,11 +250,11 @@ export interface BrowserEngineSummary {
    * Chrome: only where the bots run on their computer (the desktop app). */
   myChrome?: boolean;
   /** On My Cloud, the computer that lends its Chrome. */
-  myChromeOn?: { name: string; device: "PC" | "Mac" | "computer"; online: boolean };
+  myChromeOn?: { name: string; device: 'PC' | 'Mac' | 'computer'; online: boolean };
   /** On My Cloud with no computer lending Chrome: it can be lent from the desktop app. */
   myChromeLendable?: true;
   /** browserEngine.engine: "chrome" when the bots' browsers run on OpenMausBot's own Chrome driver. */
-  engine?: "agent-browser" | "chrome";
+  engine?: 'agent-browser' | 'chrome';
   /** Self-hosted servers only: whether bots' browsers may open this server's own sites and its local network
    * (browserEngine.egress.localNetwork, off by default). Absent on the desktop and on MausBot Cloud. */
   serverSites?: boolean;
@@ -210,7 +265,7 @@ export interface BrowserProfile {
   name: string;
   /** "chrome": the profile's bots use the person's own Chrome (My Chrome).
    * Absent is the built-in browser. */
-  browser?: "chrome";
+  browser?: 'chrome';
   /** Read-only durable Electron routing inherited from legacy profiles.
    * Config PATCH payloads must omit it. */
   partitionId?: string;

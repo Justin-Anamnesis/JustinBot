@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useState, useSyncExternalStore, type SetStateAction } from "react";
-import type { FollowUp } from "../../shared/follow-up.js";
-import { isAttachment, type Attachment } from "./composer-attachments.js";
+import { useCallback, useEffect, useState, useSyncExternalStore, type SetStateAction } from 'react';
+import type { FollowUp } from '../../shared/follow-up.js';
+import { isAttachment, type Attachment } from './composer-attachments.js';
 
-const KEY = "omb-drafts";
-const ATTACHMENTS_KEY = "omb-draft-attachments";
-const SEND_IDS_KEY = "omb-draft-send-ids";
-const CHANNEL_MODES_KEY = "omb-draft-channel-modes";
+const KEY = 'omb-drafts';
+const ATTACHMENTS_KEY = 'omb-draft-attachments';
+const SEND_IDS_KEY = 'omb-draft-send-ids';
+const CHANNEL_MODES_KEY = 'omb-draft-channel-modes';
 // Outside React, so a late failure from an unmounted composer cannot overwrite a newer draft.
 const draftRevisions = new Map<string, number>();
 const replyDrafts = new Map<string, string>();
-type ChannelMode = "chat" | "goal";
+type ChannelMode = 'chat' | 'goal';
 type DraftRestore = { text: string; attachments: Attachment[]; channelMode?: ChannelMode };
 type DraftRestoreListener = (draft: DraftRestore) => void;
 const restoreListeners = new Map<string, Set<DraftRestoreListener>>();
@@ -23,12 +23,12 @@ export interface FailedComposerSend {
   requestText: string;
   replyToId?: string;
   threadId: string;
-  channelMode?: "chat" | "goal";
+  channelMode?: 'chat' | 'goal';
   /** Bot ids picked from the @ list. */
   mentions?: string[];
   followUp?: FollowUp;
 }
-type FailedComposerSendInput = Omit<FailedComposerSend, "id">;
+type FailedComposerSendInput = Omit<FailedComposerSend, 'id'>;
 export interface ComposerSendSnapshot extends FailedComposerSendInput {
   draftId: string;
   revision: number;
@@ -41,7 +41,7 @@ const restoredSends = new Map<string, RestoredSend>();
 let failedSendSequence = 0;
 
 type Values = Record<string, unknown>;
-type Store = Pick<Storage, "getItem" | "setItem"> | undefined;
+type Store = Pick<Storage, 'getItem' | 'setItem'> | undefined;
 
 // localStorage can be unavailable or reject writes (private browsing, a full quota); memory answers every read.
 const fallbackTextDrafts = new Map<string, string>();
@@ -69,7 +69,7 @@ function read(store: Store, key: string): Values {
   try {
     const raw = store?.getItem(key);
     const parsed = raw ? JSON.parse(raw) : null;
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Values) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Values) : {};
   } catch {
     return {};
   }
@@ -79,7 +79,7 @@ export function getDraft(store: Store, id: string): string {
   const memory = memoryFor(store, textDraftsByStore, fallbackTextDrafts);
   if (memory.has(id)) return memory.get(id)!;
   const text = read(store, KEY)[id];
-  const value = typeof text === "string" ? text : "";
+  const value = typeof text === 'string' ? text : '';
   memory.set(id, value);
   return value;
 }
@@ -93,8 +93,8 @@ const SAVE_DELAY_MS = 500;
 const unsavedDrafts = new Map<NonNullable<Store>, Set<string>>();
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 const page = (globalThis as { window?: Partial<EventTarget> }).window;
-page?.addEventListener?.("blur", saveDrafts);
-page?.addEventListener?.("pagehide", saveDrafts);
+page?.addEventListener?.('blur', saveDrafts);
+page?.addEventListener?.('pagehide', saveDrafts);
 
 function saveDraftLater(store: NonNullable<Store>, id: string): void {
   const ids = unsavedDrafts.get(store) ?? new Set<string>();
@@ -117,15 +117,14 @@ function saveDrafts(): void {
     try {
       store.setItem(KEY, JSON.stringify(drafts));
       unsavedDrafts.delete(store);
-    } catch {
-    }
+    } catch {}
   }
 }
 
 export function getDraftChannelMode(store: Store, id: string): ChannelMode {
   const memory = memoryFor(store, channelModesByStore, fallbackChannelModes);
   if (memory.has(id)) return memory.get(id)!;
-  const mode = read(store, CHANNEL_MODES_KEY)[id] === "goal" ? "goal" : "chat";
+  const mode = read(store, CHANNEL_MODES_KEY)[id] === 'goal' ? 'goal' : 'chat';
   memory.set(id, mode);
   return mode;
 }
@@ -133,12 +132,11 @@ export function getDraftChannelMode(store: Store, id: string): ChannelMode {
 export function setDraftChannelMode(store: Store, id: string, mode: ChannelMode): void {
   memoryFor(store, channelModesByStore, fallbackChannelModes).set(id, mode);
   const modes = read(store, CHANNEL_MODES_KEY);
-  if (mode === "goal") modes[id] = mode;
+  if (mode === 'goal') modes[id] = mode;
   else delete modes[id];
   try {
     store?.setItem(CHANNEL_MODES_KEY, JSON.stringify(modes));
-  } catch {
-  }
+  } catch {}
 }
 
 export function getDraftAttachments(store: Store, id: string): Attachment[] {
@@ -155,23 +153,24 @@ export function setDraftAttachments(store: Store, id: string, attachments: Attac
   const drafts = read(store, ATTACHMENTS_KEY);
   // Blob URLs exist only for this document: persist only upload-complete attachments.
   const durable = attachments.flatMap((attachment): Attachment[] => {
-    if (attachment.kind !== "image") return [attachment];
+    if (attachment.kind !== 'image') return [attachment];
     if (!attachment.path || attachment.uploading) return [];
-    return [{
-      kind: "image",
-      id: attachment.id,
-      path: attachment.path,
-      name: attachment.name,
-      size: attachment.size,
-      mime: attachment.mime,
-    }];
+    return [
+      {
+        kind: 'image',
+        id: attachment.id,
+        path: attachment.path,
+        name: attachment.name,
+        size: attachment.size,
+        mime: attachment.mime,
+      },
+    ];
   });
   if (durable.length) drafts[id] = durable;
   else delete drafts[id];
   try {
     store?.setItem(ATTACHMENTS_KEY, JSON.stringify(drafts));
-  } catch {
-  }
+  } catch {}
 }
 
 export function rememberReplyDraft(threadId: string, messageId: string): void {
@@ -211,9 +210,7 @@ export function useReplyDraft<T extends { id: string }>(
     message: resolveReplyMessage(threadId, messages),
   }));
   const replyTo =
-    replyState.threadId === threadId
-      ? replyState.message
-      : resolveReplyMessage(threadId, messages);
+    replyState.threadId === threadId ? replyState.message : resolveReplyMessage(threadId, messages);
 
   useEffect(() => {
     setReplyState((current) => {
@@ -222,10 +219,13 @@ export function useReplyDraft<T extends { id: string }>(
     });
   }, [messages, threadId]);
 
-  const selectReply = useCallback((message: T) => {
-    selectReplyDraft(draftId, threadId, message.id);
-    setReplyState({ threadId, message });
-  }, [draftId, threadId]);
+  const selectReply = useCallback(
+    (message: T) => {
+      selectReplyDraft(draftId, threadId, message.id);
+      setReplyState({ threadId, message });
+    },
+    [draftId, threadId],
+  );
 
   const clearReply = useCallback(() => {
     discardReplyDraft(draftId, threadId);
@@ -237,19 +237,22 @@ export function useReplyDraft<T extends { id: string }>(
     setReplyState({ threadId, message: null });
   }, [threadId]);
 
-  const restoreReply = useCallback((message: T, targetThreadId: string) => {
-    const currentId = replyDraft(targetThreadId);
-    if (currentId && currentId !== message.id) return;
-    // Persist before touching React state: this view may have unmounted mid-request.
-    rememberReplyDraft(targetThreadId, message.id);
-    if (threadId === targetThreadId) {
-      setReplyState((current) =>
-        current.threadId === targetThreadId && current.message
-          ? current
-          : { threadId: targetThreadId, message },
-      );
-    }
-  }, [threadId]);
+  const restoreReply = useCallback(
+    (message: T, targetThreadId: string) => {
+      const currentId = replyDraft(targetThreadId);
+      if (currentId && currentId !== message.id) return;
+      // Persist before touching React state: this view may have unmounted mid-request.
+      rememberReplyDraft(targetThreadId, message.id);
+      if (threadId === targetThreadId) {
+        setReplyState((current) =>
+          current.threadId === targetThreadId && current.message
+            ? current
+            : { threadId: targetThreadId, message },
+        );
+      }
+    },
+    [threadId],
+  );
 
   return { replyTo, selectReply, clearReply, consumeReply, restoreReply };
 }
@@ -276,9 +279,14 @@ function restoredSend(draftId: string): RestoredSend | undefined {
   const memory = restoredSends.get(draftId);
   if (memory) return memory;
   const stored = read(getStore(), SEND_IDS_KEY)[draftId];
-  if (!stored || (typeof stored !== "string" && typeof stored !== "object")) return undefined;
-  const value = typeof stored === "string" ? { sendId: stored } : stored as Record<string, unknown>;
-  if (typeof value.sendId !== "string" || (value.requestText !== undefined && typeof value.requestText !== "string")) return undefined;
+  if (!stored || (typeof stored !== 'string' && typeof stored !== 'object')) return undefined;
+  const value =
+    typeof stored === 'string' ? { sendId: stored } : (stored as Record<string, unknown>);
+  if (
+    typeof value.sendId !== 'string' ||
+    (value.requestText !== undefined && typeof value.requestText !== 'string')
+  )
+    return undefined;
   const send = { sendId: value.sendId, requestText: value.requestText };
   restoredSends.set(draftId, send);
   return send;
@@ -290,15 +298,14 @@ function setStoredSendId(store: Store, draftId: string, send: RestoredSend | und
   else delete ids[draftId];
   try {
     store?.setItem(SEND_IDS_KEY, JSON.stringify(ids));
-  } catch {
-  }
+  } catch {}
 }
 
 export function restoreComposerDraft(id: string, draft: DraftRestore): void {
   const store = getStore();
   setDraft(store, id, draft.text);
   setDraftAttachments(store, id, draft.attachments);
-  setDraftChannelMode(store, id, draft.channelMode ?? "chat");
+  setDraftChannelMode(store, id, draft.channelMode ?? 'chat');
   for (const listener of restoreListeners.get(id) ?? []) listener(draft);
 }
 
@@ -420,7 +427,7 @@ export function rememberFailedComposerSend(
   return failed;
 }
 
-export function recoverFailedComposerSend(sent: ComposerSendSnapshot): "restored" | "outbox" {
+export function recoverFailedComposerSend(sent: ComposerSendSnapshot): 'restored' | 'outbox' {
   if (draftRevision(sent.draftId) !== sent.revision) {
     rememberFailedComposerSend(sent.draftId, {
       sendId: sent.sendId,
@@ -432,7 +439,7 @@ export function recoverFailedComposerSend(sent: ComposerSendSnapshot): "restored
       mentions: sent.mentions,
       followUp: sent.followUp,
     });
-    return "outbox";
+    return 'outbox';
   }
   markDraftEdited(sent.draftId);
   restoreComposerDraft(sent.draftId, {
@@ -444,7 +451,7 @@ export function recoverFailedComposerSend(sent: ComposerSendSnapshot): "restored
   const retry = { sendId: sent.sendId, requestText: sent.requestText };
   restoredSends.set(sent.draftId, retry);
   setStoredSendId(getStore(), sent.draftId, retry);
-  return "restored";
+  return 'restored';
 }
 
 export function forgetFailedComposerSend(id: string, failedId: string): void {
@@ -458,7 +465,8 @@ export function useFailedComposerSends(id: string): FailedComposerSend[] {
   const [sends, setSends] = useState(() => failedComposerSends(id));
   useEffect(() => {
     setSends(failedComposerSends(id));
-    const listeners = failedSendListeners.get(id) ?? new Set<(next: FailedComposerSend[]) => void>();
+    const listeners =
+      failedSendListeners.get(id) ?? new Set<(next: FailedComposerSend[]) => void>();
     listeners.add(setSends);
     failedSendListeners.set(id, listeners);
     return () => {
@@ -472,14 +480,16 @@ export function useFailedComposerSends(id: string): FailedComposerSend[] {
 // With storage blocked the localStorage getter itself throws, and `typeof` doesn't shield it.
 function getStore(): Store {
   try {
-    return typeof localStorage === "undefined" ? undefined : localStorage;
+    return typeof localStorage === 'undefined' ? undefined : localStorage;
   } catch {
     return undefined;
   }
 }
 
 /** A draft's channel mode, the same in every place that shows it: the composer's chip and the bot panel's switch. */
-export function useComposerChannelMode(id: string): [ChannelMode, (next: SetStateAction<ChannelMode>) => void] {
+export function useComposerChannelMode(
+  id: string,
+): [ChannelMode, (next: SetStateAction<ChannelMode>) => void] {
   const store = getStore();
   const [mode, setMode] = useState(() => getDraftChannelMode(store, id));
   useEffect(() => {
@@ -492,15 +502,19 @@ export function useComposerChannelMode(id: string): [ChannelMode, (next: SetStat
     return () => {
       unsubscribe();
       listeners.delete(sync);
-      if (listeners.size === 0 && channelModeListeners.get(id) === listeners) channelModeListeners.delete(id);
+      if (listeners.size === 0 && channelModeListeners.get(id) === listeners)
+        channelModeListeners.delete(id);
     };
   }, [id, store]);
-  const set = useCallback((next: SetStateAction<ChannelMode>) => {
-    const value = typeof next === "function" ? next(getDraftChannelMode(store, id)) : next;
-    setDraftChannelMode(store, id, value);
-    setMode(value);
-    for (const listener of Array.from(channelModeListeners.get(id) ?? [])) listener();
-  }, [id, store]);
+  const set = useCallback(
+    (next: SetStateAction<ChannelMode>) => {
+      const value = typeof next === 'function' ? next(getDraftChannelMode(store, id)) : next;
+      setDraftChannelMode(store, id, value);
+      setMode(value);
+      for (const listener of Array.from(channelModeListeners.get(id) ?? [])) listener();
+    },
+    [id, store],
+  );
   return [mode, set];
 }
 
@@ -510,9 +524,9 @@ export function useDraft(id: string, legacyId?: string): [string, (next: string)
     const current = getDraft(store, id);
     if (current || !legacyId) return current;
     const legacy = getDraft(store, legacyId);
-    if (!legacy) return "";
+    if (!legacy) return '';
     setDraft(store, id, legacy);
-    setDraft(store, legacyId, "");
+    setDraft(store, legacyId, '');
     return legacy;
   });
   const set = useCallback(
@@ -537,12 +551,7 @@ export function useDraft(id: string, legacyId?: string): [string, (next: string)
 export function useComposerDraft(
   id: string,
   legacyId?: string,
-): [
-  string,
-  (next: string) => void,
-  Attachment[],
-  (next: SetStateAction<Attachment[]>) => void,
-] {
+): [string, (next: string) => void, Attachment[], (next: SetStateAction<Attachment[]>) => void] {
   const store = getStore();
   const [text, setText] = useDraft(id, legacyId);
   const [attachments, setAttachmentState] = useState(() => {
@@ -555,13 +564,15 @@ export function useComposerDraft(
     return legacy;
   });
   useEffect(() => {
-    const unsubscribe = subscribeToDraftRestores(id, (draft) => setAttachmentState(draft.attachments));
+    const unsubscribe = subscribeToDraftRestores(id, (draft) =>
+      setAttachmentState(draft.attachments),
+    );
     setAttachmentState(getDraftAttachments(store, id));
     return unsubscribe;
   }, [id, store]);
   const setAttachments = useCallback(
     (next: SetStateAction<Attachment[]>) => {
-      if (typeof next !== "function") {
+      if (typeof next !== 'function') {
         // Persist before rendering: this component may have unmounted while the request ran.
         setDraftAttachments(store, id, next);
         setAttachmentState(next);

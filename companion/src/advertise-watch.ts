@@ -43,7 +43,7 @@ export function createAddressWatcher(options: AddressWatchOptions): AddressWatch
     // must not start a second.
     if (inflight) return;
     const current = [...options.addresses()].sort();
-    const key = `${options.name?.() ?? ""}\n${current.join(",")}`;
+    const key = `${options.name?.() ?? ''}\n${current.join(',')}`;
     if (key !== failedKey) {
       failedKey = key;
       failures = 0;
@@ -52,14 +52,14 @@ export function createAddressWatcher(options: AddressWatchOptions): AddressWatch
     inflight = true;
     try {
       if (current.length === 0) {
-        options.log?.("no LAN addresses — advertising paused until a network appears");
+        options.log?.('no LAN addresses — advertising paused until a network appears');
         await options.withdraw();
       } else {
         const ok = await options.advertise();
         options.log?.(
           ok
-            ? `advertising on ${current.join(", ")}`
-            : "could not advertise — pairing by typed address still works",
+            ? `advertising on ${current.join(', ')}`
+            : 'could not advertise — pairing by typed address still works',
         );
         if (!ok && failures < (options.failureRetries ?? 0)) {
           failures += 1;

@@ -1,10 +1,10 @@
-import type { Scenario } from "../types.ts";
-import { evaluateAssertions } from "../scorers/assertions.ts";
-import type { ScenarioResult, StepResult, WorldSnapshot } from "../scorers/snapshot.ts";
-import type { SendReceipt } from "../scorers/snapshot.ts";
-import { BaseWorld, type WorldContext } from "./base-world.ts";
-import { CoordinationWorld } from "./coordination-world.ts";
-import { LocalVmWorld } from "./local-vm-world.ts";
+import type { Scenario } from '../types.ts';
+import { evaluateAssertions } from '../scorers/assertions.ts';
+import type { ScenarioResult, StepResult, WorldSnapshot } from '../scorers/snapshot.ts';
+import type { SendReceipt } from '../scorers/snapshot.ts';
+import { BaseWorld, type WorldContext } from './base-world.ts';
+import { CoordinationWorld } from './coordination-world.ts';
+import { LocalVmWorld } from './local-vm-world.ts';
 
 /** Runs one scenario against a freshly booted real server and returns the
  * frozen evidence plus every assertion verdict. The world is torn down even
@@ -12,7 +12,8 @@ import { LocalVmWorld } from "./local-vm-world.ts";
 export async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
   const startedAt = new Date().toISOString();
   const start = Date.now();
-  const world: BaseWorld = scenario.world === "coordination" ? new CoordinationWorld() : new LocalVmWorld();
+  const world: BaseWorld =
+    scenario.world === 'coordination' ? new CoordinationWorld() : new LocalVmWorld();
   const ctx: WorldContext = { sends: [] as SendReceipt[], observations: {} };
   const steps: StepResult[] = [];
   let snapshot: WorldSnapshot | undefined;
@@ -40,7 +41,8 @@ export async function runScenario(scenario: Scenario): Promise<ScenarioResult> {
   } finally {
     await world.close().catch(() => undefined);
   }
-  const assertions = snapshot === undefined ? [] : evaluateAssertions(scenario.assertions, snapshot);
+  const assertions =
+    snapshot === undefined ? [] : evaluateAssertions(scenario.assertions, snapshot);
   return {
     id: scenario.id,
     title: scenario.title,

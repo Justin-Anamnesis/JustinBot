@@ -1,9 +1,9 @@
-export const CHAT_WIDTH_IDS = ["standard", "wide", "full"] as const;
+export const CHAT_WIDTH_IDS = ['standard', 'wide', 'full'] as const;
 export type ChatWidthId = (typeof CHAT_WIDTH_IDS)[number];
 
-export const DEFAULT_CHAT_WIDTH: ChatWidthId = "standard";
+export const DEFAULT_CHAT_WIDTH: ChatWidthId = 'standard';
 
-export const CHAT_WIDTH_KEY = "omb-chat-width";
+export const CHAT_WIDTH_KEY = 'omb-chat-width';
 
 function isChatWidthId(value: unknown): value is ChatWidthId {
   return (CHAT_WIDTH_IDS as readonly unknown[]).includes(value);
@@ -11,7 +11,7 @@ function isChatWidthId(value: unknown): value is ChatWidthId {
 
 function getStore(): Storage | undefined {
   try {
-    return typeof localStorage === "undefined" ? undefined : localStorage;
+    return typeof localStorage === 'undefined' ? undefined : localStorage;
   } catch {
     return undefined;
   }

@@ -5,13 +5,13 @@
 // upstream stops sending them. Keys only: no phone-reachable string names an
 // alias, and cutting a value out of every string would also cut a short
 // alias such as "vps" out of `cloudBackend: "vps"` and the user's messages.
-const WITHHELD_KEYS = new Set(["resumeCursors", "sshAlias", "vpsAlias", "vpsAliases"]);
+const WITHHELD_KEYS = new Set(['resumeCursors', 'sshAlias', 'vpsAlias', 'vpsAliases']);
 
 export const isWithheldKey = (key: string): boolean => WITHHELD_KEYS.has(key);
 
 export function scrub<T>(value: T): T {
   if (Array.isArray(value)) return value.map(scrub) as unknown as T;
-  if (value && typeof value === "object") {
+  if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
       if (isWithheldKey(key)) continue;
@@ -25,8 +25,8 @@ export function scrub<T>(value: T): T {
 /** Anything else passes through untouched. `+json` counts (RFC 6839): one RFC
  * 9457 problem response would otherwise carry `resumeCursors` to a phone. */
 export const isJson = (contentType: string | undefined): boolean => {
-  const media = (contentType ?? "").split(";")[0].trim().toLowerCase();
-  return media === "application/json" || media.endsWith("+json");
+  const media = (contentType ?? '').split(';')[0].trim().toLowerCase();
+  return media === 'application/json' || media.endsWith('+json');
 };
 
 /** Above the harness's 3 MiB browser-live frame cap (`MAX_FRAME`), with
@@ -41,10 +41,10 @@ export const MAX_SSE_EVENT_BYTES = 4 * 1024 * 1024;
  * event can be neither flushed nor scrubbed, and the caller drops the stream.
  */
 export function createSseScrubber(): (chunk: string) => string {
-  let pending = "";
+  let pending = '';
   return (chunk: string): string => {
     pending += chunk;
-    let out = "";
+    let out = '';
     for (;;) {
       const boundary = nextBoundary(pending);
       if (!boundary) break;
@@ -66,12 +66,16 @@ export function createSseScrubber(): (chunk: string) => string {
  * buffered. */
 function nextBoundary(text: string): { index: number; terminator: string } | null {
   let best: { index: number; terminator: string } | null = null;
-  for (const terminator of ["\n\n", "\r\n\r\n", "\r\r"]) {
+  for (const terminator of ['\n\n', '\r\n\r\n', '\r\r']) {
     const index = text.indexOf(terminator);
     if (index < 0) continue;
     // On a tie the longer terminator wins: an LF inside a CRLF pair would cut
     // the event a byte short.
-    if (!best || index < best.index || (index === best.index && terminator.length > best.terminator.length)) {
+    if (
+      !best ||
+      index < best.index ||
+      (index === best.index && terminator.length > best.terminator.length)
+    ) {
       best = { index, terminator };
     }
   }
@@ -79,12 +83,12 @@ function nextBoundary(text: string): { index: number; terminator: string } | nul
 }
 
 function scrubEvent(event: string): string {
-  const eol = event.includes("\r\n") ? "\r\n" : event.includes("\r") ? "\r" : "\n";
+  const eol = event.includes('\r\n') ? '\r\n' : event.includes('\r') ? '\r' : '\n';
   return event
     .split(/\r\n|\r|\n/)
     .map((line) => {
       // `: keepalive` comments, `id:`, `event:`, `retry:` — not ours to touch
-      if (!line.startsWith("data:")) return line;
+      if (!line.startsWith('data:')) return line;
       const raw = line.slice(5).trimStart();
       if (!raw) return line;
       try {

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 import {
   initialLocalVmWorkspaceSlots,
   nativeViewOverlayIntersects,
@@ -8,7 +8,7 @@ import {
   sanitizeLocalVmWorkspaceStatus,
   selectLocalVmWorkspaceSlot,
   switchLocalVmWorkspaceControl,
-} from "./local-vm-workspace";
+} from './local-vm-workspace';
 
 const rect = (left: number, top: number, width: number, height: number) => ({
   left,
@@ -20,15 +20,15 @@ const rect = (left: number, top: number, width: number, height: number) => ({
 });
 
 const bots = [
-  { id: "vm-a", computer: "vm" as const },
-  { id: "vm-b", computer: "vm" as const },
-  { id: "vm-c", computer: "vm" as const },
-  { id: "cloud", computer: "cloud" as const },
-  { id: "hidden", computer: "vm" as const, hidden: true },
+  { id: 'vm-a', computer: 'vm' as const },
+  { id: 'vm-b', computer: 'vm' as const },
+  { id: 'vm-c', computer: 'vm' as const },
+  { id: 'cloud', computer: 'cloud' as const },
+  { id: 'hidden', computer: 'vm' as const, hidden: true },
 ];
 
-describe("Local VM native overlay shielding", () => {
-  it("hides panes only for visible intersecting overlays", () => {
+describe('Local VM native overlay shielding', () => {
+  it('hides panes only for visible intersecting overlays', () => {
     const hosts = [rect(100, 100, 400, 300)];
     expect(
       nativeViewOverlayIntersects(hosts, [
@@ -50,27 +50,24 @@ describe("Local VM native overlay shielding", () => {
   });
 });
 
-describe("Local VM workspace slots", () => {
-  it("starts with the selected VM on the left and another eligible VM on the right", () => {
-    expect(initialLocalVmWorkspaceSlots(bots, "vm-b")).toEqual(["vm-b", "vm-a"]);
+describe('Local VM workspace slots', () => {
+  it('starts with the selected VM on the left and another eligible VM on the right', () => {
+    expect(initialLocalVmWorkspaceSlots(bots, 'vm-b')).toEqual(['vm-b', 'vm-a']);
   });
 
-  it("swaps a duplicate selection instead of showing one bot twice", () => {
-    expect(selectLocalVmWorkspaceSlot(["vm-a", "vm-b"], 0, "vm-b")).toEqual([
-      "vm-b",
-      "vm-a",
-    ]);
+  it('swaps a duplicate selection instead of showing one bot twice', () => {
+    expect(selectLocalVmWorkspaceSlot(['vm-a', 'vm-b'], 0, 'vm-b')).toEqual(['vm-b', 'vm-a']);
   });
 
-  it("removes deleted or ineligible bots and fills from remaining VM bots", () => {
-    expect(reconcileLocalVmWorkspaceSlots(["vm-a", "vm-b"], bots.slice(1))).toEqual([
-      "vm-c",
-      "vm-b",
+  it('removes deleted or ineligible bots and fills from remaining VM bots', () => {
+    expect(reconcileLocalVmWorkspaceSlots(['vm-a', 'vm-b'], bots.slice(1))).toEqual([
+      'vm-c',
+      'vm-b',
     ]);
   });
 });
 
-describe("Local VM workspace control", () => {
+describe('Local VM workspace control', () => {
   function port({ held = false, owned = false } = {}) {
     const calls: string[] = [];
     return {
@@ -91,122 +88,117 @@ describe("Local VM workspace control", () => {
           return { held: false, helpReason: null, released: true };
         },
         async setInteractive(contextId: string | null) {
-          calls.push(`interactive:${contextId ?? "none"}`);
+          calls.push(`interactive:${contextId ?? 'none'}`);
           return true;
         },
       },
     };
   }
 
-  it("releases and demotes the old pane before taking the next pane", async () => {
+  it('releases and demotes the old pane before taking the next pane', async () => {
     const fixture = port();
-    const result = await switchLocalVmWorkspaceControl(
-      fixture.value,
-      "vm-a",
-      "vm-b",
-      "right",
-    );
-    expect(result.status).toBe("controlled");
+    const result = await switchLocalVmWorkspaceControl(fixture.value, 'vm-a', 'vm-b', 'right');
+    expect(result.status).toBe('controlled');
     expect(fixture.calls).toEqual([
-      "interactive:none",
-      "release:vm-a",
-      "take:vm-b",
-      "interactive:right",
+      'interactive:none',
+      'release:vm-a',
+      'take:vm-b',
+      'interactive:right',
     ]);
   });
 
-  it("atomically observes a pane already held outside the workspace", async () => {
+  it('atomically observes a pane already held outside the workspace', async () => {
     const fixture = port({ held: true, owned: false });
-    const result = await switchLocalVmWorkspaceControl(fixture.value, null, "vm-b", "right");
-    expect(result.status).toBe("held-elsewhere");
-    expect(fixture.calls).toEqual(["take:vm-b"]);
+    const result = await switchLocalVmWorkspaceControl(fixture.value, null, 'vm-b', 'right');
+    expect(result.status).toBe('held-elsewhere');
+    expect(fixture.calls).toEqual(['take:vm-b']);
   });
 
-  it("releases only a workspace-owned current pane during close", async () => {
+  it('releases only a workspace-owned current pane during close', async () => {
     const fixture = port({ held: true, owned: true });
     await releaseLocalVmWorkspaceControl(fixture.value, null);
     expect(fixture.calls).toEqual([]);
-    await releaseLocalVmWorkspaceControl(fixture.value, "vm-a");
-    expect(fixture.calls).toEqual(["interactive:none", "release:vm-a"]);
+    await releaseLocalVmWorkspaceControl(fixture.value, 'vm-a');
+    expect(fixture.calls).toEqual(['interactive:none', 'release:vm-a']);
   });
 
-  it("releases the API hold even when native demotion fails", async () => {
+  it('releases the API hold even when native demotion fails', async () => {
     const fixture = port({ held: true, owned: true });
     fixture.value.setInteractive = async (contextId: string | null) => {
-      fixture.calls.push(`interactive:${contextId ?? "none"}`);
-      throw new Error("native viewer unavailable");
+      fixture.calls.push(`interactive:${contextId ?? 'none'}`);
+      throw new Error('native viewer unavailable');
     };
 
-    await expect(releaseLocalVmWorkspaceControl(fixture.value, "vm-a")).resolves.toMatchObject({
+    await expect(releaseLocalVmWorkspaceControl(fixture.value, 'vm-a')).resolves.toMatchObject({
       held: false,
       released: true,
     });
-    expect(fixture.calls).toEqual(["interactive:none", "release:vm-a"]);
+    expect(fixture.calls).toEqual(['interactive:none', 'release:vm-a']);
   });
 
-  it("revalidates and restores the same workspace-owned pane", async () => {
+  it('revalidates and restores the same workspace-owned pane', async () => {
     const fixture = port({ held: true, owned: true });
-    const result = await switchLocalVmWorkspaceControl(fixture.value, "vm-a", "vm-a", "left");
-    expect(result.status).toBe("controlled");
-    expect(fixture.calls).toEqual(["take:vm-a", "interactive:left"]);
+    const result = await switchLocalVmWorkspaceControl(fixture.value, 'vm-a', 'vm-a', 'left');
+    expect(result.status).toBe('controlled');
+    expect(fixture.calls).toEqual(['take:vm-a', 'interactive:left']);
   });
 
-  it("demotes before releasing a newly taken hold when promotion fails", async () => {
+  it('demotes before releasing a newly taken hold when promotion fails', async () => {
     const fixture = port();
     fixture.value.setInteractive = async (contextId: string | null) => {
-      fixture.calls.push(`interactive:${contextId ?? "none"}`);
-      if (contextId === "right") throw new Error("viewer failed");
+      fixture.calls.push(`interactive:${contextId ?? 'none'}`);
+      if (contextId === 'right') throw new Error('viewer failed');
       return true;
     };
     await expect(
-      switchLocalVmWorkspaceControl(fixture.value, null, "vm-b", "right"),
-    ).rejects.toThrow("viewer failed");
+      switchLocalVmWorkspaceControl(fixture.value, null, 'vm-b', 'right'),
+    ).rejects.toThrow('viewer failed');
     expect(fixture.calls).toEqual([
-      "take:vm-b",
-      "interactive:right",
-      "interactive:none",
-      "release:vm-b",
+      'take:vm-b',
+      'interactive:right',
+      'interactive:none',
+      'release:vm-b',
     ]);
   });
 });
 
-describe("Local VM workspace status", () => {
+describe('Local VM workspace status', () => {
   const ready = {
-    mode: "per-bot",
+    mode: 'per-bot',
     max_instances: 2,
-    container: "running",
-    network: "loopback",
-    security: "hardened",
-    persistence: "durable",
+    container: 'running',
+    network: 'loopback',
+    security: 'hardened',
+    persistence: 'durable',
     desktopReady: true,
     ready: true,
-    viewer_url: "http://127.0.0.1:6080/vnc.html#password=secret",
-    problem: "must not enter state",
+    viewer_url: 'http://127.0.0.1:6080/vnc.html#password=secret',
+    problem: 'must not enter state',
   };
 
-  it("retains only normalized readiness facts and drops URL and arbitrary text", () => {
+  it('retains only normalized readiness facts and drops URL and arbitrary text', () => {
     const status = sanitizeLocalVmWorkspaceStatus(ready);
     expect(status).toEqual({
-      mode: "per-bot",
+      mode: 'per-bot',
       maxInstances: 2,
-      container: "running",
-      network: "loopback",
-      security: "hardened",
-      persistence: "durable",
+      container: 'running',
+      network: 'loopback',
+      security: 'hardened',
+      persistence: 'durable',
       desktopReady: true,
       ready: true,
     });
-    expect(status).not.toHaveProperty("viewer_url");
-    expect(status).not.toHaveProperty("problem");
+    expect(status).not.toHaveProperty('viewer_url');
+    expect(status).not.toHaveProperty('problem');
   });
 
-  it("fails closed when any required readiness guard is unsafe", () => {
-    expect(sanitizeLocalVmWorkspaceStatus({ ...ready, network: "unsafe" }).ready).toBe(false);
+  it('fails closed when any required readiness guard is unsafe', () => {
+    expect(sanitizeLocalVmWorkspaceStatus({ ...ready, network: 'unsafe' }).ready).toBe(false);
     expect(sanitizeLocalVmWorkspaceStatus({ ...ready, desktopReady: false }).ready).toBe(false);
-    expect(readyLocalVmViewerUrl({ ...ready, security: "unsafe" })).toBeNull();
+    expect(readyLocalVmViewerUrl({ ...ready, security: 'unsafe' })).toBeNull();
   });
 
-  it("returns a ready URL only for the immediate native-view handoff", () => {
+  it('returns a ready URL only for the immediate native-view handoff', () => {
     expect(readyLocalVmViewerUrl(ready)).toBe(ready.viewer_url);
   });
 });

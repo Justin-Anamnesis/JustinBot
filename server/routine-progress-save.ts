@@ -3,8 +3,8 @@
 // up to 2,000 runs. A restart acts only on a run's status, and every status change (a start, an end, a retry) is still
 // saved before the server yields, taking any waiting progress with it. A crash loses at most the last window of progress
 // on a run the restart then retries or fails anyway; a stop (shutdown, backup, a move) writes it first.
-import { existsSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 export const RUN_PROGRESS_WINDOW_MS = 5_000;
 
@@ -67,7 +67,7 @@ export class RunProgressSave {
       this.written();
     } catch (error) {
       // The progress stays in memory and the next save of the file writes it.
-      console.error("routines: could not save run progress; the next save retries it", error);
+      console.error('routines: could not save run progress; the next save retries it', error);
     }
   }
 }

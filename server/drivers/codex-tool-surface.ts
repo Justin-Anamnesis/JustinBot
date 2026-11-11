@@ -3,11 +3,15 @@
 // https://developers.openai.com/codex/browser
 export function codexToolSurfaceArgs(): string[] {
   return [
-    "-c", "features.browser_use=false",
-    "-c", "features.browser_use_external=false",
-    "-c", "features.computer_use=false",
+    '-c',
+    'features.browser_use=false',
+    '-c',
+    'features.browser_use_external=false',
+    '-c',
+    'features.computer_use=false',
     // An inline table: some CLIs read quoted dotted keys literally.
-    "-c", 'plugins={ "browser@openai-bundled" = { enabled = false }, "computer-use@openai-bundled" = { enabled = false }, "unified-computer-use@openai-bundled" = { enabled = false } }',
+    '-c',
+    'plugins={ "browser@openai-bundled" = { enabled = false }, "computer-use@openai-bundled" = { enabled = false }, "unified-computer-use@openai-bundled" = { enabled = false } }',
     // Native web search needs no desktop browser connection; keep the user's/provider's mode.
   ];
 }

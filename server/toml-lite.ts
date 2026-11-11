@@ -7,7 +7,8 @@ export class TomlError extends Error {}
 type Table = Record<string, unknown>;
 
 const table = (): Table => Object.create(null) as Table;
-const isTable = (value: unknown): value is Table => typeof value === "object" && value !== null && !Array.isArray(value);
+const isTable = (value: unknown): value is Table =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 const BARE_KEY = /[A-Za-z0-9_-]/;
 const VALUE_END = /[\s,\]}#]/;
 const MAX_DEPTH = 64;
@@ -21,17 +22,17 @@ export function parseToml(source: string): Table {
   let current = root;
 
   const fail = (message: string): never => {
-    throw new TomlError(`line ${text.slice(0, i).split("\n").length}: ${message}`);
+    throw new TomlError(`line ${text.slice(0, i).split('\n').length}: ${message}`);
   };
   const spaces = () => {
-    while (text[i] === " " || text[i] === "\t") i++;
+    while (text[i] === ' ' || text[i] === '\t') i++;
   };
   const comment = () => {
-    if (text[i] === "#") while (i < text.length && text[i] !== "\n") i++;
+    if (text[i] === '#') while (i < text.length && text[i] !== '\n') i++;
   };
   const newline = (): boolean => {
-    if (text[i] === "\n") i += 1;
-    else if (text[i] === "\r" && text[i + 1] === "\n") i += 2;
+    if (text[i] === '\n') i += 1;
+    else if (text[i] === '\r' && text[i + 1] === '\n') i += 2;
     else return false;
     return true;
   };
@@ -46,48 +47,57 @@ export function parseToml(source: string): Table {
   const endOfLine = () => {
     spaces();
     comment();
-    if (i < text.length && !newline()) fail("expected the end of the line");
+    if (i < text.length && !newline()) fail('expected the end of the line');
   };
 
   function escape(): string {
     const code = text[i + 1];
     i += 2;
     switch (code) {
-      case "b": return "\b";
-      case "t": return "\t";
-      case "n": return "\n";
-      case "f": return "\f";
-      case "r": return "\r";
-      case "e": return "\x1b";
-      case '"': return '"';
-      case "\\": return "\\";
-      case "u":
-      case "U": {
-        const length = code === "u" ? 4 : 8;
+      case 'b':
+        return '\b';
+      case 't':
+        return '\t';
+      case 'n':
+        return '\n';
+      case 'f':
+        return '\f';
+      case 'r':
+        return '\r';
+      case 'e':
+        return '\x1b';
+      case '"':
+        return '"';
+      case '\\':
+        return '\\';
+      case 'u':
+      case 'U': {
+        const length = code === 'u' ? 4 : 8;
         const hex = text.slice(i, i + length);
-        if (hex.length !== length || !/^[0-9A-Fa-f]+$/.test(hex)) fail("invalid unicode escape");
+        if (hex.length !== length || !/^[0-9A-Fa-f]+$/.test(hex)) fail('invalid unicode escape');
         const point = parseInt(hex, 16);
-        if (point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff)) fail("invalid unicode escape");
+        if (point > 0x10ffff || (point >= 0xd800 && point <= 0xdfff))
+          fail('invalid unicode escape');
         i += length;
         return String.fromCodePoint(point);
       }
       default:
-        return fail("invalid escape");
+        return fail('invalid escape');
     }
   }
 
   function basicString(): string {
     if (text.startsWith('"""', i)) return multilineBasicString();
     i += 1;
-    let out = "";
+    let out = '';
     for (;;) {
       const char = text[i];
-      if (char === undefined || char === "\n" || char === "\r") fail("unterminated string");
+      if (char === undefined || char === '\n' || char === '\r') fail('unterminated string');
       if (char === '"') {
         i += 1;
         return out;
       }
-      if (char === "\\") out += escape();
+      if (char === '\\') out += escape();
       else {
         out += char;
         i += 1;
@@ -98,19 +108,19 @@ export function parseToml(source: string): Table {
   function multilineBasicString(): string {
     i += 3;
     newline();
-    let out = "";
+    let out = '';
     for (;;) {
-      if (i >= text.length) fail("unterminated string");
+      if (i >= text.length) fail('unterminated string');
       if (text.startsWith('"""', i)) {
         let extra = 0;
         while (extra < 2 && text[i + 3 + extra] === '"') extra++;
         i += 3 + extra;
         return out + '"'.repeat(extra);
       }
-      if (text[i] === "\\") {
+      if (text[i] === '\\') {
         let next = i + 1;
-        while (text[next] === " " || text[next] === "\t") next++;
-        if (text[next] === "\n" || (text[next] === "\r" && text[next + 1] === "\n")) {
+        while (text[next] === ' ' || text[next] === '\t') next++;
+        if (text[next] === '\n' || (text[next] === '\r' && text[next + 1] === '\n')) {
           i = next;
           while (i < text.length && /[ \t\r\n]/.test(text[i]!)) i++;
           continue;
@@ -128,7 +138,7 @@ export function parseToml(source: string): Table {
       i += 3;
       newline();
       const close = text.indexOf("'''", i);
-      if (close < 0) fail("unterminated string");
+      if (close < 0) fail('unterminated string');
       let extra = 0;
       while (extra < 2 && text[close + 3 + extra] === "'") extra++;
       const out = text.slice(i, close + extra);
@@ -137,8 +147,8 @@ export function parseToml(source: string): Table {
     }
     i += 1;
     const close = text.indexOf("'", i);
-    const lineEnd = text.indexOf("\n", i);
-    if (close < 0 || (lineEnd >= 0 && lineEnd < close)) fail("unterminated string");
+    const lineEnd = text.indexOf('\n', i);
+    if (close < 0 || (lineEnd >= 0 && lineEnd < close)) fail('unterminated string');
     const out = text.slice(i, close);
     i = close + 1;
     return out;
@@ -149,7 +159,7 @@ export function parseToml(source: string): Table {
     if (text[i] === "'") return literalString();
     const start = i;
     while (i < text.length && BARE_KEY.test(text[i]!)) i++;
-    if (i === start) fail("expected a key");
+    if (i === start) fail('expected a key');
     return text.slice(start, i);
   }
 
@@ -159,8 +169,8 @@ export function parseToml(source: string): Table {
       spaces();
       parts.push(simpleKey());
       spaces();
-      if (text[i] !== ".") return parts;
-      if (parts.length >= MAX_KEY_PARTS) fail("key has too many parts");
+      if (text[i] !== '.') return parts;
+      if (parts.length >= MAX_KEY_PARTS) fail('key has too many parts');
       i += 1;
     }
   }
@@ -188,16 +198,21 @@ export function parseToml(source: string): Table {
     const start = i;
     while (i < text.length && !VALUE_END.test(text[i]!)) i++;
     // An offset date-time may put one space between its date and its time.
-    if (/^\d{4}-\d{2}-\d{2}$/.test(text.slice(start, i)) && text[i] === " " && /\d/.test(text[i + 1] ?? "")) {
+    if (
+      /^\d{4}-\d{2}-\d{2}$/.test(text.slice(start, i)) &&
+      text[i] === ' ' &&
+      /\d/.test(text[i + 1] ?? '')
+    ) {
       i += 1;
       while (i < text.length && !VALUE_END.test(text[i]!)) i++;
     }
     const raw = text.slice(start, i);
-    if (!raw) fail("expected a value");
-    if (raw === "true") return true;
-    if (raw === "false") return false;
-    if (/^[+-]?(?:inf|nan)$/.test(raw)) return raw.endsWith("nan") ? Number.NaN : raw.startsWith("-") ? -Infinity : Infinity;
-    const digits = raw.replace(/_/g, "");
+    if (!raw) fail('expected a value');
+    if (raw === 'true') return true;
+    if (raw === 'false') return false;
+    if (/^[+-]?(?:inf|nan)$/.test(raw))
+      return raw.endsWith('nan') ? Number.NaN : raw.startsWith('-') ? -Infinity : Infinity;
+    const digits = raw.replace(/_/g, '');
     if (/^0x[0-9A-Fa-f]+$/.test(digits)) return parseInt(digits.slice(2), 16);
     if (/^0o[0-7]+$/.test(digits)) return parseInt(digits.slice(2), 8);
     if (/^0b[01]+$/.test(digits)) return parseInt(digits.slice(2), 2);
@@ -211,14 +226,14 @@ export function parseToml(source: string): Table {
     const out: unknown[] = [];
     for (;;) {
       blank();
-      if (text[i] === "]") {
+      if (text[i] === ']') {
         i += 1;
         return out;
       }
       out.push(value(depth + 1));
       blank();
-      if (text[i] === ",") i += 1;
-      else if (text[i] !== "]") fail("expected , or ] in an array");
+      if (text[i] === ',') i += 1;
+      else if (text[i] !== ']') fail('expected , or ] in an array');
     }
   }
 
@@ -227,35 +242,35 @@ export function parseToml(source: string): Table {
     const out = table();
     for (;;) {
       blank();
-      if (text[i] === "}") {
+      if (text[i] === '}') {
         i += 1;
         return out;
       }
       const path = key();
-      if (text[i] !== "=") fail("expected =");
+      if (text[i] !== '=') fail('expected =');
       i += 1;
       spaces();
       assign(out, path, value(depth + 1));
       blank();
-      if (text[i] === ",") i += 1;
-      else if (text[i] !== "}") fail("expected , or } in an inline table");
+      if (text[i] === ',') i += 1;
+      else if (text[i] !== '}') fail('expected , or } in an inline table');
     }
   }
 
   function value(depth: number): unknown {
-    if (depth > MAX_DEPTH) fail("nested too deeply");
+    if (depth > MAX_DEPTH) fail('nested too deeply');
     if (text[i] === '"') return basicString();
     if (text[i] === "'") return literalString();
-    if (text[i] === "[") return array(depth);
-    if (text[i] === "{") return inlineTable(depth);
+    if (text[i] === '[') return array(depth);
+    if (text[i] === '{') return inlineTable(depth);
     return scalar();
   }
 
   function header() {
-    const many = text.startsWith("[[", i);
+    const many = text.startsWith('[[', i);
     i += many ? 2 : 1;
     const path = key();
-    if (many ? !text.startsWith("]]", i) : text[i] !== "]") fail("expected ]");
+    if (many ? !text.startsWith(']]', i) : text[i] !== ']') fail('expected ]');
     i += many ? 2 : 1;
     endOfLine();
     let at = root;
@@ -286,12 +301,12 @@ export function parseToml(source: string): Table {
   for (;;) {
     blank();
     if (i >= text.length) return root;
-    if (text[i] === "[") {
+    if (text[i] === '[') {
       header();
       continue;
     }
     const path = key();
-    if (text[i] !== "=") fail("expected =");
+    if (text[i] !== '=') fail('expected =');
     i += 1;
     spaces();
     assign(current, path, value(0));

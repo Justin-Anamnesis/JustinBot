@@ -1,5 +1,14 @@
 // Opt-in size cap for per-thread NDJSON logs: keep the newest half, cut on a line boundary, same filename.
-import { closeSync, fstatSync, openSync, readSync, renameSync, rmSync, statSync, writeSync } from "node:fs";
+import {
+  closeSync,
+  fstatSync,
+  openSync,
+  readSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeSync,
+} from 'node:fs';
 
 let capProvider: () => number | null = () => null;
 
@@ -16,7 +25,7 @@ export function currentThreadLogCap(): number | null {
 }
 
 export function capThreadLog(file: string, maxBytes: number | null): void {
-  if (typeof maxBytes !== "number" || !Number.isFinite(maxBytes) || maxBytes <= 0) return;
+  if (typeof maxBytes !== 'number' || !Number.isFinite(maxBytes) || maxBytes <= 0) return;
   let size: number;
   try {
     size = statSync(file).size;
@@ -30,7 +39,7 @@ export function capThreadLog(file: string, maxBytes: number | null): void {
 function trimToTail(file: string, keepBytes: number): void {
   const staging = `${file}.trim`;
   try {
-    const source = openSync(file, "r");
+    const source = openSync(file, 'r');
     try {
       const size = fstatSync(source).size;
       const start = Math.max(0, size - keepBytes);
@@ -45,7 +54,7 @@ function trimToTail(file: string, keepBytes: number): void {
       // Start on a record boundary; a window with no newline is one oversized record, so leave the file alone.
       const firstNewline = window.indexOf(0x0a);
       if (firstNewline === -1 || firstNewline + 1 >= window.length) return;
-      const target = openSync(staging, "w", 0o600);
+      const target = openSync(staging, 'w', 0o600);
       try {
         // writeSync can stop short too; zero progress is a failure.
         let written = firstNewline + 1;
@@ -64,7 +73,6 @@ function trimToTail(file: string, keepBytes: number): void {
   } catch {
     try {
       rmSync(staging, { force: true });
-    } catch {
-    }
+    } catch {}
   }
 }

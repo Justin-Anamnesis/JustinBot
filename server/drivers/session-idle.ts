@@ -1,6 +1,6 @@
-import { availableMemory, boxMemory, type BoxMemory } from "../box-memory.ts";
-import { engineMemory, type EngineMemory } from "../engine-memory.ts";
-import { seenWithin } from "../thread-presence.ts";
+import { availableMemory, boxMemory, type BoxMemory } from '../box-memory.ts';
+import { engineMemory, type EngineMemory } from '../engine-memory.ts';
+import { seenWithin } from '../thread-presence.ts';
 
 export interface SessionIdlePolicy {
   idleMs: number;
@@ -36,14 +36,13 @@ export function sessionIdlePolicy(
     ) ?? 0,
   );
   const configured =
-    usableMilliseconds(
-      env[`OMB_${driverPrefix}_SESSION_IDLE_MS`] ?? env.OMB_SESSION_IDLE_MS,
-    ) ?? (boxBytes <= SMALL_BOX_BYTES ? SMALL_BOX_IDLE_MS : DEFAULT_IDLE_MS);
+    usableMilliseconds(env[`OMB_${driverPrefix}_SESSION_IDLE_MS`] ?? env.OMB_SESSION_IDLE_MS) ??
+    (boxBytes <= SMALL_BOX_BYTES ? SMALL_BOX_IDLE_MS : DEFAULT_IDLE_MS);
   return { idleMs: Math.max(minimumMs, configured), minimumMs };
 }
 
 /** On a small box with less than half of it free, a second idle engine would leave no room for a turn's own engine. */
-export function idleEnginesAllowed(box: Pick<BoxMemory, "bytes">, availableBytes: number): number {
+export function idleEnginesAllowed(box: Pick<BoxMemory, 'bytes'>, availableBytes: number): number {
   return box.bytes <= SMALL_BOX_BYTES && availableBytes < box.bytes / 2 ? 1 : Infinity;
 }
 
@@ -57,12 +56,17 @@ export interface WarmEngine {
 const warmEngines = new Map<string, WarmEngine>();
 
 /** An engine went idle: when the box allows fewer idle engines than are up, the ones idle longest close now. */
-export function keepWarm(key: string, engine: WarmEngine, box: Pick<BoxMemory, "bytes"> = boxMemory(),
-  available: () => number = availableMemory): void {
+export function keepWarm(
+  key: string,
+  engine: WarmEngine,
+  box: Pick<BoxMemory, 'bytes'> = boxMemory(),
+  available: () => number = availableMemory,
+): void {
   if (box.bytes > SMALL_BOX_BYTES) return;
   warmEngines.delete(key);
   warmEngines.set(key, engine);
-  for (const [other, warm] of warmEngines) if (other !== key && !warm.idle()) warmEngines.delete(other);
+  for (const [other, warm] of warmEngines)
+    if (other !== key && !warm.idle()) warmEngines.delete(other);
   const extra = warmEngines.size - idleEnginesAllowed(box, available());
   if (extra <= 0) return;
   for (const [other, warm] of [...warmEngines].slice(0, extra)) {
@@ -72,7 +76,11 @@ export function keepWarm(key: string, engine: WarmEngine, box: Pick<BoxMemory, "
 }
 
 /** Closes an idle engine after `ms`, or sooner on a small box once another engine goes idle after it. */
-export function armIdleClose(key: string, ms: number, engine: WarmEngine): ReturnType<typeof setTimeout> {
+export function armIdleClose(
+  key: string,
+  ms: number,
+  engine: WarmEngine,
+): ReturnType<typeof setTimeout> {
   const timer = setTimeout(engine.close, ms);
   timer.unref?.();
   keepWarm(key, engine);
@@ -98,9 +106,14 @@ export const UNWATCHED_IDLE_MS = 30_000;
  * front of them lately, and for the one they have, the configured time scaled by the memory left (down to a tenth).
  * Elsewhere the configured time.
  */
-export function engineIdleMs(threadId: string, policy: SessionIdlePolicy, memory: Pick<EngineMemory, "enabled" | "headroom"> = engineMemory,
-  now: number = Date.now()): number {
+export function engineIdleMs(
+  threadId: string,
+  policy: SessionIdlePolicy,
+  memory: Pick<EngineMemory, 'enabled' | 'headroom'> = engineMemory,
+  now: number = Date.now(),
+): number {
   if (!memory.enabled) return policy.idleMs;
-  if (!seenWithin(threadId, WATCHED_MS, now)) return Math.max(policy.minimumMs, Math.min(policy.idleMs, UNWATCHED_IDLE_MS));
+  if (!seenWithin(threadId, WATCHED_MS, now))
+    return Math.max(policy.minimumMs, Math.min(policy.idleMs, UNWATCHED_IDLE_MS));
   return Math.max(policy.minimumMs, Math.round(policy.idleMs * memory.headroom()));
 }

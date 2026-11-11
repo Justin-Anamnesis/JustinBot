@@ -1,4 +1,4 @@
-import type { CompanionBridge } from "@/components/PhoneSetupFlow";
+import type { CompanionBridge } from '@/components/PhoneSetupFlow';
 
 // Its own module so the sidebar's phone button can read the phone's state without loading the setup flow and its QR code.
 export const companionBridge = (): CompanionBridge | null =>
@@ -7,6 +7,6 @@ export const companionBridge = (): CompanionBridge | null =>
 
 /** The desktop app's own page for this computer: not a browser, a server's page, or client mode. */
 export const pageIsThisComputer = (): boolean =>
-  typeof window !== "undefined"
-  && Boolean((window.ogb as { companion?: unknown } | undefined)?.companion)
-  && window.ogb?.remoteClient?.active !== true;
+  typeof window !== 'undefined' &&
+  Boolean((window.ogb as { companion?: unknown } | undefined)?.companion) &&
+  window.ogb?.remoteClient?.active !== true;

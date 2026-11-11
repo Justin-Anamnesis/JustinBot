@@ -5,7 +5,7 @@
 /** POST {tab, threadId}: this app window is open, with that conversation in front of the person (null: none, or one that
  * is theirs alone). `tab` is the window's own id, made when it loads. Sent when the conversation changes and every
  * HERE_REPEAT_MS while the window shows. */
-export const PRESENCE_HERE_PATH = "/api/presence/here";
+export const PRESENCE_HERE_PATH = '/api/presence/here';
 
 export interface PresenceHereBody {
   tab: string;
@@ -23,7 +23,7 @@ export interface PersonPresence {
 
 /** A teammate came or went. Sent to everyone signed in to the team, at most once every few seconds per person. */
 export interface TeamPresenceFrame {
-  kind: "team.presence";
+  kind: 'team.presence';
   email: string;
   here: boolean;
 }
@@ -31,14 +31,14 @@ export interface TeamPresenceFrame {
 /** Who has a shared conversation (a bot's shared chat, a group chat) open now, the receiver included. Sent only to the
  * people listed, each of whom may read it; never for a conversation that is one person's own. */
 export interface ThreadPresenceFrame {
-  kind: "thread.presence";
+  kind: 'thread.presence';
   threadId: string;
   people: string[];
 }
 
 /** Someone joined the team, left it or changed role: the app reads the people and its own session again. */
 export interface TeamPeopleFrame {
-  kind: "team.people";
+  kind: 'team.people';
 }
 
 export type PresenceFrame = TeamPresenceFrame | ThreadPresenceFrame | TeamPeopleFrame;

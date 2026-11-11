@@ -1,10 +1,15 @@
-export const TURN_ENDED_REFUSAL = "This bot turn has already ended (it finished or was stopped), so this call was refused. " +
-  "Anything the call started before the turn ended may still have run.";
+export const TURN_ENDED_REFUSAL =
+  'This bot turn has already ended (it finished or was stopped), so this call was refused. ' +
+  'Anything the call started before the turn ended may still have run.';
 
 /** Admission failures that can resume once a slot frees; never matched on error wording. */
 export function isTurnAdmissionBlocked(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error &&
-    (error.code === "thread_busy" || error.code === "thread_limit");
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error.code === 'thread_busy' || error.code === 'thread_limit')
+  );
 }
 
 /** An adapter may publish its process only after sendTurn resolves, so a Stop during that await can be a no-op: re-check and interrupt again. */
@@ -62,7 +67,11 @@ export class ProviderTurnGenerationRegistry<Outcome = never> {
     return true;
   }
 
-  complete(threadId: string, turnId: string, outcome?: Outcome): ProviderTurnGenerationOwner | null {
+  complete(
+    threadId: string,
+    turnId: string,
+    outcome?: Outcome,
+  ): ProviderTurnGenerationOwner | null {
     if (this.#completed.has(turnId)) return null;
     const owner = this.#owners.get(turnId);
     if (owner && owner.threadId !== threadId) return null;
@@ -108,10 +117,7 @@ export class ProviderTurnGenerationRegistry<Outcome = never> {
 
 /** Gates a thread between a winning Stop and the async provider turn id; reference-counted, and each owner expires so a hung adapter cannot hold it. */
 export class PendingTurnCancellations {
-  readonly #ownersByThread = new Map<
-    string,
-    Map<string, ReturnType<typeof setTimeout>>
-  >();
+  readonly #ownersByThread = new Map<string, Map<string, ReturnType<typeof setTimeout>>>();
   readonly #clearWaitersByThread = new Map<string, Set<() => void>>();
   readonly #ttlMs: number;
 
@@ -120,7 +126,8 @@ export class PendingTurnCancellations {
   }
 
   mark(threadId: string, ownerId: string): void {
-    const owners = this.#ownersByThread.get(threadId) ?? new Map<string, ReturnType<typeof setTimeout>>();
+    const owners =
+      this.#ownersByThread.get(threadId) ?? new Map<string, ReturnType<typeof setTimeout>>();
     const previous = owners.get(ownerId);
     if (previous) clearTimeout(previous);
     const expiry = setTimeout(() => {

@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type CSSProperties, type RefObject } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type RefObject } from 'react';
 
-import { cn } from "@/lib/cn";
-import { t } from "@/lib/i18n";
+import { cn } from '@/lib/cn';
+import { t } from '@/lib/i18n';
 import {
   SIDEBAR_MIN_WIDTH,
   SIDEBAR_WIDTH_KEY,
@@ -9,7 +9,7 @@ import {
   clampSidebarWidth,
   loadSidebarWidth,
   saveSidebarWidth,
-} from "@/lib/sidebar-preferences";
+} from '@/lib/sidebar-preferences';
 
 export function sidebarDefaultWidth(simple: boolean): number {
   return simple ? 280 : 320;
@@ -20,7 +20,10 @@ export const AVATARS_BELOW = 160;
 
 /** Where a drag of the sidebar's edge has it: its column of avatars, or open; open, at the width it had until the
  * pointer reaches that edge (`following` false), then wherever the pointer is. */
-export interface EdgeDrag { avatars: boolean; following: boolean }
+export interface EdgeDrag {
+  avatars: boolean;
+  following: boolean;
+}
 
 /** The drag after the pointer moved to `wanted` pixels from the sidebar's left; `from` is the width it opens at. */
 export function nextEdgeDrag(drag: EdgeDrag, wanted: number, from: number): EdgeDrag {
@@ -31,7 +34,11 @@ export function nextEdgeDrag(drag: EdgeDrag, wanted: number, from: number): Edge
 
 export type SidebarSizing = ReturnType<typeof useSidebarWidth>;
 
-export function useSidebarWidth({ simple, sidePanelOpen, sidebarRef }: {
+export function useSidebarWidth({
+  simple,
+  sidePanelOpen,
+  sidebarRef,
+}: {
   simple: boolean;
   sidePanelOpen: boolean;
   sidebarRef: RefObject<HTMLElement | null>;
@@ -40,7 +47,9 @@ export function useSidebarWidth({ simple, sidePanelOpen, sidebarRef }: {
   const defaultWidth = sidebarDefaultWidth(simple);
   const cap = simple ? 400 : 480;
   const maxWidth = sidePanelOpen ? defaultWidth : Math.min(cap, window.innerWidth - 320);
-  const [savedWidth, setSavedWidth] = useState<number | null>(() => loadSidebarWidth(undefined, key));
+  const [savedWidth, setSavedWidth] = useState<number | null>(() =>
+    loadSidebarWidth(undefined, key),
+  );
   const widthRef = useRef(savedWidth);
   const [resizing, setResizing] = useState(false);
   const [snapping, setSnapping] = useState(false);
@@ -50,13 +59,23 @@ export function useSidebarWidth({ simple, sidePanelOpen, sidebarRef }: {
     widthRef.current = width;
     setSavedWidth(width);
   }, [key]);
-  useEffect(() => () => { if (snapTimer.current) clearTimeout(snapTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (snapTimer.current) clearTimeout(snapTimer.current);
+    },
+    [],
+  );
   const current = () => Math.min(widthRef.current ?? defaultWidth, maxWidth);
   const resizeTo = (width: number) => {
-    const next = clampSidebarWidth(width, sidePanelOpen ? defaultWidth + 320 : window.innerWidth, cap);
-    if (next === Math.round(sidebarRef.current?.getBoundingClientRect().width ?? defaultWidth)) return null;
+    const next = clampSidebarWidth(
+      width,
+      sidePanelOpen ? defaultWidth + 320 : window.innerWidth,
+      cap,
+    );
+    if (next === Math.round(sidebarRef.current?.getBoundingClientRect().width ?? defaultWidth))
+      return null;
     widthRef.current = next;
-    sidebarRef.current?.style.setProperty("--sidebar-width", `${next}px`);
+    sidebarRef.current?.style.setProperty('--sidebar-width', `${next}px`);
     return next;
   };
   const save = (width: number) => {
@@ -73,12 +92,15 @@ export function useSidebarWidth({ simple, sidePanelOpen, sidebarRef }: {
     valueNow: Math.min(savedWidth ?? defaultWidth, maxWidth),
     atMinimum: () => current() <= SIDEBAR_MIN_WIDTH,
     /** A drag begins: the width the sidebar has now. */
-    startResize: () => { setResizing(true); return current(); },
+    startResize: () => {
+      setResizing(true);
+      return current();
+    },
     resizeTo,
     /** Back to `width`, unsaved: the drag ends where the sidebar was. */
     restore: (width: number) => {
       widthRef.current = width;
-      sidebarRef.current?.style.setProperty("--sidebar-width", `${width}px`);
+      sidebarRef.current?.style.setProperty('--sidebar-width', `${width}px`);
     },
     snap: () => {
       if (snapTimer.current) clearTimeout(snapTimer.current);
@@ -99,13 +121,20 @@ export function useSidebarWidth({ simple, sidePanelOpen, sidebarRef }: {
 
 /** While the edge is dragged the whole page shows the resize cursor and selects no text, wherever the pointer is. */
 function holdPageCursor(held: boolean) {
-  document.body.style.cursor = held ? "col-resize" : "";
-  document.body.style.userSelect = held ? "none" : "";
+  document.body.style.cursor = held ? 'col-resize' : '';
+  document.body.style.userSelect = held ? 'none' : '';
 }
 
 /** The sidebar's edge: a 12px strip centred on the sidebar's hairline that draws nothing of its own. Dragged, it resizes the sidebar, and past AVATARS_BELOW it leaves the column of avatars or opens
  * the sidebar again at its last width. The arrow keys do the same, a step at a time. */
-export function SidebarResizeHandle({ sizing, sidebarRef, avatars, avatarsWidth, onAvatars, style }: {
+export function SidebarResizeHandle({
+  sizing,
+  sidebarRef,
+  avatars,
+  avatarsWidth,
+  onAvatars,
+  style,
+}: {
   sizing: SidebarSizing;
   sidebarRef: RefObject<HTMLElement | null>;
   avatars: boolean;
@@ -125,16 +154,18 @@ export function SidebarResizeHandle({ sizing, sidebarRef, avatars, avatarsWidth,
   };
   return (
     <div
-      role="separator"
-      aria-label={t("sidebar.resize")}
-      aria-orientation="vertical"
+      role='separator'
+      aria-label={t('sidebar.resize')}
+      aria-orientation='vertical'
       aria-valuemin={avatarsWidth}
       aria-valuemax={sizing.maxWidth}
       aria-valuenow={avatars ? avatarsWidth : sizing.valueNow}
       tabIndex={0}
-      data-sidebar-resize={dragging ? "dragging" : ""}
-      className={cn("absolute inset-y-0 -right-1.5 z-20 hidden w-3 cursor-col-resize touch-none outline-none md:block",
-        "after:absolute after:inset-y-0 after:left-[5px] after:w-0.5 focus-visible:after:bg-focus")}
+      data-sidebar-resize={dragging ? 'dragging' : ''}
+      className={cn(
+        'absolute inset-y-0 -right-1.5 z-20 hidden w-3 cursor-col-resize touch-none outline-none md:block',
+        'after:absolute after:inset-y-0 after:left-[5px] after:w-0.5 focus-visible:after:bg-focus',
+      )}
       style={style}
       onPointerDown={(event) => {
         if (event.button !== 0) return;
@@ -156,15 +187,18 @@ export function SidebarResizeHandle({ sizing, sidebarRef, avatars, avatarsWidth,
         }
         current.state = next;
         const width = next.following ? sizing.resizeTo(wanted) : null;
-        if (width !== null) event.currentTarget.setAttribute("aria-valuenow", String(width));
+        if (width !== null) event.currentTarget.setAttribute('aria-valuenow', String(width));
       }}
       onPointerUp={end}
       onPointerCancel={end}
       onKeyDown={(event) => {
-        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();
-        const wider = event.key === "ArrowRight";
-        if (avatars) { if (wider) onAvatars(false); return; }
+        const wider = event.key === 'ArrowRight';
+        if (avatars) {
+          if (wider) onAvatars(false);
+          return;
+        }
         if (!wider && sizing.atMinimum()) onAvatars(true);
         else sizing.stepResize(wider ? 16 : -16);
       }}

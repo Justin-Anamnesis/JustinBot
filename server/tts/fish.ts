@@ -1,9 +1,9 @@
 // The API key stays on the harness: the renderer gets only voice metadata and audio bytes.
-import type { FishTtsModel } from "../config.ts";
-import { userErrorThrown } from "../user-errors.ts";
+import type { FishTtsModel } from '../config.ts';
+import { userErrorThrown } from '../user-errors.ts';
 
-const API = (process.env.OMB_FISH_AUDIO_API || "https://api.fish.audio").replace(/\/+$/, "");
-export const DEFAULT_FISH_MODEL: FishTtsModel = "s2.1-pro";
+const API = (process.env.OMB_FISH_AUDIO_API || 'https://api.fish.audio').replace(/\/+$/, '');
+export const DEFAULT_FISH_MODEL: FishTtsModel = 's2.1-pro';
 const MAX_ERROR_LENGTH = 240;
 const PAGE_SIZE = 100;
 const MAX_OWNED_PAGES = 100;
@@ -36,27 +36,30 @@ async function safeBody(res: Response): Promise<unknown> {
 }
 
 function serviceDetail(body: unknown): string {
-  if (!body || typeof body !== "object") return "";
+  if (!body || typeof body !== 'object') return '';
   const record = body as Record<string, unknown>;
   const detail = record.detail;
   const message =
-    (typeof detail === "string" && detail) ||
-    (detail && typeof detail === "object" && typeof (detail as Record<string, unknown>).message === "string"
+    (typeof detail === 'string' && detail) ||
+    (detail &&
+    typeof detail === 'object' &&
+    typeof (detail as Record<string, unknown>).message === 'string'
       ? ((detail as Record<string, unknown>).message as string)
-      : "") ||
-    (typeof record.message === "string" && record.message) ||
-    (typeof record.error === "string" && record.error) ||
-    "";
+      : '') ||
+    (typeof record.message === 'string' && record.message) ||
+    (typeof record.error === 'string' && record.error) ||
+    '';
   return message.trim().slice(0, MAX_ERROR_LENGTH);
 }
 
 function errorMessage(status: number, action: string, body: unknown): string {
   const detail = serviceDetail(body);
   if (status === 401 || status === 403) {
-    return "Fish Audio rejected that API key, or the key cannot access voice models.";
+    return 'Fish Audio rejected that API key, or the key cannot access voice models.';
   }
-  if (status === 402) return detail || "Fish Audio says this account has insufficient balance.";
-  if (status === 429) return detail || "Fish Audio is rate-limiting this account — wait a moment and try again.";
+  if (status === 402) return detail || 'Fish Audio says this account has insufficient balance.';
+  if (status === 429)
+    return detail || 'Fish Audio is rate-limiting this account — wait a moment and try again.';
   return detail ? `${action} failed: ${detail}` : `${action} failed (${status})`;
 }
 
@@ -65,13 +68,19 @@ export async function verifyKey(key: string): Promise<VerifyResult> {
     // The public catalog needs no key, so it proves nothing; `self=true` answers 401 for an absent or invalid Bearer token.
     const res = await fetch(`${API}/model?page_size=1&self=true`, {
       headers: { authorization: `Bearer ${key}` },
-      redirect: "error",
+      redirect: 'error',
       signal: AbortSignal.timeout(20_000),
     });
     if (res.ok) return { ok: true };
-    return { ok: false, message: errorMessage(res.status, "checking that key", await safeBody(res)) };
+    return {
+      ok: false,
+      message: errorMessage(res.status, 'checking that key', await safeBody(res)),
+    };
   } catch {
-    return { ok: false, message: "Couldn't reach Fish Audio to check that key — check your connection." };
+    return {
+      ok: false,
+      message: "Couldn't reach Fish Audio to check that key — check your connection.",
+    };
   }
 }
 
@@ -80,7 +89,7 @@ async function fishGet(key: string, path: string): Promise<{ status: number; bod
   try {
     response = await fetch(`${API}${path}`, {
       headers: { authorization: `Bearer ${key}` },
-      redirect: "error",
+      redirect: 'error',
       signal: AbortSignal.timeout(20_000),
     });
   } catch {
@@ -89,10 +98,13 @@ async function fishGet(key: string, path: string): Promise<{ status: number; bod
   return { status: response.status, body: await safeBody(response) };
 }
 
-async function modelPage(key: string, query: string): Promise<{ items: unknown[]; hasMore: boolean }> {
+async function modelPage(
+  key: string,
+  query: string,
+): Promise<{ items: unknown[]; hasMore: boolean }> {
   const { status, body } = await fishGet(key, `/model?${query}`);
-  if (status < 200 || status >= 300) throw new Error(errorMessage(status, "listing voices", body));
-  if (!body || typeof body !== "object") return { items: [], hasMore: false };
+  if (status < 200 || status >= 300) throw new Error(errorMessage(status, 'listing voices', body));
+  if (!body || typeof body !== 'object') return { items: [], hasMore: false };
   const page = body as Record<string, unknown>;
   return {
     items: Array.isArray(page.items) ? page.items : [],
@@ -103,20 +115,22 @@ async function modelPage(key: string, query: string): Promise<{ items: unknown[]
 async function modelById(key: string, id: string): Promise<Voice | undefined> {
   const { status, body } = await fishGet(key, `/model/${id}`);
   if (status === 404) return undefined;
-  if (status < 200 || status >= 300) throw new Error(errorMessage(status, "looking up that voice", body));
+  if (status < 200 || status >= 300)
+    throw new Error(errorMessage(status, 'looking up that voice', body));
   return toVoice(body);
 }
 
 function toVoice(item: unknown): Voice | undefined {
-  if (!item || typeof item !== "object") return undefined;
+  if (!item || typeof item !== 'object') return undefined;
   const model = item as Record<string, unknown>;
   // `/model` also lists SVC models and untrained ones; only trained TTS models are valid `reference_id`s for `/v1/tts`.
-  if (model.type !== "tts" || model.state !== "trained") return undefined;
-  const id = typeof model._id === "string" ? model._id.trim() : "";
+  if (model.type !== 'tts' || model.state !== 'trained') return undefined;
+  const id = typeof model._id === 'string' ? model._id.trim() : '';
   if (!id) return undefined;
-  const label = typeof model.title === "string" && model.title.trim() ? model.title.trim() : "Voice";
+  const label =
+    typeof model.title === 'string' && model.title.trim() ? model.title.trim() : 'Voice';
   const description =
-    typeof model.description === "string" && model.description.trim()
+    typeof model.description === 'string' && model.description.trim()
       ? model.description.trim().slice(0, MAX_ERROR_LENGTH)
       : undefined;
   return { id, label, description };
@@ -141,7 +155,9 @@ async function popularAndOwnedModels(key: string): Promise<unknown[]> {
         items.push(...page.items);
         if (!page.hasMore) return items;
       }
-      throw new Error("Fish Audio returned too many voice pages. Narrow the account's voice library and try again.");
+      throw new Error(
+        "Fish Audio returned too many voice pages. Narrow the account's voice library and try again.",
+      );
     })(),
   ]);
   return [...publicPage.items, ...owned];
@@ -161,13 +177,23 @@ export interface VoiceSearch {
   current?: string;
 }
 
-export async function listVoices(key: string, { query, current }: VoiceSearch = {}): Promise<Voice[]> {
-  const trimmed = query?.trim() ?? "";
+export async function listVoices(
+  key: string,
+  { query, current }: VoiceSearch = {},
+): Promise<Voice[]> {
+  const trimmed = query?.trim() ?? '';
   const pastedId = fishVoiceId(trimmed);
   const voices = pastedId
     ? [await modelById(key, pastedId)].filter((voice) => voice !== undefined)
-    : (trimmed ? await searchModels(key, trimmed) : await popularAndOwnedModels(key)).flatMap((item) => toVoice(item) ?? []);
-  if (!trimmed && current && fishVoiceId(current) === current && !voices.some((voice) => voice.id === current)) {
+    : (trimmed ? await searchModels(key, trimmed) : await popularAndOwnedModels(key)).flatMap(
+        (item) => toVoice(item) ?? [],
+      );
+  if (
+    !trimmed &&
+    current &&
+    fishVoiceId(current) === current &&
+    !voices.some((voice) => voice.id === current)
+  ) {
     // The list already loaded: a current voice this key cannot read (private, or a passing Fish error) only goes unnamed.
     const voice = await modelById(key, current).catch(() => undefined);
     if (voice) voices.unshift(voice);
@@ -184,51 +210,52 @@ export async function synthesize(
   let res: Response;
   try {
     res = await fetch(`${API}/v1/tts`, {
-      method: "POST",
+      method: 'POST',
       headers: {
         authorization: `Bearer ${key}`,
-        "content-type": "application/json",
-        accept: "audio/mpeg",
+        'content-type': 'application/json',
+        accept: 'audio/mpeg',
         model,
       },
       body: JSON.stringify({
         text,
         reference_id: voiceId,
-        format: "mp3",
+        format: 'mp3',
         sample_rate: 44_100,
         mp3_bitrate: 64,
-        latency: "normal",
+        latency: 'normal',
       }),
-      redirect: "error",
+      redirect: 'error',
       signal: AbortSignal.timeout(60_000),
     });
   } catch {
     throw new Error("Couldn't reach Fish Audio to generate speech — check your connection.");
   }
-  if (!res.ok) throw new Error(errorMessage(res.status, "speaking", await safeBody(res)));
-  return { bytes: new Uint8Array(await res.arrayBuffer()), mime: "audio/mpeg" };
+  if (!res.ok) throw new Error(errorMessage(res.status, 'speaking', await safeBody(res)));
+  return { bytes: new Uint8Array(await res.arrayBuffer()), mime: 'audio/mpeg' };
 }
 
 export async function transcribe(audio: Uint8Array, mime: string, key: string): Promise<string> {
   const form = new FormData();
-  form.append("audio", new Blob([audio as Uint8Array<ArrayBuffer>], { type: mime }), "speech.wav");
-  form.append("ignore_timestamps", "true");
-  form.append("diarize", "false");
-  form.append("tag_audio_events", "false");
+  form.append('audio', new Blob([audio as Uint8Array<ArrayBuffer>], { type: mime }), 'speech.wav');
+  form.append('ignore_timestamps', 'true');
+  form.append('diarize', 'false');
+  form.append('tag_audio_events', 'false');
   let res: Response;
   try {
     res = await fetch(`${API}/v1/asr`, {
-      method: "POST",
-      headers: { authorization: `Bearer ${key}`, model: "transcribe-1-pro" },
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, model: 'transcribe-1-pro' },
       body: form,
-      redirect: "error",
+      redirect: 'error',
       signal: AbortSignal.timeout(60_000),
     });
   } catch {
-    throw userErrorThrown("serverError.voice.fishTranscribeConnection");
+    throw userErrorThrown('serverError.voice.fishTranscribeConnection');
   }
   const body = await safeBody(res);
-  if (!res.ok) throw new Error(errorMessage(res.status, "hearing you", body));
-  const text = body && typeof body === "object" ? (body as Record<string, unknown>).text : undefined;
-  return typeof text === "string" ? text.trim() : "";
+  if (!res.ok) throw new Error(errorMessage(res.status, 'hearing you', body));
+  const text =
+    body && typeof body === 'object' ? (body as Record<string, unknown>).text : undefined;
+  return typeof text === 'string' ? text.trim() : '';
 }

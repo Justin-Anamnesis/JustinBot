@@ -12,8 +12,12 @@
 // again; a plan that stopped, a sign-out or a sign-in to redo clears it.
 
 const paidDevice = (state) =>
-  state?.status === "connected" && state.entitlement?.plan === "pro" && state.entitlement.status === "active" && typeof state.deviceId === "string"
-    ? state.deviceId : null;
+  state?.status === 'connected' &&
+  state.entitlement?.plan === 'pro' &&
+  state.entitlement.status === 'active' &&
+  typeof state.deviceId === 'string'
+    ? state.deviceId
+    : null;
 
 /**
  * @param {{ fetchAccess: () => Promise<{ url: string; token: string } | null>,
@@ -24,7 +28,7 @@ const paidDevice = (state) =>
  */
 export function createIncludedXSync({ fetchAccess, send, device = paidDevice }) {
   /** The sign-in and the plan's version: a changed plan asks again after a no. */
-  const planKey = (state) => `${device(state)}@${state?.entitlement?.version ?? ""}`;
+  const planKey = (state) => `${device(state)}@${state?.entitlement?.version ?? ''}`;
   /** @type {{ deviceId: string; access: { url: string; token: string } } | null} */
   let held = null;
   /** The plan key the Admin last said no to. */
@@ -38,7 +42,11 @@ export function createIncludedXSync({ fetchAccess, send, device = paidDevice }) 
     const deviceId = device(state);
     if (!deviceId) {
       // Clears a held token, or the server's note that the Admin said no.
-      if (held || refused) { held = null; refused = null; send(null); }
+      if (held || refused) {
+        held = null;
+        refused = null;
+        send(null);
+      }
       return;
     }
     if (held?.deviceId === deviceId || refused === planKey(state)) return;
@@ -49,12 +57,22 @@ export function createIncludedXSync({ fetchAccess, send, device = paidDevice }) 
         const access = await fetchAccess();
         // The sign-in or plan changed while asking: this answer is for a state that is gone.
         if (planKey(latest) !== key) return;
-        if (access) { held = { deviceId, access }; refused = null; send(access); }
-        else { held = null; refused = key; send(null, { offered: false }); }
+        if (access) {
+          held = { deviceId, access };
+          refused = null;
+          send(access);
+        } else {
+          held = null;
+          refused = key;
+          send(null, { offered: false });
+        }
       } catch {
         // Offline or the Admin is down: the next state change tries again. Another sign-in's token never stays with the server
         // meanwhile: the account in use just changed, and its bots would run on the one before.
-        if (held && held.deviceId !== deviceId && planKey(latest) === key) { held = null; send(null); }
+        if (held && held.deviceId !== deviceId && planKey(latest) === key) {
+          held = null;
+          send(null);
+        }
       } finally {
         inflight = null;
       }
@@ -84,8 +102,15 @@ export function createDesktopIncludedX({ account, server, log }) {
     send: (access, note) => {
       const proc = server();
       if (!proc) return;
-      try { proc.postMessage({ type: "openmausbot:included-x", access, ...(note?.offered === false ? { offered: false } : {}) }); }
-      catch (error) { log(`X research access sync failed: ${error?.message ?? error}`); }
+      try {
+        proc.postMessage({
+          type: 'openmausbot:included-x',
+          access,
+          ...(note?.offered === false ? { offered: false } : {}),
+        });
+      } catch (error) {
+        log(`X research access sync failed: ${error?.message ?? error}`);
+      }
     },
   });
 }

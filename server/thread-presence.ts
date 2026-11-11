@@ -25,7 +25,11 @@ function sight(threadId: string, at: number): void {
 export function sawThread(threadId: string, at: number = Date.now()): void {
   sight(threadId, at);
   for (const listener of seenListeners) {
-    try { listener(threadId); } catch (error) { console.warn(`thread presence: ${(error as Error).message}`); }
+    try {
+      listener(threadId);
+    } catch (error) {
+      console.warn(`thread presence: ${(error as Error).message}`);
+    }
   }
 }
 

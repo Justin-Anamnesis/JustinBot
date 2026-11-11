@@ -1,11 +1,11 @@
 // Paired phones. The harness trusts loopback, so off loopback a device token is
 // the credential. Only its SHA-256 is stored: a stolen devices.json is not a
 // stolen fleet.
-import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { DATA_DIR, ensureDataDir, writeFileAtomic } from "./state.ts";
+import { DATA_DIR, ensureDataDir, writeFileAtomic } from './state.ts';
 
 export interface DeviceRecord {
   id: string;
@@ -26,9 +26,9 @@ export interface DeviceRecord {
   e2eAt?: number;
 }
 
-export type DeviceRoutes = "any" | "local";
+export type DeviceRoutes = 'any' | 'local';
 
-export type PublicDevice = Omit<DeviceRecord, "tokenHash">;
+export type PublicDevice = Omit<DeviceRecord, 'tokenHash'>;
 
 /** `token` rides in the QR, has enough entropy to stand alone and is never
  * persisted. `code` is six digits, so it lives two minutes and dies after a
@@ -50,49 +50,52 @@ interface PairingReplay {
   result: { device: PublicDevice; token: string };
 }
 
-const DEVICES_FILE = join(DATA_DIR, "devices.json");
+const DEVICES_FILE = join(DATA_DIR, 'devices.json');
 export const PAIRING_TTL_MS = 120_000;
 export const MAX_PAIRING_ATTEMPTS = 5;
 export const MAX_DEVICES = 20;
 /** lastSeen is a UI nicety, not an audit log. */
 const LAST_SEEN_WRITE_MS = 60_000;
 
-const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 
 /** Constant-time: a plain === leaks a prefix through timing. */
 function sameDigest(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   try {
-    return timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
+    return timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
   } catch {
     return false;
   }
 }
 
 function sameCredential(a: string, b: string): boolean {
-  const left = Buffer.from(a, "utf8");
-  const right = Buffer.from(b, "utf8");
+  const left = Buffer.from(a, 'utf8');
+  const right = Buffer.from(b, 'utf8');
   if (left.length !== right.length) return false;
   return timingSafeEqual(left, right);
 }
 
 /** Untrusted display text from the phone. */
 export function cleanDeviceName(raw: unknown): string {
-  const name = String(raw ?? "")
+  const name = String(raw ?? '')
+    // prettier-ignore
     // oxlint-disable-next-line no-control-regex -- strips control characters from a display name
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
     .trim()
     .slice(0, 60);
-  return name || "Companion";
+  return name || 'Companion';
 }
 
 /** `0` and negatives would date a device to 1970. */
 const timestamp = (value: unknown, fallback: number): number =>
-  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : fallback;
 
 /** `lastSeenAt` falls back to `createdAt`: a device not heard from since
  * pairing was last seen when it paired. */
-function normalizeDevice(record: Partial<DeviceRecord> & { id: string; tokenHash: string }): DeviceRecord {
+function normalizeDevice(
+  record: Partial<DeviceRecord> & { id: string; tokenHash: string },
+): DeviceRecord {
   const createdAt = timestamp(record.createdAt, Date.now());
   return {
     id: record.id,
@@ -102,8 +105,8 @@ function normalizeDevice(record: Partial<DeviceRecord> & { id: string; tokenHash
     lastSeenAt: timestamp(record.lastSeenAt, createdAt),
     cloudDesktopAccess: record.cloudDesktopAccess === true,
     browserControlAccess: record.browserControlAccess === true,
-    routes: record.routes === "local" ? "local" : "any",
-    ...(typeof record.e2eAt === "number" && record.e2eAt > 0 ? { e2eAt: record.e2eAt } : {}),
+    routes: record.routes === 'local' ? 'local' : 'any',
+    ...(typeof record.e2eAt === 'number' && record.e2eAt > 0 ? { e2eAt: record.e2eAt } : {}),
   };
 }
 
@@ -157,20 +160,20 @@ export class DeviceRegistry {
    * gets defaults. */
   constructor() {
     try {
-      const parsed = JSON.parse(readFileSync(DEVICES_FILE, "utf8"));
+      const parsed = JSON.parse(readFileSync(DEVICES_FILE, 'utf8'));
       if (Array.isArray(parsed?.devices)) {
         this.devices = parsed.devices
           .filter(
             (d: unknown): d is Partial<DeviceRecord> & { id: string; tokenHash: string } =>
-              typeof (d as DeviceRecord)?.id === "string" &&
-              typeof (d as DeviceRecord)?.tokenHash === "string",
+              typeof (d as DeviceRecord)?.id === 'string' &&
+              typeof (d as DeviceRecord)?.tokenHash === 'string',
           )
           .map(normalizeDevice);
       } else {
         this.unreadable = true;
       }
     } catch (error) {
-      this.unreadable = (error as NodeJS.ErrnoException)?.code !== "ENOENT";
+      this.unreadable = (error as NodeJS.ErrnoException)?.code !== 'ENOENT';
     }
   }
 
@@ -214,7 +217,9 @@ export class DeviceRegistry {
       expired = true;
     }
     if (expired) this.changed();
-    return [this.window, this.previousWindow].filter((window): window is PairingWindow => window !== null);
+    return [this.window, this.previousWindow].filter(
+      (window): window is PairingWindow => window !== null,
+    );
   }
 
   /** A fresh code while the pairing screen stays open; the one before keeps its remaining time. */
@@ -230,8 +235,8 @@ export class DeviceRegistry {
   /** `randomInt`, not `Math.random`: the code is a credential. */
   private newWindow(): PairingWindow {
     return {
-      code: String(randomInt(0, 1_000_000)).padStart(6, "0"),
-      token: `omb_pair_${randomBytes(32).toString("base64url")}`,
+      code: String(randomInt(0, 1_000_000)).padStart(6, '0'),
+      token: `omb_pair_${randomBytes(32).toString('base64url')}`,
       expiresAt: Date.now() + PAIRING_TTL_MS,
       attemptsLeft: MAX_PAIRING_ATTEMPTS,
     };
@@ -278,9 +283,9 @@ export class DeviceRegistry {
     name: unknown,
     pairRequestId?: unknown,
   ): { device: PublicDevice; token: string } | { error: string } {
-    const presented = String(credential ?? "");
+    const presented = String(credential ?? '');
     const requestId =
-      typeof pairRequestId === "string" && /^[A-Za-z0-9._-]{16,128}$/.test(pairRequestId)
+      typeof pairRequestId === 'string' && /^[A-Za-z0-9._-]{16,128}$/.test(pairRequestId)
         ? pairRequestId
         : null;
 
@@ -295,25 +300,30 @@ export class DeviceRegistry {
     }
 
     const windows = this.pairingWindows();
-    const window = windows.find((candidate) => sameCredential(candidate.code, presented) || sameCredential(candidate.token, presented));
-    if (windows.length === 0) return { error: "no pairing is in progress — open Phone settings on your computer" };
+    const window = windows.find(
+      (candidate) =>
+        sameCredential(candidate.code, presented) || sameCredential(candidate.token, presented),
+    );
+    if (windows.length === 0)
+      return { error: 'no pairing is in progress — open Phone settings on your computer' };
     if (!window) {
       // Every open window pays for a wrong guess: without burning them, six digits is seconds of guessing.
       for (const open of windows) open.attemptsLeft -= 1;
       if (windows.some((open) => open.attemptsLeft <= 0)) {
         this.closePairing();
-        return { error: "too many incorrect codes — start pairing again" };
+        return { error: 'too many incorrect codes — start pairing again' };
       }
-      return { error: "that pairing credential is not right" };
+      return { error: 'that pairing credential is not right' };
     }
     // After the code check: a full fleet must not answer wrong guesses, which
     // would leak state and cost no attempts.
-    if (this.devices.length >= MAX_DEVICES) return { error: "too many paired devices — remove one first" };
+    if (this.devices.length >= MAX_DEVICES)
+      return { error: 'too many paired devices — remove one first' };
     // Consume every open window without clearing a replay; `closePairing` clears both.
     this.window = null;
     this.previousWindow = null;
 
-    const token = `omb_${randomBytes(32).toString("base64url")}`;
+    const token = `omb_${randomBytes(32).toString('base64url')}`;
     const device: DeviceRecord = {
       id: randomUUID(),
       name: cleanDeviceName(name),
@@ -322,7 +332,7 @@ export class DeviceRegistry {
       lastSeenAt: Date.now(),
       cloudDesktopAccess: false,
       browserControlAccess: false,
-      routes: "any",
+      routes: 'any',
     };
     this.devices.push(device);
     // Unlike lastSeenAt, a failed write rolls the registration back: a device
@@ -376,8 +386,7 @@ export class DeviceRegistry {
       // A failed lastSeenAt write must never stop a valid token authenticating.
       try {
         this.persist();
-      } catch {
-      }
+      } catch {}
     }
     return device;
   }

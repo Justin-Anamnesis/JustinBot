@@ -1,15 +1,21 @@
 // The status line's words for each running tool call, whatever the engine: what the call works on (its step), how a
 // long one is doing (its last output, or what its processes show), and a running command's last lines of output.
-import { stripVTControlCharacters } from "node:util";
+import { stripVTControlCharacters } from 'node:util';
 
-import { classifyQuiet, quietNoticeMs, quietTickMs, sampleProcessTree, type ProcessSample } from "../drivers/acp/quiet-status.ts";
-import { redactSecretsInText } from "../redact.ts";
-import { toolStep } from "../step-summary.ts";
-import { newId, type RuntimeEvent } from "../contracts.ts";
-import type { StepQuiet } from "../../shared/turn-progress.ts";
-import type { ProgressEvent } from "./progress-gate.ts";
+import {
+  classifyQuiet,
+  quietNoticeMs,
+  quietTickMs,
+  sampleProcessTree,
+  type ProcessSample,
+} from '../drivers/acp/quiet-status.ts';
+import { redactSecretsInText } from '../redact.ts';
+import { toolStep } from '../step-summary.ts';
+import { newId, type RuntimeEvent } from '../contracts.ts';
+import type { StepQuiet } from '../../shared/turn-progress.ts';
+import type { ProgressEvent } from './progress-gate.ts';
 
-type OutputEvent = Extract<RuntimeEvent, { type: "item.output" }>;
+type OutputEvent = Extract<RuntimeEvent, { type: 'item.output' }>;
 
 /** The least time between two frames that change only a call's output. */
 export const TAIL_FRAME_MS = 1_000;
@@ -34,7 +40,7 @@ interface Call {
 export interface LiveStepsOptions {
   offer(event: ProgressEvent): void;
   /** The local process running the engine of this event's turn, when the engine has one. */
-  enginePid(event: Pick<RuntimeEvent, "threadId" | "providerInstanceId">): number | undefined;
+  enginePid(event: Pick<RuntimeEvent, 'threadId' | 'providerInstanceId'>): number | undefined;
   sample?: (pid: number, since: number) => Promise<ProcessSample>;
   now?: () => number;
   noticeMs?: () => number;
@@ -46,26 +52,41 @@ const ENV_LINE = /^((?:export |declare -x |set )?[A-Za-z_][A-Za-z0-9_]*=).+$/;
 
 /** The last lines a command printed, as a person would read them: no escape codes, a progress bar at its latest state. */
 export function outputTail(output: string): string[] {
-  return stripVTControlCharacters(output).split(/\r?\n/)
-    .map((line) => (line.split("\r").filter((part) => part.trim()).pop() ?? "").replace(/\p{Cc}/gu, "").trim())
+  return stripVTControlCharacters(output)
+    .split(/\r?\n/)
+    .map((line) =>
+      (
+        line
+          .split('\r')
+          .filter((part) => part.trim())
+          .pop() ?? ''
+      )
+        .replace(/\p{Cc}/gu, '')
+        .trim(),
+    )
     .filter(Boolean)
     .slice(-TAIL_LINES)
     .map((line) => {
-      const safe = redactSecretsInText(line).replace(ENV_LINE, "$1…");
+      const safe = redactSecretsInText(line).replace(ENV_LINE, '$1…');
       return safe.length > TAIL_LINE_MAX ? `${safe.slice(0, TAIL_LINE_MAX - 1)}…` : safe;
     });
 }
 
-function quietOf(call: Call, previous: ProcessSample | null, sinceMs: number, sample: ProcessSample): StepQuiet | undefined {
+function quietOf(
+  call: Call,
+  previous: ProcessSample | null,
+  sinceMs: number,
+  sample: ProcessSample,
+): StepQuiet | undefined {
   const state = classifyQuiet({ logged: null, context: null, sample, previous, sinceMs });
-  if (state.kind === "waiting-model") return { kind: "network" };
-  if (state.kind === "busy") return { kind: "busy" };
-  if (state.kind === "no-signs") return { kind: "idle" };
+  if (state.kind === 'waiting-model') return { kind: 'network' };
+  if (state.kind === 'busy') return { kind: 'busy' };
+  if (state.kind === 'no-signs') return { kind: 'idle' };
   return call.quiet;
 }
 
 const sameQuiet = (a: StepQuiet | undefined, b: StepQuiet | undefined) =>
-  a?.kind === b?.kind && (a?.kind !== "output" || a.at === (b as { at?: number } | undefined)?.at);
+  a?.kind === b?.kind && (a?.kind !== 'output' || a.at === (b as { at?: number } | undefined)?.at);
 
 export class LiveSteps {
   private readonly threads = new Map<string, Map<string, Call>>();
@@ -88,7 +109,7 @@ export class LiveSteps {
       this.idleCheck();
       return event;
     }
-    if (event.type === "item.completed" && event.itemType === "tool" && event.itemId) {
+    if (event.type === 'item.completed' && event.itemType === 'tool' && event.itemId) {
       const calls = this.threads.get(event.threadId);
       const call = calls?.get(event.itemId);
       if (call) this.drop(call);
@@ -97,7 +118,7 @@ export class LiveSteps {
       this.idleCheck();
       return event;
     }
-    if (event.type !== "item.started" || event.itemType !== "tool" || !event.itemId) return event;
+    if (event.type !== 'item.started' || event.itemType !== 'tool' || !event.itemId) return event;
     const step = toolStep(event);
     if (!step) return event;
     let calls = this.threads.get(event.threadId);
@@ -105,11 +126,26 @@ export class LiveSteps {
     const repeated = calls.get(event.itemId);
     if (repeated) this.drop(repeated);
     const frame: ProgressEvent = {
-      eventId: newId(), provider: event.provider, providerInstanceId: event.providerInstanceId, threadId: event.threadId,
-      createdAt: event.createdAt, turnId: event.turnId, itemId: event.itemId, type: "turn.progress", ...step,
+      eventId: newId(),
+      provider: event.provider,
+      providerInstanceId: event.providerInstanceId,
+      threadId: event.threadId,
+      createdAt: event.createdAt,
+      turnId: event.turnId,
+      itemId: event.itemId,
+      type: 'turn.progress',
+      ...step,
     };
     calls.set(event.itemId, {
-      frame, startedAt: this.now(), output: "", outputAt: null, sample: null, sampledAt: 0, sampling: false, tailSentAt: 0, tailTimer: null,
+      frame,
+      startedAt: this.now(),
+      output: '',
+      outputAt: null,
+      sample: null,
+      sampledAt: 0,
+      sampling: false,
+      tailSentAt: 0,
+      tailTimer: null,
     });
     this.timer ??= setInterval(() => void this.tick(), this.opts.tickMs?.() ?? quietTickMs());
     this.timer.unref?.();
@@ -119,7 +155,7 @@ export class LiveSteps {
   /** The status-line frame of a call that just started, sent after the call's own start event. */
   announce(event: RuntimeEvent): void {
     const call = event.itemId ? this.threads.get(event.threadId)?.get(event.itemId) : undefined;
-    if (call && event.type === "item.started") this.send(call);
+    if (call && event.type === 'item.started') this.send(call);
   }
 
   /** An engine's own report about a call carries the call's step, how it is doing and its output too. */
@@ -132,7 +168,7 @@ export class LiveSteps {
 
   output(event: OutputEvent): void {
     const call = event.itemId ? this.threads.get(event.threadId)?.get(event.itemId) : undefined;
-    if (!call || !event.text || call.frame.activity !== "command") return;
+    if (!call || !event.text || call.frame.activity !== 'command') return;
     const output = event.whole ? event.text : call.output + event.text;
     call.output = output.length > OUTPUT_KEPT ? output.slice(-OUTPUT_KEPT) : output;
     call.outputAt = this.now();
@@ -154,8 +190,9 @@ export class LiveSteps {
     call.tailSentAt = this.now();
     const tail = outputTail(call.output);
     const noticed = this.now() - call.startedAt >= (this.opts.noticeMs?.() ?? quietNoticeMs());
-    const quiet: StepQuiet | undefined = noticed && call.outputAt !== null ? { kind: "output", at: call.outputAt } : call.quiet;
-    if (tail.join("\n") === call.tail?.join("\n") && sameQuiet(quiet, call.quiet)) return;
+    const quiet: StepQuiet | undefined =
+      noticed && call.outputAt !== null ? { kind: 'output', at: call.outputAt } : call.quiet;
+    if (tail.join('\n') === call.tail?.join('\n') && sameQuiet(quiet, call.quiet)) return;
     call.tail = tail;
     call.quiet = quiet;
     this.send(call);
@@ -163,15 +200,26 @@ export class LiveSteps {
 
   private words(call: Call): Partial<ProgressEvent> {
     const { activity, target, detail } = call.frame;
-    return { activity, target, ...(detail ? { detail } : {}), ...(call.quiet ? { quiet: call.quiet } : {}), ...(call.tail?.length ? { tail: call.tail } : {}) };
+    return {
+      activity,
+      target,
+      ...(detail ? { detail } : {}),
+      ...(call.quiet ? { quiet: call.quiet } : {}),
+      ...(call.tail?.length ? { tail: call.tail } : {}),
+    };
   }
 
   private send(call: Call): void {
-    this.opts.offer({ ...call.frame, eventId: newId(), createdAt: new Date(this.now()).toISOString(), ...this.words(call) });
+    this.opts.offer({
+      ...call.frame,
+      eventId: newId(),
+      createdAt: new Date(this.now()).toISOString(),
+      ...this.words(call),
+    });
   }
 
   private tracked(call: Call): boolean {
-    return this.threads.get(call.frame.threadId)?.get(call.frame.itemId ?? "") === call;
+    return this.threads.get(call.frame.threadId)?.get(call.frame.itemId ?? '') === call;
   }
 
   private drop(call: Call): void {
@@ -192,7 +240,10 @@ export class LiveSteps {
     for (const calls of Array.from(this.threads.values())) {
       for (const call of Array.from(calls.values())) {
         if (now - call.startedAt < noticeMs || call.sampling) continue;
-        const quiet = call.outputAt !== null ? { kind: "output" as const, at: call.outputAt } : await this.processQuiet(call, now);
+        const quiet =
+          call.outputAt !== null
+            ? { kind: 'output' as const, at: call.outputAt }
+            : await this.processQuiet(call, now);
         if (!this.tracked(call) || sameQuiet(quiet, call.quiet)) continue;
         call.quiet = quiet;
         this.send(call);

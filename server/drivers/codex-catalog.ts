@@ -1,37 +1,37 @@
 // Codex model catalog: official ChatGPT rows stay in the main picker; everything wired in ~/.codex is
 // tagged `custom`. `codex app-server` thread/start takes `model` and `modelProvider` separately.
-import { readdirSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { readdirSync, readFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { basename, join } from 'node:path';
 
-import type { ModelCatalog } from "../contracts.ts";
-import { qualifiedModelLabel } from "../contracts.ts";
-import { killCliTree, spawnCli } from "../procs.ts";
-import { codexHome } from "./codex-identity.ts";
-import { unconfirmedModelCatalog } from "../startup-model-catalog.ts";
-import { codexLocalProviderArgs, mergeLocalInject } from "./local-inject.ts";
+import type { ModelCatalog } from '../contracts.ts';
+import { qualifiedModelLabel } from '../contracts.ts';
+import { killCliTree, spawnCli } from '../procs.ts';
+import { codexHome } from './codex-identity.ts';
+import { unconfirmedModelCatalog } from '../startup-model-catalog.ts';
+import { codexLocalProviderArgs, mergeLocalInject } from './local-inject.ts';
 
 export const STATIC_CODEX_MODELS: ModelCatalog = {
-  default: "gpt-5.6-sol",
+  default: 'gpt-5.6-sol',
   options: [
     // Only used when live discovery fails; these rows do not establish account access.
-    { id: "gpt-6-astra", label: "GPT-6 Astra (availability unverified)" },
-    { id: "gpt-6-sol", label: "GPT-6 Sol (availability unverified)" },
-    { id: "gpt-6-luna", label: "GPT-6 Luna (availability unverified)" },
-    { id: "gpt-5.6-sol", label: "GPT-5.6 Sol" },
-    { id: "gpt-5.6-terra", label: "GPT-5.6 Terra" },
-    { id: "gpt-5.6-luna", label: "GPT-5.6 Luna" },
-    { id: "gpt-5.5", label: "GPT-5.5" },
-    { id: "gpt-5.4", label: "GPT-5.4" },
-    { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
-    { id: "gpt-5.3-codex-spark", label: "GPT-5.3 Codex Spark" },
+    { id: 'gpt-6-astra', label: 'GPT-6 Astra (availability unverified)' },
+    { id: 'gpt-6-sol', label: 'GPT-6 Sol (availability unverified)' },
+    { id: 'gpt-6-luna', label: 'GPT-6 Luna (availability unverified)' },
+    { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' },
+    { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra' },
+    { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna' },
+    { id: 'gpt-5.5', label: 'GPT-5.5' },
+    { id: 'gpt-5.4', label: 'GPT-5.4' },
+    { id: 'gpt-5.4-mini', label: 'GPT-5.4 Mini' },
+    { id: 'gpt-5.3-codex-spark', label: 'GPT-5.3 Codex Spark' },
   ],
 };
 
 /** Official rows force this provider, so a local `model_provider = "omlx"` cannot swallow GPT-5.6. */
-export const OFFICIAL_CODEX_PROVIDER = "openai";
+export const OFFICIAL_CODEX_PROVIDER = 'openai';
 
-const SEP = "::";
+const SEP = '::';
 const MODEL_ID = /^[\w][\w./:+-]*$/;
 const PROVIDER_ID = /^[a-z][a-z0-9_-]*$/i;
 
@@ -54,9 +54,15 @@ export function decodeCodexSelection(id: string | null | undefined): {
 
 /** Starts Codex on the chosen model's provider. codex-cli 0.167.0 refuses a turn whose thread provider differs from its
  * current one ("This chat uses custom, but your current provider is magpie"), whatever config.toml's model_provider says. */
-export function codexSelectedProviderArgs(env: Record<string, string | undefined>, modelId: string | null | undefined): string[] {
+export function codexSelectedProviderArgs(
+  env: Record<string, string | undefined>,
+  modelId: string | null | undefined,
+): string[] {
   const provider = decodeCodexSelection(modelId).modelProvider;
-  return [...codexLocalProviderArgs(env, modelId), ...(provider ? ["-c", `model_provider=${JSON.stringify(provider)}`] : [])];
+  return [
+    ...codexLocalProviderArgs(env, modelId),
+    ...(provider ? ['-c', `model_provider=${JSON.stringify(provider)}`] : []),
+  ];
 }
 
 interface CodexAppServerModel {
@@ -73,17 +79,17 @@ export function readCodexAppServerModelCatalog(
   timeoutMs = 8_000,
 ): Promise<ModelCatalog | null> {
   return new Promise((resolve) => {
-    const child = spawnCli(cli, ["app-server"], {
+    const child = spawnCli(cli, ['app-server'], {
       cwd: homedir(),
       env,
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
     let settled = false;
-    let buffer = "";
+    let buffer = '';
     let nextId = 1;
     const models: CodexAppServerModel[] = [];
     const cursors = new Set<string>();
-    const pending = new Map<number, "initialize" | "models">();
+    const pending = new Map<number, 'initialize' | 'models'>();
 
     const finish = (catalog: ModelCatalog | null) => {
       if (settled) return;
@@ -92,26 +98,26 @@ export function readCodexAppServerModelCatalog(
       killCliTree(child);
       resolve(catalog);
     };
-    const request = (method: string, params: unknown, kind: "initialize" | "models") => {
+    const request = (method: string, params: unknown, kind: 'initialize' | 'models') => {
       const id = nextId++;
       pending.set(id, kind);
       try {
-        child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
+        child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`);
       } catch {
         finish(null);
       }
     };
     const requestModels = (cursor: string | null) => {
-      request("model/list", { cursor, limit: 100 }, "models");
+      request('model/list', { cursor, limit: 100 }, 'models');
     };
     const timer = setTimeout(() => finish(null), timeoutMs);
     timer.unref?.();
 
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk) => {
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
       buffer += chunk;
       let newline;
-      while ((newline = buffer.indexOf("\n")) !== -1) {
+      while ((newline = buffer.indexOf('\n')) !== -1) {
         const line = buffer.slice(0, newline);
         buffer = buffer.slice(newline + 1);
         if (!line.trim()) continue;
@@ -128,9 +134,11 @@ export function readCodexAppServerModelCatalog(
           finish(null);
           return;
         }
-        if (kind === "initialize") {
+        if (kind === 'initialize') {
           try {
-            child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method: "initialized", params: {} })}\n`);
+            child.stdin.write(
+              `${JSON.stringify({ jsonrpc: '2.0', method: 'initialized', params: {} })}\n`,
+            );
           } catch {
             finish(null);
             return;
@@ -141,22 +149,32 @@ export function readCodexAppServerModelCatalog(
 
         const page = message.result;
         if (Array.isArray(page?.data)) models.push(...page.data);
-        const cursor = typeof page?.nextCursor === "string" && page.nextCursor ? page.nextCursor : null;
+        const cursor =
+          typeof page?.nextCursor === 'string' && page.nextCursor ? page.nextCursor : null;
         if (cursor && !cursors.has(cursor)) {
           cursors.add(cursor);
           requestModels(cursor);
           continue;
         }
 
-        const options: ModelCatalog["options"] = [];
+        const options: ModelCatalog['options'] = [];
         const seen = new Set<string>();
         let defaultModel: string | null = null;
         for (const row of models) {
-          if (row.hidden === true || typeof row.id !== "string" || !MODEL_ID.test(row.id) || seen.has(row.id)) continue;
+          if (
+            row.hidden === true ||
+            typeof row.id !== 'string' ||
+            !MODEL_ID.test(row.id) ||
+            seen.has(row.id)
+          )
+            continue;
           seen.add(row.id);
           options.push({
             id: row.id,
-            label: typeof row.displayName === "string" && row.displayName.trim() ? row.displayName : row.id,
+            label:
+              typeof row.displayName === 'string' && row.displayName.trim()
+                ? row.displayName
+                : row.id,
           });
           if (row.isDefault === true) defaultModel = row.id;
         }
@@ -170,15 +188,15 @@ export function readCodexAppServerModelCatalog(
         });
       }
     });
-    child.on("error", () => finish(null));
-    child.on("close", () => finish(null));
-    request("initialize", { clientInfo: { name: "openmausbot", version: "1" } }, "initialize");
+    child.on('error', () => finish(null));
+    child.on('close', () => finish(null));
+    request('initialize', { clientInfo: { name: 'openmausbot', version: '1' } }, 'initialize');
   });
 }
 
 function unquote(raw: string): string {
   let value = raw.trim();
-  const hash = value.indexOf(" #");
+  const hash = value.indexOf(' #');
   if (hash !== -1 && !(value.startsWith('"') || value.startsWith("'"))) {
     value = value.slice(0, hash).trim();
   }
@@ -207,7 +225,7 @@ interface CodexToml {
 function parseCodexToml(text: string): CodexToml {
   const result: CodexToml = { providers: [] };
   const byId = new Map<string, CodexProvider>();
-  let section: "root" | "other" | CodexProvider = "root";
+  let section: 'root' | 'other' | CodexProvider = 'root';
 
   const providerFor = (id: string): CodexProvider => {
     let provider = byId.get(id);
@@ -221,40 +239,40 @@ function parseCodexToml(text: string): CodexToml {
 
   for (const line of text.split(/\r?\n/)) {
     const stripped = line.trim();
-    if (!stripped || stripped.startsWith("#")) continue;
-    if (stripped.startsWith("[") && stripped.endsWith("]")) {
+    if (!stripped || stripped.startsWith('#')) continue;
+    if (stripped.startsWith('[') && stripped.endsWith(']')) {
       const inner = stripped.slice(1, -1);
       const match = /^model_providers\.(.+)$/.exec(inner);
       if (match) {
         let id = match[1];
         if (id.startsWith('"') && id.endsWith('"')) id = id.slice(1, -1);
-        section = PROVIDER_ID.test(id) ? providerFor(id) : "other";
+        section = PROVIDER_ID.test(id) ? providerFor(id) : 'other';
       } else {
-        section = "other";
+        section = 'other';
       }
       continue;
     }
-    const eq = stripped.indexOf("=");
+    const eq = stripped.indexOf('=');
     if (eq < 0) continue;
     const key = stripped.slice(0, eq).trim();
     const value = unquote(stripped.slice(eq + 1));
     if (!value) continue;
-    if (section === "root") {
-      if (key === "model") result.model = value;
-      if (key === "model_provider") result.modelProvider = value;
+    if (section === 'root') {
+      if (key === 'model') result.model = value;
+      if (key === 'model_provider') result.modelProvider = value;
       continue;
     }
-    if (section === "other") continue;
-    if (key === "name") section.name = value;
-    if (key === "base_url") section.baseUrl = value;
-    if (key === "env_key") section.envKey = value;
+    if (section === 'other') continue;
+    if (key === 'name') section.name = value;
+    if (key === 'base_url') section.baseUrl = value;
+    if (key === 'env_key') section.envKey = value;
   }
   return result;
 }
 
 function readText(path: string): string | null {
   try {
-    return readFileSync(path, "utf8");
+    return readFileSync(path, 'utf8');
   } catch {
     return null;
   }
@@ -272,7 +290,12 @@ function providerName(provider: string, known: Map<string, CodexProvider>): stri
   return known.get(provider)?.name || provider;
 }
 
-function niceLabel(model: string, provider: string, known: Map<string, CodexProvider>, named: Map<string, string>): string {
+function niceLabel(
+  model: string,
+  provider: string,
+  known: Map<string, CodexProvider>,
+  named: Map<string, string>,
+): string {
   const encoded = encodeCodexSelection(provider, model);
   if (named.has(encoded)) return named.get(encoded)!;
   const host = providerName(provider, known);
@@ -284,11 +307,11 @@ function niceLabel(model: string, provider: string, known: Map<string, CodexProv
 
 function collectCatalogNames(home: string): Map<string, string> {
   const named = new Map<string, string>();
-  for (const file of listDir(join(home, "model-catalogs"))) {
-    if (!file.endsWith(".json")) continue;
-    const provider = basename(file, ".json").replace(/-models$/, "");
+  for (const file of listDir(join(home, 'model-catalogs'))) {
+    if (!file.endsWith('.json')) continue;
+    const provider = basename(file, '.json').replace(/-models$/, '');
     if (!PROVIDER_ID.test(provider)) continue;
-    const raw = readText(join(home, "model-catalogs", file));
+    const raw = readText(join(home, 'model-catalogs', file));
     if (!raw) continue;
     let parsed: unknown;
     try {
@@ -298,17 +321,30 @@ function collectCatalogNames(home: string): Map<string, string> {
     }
     const records = Array.isArray(parsed)
       ? parsed
-      : parsed && typeof parsed === "object" && Array.isArray((parsed as { models?: unknown }).models)
+      : parsed &&
+          typeof parsed === 'object' &&
+          Array.isArray((parsed as { models?: unknown }).models)
         ? (parsed as { models: unknown[] }).models
-        : parsed && typeof parsed === "object" && Array.isArray((parsed as { data?: unknown }).data)
+        : parsed && typeof parsed === 'object' && Array.isArray((parsed as { data?: unknown }).data)
           ? (parsed as { data: unknown[] }).data
           : [];
     for (const record of records) {
-      if (!record || typeof record !== "object") continue;
-      const row = record as { slug?: unknown; id?: unknown; display_name?: unknown; name?: unknown };
-      const slug = typeof row.slug === "string" ? row.slug : typeof row.id === "string" ? row.id : "";
+      if (!record || typeof record !== 'object') continue;
+      const row = record as {
+        slug?: unknown;
+        id?: unknown;
+        display_name?: unknown;
+        name?: unknown;
+      };
+      const slug =
+        typeof row.slug === 'string' ? row.slug : typeof row.id === 'string' ? row.id : '';
       if (!MODEL_ID.test(slug)) continue;
-      const label = typeof row.display_name === "string" ? row.display_name : typeof row.name === "string" ? row.name : "";
+      const label =
+        typeof row.display_name === 'string'
+          ? row.display_name
+          : typeof row.name === 'string'
+            ? row.name
+            : '';
       if (label) named.set(encodeCodexSelection(provider, slug), label);
     }
   }
@@ -318,16 +354,19 @@ function collectCatalogNames(home: string): Map<string, string> {
 function idsFromModelsPayload(payload: unknown): string[] {
   const records = Array.isArray(payload)
     ? payload
-    : payload && typeof payload === "object" && Array.isArray((payload as { data?: unknown }).data)
+    : payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data)
       ? (payload as { data: unknown[] }).data
-      : payload && typeof payload === "object" && Array.isArray((payload as { models?: unknown }).models)
+      : payload &&
+          typeof payload === 'object' &&
+          Array.isArray((payload as { models?: unknown }).models)
         ? (payload as { models: unknown[] }).models
         : [];
   return records.flatMap((record) => {
-    if (typeof record === "string") return MODEL_ID.test(record) ? [record] : [];
-    if (!record || typeof record !== "object") return [];
-    const id = (record as { id?: unknown; slug?: unknown }).id ?? (record as { slug?: unknown }).slug;
-    return typeof id === "string" && MODEL_ID.test(id) ? [id] : [];
+    if (typeof record === 'string') return MODEL_ID.test(record) ? [record] : [];
+    if (!record || typeof record !== 'object') return [];
+    const id =
+      (record as { id?: unknown; slug?: unknown }).id ?? (record as { slug?: unknown }).slug;
+    return typeof id === 'string' && MODEL_ID.test(id) ? [id] : [];
   });
 }
 
@@ -337,7 +376,7 @@ async function probeProviderModels(
   fetchImpl: typeof fetch,
 ): Promise<string[]> {
   if (!provider.baseUrl) return [];
-  const url = `${provider.baseUrl.replace(/\/$/, "")}/models`;
+  const url = `${provider.baseUrl.replace(/\/$/, '')}/models`;
   const headers: Record<string, string> = {};
   if (provider.envKey && env[provider.envKey]) {
     headers.Authorization = `Bearer ${env[provider.envKey]}`;
@@ -375,7 +414,7 @@ async function catalogAround(
   // A relative CODEX_HOME or user home must not load a catalog from another directory.
   const home = codexHome(env);
   if (!home) return mergeLocalInject(official, env, fetchImpl);
-  const mainText = readText(join(home, "config.toml"));
+  const mainText = readText(join(home, 'config.toml'));
   if (!mainText) return mergeLocalInject(official, env, fetchImpl);
 
   const main = parseCodexToml(mainText);
@@ -390,15 +429,16 @@ async function catalogAround(
     if (
       provider === OFFICIAL_CODEX_PROVIDER &&
       official.options.some((option) => option.id === model)
-    ) return;
+    )
+      return;
     extras.push({ provider, model });
   };
 
   remember(main.modelProvider, main.model);
 
   for (const file of listDir(home)) {
-    if (!file.endsWith(".config.toml")) continue;
-    const profile = parseCodexToml(readText(join(home, file)) ?? "");
+    if (!file.endsWith('.config.toml')) continue;
+    const profile = parseCodexToml(readText(join(home, file)) ?? '');
     for (const provider of profile.providers) {
       if (!known.has(provider.id)) known.set(provider.id, provider);
     }
@@ -431,14 +471,15 @@ async function catalogAround(
     });
   }
 
-  const configured = main.model && main.modelProvider
-    ? main.modelProvider === OFFICIAL_CODEX_PROVIDER &&
-      official.options.some((option) => option.id === main.model)
-      ? main.model
-      : encodeCodexSelection(main.modelProvider, main.model)
-    : main.model && seen.has(main.model)
-      ? main.model
-      : null;
+  const configured =
+    main.model && main.modelProvider
+      ? main.modelProvider === OFFICIAL_CODEX_PROVIDER &&
+        official.options.some((option) => option.id === main.model)
+        ? main.model
+        : encodeCodexSelection(main.modelProvider, main.model)
+      : main.model && seen.has(main.model)
+        ? main.model
+        : null;
 
   return mergeLocalInject(
     {

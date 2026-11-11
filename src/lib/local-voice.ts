@@ -1,15 +1,15 @@
-export type RemoteVoiceProvider = "host" | "system";
+export type RemoteVoiceProvider = 'host' | 'system';
 
 type Preferences = {
   provider?: RemoteVoiceProvider;
   voices?: Record<string, string>;
 };
 
-const STORAGE_KEY = "openmausbot.remote-voice.v1";
+const STORAGE_KEY = 'openmausbot.remote-voice.v1';
 
 function storage(): Storage | null {
   try {
-    return typeof localStorage === "undefined" ? null : localStorage;
+    return typeof localStorage === 'undefined' ? null : localStorage;
   } catch {
     return null;
   }
@@ -20,7 +20,7 @@ function read(): Preferences {
     const value = storage()?.getItem(STORAGE_KEY);
     if (!value) return {};
     const parsed = JSON.parse(value) as Preferences;
-    return parsed && typeof parsed === "object" ? parsed : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
   } catch {
     return {};
   }
@@ -29,23 +29,22 @@ function read(): Preferences {
 function write(next: Preferences): void {
   try {
     storage()?.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-  }
+  } catch {}
 }
 
 export function localSystemVoicesAvailable(): boolean {
   return (
-    typeof window !== "undefined" &&
+    typeof window !== 'undefined' &&
     window.ogb?.remoteClient?.active === true &&
-    window.ogb?.platform === "darwin" &&
-    typeof window.speechSynthesis !== "undefined" &&
-    typeof window.SpeechSynthesisUtterance !== "undefined"
+    window.ogb?.platform === 'darwin' &&
+    typeof window.speechSynthesis !== 'undefined' &&
+    typeof window.SpeechSynthesisUtterance !== 'undefined'
   );
 }
 
 export function remoteVoiceProvider(): RemoteVoiceProvider {
   const provider = read().provider;
-  return provider === "host" ? "host" : "system";
+  return provider === 'host' ? 'host' : 'system';
 }
 
 export function setRemoteVoiceProvider(provider: RemoteVoiceProvider): void {
@@ -53,8 +52,8 @@ export function setRemoteVoiceProvider(provider: RemoteVoiceProvider): void {
 }
 
 export function remoteSystemVoice(botId?: string): string {
-  if (!botId) return "";
-  return read().voices?.[botId] ?? "";
+  if (!botId) return '';
+  return read().voices?.[botId] ?? '';
 }
 
 export function setRemoteSystemVoice(botId: string, voiceId: string): void {
@@ -69,7 +68,7 @@ export function setRemoteSystemVoice(botId: string, voiceId: string): void {
 }
 
 export function localSystemVoiceActive(): boolean {
-  return localSystemVoicesAvailable() && remoteVoiceProvider() === "system";
+  return localSystemVoicesAvailable() && remoteVoiceProvider() === 'system';
 }
 
 export type LocalSystemVoice = {

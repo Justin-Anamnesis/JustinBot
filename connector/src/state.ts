@@ -1,11 +1,20 @@
 // The connector's state volume: small JSON files, each written whole (temp file, then rename) and readable by root only,
 // in a folder only root may enter. The box's private key and the home's environment live here and nowhere else; the
 // home's secrets are also in their own folder, the only one a container (the home, read-only) ever mounts.
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
 
-import type { ServerMode } from "./protocol.ts";
-import { HOME_SECRET_ENV, HOME_SECRETS_DIR, HOME_SECRETS_FILE } from "./settings.ts";
+import type { ServerMode } from './protocol.ts';
+import { HOME_SECRET_ENV, HOME_SECRETS_DIR, HOME_SECRETS_FILE } from './settings.ts';
 
 export interface AgentRecord {
   version: 2;
@@ -38,7 +47,7 @@ export interface ConfigRecord {
 /** A step of a job that changes the home or its data, written before the step starts, so a restart can finish it. */
 export interface Operation {
   jobId: string;
-  type: "start" | "update" | "restore" | "import-disk" | "backup" | "export-disk";
+  type: 'start' | 'update' | 'restore' | 'import-disk' | 'backup' | 'export-disk';
   phase: string;
   previousImage: string | null;
   nextImage: string | null;
@@ -54,7 +63,7 @@ export interface Operation {
 export interface HomeRecord {
   version: 1;
   /** What the Admin asked for last; the connector keeps the home that way. */
-  desired: "running" | "stopped";
+  desired: 'running' | 'stopped';
   image: string | null;
   /** The image before the last update, kept on the server so a rollback needs no download. */
   previousImage: string | null;
@@ -65,7 +74,7 @@ export interface StatusRecord {
   connected: boolean;
   unauthorized: boolean;
   /** What the Admin last said of this box: the team's Owner has not accepted it yet, or has. */
-  boxState?: "pending" | "accepted" | null;
+  boxState?: 'pending' | 'accepted' | null;
   lastConnectedAt: number | null;
   lastHeartbeatAt: number | null;
   lastError: string | null;
@@ -84,14 +93,14 @@ export interface SelfUpdateRecord {
 }
 
 const FILES = {
-  agent: "agent.json",
-  home: "home.json",
-  env: "home-env.json",
-  status: "status.json",
-  selfUpdate: "self-update.json",
-  count: "connect-count.json",
-  config: "admin-config.json",
-  pause: "pause.json",
+  agent: 'agent.json',
+  home: 'home.json',
+  env: 'home-env.json',
+  status: 'status.json',
+  selfUpdate: 'self-update.json',
+  count: 'connect-count.json',
+  config: 'admin-config.json',
+  pause: 'pause.json',
 } as const;
 
 export class StateStore {
@@ -110,9 +119,11 @@ export class StateStore {
     const file = this.path(name);
     if (!existsSync(file)) return null;
     try {
-      return JSON.parse(readFileSync(file, "utf8")) as T;
+      return JSON.parse(readFileSync(file, 'utf8')) as T;
     } catch {
-      throw new Error(`The connector's state file ${name} is unreadable. Run the install command again to repair it.`);
+      throw new Error(
+        `The connector's state file ${name} is unreadable. Run the install command again to repair it.`,
+      );
     }
   }
 
@@ -120,7 +131,7 @@ export class StateStore {
     const file = this.path(name);
     const temp = `${file}.${process.pid}.tmp`;
     writeFileSync(temp, `${JSON.stringify(value, null, 1)}\n`, { mode: 0o600 });
-    if (process.platform !== "win32") chmodSync(temp, 0o600);
+    if (process.platform !== 'win32') chmodSync(temp, 0o600);
     renameSync(temp, file);
   }
 
@@ -158,7 +169,15 @@ export class StateStore {
   }
 
   home(): HomeRecord {
-    return this.read<HomeRecord>(FILES.home) ?? { version: 1, desired: "stopped", image: null, previousImage: null, operation: null };
+    return (
+      this.read<HomeRecord>(FILES.home) ?? {
+        version: 1,
+        desired: 'stopped',
+        image: null,
+        previousImage: null,
+        operation: null,
+      }
+    );
   }
 
   saveHome(record: HomeRecord): void {
@@ -182,12 +201,22 @@ export class StateStore {
   /** The secrets of `env`, and nothing else, for the home's launcher to read. */
   saveHomeSecrets(env: Record<string, string>): void {
     privateDir(this.homeSecretsDir);
-    const secrets = Object.fromEntries(HOME_SECRET_ENV.flatMap((name) => (env[name] ? [[name, env[name]]] : [])));
+    const secrets = Object.fromEntries(
+      HOME_SECRET_ENV.flatMap((name) => (env[name] ? [[name, env[name]]] : [])),
+    );
     this.write(join(HOME_SECRETS_DIR, HOME_SECRETS_FILE), secrets);
   }
 
   status(): StatusRecord {
-    return this.read<StatusRecord>(FILES.status) ?? { connected: false, unauthorized: false, lastConnectedAt: null, lastHeartbeatAt: null, lastError: null };
+    return (
+      this.read<StatusRecord>(FILES.status) ?? {
+        connected: false,
+        unauthorized: false,
+        lastConnectedAt: null,
+        lastHeartbeatAt: null,
+        lastError: null,
+      }
+    );
   }
 
   saveStatus(patch: Partial<StatusRecord>): void {
@@ -212,18 +241,18 @@ export class StateStore {
   }
 
   /** Decides a self-update once: the first of the two connectors to rename the record wins; the other learns which. */
-  settleSelfUpdate(outcome: "confirmed" | "aborted"): "confirmed" | "aborted" {
+  settleSelfUpdate(outcome: 'confirmed' | 'aborted'): 'confirmed' | 'aborted' {
     try {
       renameSync(this.path(FILES.selfUpdate), this.path(`self-update.${outcome}.json`));
       return outcome;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-      return existsSync(this.path("self-update.confirmed.json")) ? "confirmed" : "aborted";
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      return existsSync(this.path('self-update.confirmed.json')) ? 'confirmed' : 'aborted';
     }
   }
 
-  selfUpdateOutcome(): { outcome: "confirmed" | "aborted"; record: SelfUpdateRecord } | null {
-    for (const outcome of ["confirmed", "aborted"] as const) {
+  selfUpdateOutcome(): { outcome: 'confirmed' | 'aborted'; record: SelfUpdateRecord } | null {
+    for (const outcome of ['confirmed', 'aborted'] as const) {
       const record = this.read<SelfUpdateRecord>(`self-update.${outcome}.json`);
       if (record) return { outcome, record };
     }
@@ -231,12 +260,12 @@ export class StateStore {
   }
 
   clearSelfUpdateOutcome(): void {
-    this.remove("self-update.confirmed.json");
-    this.remove("self-update.aborted.json");
+    this.remove('self-update.confirmed.json');
+    this.remove('self-update.aborted.json');
   }
 }
 
 function privateDir(dir: string): void {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
-  if (process.platform !== "win32" && (statSync(dir).mode & 0o077) !== 0) chmodSync(dir, 0o700);
+  if (process.platform !== 'win32' && (statSync(dir).mode & 0o077) !== 0) chmodSync(dir, 0o700);
 }

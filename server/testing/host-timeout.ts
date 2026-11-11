@@ -3,7 +3,7 @@
 // (vite.config.ts scales the defaults; explicit timeouts use hostTimeout()). One file at a time on Linux and macOS
 // stays strict.
 const sideBySide = Number(process.env.OMB_VITEST_WORKERS) > 1;
-export const HOST_TIMEOUT_FACTOR = process.platform === "win32" || sideBySide ? 2 : 1;
+export const HOST_TIMEOUT_FACTOR = process.platform === 'win32' || sideBySide ? 2 : 1;
 
 export function hostTimeout(ms: number): number {
   return ms * HOST_TIMEOUT_FACTOR;

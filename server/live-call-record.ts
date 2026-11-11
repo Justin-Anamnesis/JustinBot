@@ -1,20 +1,20 @@
 // Never holds anything said on a call beyond the requests the bot already received.
 // steer-queue.ts imports this at runtime, so it stays light: store and title machinery arrive as injected deps.
-import { liveCallRowText } from "../shared/live-call.ts";
-import type { LiveCallRecord } from "../shared/wire.ts";
-import type { Message } from "./store.ts";
+import { liveCallRowText } from '../shared/live-call.ts';
+import type { LiveCallRecord } from '../shared/wire.ts';
+import type { Message } from './store.ts';
 
 export function spokenLineFields(
-  via: "api" | "call" | undefined,
+  via: 'api' | 'call' | undefined,
   callId: string | undefined,
-): { via?: "call"; callId?: string } {
-  if (via !== "call") return {};
+): { via?: 'call'; callId?: string } {
+  if (via !== 'call') return {};
   return callId ? { via, callId } : { via };
 }
 
 export interface LiveCallRecordDeps {
   chatExists(botId: string, threadId: string): boolean;
-  appendMessage(threadId: string, message: Omit<Message, "id" | "at">): Message;
+  appendMessage(threadId: string, message: Omit<Message, 'id' | 'at'>): Message;
 }
 
 export function recordLiveCall(
@@ -24,8 +24,8 @@ export function recordLiveCall(
   const { threadId, botName, record } = input;
   if (!deps.chatExists(record.botId, threadId)) return null;
   return deps.appendMessage(threadId, {
-    role: "bot",
-    kind: "call",
+    role: 'bot',
+    kind: 'call',
     text: liveCallRowText(botName, record.seconds),
     call: record,
   });
@@ -40,9 +40,12 @@ export interface LiveCallTitleDeps {
 }
 
 /** `store.patchMessage` does not scrub what the engine wrote, so the title is scrubbed here too. */
-export async function titleLiveCall(deps: LiveCallTitleDeps, input: { threadId: string; row: Message }): Promise<void> {
+export async function titleLiveCall(
+  deps: LiveCallTitleDeps,
+  input: { threadId: string; row: Message },
+): Promise<void> {
   const record = input.row.call;
-  if (!record || record.endReason === "shutdown") return;
+  if (!record || record.endReason === 'shutdown') return;
   try {
     const excerpt = deps.excerpt(deps.messagesFor(input.threadId), record.callId);
     if (!excerpt) return;
@@ -50,7 +53,8 @@ export async function titleLiveCall(deps: LiveCallTitleDeps, input: { threadId: 
     if (!title) return;
     const current = deps.messagesFor(input.threadId).find((message) => message.id === input.row.id);
     if (!current?.call) return;
-    deps.patchMessage(input.threadId, input.row.id, { call: { ...current.call, title: deps.scrub(title) } });
-  } catch {
-  }
+    deps.patchMessage(input.threadId, input.row.id, {
+      call: { ...current.call, title: deps.scrub(title) },
+    });
+  } catch {}
 }

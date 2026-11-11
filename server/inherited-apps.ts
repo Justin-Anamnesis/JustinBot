@@ -1,6 +1,6 @@
-import { botOwner, type OwnedBot } from "../shared/bot-owner.ts";
-import type { ConnectorScopes } from "../shared/connector-scopes.ts";
-import type { BotVisibility, ConnectorToolGrant } from "../shared/wire.ts";
+import { botOwner, type OwnedBot } from '../shared/bot-owner.ts';
+import type { ConnectorScopes } from '../shared/connector-scopes.ts';
+import type { BotVisibility, ConnectorToolGrant } from '../shared/wire.ts';
 
 /** What a bot may use of the connected apps: the switch, each app's tools and read or write level, its MCP servers. */
 export interface AppGrants {
@@ -10,10 +10,12 @@ export interface AppGrants {
   mcpServers?: string[];
 }
 
-type Placed = Pick<OwnedBot, "createdBy" | "reportsTo" | "defaultBot"> & { visibility?: BotVisibility };
+type Placed = Pick<OwnedBot, 'createdBy' | 'reportsTo' | 'defaultBot'> & {
+  visibility?: BotVisibility;
+};
 
-const GRANTS = ["composio", "connectorTools", "connectorScopes", "mcpServers"] as const;
-const audience = (bot: Placed) => JSON.stringify(bot.visibility ?? "everyone");
+const GRANTS = ['composio', 'connectorTools', 'connectorScopes', 'mcpServers'] as const;
+const audience = (bot: Placed) => JSON.stringify(bot.visibility ?? 'everyone');
 
 /** The connected apps a bot a Chief creates starts with: a copy of the Chief's own grants and levels, never more.
  * Security: only a bot with the Chief's owner and exactly the Chief's audience gets them, so nobody reaches an app
@@ -24,7 +26,8 @@ export function appsFromCreator(creator: AppGrants & Placed, created: Placed): A
     return { composio: false, connectorTools: {}, mcpServers: [] };
   }
   const grants: AppGrants = {};
-  for (const key of GRANTS) if (creator[key] !== undefined) Object.assign(grants, { [key]: structuredClone(creator[key]) });
+  for (const key of GRANTS)
+    if (creator[key] !== undefined) Object.assign(grants, { [key]: structuredClone(creator[key]) });
   // Absent would mean every tool once connected apps are turned on.
   if (grants.composio === false) grants.connectorTools ??= {};
   return grants;

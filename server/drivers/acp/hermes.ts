@@ -1,21 +1,41 @@
 // Hermes Agent (Nous Research's `hermes acp`), custom-only. ACP ignores `hermes -m` (cmd_acp does not
 // forward it), and OPENAI_API_KEY makes provider:auto resolve to OpenRouter without its key ("HTTP 401:
 // Missing Authentication header"), so injects write providers.<host> and set_model `custom:<host>:<model>`.
-import { accessSync, constants, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { parse as parseYaml } from "yaml";
+import {
+  accessSync,
+  constants,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 
-import type { ModelCatalog } from "../../contracts.ts";
-import { findCliCandidates, harnessHome, resolveCliSpawn, splitCliString, whichWin } from "../../env-path.ts";
-import { resolveCli, spawnCli } from "../../procs.ts";
-import { decodeInjectId, hostApiKey, INJECT_SEP, localHost, mergeLocalInject } from "../local-inject.ts";
-import { createAcpDriver, type AcpSupport } from "./core.ts";
+import type { ModelCatalog } from '../../contracts.ts';
+import {
+  findCliCandidates,
+  harnessHome,
+  resolveCliSpawn,
+  splitCliString,
+  whichWin,
+} from '../../env-path.ts';
+import { resolveCli, spawnCli } from '../../procs.ts';
+import {
+  decodeInjectId,
+  hostApiKey,
+  INJECT_SEP,
+  localHost,
+  mergeLocalInject,
+} from '../local-inject.ts';
+import { createAcpDriver, type AcpSupport } from './core.ts';
 
-const EMPTY: ModelCatalog = { default: "", options: [] };
+const EMPTY: ModelCatalog = { default: '', options: [] };
 
-export const HERMES_OPENMAUS_SCREENSHOT_COMPAT = "HERMES_OPENMAUS_SCREENSHOT_COMPAT";
-export const HERMES_OPENMAUS_SCREENSHOT_COMPAT_MODEL = "HERMES_OPENMAUS_SCREENSHOT_COMPAT_MODEL";
+export const HERMES_OPENMAUS_SCREENSHOT_COMPAT = 'HERMES_OPENMAUS_SCREENSHOT_COMPAT';
+export const HERMES_OPENMAUS_SCREENSHOT_COMPAT_MODEL = 'HERMES_OPENMAUS_SCREENSHOT_COMPAT_MODEL';
 
 export function bindHermesScreenshotCompat(
   env: Record<string, string | undefined>,
@@ -25,7 +45,7 @@ export function bindHermesScreenshotCompat(
   delete env[HERMES_OPENMAUS_SCREENSHOT_COMPAT_MODEL];
   const inject = decodeInjectId(modelId);
   if (!inject) return;
-  env[HERMES_OPENMAUS_SCREENSHOT_COMPAT] = "1";
+  env[HERMES_OPENMAUS_SCREENSHOT_COMPAT] = '1';
   env[HERMES_OPENMAUS_SCREENSHOT_COMPAT_MODEL] = inject.model;
 }
 
@@ -34,22 +54,30 @@ function quoteYaml(value: string): string {
   return JSON.stringify(value);
 }
 
-function upsertHermesProvider(text: string, hostId: string, baseUrl: string, apiKey: string): string {
-  const block = [`  ${hostId}:`, `    base_url: ${quoteYaml(baseUrl)}`, `    api_key: ${quoteYaml(apiKey)}`, ""].join(
-    "\n",
-  );
+function upsertHermesProvider(
+  text: string,
+  hostId: string,
+  baseUrl: string,
+  apiKey: string,
+): string {
+  const block = [
+    `  ${hostId}:`,
+    `    base_url: ${quoteYaml(baseUrl)}`,
+    `    api_key: ${quoteYaml(apiKey)}`,
+    '',
+  ].join('\n');
   if (/^providers:\s*$/m.test(text)) {
     const replaced = replaceHermesHostBlock(text, hostId, block);
     if (replaced !== null) return replaced;
     return text.replace(/^providers:\s*$/m, `providers:\n${block.trimEnd()}`);
   }
-  const prefix = text && !text.endsWith("\n") ? `${text}\n` : text;
+  const prefix = text && !text.endsWith('\n') ? `${text}\n` : text;
   return `${prefix}\nproviders:\n${block}`;
 }
 
 /** Replace `  hostId:` through the next sibling 2-space key or a top-level key. */
 function replaceHermesHostBlock(text: string, hostId: string, block: string): string | null {
-  const lines = text.split("\n");
+  const lines = text.split('\n');
   const start = lines.findIndex((line) => line === `  ${hostId}:`);
   if (start < 0) return null;
   let end = start + 1;
@@ -58,8 +86,12 @@ function replaceHermesHostBlock(text: string, hostId: string, block: string): st
     if (/^  \S/.test(line) || /^\S/.test(line)) break;
     end++;
   }
-  while (end > start + 1 && lines[end - 1] === "") end--;
-  return [...lines.slice(0, start), ...block.replace(/\n$/, "").split("\n"), ...lines.slice(end)].join("\n");
+  while (end > start + 1 && lines[end - 1] === '') end--;
+  return [
+    ...lines.slice(0, start),
+    ...block.replace(/\n$/, '').split('\n'),
+    ...lines.slice(end),
+  ].join('\n');
 }
 
 export function ensureHermesInjectProvider(
@@ -71,14 +103,14 @@ export function ensureHermesInjectProvider(
   const host = localHost(inject.host);
   if (!host) return modelId;
 
-  const dir = env.HERMES_HOME || harnessHome("hermes", env);
+  const dir = env.HERMES_HOME || harnessHome('hermes', env);
   mkdirSync(dir, { recursive: true });
-  const path = join(dir, "config.yaml");
-  let text = "";
+  const path = join(dir, 'config.yaml');
+  let text = '';
   try {
-    text = readFileSync(path, "utf8");
+    text = readFileSync(path, 'utf8');
   } catch {
-    text = "";
+    text = '';
   }
   const next = upsertHermesProvider(text, inject.host, host.baseUrl, hostApiKey(host, env));
   if (next !== text) writeFileSync(path, next);
@@ -90,50 +122,54 @@ export function hermesAcpModelId(modelId: string | null | undefined): string | n
   const inject = decodeInjectId(modelId);
   if (inject) return `custom:${inject.host}:${inject.model}`;
   // Hermes' own ACP ids are `<provider>:<model>` (`openrouter:qwen/qwen3.8-max`), forwarded untouched.
-  const native = typeof modelId === "string" ? modelId.trim() : "";
-  if (native && !native.includes(INJECT_SEP) && /^[a-z0-9_-]+:[\w./:-]+$/i.test(native)) return native;
+  const native = typeof modelId === 'string' ? modelId.trim() : '';
+  if (native && !native.includes(INJECT_SEP) && /^[a-z0-9_-]+:[\w./:-]+$/i.test(native))
+    return native;
   return null;
 }
 
 /** Not an inject id: no session/set_model and no -m, so Hermes runs the model in its own config.yaml. */
-export const HERMES_CONFIG_MODEL_ID = "hermes-default";
+export const HERMES_CONFIG_MODEL_ID = 'hermes-default';
 
 // `custom: true` is load-bearing: a custom-only agent's picker pane lists only options carrying it.
 function hermesConfigOption(model: string) {
   return {
     id: HERMES_CONFIG_MODEL_ID,
-    label: model ? `${model} (Hermes config)` : "Hermes default (config)",
+    label: model ? `${model} (Hermes config)` : 'Hermes default (config)',
     custom: true as const,
   };
 }
 
 function nonEmptyDotenvValue(text: string, name: string): string | null {
-  const match = new RegExp(`^[ \\t]*(?:export[ \\t]+)?${name}[ \\t]*=[ \\t]*([^\\r\\n]*)$`, "m").exec(text);
+  const match = new RegExp(
+    `^[ \\t]*(?:export[ \\t]+)?${name}[ \\t]*=[ \\t]*([^\\r\\n]*)$`,
+    'm',
+  ).exec(text);
   if (!match) return null;
   const raw = match[1].trim();
-  if (!raw || raw.startsWith("#")) return null;
+  if (!raw || raw.startsWith('#')) return null;
   const quote = raw[0];
   if (quote === '"' || quote === "'") {
     const closing = raw.indexOf(quote, 1);
     if (closing < 0) return null;
     const trailing = raw.slice(closing + 1).trim();
-    if (trailing && !trailing.startsWith("#")) return null;
+    if (trailing && !trailing.startsWith('#')) return null;
     return raw.slice(1, closing).trim() || null;
   }
-  return raw.replace(/[ \t]+#.*$/, "").trim() || null;
+  return raw.replace(/[ \t]+#.*$/, '').trim() || null;
 }
 
 const HERMES_HOSTED_PROVIDER_KEYS = [
-  "OPENROUTER_API_KEY",
-  "GLM_API_KEY",
-  "ZAI_API_KEY",
-  "Z_AI_API_KEY",
+  'OPENROUTER_API_KEY',
+  'GLM_API_KEY',
+  'ZAI_API_KEY',
+  'Z_AI_API_KEY',
 ] as const;
 
-const HERMES_LOCAL_CONFIG_PROVIDERS = new Set(["custom", "lmstudio", "ollama", "vllm", "llamacpp"]);
+const HERMES_LOCAL_CONFIG_PROVIDERS = new Set(['custom', 'lmstudio', 'ollama', 'vllm', 'llamacpp']);
 
 function yamlString(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 /** The forms Hermes' `_normalize_root_model_keys` accepts: a scalar `model`, or a mapping whose id is
@@ -146,27 +182,28 @@ function hermesConfigDefault(text: string): { model: string; provider: string } 
   } catch {
     return null;
   }
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const config = raw as Record<string, unknown>;
   const rootProvider = yamlString(config.provider);
-  if (typeof config.model === "string") {
+  if (typeof config.model === 'string') {
     const model = config.model.trim();
     return model ? { model, provider: rootProvider } : null;
   }
-  if (!config.model || typeof config.model !== "object" || Array.isArray(config.model)) return null;
+  if (!config.model || typeof config.model !== 'object' || Array.isArray(config.model)) return null;
 
   const modelConfig = config.model as Record<string, unknown>;
   const outerProvider = yamlString(modelConfig.provider) || rootProvider;
-  for (const key of ["default", "model", "name"] as const) {
+  for (const key of ['default', 'model', 'name'] as const) {
     const candidate = modelConfig[key];
     const scalar = yamlString(candidate);
     if (scalar) return { model: scalar, provider: outerProvider };
-    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) continue;
     const nested = candidate as Record<string, unknown>;
     const nestedModel = yamlString(nested.model) || yamlString(nested.default);
     if (!nestedModel) continue;
     const nestedProvider = yamlString(nested.provider);
-    const provider = !outerProvider || outerProvider === "auto" ? nestedProvider || outerProvider : outerProvider;
+    const provider =
+      !outerProvider || outerProvider === 'auto' ? nestedProvider || outerProvider : outerProvider;
     return { model: nestedModel, provider };
   }
   return null;
@@ -177,38 +214,42 @@ function hermesConfigDefault(text: string): { model: string; provider: string } 
 export function hermesConfiguredModel(
   env: Record<string, string | undefined> = process.env,
 ): { id: string; label: string; custom: true } | null {
-  const dir = env.HERMES_HOME || harnessHome("hermes", env);
-  let secrets = "";
+  const dir = env.HERMES_HOME || harnessHome('hermes', env);
+  let secrets = '';
   try {
-    secrets = readFileSync(join(dir, ".env"), "utf8");
+    secrets = readFileSync(join(dir, '.env'), 'utf8');
   } catch {}
 
-  const hasHostedProviderKey = HERMES_HOSTED_PROVIDER_KEYS.some((name) => nonEmptyDotenvValue(secrets, name));
+  const hasHostedProviderKey = HERMES_HOSTED_PROVIDER_KEYS.some((name) =>
+    nonEmptyDotenvValue(secrets, name),
+  );
 
   // `hermes login` / `hermes setup` record the default in config.yaml; the OAuth token lives in Hermes' auth store.
   let configuredDefault: { model: string; provider: string } | null = null;
   try {
-    configuredDefault = hermesConfigDefault(readFileSync(join(dir, "config.yaml"), "utf8"));
+    configuredDefault = hermesConfigDefault(readFileSync(join(dir, 'config.yaml'), 'utf8'));
   } catch {}
 
-  const configuredProvider = configuredDefault?.provider.toLowerCase() ?? "";
+  const configuredProvider = configuredDefault?.provider.toLowerCase() ?? '';
   const configIsLocal =
-    HERMES_LOCAL_CONFIG_PROVIDERS.has(configuredProvider) || configuredProvider.startsWith("custom:");
+    HERMES_LOCAL_CONFIG_PROVIDERS.has(configuredProvider) ||
+    configuredProvider.startsWith('custom:');
   if (configuredDefault && configIsLocal) return null;
 
   const configIsHosted = configuredDefault !== null;
   if (!hasHostedProviderKey && !configIsHosted) return null;
 
-  return hermesConfigOption(configuredDefault?.model ?? "");
+  return hermesConfigOption(configuredDefault?.model ?? '');
 }
 
 /** A runnable file, so the default entry never points at a directory or a file that can't start. A wrapper such as
  * `wsl hermes` is looked up by its first word, as resolveCliSpawn launches it, and any runnable PATH match counts. */
 function hermesInstalled(cli: string): boolean {
   const trimmed = cli.trim();
-  const head = trimmed.includes(" ") && existsSync(trimmed) ? trimmed : (splitCliString(trimmed)[0] ?? "");
+  const head =
+    trimmed.includes(' ') && existsSync(trimmed) ? trimmed : (splitCliString(trimmed)[0] ?? '');
   // An unrecognized .cmd/.bat shim stays a shim after resolution, and Node can't spawn it without a shell.
-  if (process.platform === "win32") {
+  if (process.platform === 'win32') {
     return whichWin(head) !== null && !/\.(cmd|bat)$/i.test(resolveCliSpawn(trimmed, []).command);
   }
   return findCliCandidates(head).some((found) => {
@@ -222,19 +263,21 @@ function hermesInstalled(cli: string): boolean {
   });
 }
 
-const HERMES_PROBED_PROVIDERS = new Set(["ollama", "lmstudio"]);
+const HERMES_PROBED_PROVIDERS = new Set(['ollama', 'lmstudio']);
 /** Hosts the IPv4 probe reaches; IPv6 loopback ([::1]) is not one of them. */
-const PROBED_LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost"]);
+const PROBED_LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost']);
 
 function yamlMap(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 function hermesUsesProbedProvider(env: Record<string, string | undefined>): boolean {
-  const dir = env.HERMES_HOME || harnessHome("hermes", env);
+  const dir = env.HERMES_HOME || harnessHome('hermes', env);
   try {
-    const text = readFileSync(join(dir, "config.yaml"), "utf8");
-    const provider = hermesConfigDefault(text)?.provider.toLowerCase() ?? "";
+    const text = readFileSync(join(dir, 'config.yaml'), 'utf8');
+    const provider = hermesConfigDefault(text)?.provider.toLowerCase() ?? '';
     const probe = HERMES_PROBED_PROVIDERS.has(provider) ? localHost(provider) : undefined;
     if (!probe) return false;
     const config = yamlMap(parseYaml(text));
@@ -255,7 +298,7 @@ function hermesUsesProbedProvider(env: Record<string, string | undefined>): bool
   }
 }
 
-export const HERMES_ACP_MODELS_TIMEOUT_ENV = "HERMES_ACP_MODELS_TIMEOUT_MS";
+export const HERMES_ACP_MODELS_TIMEOUT_ENV = 'HERMES_ACP_MODELS_TIMEOUT_MS';
 /** Hermes with several providers answers initialize in about a second but session/new, which carries
  * the models, in ~6-7 s. */
 export const HERMES_ACP_MODELS_DEFAULT_TIMEOUT_MS = 15_000;
@@ -281,8 +324,12 @@ export async function fetchHermesAcpModels(
     let child: ReturnType<typeof spawnCli>;
     try {
       // Resolved on the supplied PATH (Windows npm shims), then spawned by spawnCli, which resolves on the app's.
-      const resolved = resolveCli(cli, ["acp"], env as NodeJS.ProcessEnv);
-      child = spawnCli(resolved.command, resolved.args, { stdio: ["pipe", "pipe", "ignore"], env: env as NodeJS.ProcessEnv, box: { allowEnv } });
+      const resolved = resolveCli(cli, ['acp'], env as NodeJS.ProcessEnv);
+      child = spawnCli(resolved.command, resolved.args, {
+        stdio: ['pipe', 'pipe', 'ignore'],
+        env: env as NodeJS.ProcessEnv,
+        box: { allowEnv },
+      });
     } catch {
       return resolve([]);
     }
@@ -297,7 +344,7 @@ export async function fetchHermesAcpModels(
         if (child.kill()) {
           hardKillTimer = setTimeout(() => {
             try {
-              child.kill("SIGKILL");
+              child.kill('SIGKILL');
             } catch {}
           }, 1_000);
           hardKillTimer.unref?.();
@@ -306,15 +353,15 @@ export async function fetchHermesAcpModels(
       resolve(out);
     };
     timer = setTimeout(() => done([]), hermesAcpModelsTimeoutMs(env));
-    child.once("error", () => done([]));
+    child.once('error', () => done([]));
     // A child that already exited makes stdin emit EPIPE, and an unhandled stream 'error' crashes the server.
-    child.stdin?.on("error", () => done([]));
-    child.once("close", () => {
+    child.stdin?.on('error', () => done([]));
+    child.once('close', () => {
       if (hardKillTimer) clearTimeout(hardKillTimer);
       done([]);
     });
 
-    let buf = "";
+    let buf = '';
     let id = 0;
     const send = (method: string, params: unknown) => {
       id += 1;
@@ -323,9 +370,12 @@ export async function fetchHermesAcpModels(
           done([]);
           return 0;
         }
-        child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`, (error) => {
-          if (error) done([]);
-        });
+        child.stdin.write(
+          `${JSON.stringify({ jsonrpc: '2.0', id, method, params })}\n`,
+          (error) => {
+            if (error) done([]);
+          },
+        );
       } catch {
         done([]);
         return 0;
@@ -334,10 +384,10 @@ export async function fetchHermesAcpModels(
     };
     let initId = 0;
     let sessionId = 0;
-    child.stdout?.on("data", (chunk) => {
+    child.stdout?.on('data', (chunk) => {
       buf += String(chunk);
       let nl: number;
-      while ((nl = buf.indexOf("\n")) >= 0) {
+      while ((nl = buf.indexOf('\n')) >= 0) {
         const line = buf.slice(0, nl);
         buf = buf.slice(nl + 1);
         let msg: any;
@@ -348,24 +398,27 @@ export async function fetchHermesAcpModels(
         }
         if (msg?.id === initId) {
           if (!msg.result) return done([]);
-          sessionId = send("session/new", { cwd: env.HOME || env.USERPROFILE || homedir(), mcpServers: [] });
+          sessionId = send('session/new', {
+            cwd: env.HOME || env.USERPROFILE || homedir(),
+            mcpServers: [],
+          });
         } else if (sessionId && msg?.id === sessionId) {
           const list = Array.isArray(msg.result?.models?.availableModels)
             ? msg.result.models.availableModels
             : [];
           done(
             list
-              .filter((m: any) => typeof m?.modelId === "string" && m.modelId)
+              .filter((m: any) => typeof m?.modelId === 'string' && m.modelId)
               .map((m: any) => ({
                 id: m.modelId as string,
-                label: (typeof m.name === "string" && m.name.trim()) || (m.modelId as string),
+                label: (typeof m.name === 'string' && m.name.trim()) || (m.modelId as string),
                 custom: true as const,
               })),
           );
         }
       }
     });
-    initId = send("initialize", {
+    initId = send('initialize', {
       protocolVersion: 1,
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
     });
@@ -377,22 +430,24 @@ export async function resolveHermesModels(
   config?: { cli?: string },
   allowEnv: readonly string[] = [],
 ): Promise<ModelCatalog> {
-  const cli = config?.cli || "hermes";
+  const cli = config?.cli || 'hermes';
   const catalog = await mergeLocalInject(EMPTY, env);
   const configured = hermesConfiguredModel(env);
   const remote = configured ? await fetchHermesAcpModels(cli, env, allowEnv) : [];
   const seen = new Set<string>();
-  const options = [...(configured ? [configured] : []), ...remote, ...catalog.options].filter((o) => {
-    if (seen.has(o.id)) return false;
-    seen.add(o.id);
-    return true;
-  });
+  const options = [...(configured ? [configured] : []), ...remote, ...catalog.options].filter(
+    (o) => {
+      if (seen.has(o.id)) return false;
+      seen.add(o.id);
+      return true;
+    },
+  );
   // A custom endpoint or a config we can't read (another HERMES_HOME, WSL) would leave no choice and no way to
   // create a Hermes bot: offer Hermes' own config.yaml model, which starts `hermes acp` without picking one.
   if (!options.length && !hermesUsesProbedProvider(env) && hermesInstalled(cli)) {
-    options.push(hermesConfigOption(""));
+    options.push(hermesConfigOption(''));
   }
-  return { default: options[0]?.id ?? "", options };
+  return { default: options[0]?.id ?? '', options };
 }
 
 async function applySetting(
@@ -413,21 +468,27 @@ async function applySetting(
  * before its next model call, and answers with one of these lines. After "No active turn" Hermes runs the text as its
  * next prompt before it answers the `/steer` prompt. */
 const HERMES_STEER_ANSWERS = [
-  ["⏩ Steer queued for the active turn:", "accepted"],
-  ["No active turn — queued for the next turn.", "accepted"],
-  ["⚠️ Steer failed:", "refused"],
+  ['⏩ Steer queued for the active turn:', 'accepted'],
+  ['No active turn — queued for the next turn.', 'accepted'],
+  ['⚠️ Steer failed:', 'refused'],
 ] as const;
 
-export function hermesSteerAnswer(chunk: string): "accepted" | "refused" | null {
+export function hermesSteerAnswer(chunk: string): 'accepted' | 'refused' | null {
   return HERMES_STEER_ANSWERS.find(([line]) => chunk.startsWith(line))?.[1] ?? null;
 }
 
 const support: AcpSupport = {
-  driverKind: "hermesAgent",
-  displayName: "Hermes",
-  access: "custom",
+  driverKind: 'hermesAgent',
+  displayName: 'Hermes',
+  access: 'custom',
   models: EMPTY,
-  resolveModels: (env: Record<string, string | undefined>, config: any, _instanceId: string, _fresh?: boolean, allowEnv?: readonly string[]) => resolveHermesModels(env, config, allowEnv),
+  resolveModels: (
+    env: Record<string, string | undefined>,
+    config: any,
+    _instanceId: string,
+    _fresh?: boolean,
+    allowEnv?: readonly string[],
+  ) => resolveHermesModels(env, config, allowEnv),
   resolveTurnModel: (model, env) => {
     // Never inherit a broad or stale compatibility grant from the parent; bind one concrete model.
     bindHermesScreenshotCompat(env, model);
@@ -435,30 +496,30 @@ const support: AcpSupport = {
     ensureHermesInjectProvider(model, env);
     return model;
   },
-  defaultCli: "hermes",
-  nativeSource: "hermes.acp",
-  loginNote: "Hermes CLI is not installed",
+  defaultCli: 'hermes',
+  nativeSource: 'hermes.acp',
+  loginNote: 'Hermes CLI is not installed',
   install: {
     command: {
-      darwin: "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash",
-      linux: "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash",
-      win32: "iex (irm https://hermes-agent.nousresearch.com/install.ps1)",
+      darwin: 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash',
+      linux: 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash',
+      win32: 'iex (irm https://hermes-agent.nousresearch.com/install.ps1)',
     },
-    docsUrl: "https://hermes-agent.nousresearch.com/docs/getting-started/quickstart",
-    signInCommand: "hermes setup",
+    docsUrl: 'https://hermes-agent.nousresearch.com/docs/getting-started/quickstart',
+    signInCommand: 'hermes setup',
   },
-  spawnArgs: () => ["acp"],
+  spawnArgs: () => ['acp'],
   // Hermes keeps the first MCP server it registers under a name for the process's life, so a new bearer needs a fresh process.
   restartOnMcpChange: true,
   resendsReasoningReply: true,
-  steer: { command: "steer", answer: hermesSteerAnswer },
+  steer: { command: 'steer', answer: hermesSteerAnswer },
   transformEnv: (env) => {
     // A leftover OPENAI_API_KEY makes Hermes auto-resolve to OpenRouter with no Authorization header.
     delete env.OPENAI_API_KEY;
     delete env.OPENROUTER_API_KEY;
   },
   pickAuthMethod: () => null,
-  authFailure: "continue",
+  authFailure: 'continue',
   isAuthenticated: () => true,
   async configureSession({ request, sessionId, turn }) {
     // Decode only: ensure* here would read process.env and rewrite the user's real ~/.hermes/config.yaml.
@@ -466,7 +527,7 @@ const support: AcpSupport = {
     if (!native) return;
     await applySetting(
       request,
-      "session/set_model",
+      'session/set_model',
       { sessionId, modelId: native },
       `model "${native}"`,
     );

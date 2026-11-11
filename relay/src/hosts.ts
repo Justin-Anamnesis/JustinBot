@@ -1,12 +1,12 @@
-import { timingSafeEqual } from "node:crypto";
-import type { WebSocket } from "ws";
-import type { Context } from "./context.ts";
-import { hid8 } from "./log.ts";
-import { afterFirstMessage, closeWith, sendJson, type MessageHandler } from "./socket.ts";
-import type { Session } from "./splice.ts";
-import { TokenBucket } from "./limits.ts";
-import { verifyToken, type TokenResult } from "./token.ts";
-import { Close, parseAdmit, parseAuth, parseData, parseObject } from "./wire.ts";
+import { timingSafeEqual } from 'node:crypto';
+import type { WebSocket } from 'ws';
+import type { Context } from './context.ts';
+import { hid8 } from './log.ts';
+import { afterFirstMessage, closeWith, sendJson, type MessageHandler } from './socket.ts';
+import type { Session } from './splice.ts';
+import { TokenBucket } from './limits.ts';
+import { verifyToken, type TokenResult } from './token.ts';
+import { Close, parseAdmit, parseAuth, parseData, parseObject } from './wire.ts';
 
 const NO_MATCH = Buffer.alloc(32);
 
@@ -55,7 +55,8 @@ export class Hosts {
   }
 
   release(entry: HostEntry): void {
-    if (!entry.control && entry.sessions.size === 0 && this.entries.get(entry.hidText) === entry) this.entries.delete(entry.hidText);
+    if (!entry.control && entry.sessions.size === 0 && this.entries.get(entry.hidText) === entry)
+      this.entries.delete(entry.hidText);
   }
 
   /**
@@ -117,13 +118,14 @@ export class HostBudgets {
 
   sweep(): void {
     const day = this.today();
-    for (const [hidText, budget] of this.budgets) if (budget.day !== day) this.budgets.delete(hidText);
+    for (const [hidText, budget] of this.budgets)
+      if (budget.day !== day) this.budgets.delete(hidText);
   }
 }
 
 function checkToken(ctx: Context, token: string, expectHid?: string): TokenResult {
   const result = verifyToken(token, ctx.tokenKeys, ctx.wallSeconds(), expectHid);
-  if (!result.ok) ctx.metrics.inc("relay_token_rejected_total", result.reason);
+  if (!result.ok) ctx.metrics.inc('relay_token_rejected_total', result.reason);
   return result;
 }
 
@@ -147,19 +149,26 @@ export function handleControl(ctx: Context, ws: WebSocket): void {
     entry.control = ws;
     entry.admission = [];
     if (previous) closeWith(ctx, previous, Close.Replaced);
-    else ctx.metrics.peak("hosts_connected", (ctx.hosts.connected += 1));
+    else ctx.metrics.peak('hosts_connected', (ctx.hosts.connected += 1));
 
     const since = ctx.now();
-    const rate = new TokenBucket(ctx.limits.controlBurst, ctx.limits.controlPerSecond / 1000, ctx.now);
+    const rate = new TokenBucket(
+      ctx.limits.controlBurst,
+      ctx.limits.controlPerSecond / 1000,
+      ctx.now,
+    );
     let expires = verified.claims.exp;
     let admitted = false;
     let expiry: NodeJS.Timeout | undefined;
     const armExpiry = () => {
       clearTimeout(expiry);
-      expiry = setTimeout(() => {
-        if (ctx.wallSeconds() >= expires) closeWith(ctx, ws, Close.TokenInvalid);
-        else armExpiry();
-      }, Math.max(0, expires * 1000 - ctx.wallSeconds() * 1000));
+      expiry = setTimeout(
+        () => {
+          if (ctx.wallSeconds() >= expires) closeWith(ctx, ws, Close.TokenInvalid);
+          else armExpiry();
+        },
+        Math.max(0, expires * 1000 - ctx.wallSeconds() * 1000),
+      );
     };
     armExpiry();
     const admitDeadline = setTimeout(() => {
@@ -167,7 +176,7 @@ export function handleControl(ctx: Context, ws: WebSocket): void {
     }, ctx.limits.admitDeadlineMs);
 
     ctx.heartbeat.track(ws);
-    ws.once("close", (code) => {
+    ws.once('close', (code) => {
       clearTimeout(expiry);
       clearTimeout(admitDeadline);
       if (entry.control === ws) {
@@ -176,23 +185,36 @@ export function handleControl(ctx: Context, ws: WebSocket): void {
         ctx.hosts.connected -= 1;
       }
       ctx.hosts.release(entry);
-      ctx.log({ ev: "host", hid8: entry.hid8, dur_s: Math.round((ctx.now() - since) / 1000), close: code });
+      ctx.log({
+        ev: 'host',
+        hid8: entry.hid8,
+        dur_s: Math.round((ctx.now() - since) / 1000),
+        close: code,
+      });
     });
-    sendJson(ws, { t: "hello", v: 1, node: ctx.node, sessionsMax: ctx.limits.hostSessionsMax });
+    sendJson(ws, { t: 'hello', v: 1, node: ctx.node, sessionsMax: ctx.limits.hostSessionsMax });
 
     const handler: MessageHandler = (data, isBinary) => {
       ctx.heartbeat.mark(ws);
       if (entry.control !== ws) return;
       if (!rate.take()) return closeWith(ctx, ws, Close.Limited);
-      const next = !isBinary && data.length <= ctx.limits.authMessageBytes ? parseObject(data.toString("utf8")) : undefined;
-      if (next?.t === "auth") {
+      const next =
+        !isBinary && data.length <= ctx.limits.authMessageBytes
+          ? parseObject(data.toString('utf8'))
+          : undefined;
+      if (next?.t === 'auth') {
         const refresh = parseAuth(next);
         if (refresh === undefined) return closeWith(ctx, ws, Close.Malformed);
         const renewed = checkToken(ctx, refresh, entry.hidText);
         if (!renewed.ok) return closeWith(ctx, ws, Close.TokenInvalid);
         expires = renewed.claims.exp;
         armExpiry();
-        return sendJson(ws, { t: "hello", v: 1, node: ctx.node, sessionsMax: ctx.limits.hostSessionsMax });
+        return sendJson(ws, {
+          t: 'hello',
+          v: 1,
+          node: ctx.node,
+          sessionsMax: ctx.limits.hostSessionsMax,
+        });
       }
       const set = next ? parseAdmit(next, ctx.limits.admissionMax) : undefined;
       if (!set) return closeWith(ctx, ws, Close.Malformed);
@@ -213,7 +235,7 @@ export function handleData(ctx: Context, ws: WebSocket): void {
     const verified = checkToken(ctx, claim.token);
     if (!verified.ok) return void closeWith(ctx, ws, Close.TokenInvalid);
     const session = ctx.hosts.get(verified.claims.hidText)?.sessions.get(claim.sid);
-    if (!session || session.state !== "pending") return void closeWith(ctx, ws, Close.NotFound);
+    if (!session || session.state !== 'pending') return void closeWith(ctx, ws, Close.NotFound);
     session.splice(ws);
     return (data, isBinary) => session.fromHost(data, isBinary);
   });

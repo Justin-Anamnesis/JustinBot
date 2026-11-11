@@ -1,9 +1,9 @@
 // Kept apart from config.json so a pasted or exported config never carries a token; a token never follows its entry to another URL.
-import { mkdirSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { z } from "zod";
+import { mkdirSync, readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { z } from 'zod';
 
-import { writeFileAtomic } from "./atomic.ts";
+import { writeFileAtomic } from './atomic.ts';
 
 const tokensSchema = z.object({
   access: z.string().min(1),
@@ -14,11 +14,11 @@ const tokensSchema = z.object({
 
 const recordSchema = z.object({
   url: z.string(),
-  state: z.enum(["needs-sign-in", "signed-in"]),
+  state: z.enum(['needs-sign-in', 'signed-in']),
   issuer: z.string().optional(),
   clientId: z.string().optional(),
   /** The secret stays in config.json; it is never kept here. */
-  tokenAuth: z.enum(["client_secret_post", "client_secret_basic"]).optional(),
+  tokenAuth: z.enum(['client_secret_post', 'client_secret_basic']).optional(),
   redirectUri: z.string().optional(),
   tokenEndpoint: z.string().optional(),
   revocationEndpoint: z.string().optional(),
@@ -67,10 +67,9 @@ export class McpOAuthStore {
   // Read through on every call: another process may have changed the file.
   private read(): StoreFile {
     try {
-      const parsed = fileSchema.safeParse(JSON.parse(readFileSync(this.file, "utf8")));
+      const parsed = fileSchema.safeParse(JSON.parse(readFileSync(this.file, 'utf8')));
       if (parsed.success) return parsed.data;
-    } catch {
-    }
+    } catch {}
     return { servers: {} };
   }
 

@@ -1,20 +1,20 @@
-const { desktopViewerUrl, sameDesktopViewerOrigin } = require("./desktop-viewer.cjs");
+const { desktopViewerUrl, sameDesktopViewerOrigin } = require('./desktop-viewer.cjs');
 
 const MAX_WORKSPACE_VIEWS = 2;
 const CONTEXT_ID = /^[A-Za-z0-9:_-]{1,120}$/;
 
 function isLoopbackHostname(hostname) {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
 
 /** The noVNC endpoint must stay on this host. view_only sits in noVNC's hash beside its short-lived password: change only that bit. */
 function desktopWorkspaceUrl(rawUrl, interactive = false) {
   const url = desktopViewerUrl(rawUrl);
   if (!isLoopbackHostname(url.hostname)) {
-    throw new Error("Local VM desktops must use a loopback address");
+    throw new Error('Local VM desktops must use a loopback address');
   }
   const fragment = new URLSearchParams(url.hash.slice(1));
-  fragment.set("view_only", interactive ? "false" : "true");
+  fragment.set('view_only', interactive ? 'false' : 'true');
   url.hash = fragment.toString();
   return url;
 }
@@ -25,22 +25,22 @@ function desktopWorkspaceIdentity(url) {
 }
 
 function desktopWorkspaceContextId(value) {
-  if (Object.prototype.toString.call(value) !== "[object String]" || !CONTEXT_ID.test(value)) {
-    throw new Error("The desktop workspace context is invalid");
+  if (Object.prototype.toString.call(value) !== '[object String]' || !CONTEXT_ID.test(value)) {
+    throw new Error('The desktop workspace context is invalid');
   }
   return value;
 }
 
 function normalizeDesktopWorkspaceBounds(rawBounds, contentSize) {
-  if (Object.prototype.toString.call(rawBounds) !== "[object Object]") {
-    throw new Error("Desktop workspace bounds are invalid");
+  if (Object.prototype.toString.call(rawBounds) !== '[object Object]') {
+    throw new Error('Desktop workspace bounds are invalid');
   }
   if (!Array.isArray(contentSize) || contentSize.length !== 2) {
-    throw new Error("The desktop workspace owner size is unavailable");
+    throw new Error('The desktop workspace owner size is unavailable');
   }
   const values = [rawBounds.x, rawBounds.y, rawBounds.width, rawBounds.height];
   if (values.some((value) => !Number.isFinite(value))) {
-    throw new Error("Desktop workspace bounds are invalid");
+    throw new Error('Desktop workspace bounds are invalid');
   }
 
   const ownerWidth = Math.max(1, Math.floor(contentSize[0]));
@@ -49,7 +49,7 @@ function normalizeDesktopWorkspaceBounds(rawBounds, contentSize) {
   let y = Math.round(rawBounds.y);
   let width = Math.round(rawBounds.width);
   let height = Math.round(rawBounds.height);
-  if (width < 1 || height < 1) throw new Error("Desktop workspace bounds are empty");
+  if (width < 1 || height < 1) throw new Error('Desktop workspace bounds are empty');
 
   x = Math.max(0, Math.min(x, ownerWidth - 1));
   y = Math.max(0, Math.min(y, ownerHeight - 1));
@@ -59,8 +59,9 @@ function normalizeDesktopWorkspaceBounds(rawBounds, contentSize) {
 }
 
 function createDesktopWorkspaceManager({ owner, createView, notify, partitionPrefix }) {
-  if (!owner || owner.isDestroyed?.()) throw new Error("The OpenMausBot window is unavailable");
-  if (createView?.constructor !== Function) throw new Error("The desktop workspace viewer is unavailable");
+  if (!owner || owner.isDestroyed?.()) throw new Error('The OpenMausBot window is unavailable');
+  if (createView?.constructor !== Function)
+    throw new Error('The desktop workspace viewer is unavailable');
   const emit = notify?.constructor === Function ? notify : () => {};
   const entries = new Map();
   let partitionCounter = 0;
@@ -76,7 +77,7 @@ function createDesktopWorkspaceManager({ owner, createView, notify, partitionPre
   const stateFor = (entry, status, code) => {
     const state = {
       contextId: entry.contextId,
-      open: status !== "closed",
+      open: status !== 'closed',
       status,
       interactive: entry.interactive,
     };
@@ -84,7 +85,7 @@ function createDesktopWorkspaceManager({ owner, createView, notify, partitionPre
     return state;
   };
 
-  const removeEntry = (entry, status = "closed", code) => {
+  const removeEntry = (entry, status = 'closed', code) => {
     if (entries.get(entry.contextId) !== entry) {
       return entry.terminalState ?? stateFor(entry, status, code);
     }
@@ -109,21 +110,23 @@ function createDesktopWorkspaceManager({ owner, createView, notify, partitionPre
   const secureView = (entry, viewerOrigin) => {
     const contents = entry.view.webContents;
     contents.session.setPermissionCheckHandler(() => false);
-    contents.session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
-    contents.setWindowOpenHandler(() => ({ action: "deny" }));
+    contents.session.setPermissionRequestHandler((_webContents, _permission, callback) =>
+      callback(false),
+    );
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
     const keepOnOrigin = (event, target) => {
       if (sameDesktopViewerOrigin(target, viewerOrigin)) return;
       event.preventDefault();
     };
-    contents.on("will-navigate", keepOnOrigin);
-    contents.on("will-redirect", keepOnOrigin);
-    contents.on("did-fail-load", (_event, code, _description, _failedUrl, isMainFrame) => {
+    contents.on('will-navigate', keepOnOrigin);
+    contents.on('will-redirect', keepOnOrigin);
+    contents.on('did-fail-load', (_event, code, _description, _failedUrl, isMainFrame) => {
       if (!isMainFrame || code === -3 || entries.get(entry.contextId) !== entry) return;
-      removeEntry(entry, "error", "load-failed");
+      removeEntry(entry, 'error', 'load-failed');
     });
-    contents.on("render-process-gone", () => {
-      if (entries.get(entry.contextId) === entry) removeEntry(entry, "error", "renderer-gone");
+    contents.on('render-process-gone', () => {
+      if (entries.get(entry.contextId) === entry) removeEntry(entry, 'error', 'renderer-gone');
     });
   };
 
@@ -132,31 +135,31 @@ function createDesktopWorkspaceManager({ owner, createView, notify, partitionPre
       const current = entry.view.webContents.getURL();
       const next = desktopWorkspaceUrl(current, interactive);
       entry.interactive = interactive;
-      emit(stateFor(entry, "opening"));
+      emit(stateFor(entry, 'opening'));
       await entry.view.webContents.loadURL(next.toString());
     } catch {
-        // A failed demotion must never leave an old interactive noVNC document receiving input: fail closed.
-      removeEntry(entry, "error", "load-failed");
-      throw new Error("The Local VM desktop did not load");
+      // A failed demotion must never leave an old interactive noVNC document receiving input: fail closed.
+      removeEntry(entry, 'error', 'load-failed');
+      throw new Error('The Local VM desktop did not load');
     }
-    if (entries.get(entry.contextId) === entry) emit(stateFor(entry, "ready"));
+    if (entries.get(entry.contextId) === entry) emit(stateFor(entry, 'ready'));
   };
 
   return {
     async open(input) {
-      if (Object.prototype.toString.call(input) !== "[object Object]") {
-        throw new Error("Desktop workspace input is invalid");
+      if (Object.prototype.toString.call(input) !== '[object Object]') {
+        throw new Error('Desktop workspace input is invalid');
       }
       const contextId = desktopWorkspaceContextId(input.contextId);
-      if (entries.has(contextId)) throw new Error("That desktop workspace slot is already open");
+      if (entries.has(contextId)) throw new Error('That desktop workspace slot is already open');
       if (entries.size >= MAX_WORKSPACE_VIEWS) {
-        throw new Error("Only two Local VM desktops can be open together");
+        throw new Error('Only two Local VM desktops can be open together');
       }
 
       const url = desktopWorkspaceUrl(input.url, false);
       const identity = desktopWorkspaceIdentity(url);
       if ([...entries.values()].some((entry) => entry.identity === identity)) {
-        throw new Error("That Local VM desktop is already open");
+        throw new Error('That Local VM desktop is already open');
       }
       const bounds = normalizeDesktopWorkspaceBounds(input.bounds, owner.getContentSize());
       const partition = `${partitionPrefix}-${++partitionCounter}`;
@@ -177,35 +180,36 @@ function createDesktopWorkspaceManager({ owner, createView, notify, partitionPre
       view.setBounds(bounds);
       view.setVisible(false);
       owner.contentView.addChildView(view);
-      emit(stateFor(entry, "opening"));
+      emit(stateFor(entry, 'opening'));
       try {
         await view.webContents.loadURL(url.toString());
       } catch {
-        removeEntry(entry, "error", "load-failed");
-        throw new Error("The Local VM desktop did not load");
+        removeEntry(entry, 'error', 'load-failed');
+        throw new Error('The Local VM desktop did not load');
       }
       if (entries.get(contextId) === entry) {
-        const readyState = stateFor(entry, "ready");
+        const readyState = stateFor(entry, 'ready');
         emit(readyState);
         return readyState;
       }
-      return entry.terminalState ?? stateFor(entry, "closed");
+      return entry.terminalState ?? stateFor(entry, 'closed');
     },
 
     layout(items) {
       if (!Array.isArray(items) || items.length > MAX_WORKSPACE_VIEWS) {
-        throw new Error("Desktop workspace layout is invalid");
+        throw new Error('Desktop workspace layout is invalid');
       }
       const seen = new Set();
       for (const item of items) {
-        if (Object.prototype.toString.call(item) !== "[object Object]") {
-          throw new Error("Desktop workspace layout is invalid");
+        if (Object.prototype.toString.call(item) !== '[object Object]') {
+          throw new Error('Desktop workspace layout is invalid');
         }
         const contextId = desktopWorkspaceContextId(item.contextId);
-        if (seen.has(contextId)) throw new Error("Desktop workspace layout contains a duplicate slot");
+        if (seen.has(contextId))
+          throw new Error('Desktop workspace layout contains a duplicate slot');
         seen.add(contextId);
         const entry = entries.get(contextId);
-        if (!entry) throw new Error("That desktop workspace slot is not open");
+        if (!entry) throw new Error('That desktop workspace slot is not open');
         const bounds = normalizeDesktopWorkspaceBounds(item.bounds, owner.getContentSize());
         entry.view.setBounds(bounds);
         entry.view.setVisible(item.visible === true);
@@ -217,13 +221,13 @@ function createDesktopWorkspaceManager({ owner, createView, notify, partitionPre
       const contextId = rawContextId == null ? null : desktopWorkspaceContextId(rawContextId);
       const targetEntry = contextId === null ? null : entries.get(contextId);
       if (contextId !== null && !targetEntry) {
-        return Promise.reject(new Error("That desktop workspace slot is not open"));
+        return Promise.reject(new Error('That desktop workspace slot is not open'));
       }
       return serializeInteractiveChange(async () => {
         if (targetEntry && entries.get(contextId) !== targetEntry) {
-          throw new Error("That desktop workspace slot is not open");
+          throw new Error('That desktop workspace slot is not open');
         }
-          // Finish every demotion before promoting; the queue keeps overlapping IPC from seeing a flag change mid-reload.
+        // Finish every demotion before promoting; the queue keeps overlapping IPC from seeing a flag change mid-reload.
         for (const entry of entries.values()) {
           if (
             entries.get(entry.contextId) === entry &&

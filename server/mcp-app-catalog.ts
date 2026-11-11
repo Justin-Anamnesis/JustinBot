@@ -1,17 +1,17 @@
 // Which of the person's MCP servers have apps, persisted to DATA_DIR/mcp-app-catalog.json. An entry belongs
 // to the configuration it was learned from, so an edited server is a server never seen, and a server never
 // probed or observed is mounted unchanged.
-import { createHash, randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { createHash, randomBytes } from 'node:crypto';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
-import type { McpServerSpec } from "./contracts.ts";
-import { toolUiResource, toolVisibility, uiMeta, type AppVisibility } from "./mcp-app-observer.ts";
+import type { McpServerSpec } from './contracts.ts';
+import { toolUiResource, toolVisibility, uiMeta, type AppVisibility } from './mcp-app-observer.ts';
 
 export const MCP_APP_CATALOG_STALE_MS = 7 * 24 * 60 * 60_000;
 const MAX_TOOLS = 500;
 
-export type UiExtensionState = "ok" | "refused" | "unknown";
+export type UiExtensionState = 'ok' | 'refused' | 'unknown';
 
 export interface McpAppCatalogTool {
   title?: string;
@@ -34,30 +34,36 @@ interface StoredEntry extends McpAppCatalogEntry {
 
 type Json = Record<string, unknown>;
 function isRecord(value: unknown): value is Json {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 /** How many times a command server was restarted, in the spec a turn mounts (host/mcp-servers-host.ts). */
-export const MCP_RESTART_ENV = "OMB_MCP_RESTART";
+export const MCP_RESTART_ENV = 'OMB_MCP_RESTART';
 
 /** Headers are left out, so a refreshed sign-in token is the same server, and so is the restart count, so a restarted
  * server keeps its apps; hashed, so no credential is stored. */
 export function mcpServerConfigHash(server: McpServerSpec | Json): string {
   const record = server as Json;
   const { [MCP_RESTART_ENV]: _restarts, ...env } = isRecord(record.env) ? record.env : {};
-  const identity = typeof record.url === "string"
-    ? { type: record.type === "sse" ? "sse" : "http", url: record.url }
-    : { command: record.command, args: Array.isArray(record.args) ? record.args : [], env };
-  return createHash("sha256").update(JSON.stringify(identity)).digest("hex");
+  const identity =
+    typeof record.url === 'string'
+      ? { type: record.type === 'sse' ? 'sse' : 'http', url: record.url }
+      : { command: record.command, args: Array.isArray(record.args) ? record.args : [], env };
+  return createHash('sha256').update(JSON.stringify(identity)).digest('hex');
 }
 
 export function catalogTool(tool: unknown): McpAppCatalogTool | null {
-  if (!isRecord(tool) || typeof tool.name !== "string") return null;
+  if (!isRecord(tool) || typeof tool.name !== 'string') return null;
   const resourceUri = toolUiResource(tool);
   const ui = uiMeta(tool);
   if (!resourceUri && !Array.isArray(ui?.visibility)) return null;
   const annotations = isRecord(tool.annotations) ? tool.annotations : {};
-  const title = typeof tool.title === "string" ? tool.title : typeof annotations.title === "string" ? annotations.title : undefined;
+  const title =
+    typeof tool.title === 'string'
+      ? tool.title
+      : typeof annotations.title === 'string'
+        ? annotations.title
+        : undefined;
   return {
     ...(title ? { title: title.slice(0, 200) } : {}),
     visibility: toolVisibility(tool),
@@ -68,9 +74,16 @@ export function catalogTool(tool: unknown): McpAppCatalogTool | null {
 }
 
 function isEntry(value: unknown): value is StoredEntry {
-  return isRecord(value) && typeof value.hash === "string" && typeof value.apps === "boolean"
-    && (value.uiExtension === "ok" || value.uiExtension === "refused" || value.uiExtension === "unknown")
-    && isRecord(value.tools) && typeof value.at === "number";
+  return (
+    isRecord(value) &&
+    typeof value.hash === 'string' &&
+    typeof value.apps === 'boolean' &&
+    (value.uiExtension === 'ok' ||
+      value.uiExtension === 'refused' ||
+      value.uiExtension === 'unknown') &&
+    isRecord(value.tools) &&
+    typeof value.at === 'number'
+  );
 }
 
 export class McpAppCatalog {
@@ -88,10 +101,14 @@ export class McpAppCatalog {
     this.entries = new Map();
     if (!this.file) return this.entries;
     try {
-      const parsed: unknown = JSON.parse(readFileSync(this.file, "utf8"));
-      const servers = isRecord(parsed) && parsed.v === 1 && isRecord(parsed.servers) ? parsed.servers : {};
-      for (const [name, entry] of Object.entries(servers)) if (isEntry(entry)) this.entries.set(name, entry);
-    } catch { /* none yet, or unreadable: learned again */ }
+      const parsed: unknown = JSON.parse(readFileSync(this.file, 'utf8'));
+      const servers =
+        isRecord(parsed) && parsed.v === 1 && isRecord(parsed.servers) ? parsed.servers : {};
+      for (const [name, entry] of Object.entries(servers))
+        if (isEntry(entry)) this.entries.set(name, entry);
+    } catch {
+      /* none yet, or unreadable: learned again */
+    }
     return this.entries;
   }
 
@@ -99,11 +116,15 @@ export class McpAppCatalog {
     if (!this.file) return;
     try {
       mkdirSync(dirname(this.file), { recursive: true, mode: 0o700 });
-      const temp = `${this.file}.${randomBytes(6).toString("hex")}.tmp`;
-      writeFileSync(temp, JSON.stringify({ v: 1, servers: Object.fromEntries(this.load()) }, null, 2), { mode: 0o600 });
+      const temp = `${this.file}.${randomBytes(6).toString('hex')}.tmp`;
+      writeFileSync(
+        temp,
+        JSON.stringify({ v: 1, servers: Object.fromEntries(this.load()) }, null, 2),
+        { mode: 0o600 },
+      );
       renameSync(temp, this.file);
     } catch (error) {
-      console.error("mcp apps: could not save the app catalog", error);
+      console.error('mcp apps: could not save the app catalog', error);
     }
   }
 
@@ -119,7 +140,11 @@ export class McpAppCatalog {
     return !entry || this.now() - entry.at > MCP_APP_CATALOG_STALE_MS;
   }
 
-  private put(name: string, server: McpServerSpec | Json, update: (previous: McpAppCatalogEntry | undefined) => McpAppCatalogEntry): McpAppCatalogEntry {
+  private put(
+    name: string,
+    server: McpServerSpec | Json,
+    update: (previous: McpAppCatalogEntry | undefined) => McpAppCatalogEntry,
+  ): McpAppCatalogEntry {
     const next = update(this.get(name, server));
     const entries = this.load();
     const before = entries.get(name);
@@ -127,31 +152,46 @@ export class McpAppCatalog {
     entries.set(name, stored);
     const { at: _a, ...was } = before ?? { at: 0 };
     const { at: _b, ...now } = stored;
-    if (!before || JSON.stringify(was) !== JSON.stringify(now) || stored.at - before.at > 60 * 60_000) this.save();
+    if (
+      !before ||
+      JSON.stringify(was) !== JSON.stringify(now) ||
+      stored.at - before.at > 60 * 60_000
+    )
+      this.save();
     return next;
   }
 
   /** `uiExtension` undefined keeps what was known. */
-  recordList(name: string, server: McpServerSpec | Json, tools: unknown[], uiExtension?: UiExtensionState): McpAppCatalogEntry {
+  recordList(
+    name: string,
+    server: McpServerSpec | Json,
+    tools: unknown[],
+    uiExtension?: UiExtensionState,
+  ): McpAppCatalogEntry {
     const known: Record<string, McpAppCatalogTool> = {};
     for (const tool of tools) {
       const entry = catalogTool(tool);
-      if (entry && Object.keys(known).length < MAX_TOOLS) known[(tool as { name: string }).name] = entry;
+      if (entry && Object.keys(known).length < MAX_TOOLS)
+        known[(tool as { name: string }).name] = entry;
     }
     return this.put(name, server, (previous) => ({
       apps: Object.values(known).some((tool) => tool.resourceUri !== undefined),
-      uiExtension: uiExtension ?? previous?.uiExtension ?? "unknown",
+      uiExtension: uiExtension ?? previous?.uiExtension ?? 'unknown',
       tools: known,
       at: this.now(),
     }));
   }
 
-  recordTool(name: string, server: McpServerSpec | Json, definition: unknown): McpAppCatalogEntry | undefined {
+  recordTool(
+    name: string,
+    server: McpServerSpec | Json,
+    definition: unknown,
+  ): McpAppCatalogEntry | undefined {
     const tool = catalogTool(definition);
     if (!tool || !tool.resourceUri) return undefined;
     return this.put(name, server, (previous) => ({
       apps: true,
-      uiExtension: previous?.uiExtension ?? "unknown",
+      uiExtension: previous?.uiExtension ?? 'unknown',
       tools: { ...previous?.tools, [(definition as { name: string }).name]: tool },
       at: previous?.at ?? this.now(),
     }));

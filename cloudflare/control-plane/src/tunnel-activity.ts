@@ -17,7 +17,7 @@ export interface TunnelActivity {
   status: string | null;
 }
 
-export type IdleReason = "never_connected" | "offline";
+export type IdleReason = 'never_connected' | 'offline';
 
 export interface IdlePolicy {
   neverConnectedMs: number;
@@ -33,9 +33,12 @@ interface RawTunnelActivity {
 }
 
 function timestamp(value: string | null | undefined): { malformed: boolean; value: number | null } {
-  if (value === undefined || value === null || value === "") return { malformed: false, value: null };
+  if (value === undefined || value === null || value === '')
+    return { malformed: false, value: null };
   const parsed = Date.parse(value);
-  return Number.isFinite(parsed) ? { malformed: false, value: parsed } : { malformed: true, value: null };
+  return Number.isFinite(parsed)
+    ? { malformed: false, value: parsed }
+    : { malformed: true, value: null };
 }
 
 export function tunnelActivity(raw: RawTunnelActivity): TunnelActivity {
@@ -48,14 +51,14 @@ export function tunnelActivity(raw: RawTunnelActivity): TunnelActivity {
     createdAt: created.value,
     connectionCount: raw.connections?.length ?? 0,
     malformed: active.malformed || inactive.malformed || created.malformed,
-    status: typeof raw.status === "string" ? raw.status : null,
+    status: typeof raw.status === 'string' ? raw.status : null,
   };
 }
 
 /** How long the installation and endpoint must also have been quiet before
  * a tunnel idle for `reason` may be reclaimed. */
 export function quietPeriodMs(reason: IdleReason, policy: IdlePolicy): number {
-  return reason === "never_connected" ? policy.neverConnectedMs : policy.offlineMs;
+  return reason === 'never_connected' ? policy.neverConnectedMs : policy.offlineMs;
 }
 
 /**
@@ -76,20 +79,26 @@ export function idleTunnelReason(
 ): IdleReason | null {
   if (!activity || activity.malformed || activity.connectionCount > 0) return null;
 
-  if (activity.status === "inactive") {
+  if (activity.status === 'inactive') {
     if (activity.connsActiveAt !== null) return null;
-    if (activity.createdAt === null || activity.createdAt > now - policy.neverConnectedMs) return null;
-    if (activity.connsInactiveAt !== null && activity.connsInactiveAt > now - policy.neverConnectedMs) {
+    if (activity.createdAt === null || activity.createdAt > now - policy.neverConnectedMs)
+      return null;
+    if (
+      activity.connsInactiveAt !== null &&
+      activity.connsInactiveAt > now - policy.neverConnectedMs
+    ) {
       return null;
     }
-    return "never_connected";
+    return 'never_connected';
   }
 
-  if (activity.status === "down") {
-    if (activity.connsInactiveAt === null || activity.connsInactiveAt > now - policy.offlineMs) return null;
-    if (activity.connsActiveAt !== null && activity.connsActiveAt >= activity.connsInactiveAt) return null;
+  if (activity.status === 'down') {
+    if (activity.connsInactiveAt === null || activity.connsInactiveAt > now - policy.offlineMs)
+      return null;
+    if (activity.connsActiveAt !== null && activity.connsActiveAt >= activity.connsInactiveAt)
+      return null;
     if (activity.createdAt !== null && activity.createdAt > now - policy.offlineMs) return null;
-    return "offline";
+    return 'offline';
   }
 
   return null;

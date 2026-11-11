@@ -1,7 +1,7 @@
-import type { CdpSession, Params } from "./connection.ts";
-import { DriverError } from "./errors.ts";
+import type { CdpSession, Params } from './connection.ts';
+import { DriverError } from './errors.ts';
 
-export type DialogType = "alert" | "confirm" | "prompt" | "beforeunload";
+export type DialogType = 'alert' | 'confirm' | 'prompt' | 'beforeunload';
 
 export interface PendingDialog {
   type: DialogType;
@@ -12,7 +12,7 @@ export interface PendingDialog {
 }
 
 const DIALOG_TEXT_LIMIT = 4_000;
-const TYPES: readonly DialogType[] = ["alert", "confirm", "prompt", "beforeunload"];
+const TYPES: readonly DialogType[] = ['alert', 'confirm', 'prompt', 'beforeunload'];
 
 /** A tab's JavaScript dialog. It stays open until someone answers it; only an agent's own navigation answers a beforeunload. */
 export class Dialogs {
@@ -31,8 +31,8 @@ export class Dialogs {
       if (this.#pending?.session === session) this.#closed();
     };
     const offs = [
-      session.on("Page.javascriptDialogOpening", (params) => this.#opened(session, params)),
-      session.on("Page.javascriptDialogClosed", clear),
+      session.on('Page.javascriptDialogOpening', (params) => this.#opened(session, params)),
+      session.on('Page.javascriptDialogClosed', clear),
       session.onDetach(clear),
     ];
     return () => {
@@ -60,10 +60,19 @@ export class Dialogs {
     return { opened, cancel };
   }
 
-  async answer({ accept, promptText }: { accept: boolean; promptText?: string }): Promise<PendingDialog> {
+  async answer({
+    accept,
+    promptText,
+  }: {
+    accept: boolean;
+    promptText?: string;
+  }): Promise<PendingDialog> {
     const pending = this.#pending;
-    if (!pending) throw new DriverError("refused", "No dialog is open.");
-    await pending.session.send("Page.handleJavaScriptDialog", { accept, ...(promptText === undefined ? {} : { promptText }) });
+    if (!pending) throw new DriverError('refused', 'No dialog is open.');
+    await pending.session.send('Page.handleJavaScriptDialog', {
+      accept,
+      ...(promptText === undefined ? {} : { promptText }),
+    });
     if (this.#pending === pending) this.#closed();
     return pending.dialog;
   }
@@ -72,7 +81,7 @@ export class Dialogs {
   async acceptingBeforeUnload<T>(work: () => Promise<T>): Promise<T> {
     this.#acceptBeforeUnload++;
     try {
-      if (this.#pending?.dialog.type === "beforeunload") await this.answer({ accept: true });
+      if (this.#pending?.dialog.type === 'beforeunload') await this.answer({ accept: true });
       return await work();
     } finally {
       this.#acceptBeforeUnload--;
@@ -80,19 +89,22 @@ export class Dialogs {
   }
 
   #opened(session: CdpSession, params: Params): void {
-    const type = TYPES.find((candidate) => candidate === params.type) ?? "alert";
+    const type = TYPES.find((candidate) => candidate === params.type) ?? 'alert';
     const dialog: PendingDialog = {
       type,
-      message: String(params.message ?? "").slice(0, DIALOG_TEXT_LIMIT),
-      defaultPrompt: String(params.defaultPrompt ?? "").slice(0, DIALOG_TEXT_LIMIT),
-      url: String(params.url ?? "").slice(0, 2_048),
+      message: String(params.message ?? '').slice(0, DIALOG_TEXT_LIMIT),
+      defaultPrompt: String(params.defaultPrompt ?? '').slice(0, DIALOG_TEXT_LIMIT),
+      url: String(params.url ?? '').slice(0, 2_048),
       openedAt: Date.now(),
     };
     this.#pending = { dialog, session };
     for (const listener of this.#openListeners) {
-      try { listener(dialog); } catch {}
+      try {
+        listener(dialog);
+      } catch {}
     }
-    if (type === "beforeunload" && this.#acceptBeforeUnload > 0) void this.answer({ accept: true }).catch(() => {});
+    if (type === 'beforeunload' && this.#acceptBeforeUnload > 0)
+      void this.answer({ accept: true }).catch(() => {});
   }
 
   #closed(): void {
@@ -100,7 +112,9 @@ export class Dialogs {
     if (!pending) return;
     this.#pending = null;
     for (const listener of this.#closeListeners) {
-      try { listener(pending.dialog); } catch {}
+      try {
+        listener(pending.dialog);
+      } catch {}
     }
   }
 }

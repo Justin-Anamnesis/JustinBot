@@ -1,25 +1,30 @@
-import { useCallback, useEffect, useRef, type MouseEvent } from "react";
-import { PAGE_ID } from "../../shared/published-page";
-import type { Bot } from "@/state/store";
-import { useOptionalStoreRef } from "@/state/store-ref";
-import { openExternalLink } from "./app-links";
-import { browserAvailable, builtInBrowserEnabled, type FeatureFlagConfig } from "./feature-flags";
+import { useCallback, useEffect, useRef, type MouseEvent } from 'react';
+import { PAGE_ID } from '../../shared/published-page';
+import type { Bot } from '@/state/store';
+import { useOptionalStoreRef } from '@/state/store-ref';
+import { openExternalLink } from './app-links';
+import { browserAvailable, builtInBrowserEnabled, type FeatureFlagConfig } from './feature-flags';
 
-export const PAGES_DOMAIN = "mausbot.page";
+export const PAGES_DOMAIN = 'mausbot.page';
 
 /** A link to a page a bot published: https://<page id>.mausbot.page/… Never an app, chat or prompt link. */
 export function isPublishedPageUrl(value: string | null | undefined): value is string {
-  if (typeof value !== "string") return false;
+  if (typeof value !== 'string') return false;
   let url: URL;
-  try { url = new URL(value); } catch { return false; }
-  if (url.protocol !== "https:" || url.username || url.password || url.port) return false;
-  const host = url.hostname.toLowerCase(), suffix = `.${PAGES_DOMAIN}`;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return false;
+  const host = url.hostname.toLowerCase(),
+    suffix = `.${PAGES_DOMAIN}`;
   return host.endsWith(suffix) && PAGE_ID.test(host.slice(0, -suffix.length));
 }
 
 export interface PageOpenFacts {
   selectedId: string | null;
-  bots: ReadonlyArray<Pick<Bot, "id" | "browser">>;
+  bots: ReadonlyArray<Pick<Bot, 'id' | 'browser'>>;
   groups: ReadonlyArray<{ id: string }>;
   config: FeatureFlagConfig | null | undefined;
   /** The desktop app's bridge, which only the desktop app's window has. */
@@ -36,14 +41,26 @@ export function pagePanelBot(url: string, facts: PageOpenFacts): string | null {
   if (facts.groups.some((group) => group.id === facts.selectedId)) return null;
   const bot = facts.bots.find((candidate) => candidate.id === facts.selectedId);
   const engine = facts.config?.browserEngine;
-  if (!bot || bot.browser === false || !builtInBrowserEnabled(facts.config) || !browserAvailable(facts.config)) return null;
+  if (
+    !bot ||
+    bot.browser === false ||
+    !builtInBrowserEnabled(facts.config) ||
+    !browserAvailable(facts.config)
+  )
+    return null;
   return engine?.installing || engine?.installError ? null : bot.id;
 }
 
-export interface PanelPage { botId: string; url: string; nonce: number; at: number }
+export interface PanelPage {
+  botId: string;
+  url: string;
+  nonce: number;
+  at: number;
+}
 /** A request older than this is dropped, so a panel opened much later never opens a page by surprise. */
 const PANEL_PAGE_FRESH_MS = 10_000;
-let pending: PanelPage | null = null, nonce = 0;
+let pending: PanelPage | null = null,
+  nonce = 0;
 const takers = new Set<() => void>();
 
 export function requestPanelPage(botId: string, url: string, now = Date.now()): void {
@@ -64,7 +81,9 @@ export function usePanelPage(botId: string, open: (page: PanelPage) => void): vo
     };
     take();
     takers.add(take);
-    return () => { takers.delete(take); };
+    return () => {
+      takers.delete(take);
+    };
   }, [botId]);
 }
 
@@ -76,21 +95,41 @@ export function usePageOpener(): (url: string) => void {
   const latest = useRef(store);
   latest.current = store;
   return useCallback((url: string) => {
-    const app = latest.current, state = app?.state();
-    const botId = app && state ? pagePanelBot(url, { selectedId: state.selectedId, bots: state.bots ?? [], groups: state.groups ?? [], config: state.config, desktop: window.ogb }) : null;
-    if (!app || !botId) { void openExternalLink(url).catch(() => {}); return; }
+    const app = latest.current,
+      state = app?.state();
+    const botId =
+      app && state
+        ? pagePanelBot(url, {
+            selectedId: state.selectedId,
+            bots: state.bots ?? [],
+            groups: state.groups ?? [],
+            config: state.config,
+            desktop: window.ogb,
+          })
+        : null;
+    if (!app || !botId) {
+      void openExternalLink(url).catch(() => {});
+      return;
+    }
     requestPanelPage(botId, url);
-    app.dispatch({ type: "toggleComputer", open: true });
+    app.dispatch({ type: 'toggleComputer', open: true });
   }, []);
 }
 
 /** A page link's click opens it like the card's Open; a click its hover card already took stays taken. */
-export function withPageOpen<T extends { onClick?: (event: MouseEvent<HTMLElement>) => void }>(href: string | undefined, open: (url: string) => void, anchor: T): T {
+export function withPageOpen<T extends { onClick?: (event: MouseEvent<HTMLElement>) => void }>(
+  href: string | undefined,
+  open: (url: string) => void,
+  anchor: T,
+): T {
   if (!isPublishedPageUrl(href)) return anchor;
-  return { ...anchor, onClick: (event: MouseEvent<HTMLElement>) => {
-    anchor.onClick?.(event);
-    if (event.defaultPrevented) return;
-    event.preventDefault();
-    open(href);
-  } };
+  return {
+    ...anchor,
+    onClick: (event: MouseEvent<HTMLElement>) => {
+      anchor.onClick?.(event);
+      if (event.defaultPrevented) return;
+      event.preventDefault();
+      open(href);
+    },
+  };
 }

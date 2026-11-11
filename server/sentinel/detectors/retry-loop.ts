@@ -1,17 +1,17 @@
 // Counted over the whole scan window, so a loop that spans two scans still adds up.
-import { capTitle, failureKey, signatureOf, toolOrigin } from "../normalize.ts";
-import type { Detector, Observation, SentinelRecord } from "../types.ts";
+import { capTitle, failureKey, signatureOf, toolOrigin } from '../normalize.ts';
+import type { Detector, Observation, SentinelRecord } from '../types.ts';
 
-type ToolRecord = Extract<SentinelRecord, { type: "tool" }>;
+type ToolRecord = Extract<SentinelRecord, { type: 'tool' }>;
 
 export const retryLoop: Detector = {
-  name: "retry_loop",
+  name: 'retry_loop',
   detect(records, config) {
     const loops = new Map<string, { signature: string; title: string; calls: ToolRecord[] }>();
     for (const record of records) {
-      if (record.type !== "tool" || record.ok || !record.turnId) continue;
+      if (record.type !== 'tool' || record.ok || !record.turnId) continue;
       const failure = failureKey(record.tool, record.text);
-      const signature = signatureOf("retry_loop", record.tool, failure.key);
+      const signature = signatureOf('retry_loop', record.tool, failure.key);
       const key = `${record.turnId}\n${signature}`;
       const loop = loops.get(key) ?? { signature, title: failure.title, calls: [] };
       loop.calls.push(record);
@@ -23,17 +23,17 @@ export const retryLoop: Detector = {
       const last = calls.reduce((a, b) => (b.at >= a.at ? b : a));
       const origin = toolOrigin(last.tool);
       observations.push({
-        kind: "retry_loop",
+        kind: 'retry_loop',
         signature,
         title: capTitle(`repeated in one turn: ${title}`),
         origin,
-        severity: origin === "harness" ? "high" : "medium",
+        severity: origin === 'harness' ? 'high' : 'medium',
         tool: last.tool,
         threadId: last.threadId,
         turnId: last.turnId!,
         at: last.at,
         occurrence: `retry:${last.turnId}:${signature}`,
-        evidence: { source: "messages", id: last.id },
+        evidence: { source: 'messages', id: last.id },
         ...(last.botId ? { botId: last.botId } : {}),
       });
     }

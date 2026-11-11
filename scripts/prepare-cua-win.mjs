@@ -1,29 +1,30 @@
 // Stage the Windows CUA executable and native SDK outside ASAR.
-import { createHash } from "node:crypto";
-import { copyFile, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { existsSync, realpathSync } from "node:fs";
-import { execFile } from "node:child_process";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
-import { build } from "esbuild";
-import { createBackgroundExecutable } from "./cua-windows-background.mjs";
+import { createHash } from 'node:crypto';
+import { copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { existsSync, realpathSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { build } from 'esbuild';
+import { createBackgroundExecutable } from './cua-windows-background.mjs';
 
-if (process.platform !== "win32" || process.arch !== "x64") throw new Error("prepare-cua-win requires Windows x64");
+if (process.platform !== 'win32' || process.arch !== 'x64')
+  throw new Error('prepare-cua-win requires Windows x64');
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const run = promisify(execFile);
-const stage = join(root, "dist-native", "cua-win32-x64");
-const sdkEntry = fileURLToPath(import.meta.resolve("@trycua/cua-driver"));
-const sdkRoot = realpathSync(join(dirname(sdkEntry), ".."));
-const dependencyRoot = join(sdkRoot, "..", "..");
-const sdkPackage = JSON.parse(await readFile(join(sdkRoot, "package.json"), "utf8"));
+const stage = join(root, 'dist-native', 'cua-win32-x64');
+const sdkEntry = fileURLToPath(import.meta.resolve('@trycua/cua-driver'));
+const sdkRoot = realpathSync(join(dirname(sdkEntry), '..'));
+const dependencyRoot = join(sdkRoot, '..', '..');
+const sdkPackage = JSON.parse(await readFile(join(sdkRoot, 'package.json'), 'utf8'));
 const expectedVersion = String(sdkPackage.version);
 
 const release = {
-  version: "0.45.4",
-  file: "cua-driver-rs-0.45.4-windows-x86_64-binary.zip",
-  sha256: "949927b4cb0519c6fb1377878d67d79a8d6fae7bc56cbed17c7aa26448d82cb5",
+  version: '0.45.4',
+  file: 'cua-driver-rs-0.45.4-windows-x86_64-binary.zip',
+  sha256: '949927b4cb0519c6fb1377878d67d79a8d6fae7bc56cbed17c7aa26448d82cb5',
 };
 
 if (expectedVersion !== release.version) {
@@ -35,7 +36,7 @@ if (expectedVersion !== release.version) {
 async function binaryVersion(candidate) {
   if (!candidate || !existsSync(candidate)) return null;
   try {
-    const { stdout } = await run(candidate, ["--version"], { timeout: 5000, windowsHide: true });
+    const { stdout } = await run(candidate, ['--version'], { timeout: 5000, windowsHide: true });
     return stdout.match(/cua-driver\s+([\d.]+)/)?.[1] ?? null;
   } catch {
     return null;
@@ -43,8 +44,14 @@ async function binaryVersion(candidate) {
 }
 
 async function officialBinary() {
-  const cache = join(root, "node_modules", ".cache", "openmausbot", `cua-driver-${release.version}-win`);
-  const cachedBinary = join(cache, "cua-driver.exe");
+  const cache = join(
+    root,
+    'node_modules',
+    '.cache',
+    'openmausbot',
+    `cua-driver-${release.version}-win`,
+  );
+  const cachedBinary = join(cache, 'cua-driver.exe');
   if ((await binaryVersion(cachedBinary)) === expectedVersion) return cachedBinary;
 
   await rm(cache, { recursive: true, force: true });
@@ -52,23 +59,31 @@ async function officialBinary() {
   const url = `https://github.com/trycua/cua/releases/download/cua-driver-rs-v${release.version}/${release.file}`;
   console.log(`Downloading CUA Driver ${release.version} from the official release…`);
   const response = await fetch(url, {
-    headers: { "user-agent": "OpenMausBot-packager" },
+    headers: { 'user-agent': 'OpenMausBot-packager' },
     signal: AbortSignal.timeout(120_000),
   });
   if (!response.ok) throw new Error(`CUA Driver download failed: HTTP ${response.status}`);
   const bytes = Buffer.from(await response.arrayBuffer());
-  const digest = createHash("sha256").update(bytes).digest("hex");
+  const digest = createHash('sha256').update(bytes).digest('hex');
   if (digest !== release.sha256) {
     throw new Error(`CUA Driver checksum mismatch: expected ${release.sha256}, got ${digest}`);
   }
   const archive = join(cache, release.file);
   await writeFile(archive, bytes);
-  await run("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command",
-    "Expand-Archive -LiteralPath $env:OMB_CUA_ARCHIVE -DestinationPath $env:OMB_CUA_EXTRACT"], {
-    env: { ...process.env, OMB_CUA_ARCHIVE: archive, OMB_CUA_EXTRACT: cache },
-    timeout: 60_000,
-    windowsHide: true,
-  });
+  await run(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-NonInteractive',
+      '-Command',
+      'Expand-Archive -LiteralPath $env:OMB_CUA_ARCHIVE -DestinationPath $env:OMB_CUA_EXTRACT',
+    ],
+    {
+      env: { ...process.env, OMB_CUA_ARCHIVE: archive, OMB_CUA_EXTRACT: cache },
+      timeout: 60_000,
+      windowsHide: true,
+    },
+  );
   if ((await binaryVersion(cachedBinary)) !== expectedVersion) {
     throw new Error(`downloaded CUA Driver does not report version ${expectedVersion}`);
   }
@@ -80,18 +95,18 @@ if (process.env.CUA_DRIVER_PATH) {
   const suppliedVersion = await binaryVersion(process.env.CUA_DRIVER_PATH);
   if (suppliedVersion !== expectedVersion) {
     throw new Error(
-      `CUA_DRIVER_PATH must point to cua-driver ${expectedVersion}; found ${suppliedVersion ?? "an unreadable binary"}`,
+      `CUA_DRIVER_PATH must point to cua-driver ${expectedVersion}; found ${suppliedVersion ?? 'an unreadable binary'}`,
     );
   }
   binary = process.env.CUA_DRIVER_PATH;
 } else {
-  const nativePackage = join(dependencyRoot, "@trycua", "cua-driver-win32-x64-msvc");
+  const nativePackage = join(dependencyRoot, '@trycua', 'cua-driver-win32-x64-msvc');
   if (!existsSync(nativePackage)) {
     throw new Error(
       `required CUA win32-x64 native package is missing — is pnpm.supportedArchitectures.cpu set in package.json?`,
     );
   }
-  const candidate = join(realpathSync(nativePackage), "cua_driver.exe");
+  const candidate = join(realpathSync(nativePackage), 'cua_driver.exe');
   if (!existsSync(candidate)) {
     binary = await officialBinary();
   } else {
@@ -109,50 +124,55 @@ if (!details.isFile()) {
 
 await rm(stage, { recursive: true, force: true });
 await mkdir(stage, { recursive: true });
-await copyFile(binary, join(stage, "cua-driver.exe"));
-await writeFile(join(stage, "cua-driver-background.exe"), createBackgroundExecutable(await readFile(binary)));
+await copyFile(binary, join(stage, 'cua-driver.exe'));
+await writeFile(
+  join(stage, 'cua-driver-background.exe'),
+  createBackgroundExecutable(await readFile(binary)),
+);
 
-const nativeDir = join(stage, "cua-sdk", "native");
-const winNativePackage = join(dependencyRoot, "@trycua", "cua-driver-win32-x64-msvc");
+const nativeDir = join(stage, 'cua-sdk', 'native');
+const winNativePackage = join(dependencyRoot, '@trycua', 'cua-driver-win32-x64-msvc');
 if (!existsSync(winNativePackage)) {
-  throw new Error(
-    `required CUA win32-x64 native package is missing`,
-  );
+  throw new Error(`required CUA win32-x64 native package is missing`);
 }
 await mkdir(nativeDir, { recursive: true });
 await Promise.all([
-  copyFile(join(realpathSync(winNativePackage), "cua_driver_sdk.dll"), join(nativeDir, "cua_driver_sdk.dll")),
-  copyFile(join(realpathSync(winNativePackage), "cua_driver_node_runtime.node"), join(nativeDir, "cua_driver_node_runtime.node")),
+  copyFile(
+    join(realpathSync(winNativePackage), 'cua_driver_sdk.dll'),
+    join(nativeDir, 'cua_driver_sdk.dll'),
+  ),
+  copyFile(
+    join(realpathSync(winNativePackage), 'cua_driver_node_runtime.node'),
+    join(nativeDir, 'cua_driver_node_runtime.node'),
+  ),
 ]);
 
-const bundle = join(stage, "cua-sdk", "cua-sdk.mjs");
+const bundle = join(stage, 'cua-sdk', 'cua-sdk.mjs');
 await build({
   stdin: {
-    contents: [
-      'export { EmbeddedCuaDriverHost } from "@trycua/cua-driver/embedded";',
-    ].join("\n"),
+    contents: ['export { EmbeddedCuaDriverHost } from "@trycua/cua-driver/embedded";'].join('\n'),
     resolveDir: root,
-    sourcefile: "openmausbot-cua-entry.mjs",
-    loader: "js",
+    sourcefile: 'openmausbot-cua-entry.mjs',
+    loader: 'js',
   },
   bundle: true,
-  platform: "node",
-  target: "node20",
-  format: "esm",
+  platform: 'node',
+  target: 'node20',
+  format: 'esm',
   banner: {
     js: 'import { createRequire as __openmausbotCreateRequire } from "node:module"; const require = __openmausbotCreateRequire(import.meta.url);',
   },
   outfile: bundle,
-  logLevel: "silent",
+  logLevel: 'silent',
 });
 // The SDK resolves its native library through @ubjs at runtime; the bundled
 // resolver is patched so OPENMAUSBOT_CUA_SDK_LIBRARY (the staged DLL) wins over
 // node_modules lookups that do not exist in the packaged app.
-const bundledSource = await readFile(bundle, "utf8");
+const bundledSource = await readFile(bundle, 'utf8');
 const resolverPattern = /function resolveLibPath\d*\(opts\) \{/g;
 const resolvers = bundledSource.match(resolverPattern) ?? [];
 if (resolvers.length !== 1) {
-  throw new Error("could not patch the bundled CUA native-library resolver");
+  throw new Error('could not patch the bundled CUA native-library resolver');
 }
 await writeFile(
   bundle,

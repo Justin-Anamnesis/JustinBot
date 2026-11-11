@@ -1,8 +1,22 @@
-import { RuntimeCoordinator } from "./runtime-coordinator.ts";
-import type { WorkOrigin } from "./peer-provenance.ts";
-import type { LegacyThreadResolver } from "./runtime/import-legacy.ts";
-import type { Answerer, Assignment, EnvelopeNames, Level, Limits, Mode, Origin, Outcome, Owner, Reply, Requester, StatusView, TurnEvidence } from "./runtime/types.ts";
-import type { ModelSelection } from "../shared/wire.ts";
+import { RuntimeCoordinator } from './runtime-coordinator.ts';
+import type { WorkOrigin } from './peer-provenance.ts';
+import type { LegacyThreadResolver } from './runtime/import-legacy.ts';
+import type {
+  Answerer,
+  Assignment,
+  EnvelopeNames,
+  Level,
+  Limits,
+  Mode,
+  Origin,
+  Outcome,
+  Owner,
+  Reply,
+  Requester,
+  StatusView,
+  TurnEvidence,
+} from './runtime/types.ts';
+import type { ModelSelection } from '../shared/wire.ts';
 
 /** One coordinate_bots call, as the internal route hands it to the server. */
 export type CoordinateBotsCall = {
@@ -14,7 +28,7 @@ export type CoordinateBotsCall = {
   /** "standing" (the conversation's one work thread with each teammate), "new", or the id of a thread the caller opened on
    * that teammate. */
   thread: string;
-  reply: "resume" | "none";
+  reply: 'resume' | 'none';
   consult: boolean;
   inMyFolder?: boolean;
   doneWhen?: string;
@@ -23,12 +37,13 @@ export type CoordinateBotsCall = {
   /** The assignment whose question the message answers, instead of new work. */
   answers?: string;
   /** start_thread's report_back: the one target is the sender's own new thread, run on this model. */
-  ownThread?: { modelSelection?: ModelSelection; approvalMode?: "ask" };
+  ownThread?: { modelSelection?: ModelSelection; approvalMode?: 'ask' };
 };
 
 export type { LegacyThreadResolver };
 
-export type HandoffStatus = "source" | "queued" | "running" | "waiting" | "resume" | "completed" | "failed" | "cancelled";
+export type HandoffStatus =
+  'source' | 'queued' | 'running' | 'waiting' | 'resume' | 'completed' | 'failed' | 'cancelled';
 
 export interface HandoffView {
   id: string;
@@ -47,10 +62,10 @@ export interface HandoffView {
   executions: number;
   startedAt?: number;
   lastProgressAt?: number;
-  kind: "work" | "assignment";
+  kind: 'work' | 'assignment';
   origin?: WorkOrigin;
   restarts: number;
-  restart?: "rerun" | "cut" | "teammates";
+  restart?: 'rerun' | 'cut' | 'teammates';
   /** work: do it; consult: answer, act on nothing; notify: one-way. */
   mode: Mode;
   /** resume: the requester is woken; poll: it reads its inbox; none: nothing comes back. */
@@ -102,7 +117,7 @@ export interface HandoffOpener {
 export interface HandoffOptions {
   mode?: Mode;
   reply?: Reply;
-  thread?: "standing" | "new";
+  thread?: 'standing' | 'new';
   rework?: boolean;
   requestBatchKey?: string;
   doneWhen?: string;
@@ -110,20 +125,20 @@ export interface HandoffOptions {
   ownThread?: boolean;
 }
 
-export type RoomAddress = Pick<HandoffView, "groupId" | "threadId" | "botId">;
+export type RoomAddress = Pick<HandoffView, 'groupId' | 'threadId' | 'botId'>;
 
 /** `note` is `text` without the brief, for a room whose transcript already has the words; `restartNote` already leads `text`. */
 export interface ComposedTurn {
   text: string;
   note: string;
   restartNote: string;
-  turn: "first" | "resume" | "rerun" | "answered" | "continued";
+  turn: 'first' | 'resume' | 'rerun' | 'answered' | 'continued';
 }
 
 export interface LiveHandoffEdge {
   sourceBotId: string;
   targetBotId: string;
-  state: "queued" | "running";
+  state: 'queued' | 'running';
   threadId: string;
   groupId?: string;
 }
@@ -136,7 +151,12 @@ export interface CoordinatorHost {
   /** Why a busy node waits, in words for the record. */
   holdReason?(node: HandoffView): string;
   /** For a root this is the person's own conversation continuing: person-visible, never internal. */
-  run(node: HandoffView, resumed: boolean, signal: AbortSignal, composed: ComposedTurn): Promise<HostTurnResult>;
+  run(
+    node: HandoffView,
+    resumed: boolean,
+    signal: AbortSignal,
+    composed: ComposedTurn,
+  ): Promise<HostTurnResult>;
   report(child: HandoffView, parent?: HandoffView): void;
   changed(groupIds: ReadonlySet<string>, directThreadIds: ReadonlySet<string>): void;
   names(node: HandoffView, parent?: HandoffView): EnvelopeNames;
@@ -145,7 +165,10 @@ export interface CoordinatorHost {
   /** The level the target thread will really run with, so the envelope states the truth, and, when that came down a Chief's
    * chain, the Chief conversation's level. A Chief's level flows into a room with the hand-off, never onto the shared thread,
    * so it resolves from `source`, the requester's node, whose parents lead up the chain. */
-  levelOf(target: RoomAddress, source?: HandoffView): { level: Level; chief?: Level; driverKind?: string };
+  levelOf(
+    target: RoomAddress,
+    source?: HandoffView,
+  ): { level: Level; chief?: Level; driverKind?: string };
   chiefOf(address: RoomAddress): boolean;
   /** What the cut turn already did outward (sent, posted, paid): a turn that acted outward is not run again. */
   outward?(node: HandoffView): string[];
@@ -157,7 +180,11 @@ export interface CoordinatorHost {
   /** One word from a small model about a teammate's reply (runtime/status-reply.ts), on `requesterBotId`'s own engine: the
    * requester's turn is what the answer may save, and the teammate's engine is busy with the teammate's work. Absent,
    * undefined or a throw: the requester wakes. */
-  statusReply?(requesterBotId: string, prompt: string, signal: AbortSignal): Promise<string | undefined>;
+  statusReply?(
+    requesterBotId: string,
+    prompt: string,
+    signal: AbortSignal,
+  ): Promise<string | undefined>;
 }
 
 export interface Coordinator {
@@ -170,13 +197,19 @@ export interface Coordinator {
   active(): HandoffView[];
   children(id: string): HandoffView[];
   /** A generation with no root is refused; throws an Error whose message is the typed refusal shown to the model. */
-  enqueue(source: RoomAddress, generation: string, parentId: string | undefined, target: RoomAddress, text: string,
-    options?: HandoffOptions): { node: HandoffView; duplicate: boolean };
+  enqueue(
+    source: RoomAddress,
+    generation: string,
+    parentId: string | undefined,
+    target: RoomAddress,
+    text: string,
+    options?: HandoffOptions,
+  ): { node: HandoffView; duplicate: boolean };
   status(id: string): StatusView | undefined;
   /** Every assignment this conversation was given that was open at `since` or began after, with all handed out under it; rows oldest first. */
   job(threadId: string, since: number, botId?: string): { scopes: string[]; rows: Assignment[] };
   /** Undelivered inbox items for a polling requester, marked delivered. */
-  poll(owner: Owner): { items: StatusView["inbox"]; assignments: HandoffView[] };
+  poll(owner: Owner): { items: StatusView['inbox']; assignments: HandoffView[] };
   /** Non-terminal work the conversation in this thread is waiting on, rooms included. */
   outstandingFor(threadId: string): HandoffView[];
   /** Running assignments whose turn happens in this thread; reads only that thread's rows, so it stays cheap to ask often. */
@@ -195,7 +228,12 @@ export interface Coordinator {
   releaseParked(id: string, reason: string): void;
   prune(before: number): number;
   sharedRequest(node: HandoffView): { id: string; botIds: string[] };
-  cancelRoom(groupId: string, threadId?: string, reason?: string, status?: "failed" | "cancelled"): void;
+  cancelRoom(
+    groupId: string,
+    threadId?: string,
+    reason?: string,
+    status?: 'failed' | 'cancelled',
+  ): void;
   cancelDirect(threadId: string, reason?: string): void;
   activeDirect(threadId: string): boolean;
   assignerOf(threadId: string): HandoffView | undefined;
@@ -210,7 +248,7 @@ export interface Coordinator {
   note(id: string): string | undefined;
   tick(): void;
   /** How soon the next tick() matters (Runtime.pace). */
-  pace(): "busy" | "parked" | "idle";
+  pace(): 'busy' | 'parked' | 'idle';
   close(): void;
   progress(threadId: string): void;
   /** What the turn this thread is running waits for, for the record. */

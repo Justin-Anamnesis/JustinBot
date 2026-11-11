@@ -1,6 +1,6 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import { speaker, type SpeechSnapshot } from "./index";
+import { speaker, type SpeechSnapshot } from './index';
 
 export function useSpeech(): SpeechSnapshot {
   return useSyncExternalStore(

@@ -1,8 +1,8 @@
-import { routineVisible, type VisibleSet } from "../bot-visibility.ts";
-import type { RequestAuth } from "../request-auth.ts";
-import type { NeedsYouItem } from "../../shared/today.ts";
-import { needsYouNow, todayReport, type TodaySources, type TodayViewer } from "../today.ts";
-import { PASS, type RouteHandler } from "./table.ts";
+import { routineVisible, type VisibleSet } from '../bot-visibility.ts';
+import type { RequestAuth } from '../request-auth.ts';
+import type { NeedsYouItem } from '../../shared/today.ts';
+import { needsYouNow, todayReport, type TodaySources, type TodayViewer } from '../today.ts';
+import { PASS, type RouteHandler } from './table.ts';
 
 export interface TodayRouteDeps {
   sources: () => TodaySources;
@@ -21,22 +21,33 @@ export function createTodayRoutes(deps: TodayRouteDeps): RouteHandler {
     const visible = deps.visibleFor(auth);
     const asks = deps.asks;
     return {
-      admin: auth.scopes.includes("admin"),
+      admin: auth.scopes.includes('admin'),
       thread: (threadId) => visible.thread(threadId),
       routine: (run) => routineVisible(run, visible),
-      ...(asks ? { asks: (botId: string | undefined, threadId: string) => asks(auth, botId, threadId) } : {}),
+      ...(asks
+        ? { asks: (botId: string | undefined, threadId: string) => asks(auth, botId, threadId) }
+        : {}),
     };
   };
   return async ({ res, path, method, url, auth, json }) => {
-    if (path === "/api/needs-you") {
-      if (method !== "GET") return json(res, 405, { error: "method not allowed" });
-      return json(res, 200, { items: [...needsYouNow(deps.sources(), viewerFor(auth), deps.now?.() ?? Date.now()), ...(deps.messages?.(auth) ?? [])] });
+    if (path === '/api/needs-you') {
+      if (method !== 'GET') return json(res, 405, { error: 'method not allowed' });
+      return json(res, 200, {
+        items: [
+          ...needsYouNow(deps.sources(), viewerFor(auth), deps.now?.() ?? Date.now()),
+          ...(deps.messages?.(auth) ?? []),
+        ],
+      });
     }
-    if (path !== "/api/today") return PASS;
-    if (method !== "GET") return json(res, 405, { error: "method not allowed" });
-    const since = Number(url.searchParams.get("since") ?? Number.NaN);
-    if (!Number.isFinite(since)) return json(res, 400, { error: "since must be a time in milliseconds" });
+    if (path !== '/api/today') return PASS;
+    if (method !== 'GET') return json(res, 405, { error: 'method not allowed' });
+    const since = Number(url.searchParams.get('since') ?? Number.NaN);
+    if (!Number.isFinite(since))
+      return json(res, 400, { error: 'since must be a time in milliseconds' });
     const report = todayReport(deps.sources(), viewerFor(auth), since, deps.now?.() ?? Date.now());
-    return json(res, 200, { ...report, needsYou: [...report.needsYou, ...(deps.messages?.(auth) ?? [])] });
+    return json(res, 200, {
+      ...report,
+      needsYou: [...report.needsYou, ...(deps.messages?.(auth) ?? [])],
+    });
   };
 }

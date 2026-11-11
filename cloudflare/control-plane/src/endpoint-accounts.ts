@@ -1,7 +1,7 @@
 // Which Cloudflare account an endpoint lives in. Pure rules, no I/O. A row keeps
 // its account for life; only a new row chooses, and only a row that never
 // handed out an address may move.
-import type { ControlPlaneConfig, EndpointAccount } from "./config";
+import type { ControlPlaneConfig, EndpointAccount } from './config';
 
 /** After Cloudflare refuses an account a new tunnel or DNS record (its
  * quota) or, with several accounts, refuses its token, the account takes no
@@ -78,14 +78,16 @@ export function opaqueHostnameSQL(hostname: string, suffix: string): string {
 export const ACTED_ON_ENDPOINT_SQL = `EXISTS (
           SELECT 1 FROM json_each(?) AS account
            WHERE json_extract(account.value, '$.id') = e.provider_account
-             AND ${opaqueHostnameSQL("e.hostname", "json_extract(account.value, '$.suffix')")}
+             AND ${opaqueHostnameSQL('e.hostname', "json_extract(account.value, '$.suffix')")}
         )`;
 
 export function actedOnAccounts(config: ControlPlaneConfig): string {
-  return JSON.stringify(config.endpointAccounts.map((account) => ({
-    id: account.accountId,
-    suffix: account.companionHostSuffix,
-  })));
+  return JSON.stringify(
+    config.endpointAccounts.map((account) => ({
+      id: account.accountId,
+      suffix: account.companionHostSuffix,
+    })),
+  );
 }
 
 /** A row that never finished provisioning and holds no provider resource. It
@@ -105,7 +107,7 @@ const RELEASE = /^([0-9]{1,9})\.([0-9]{1,9})\.([0-9]{1,9})(-[0-9A-Za-z.-]+)?(\+[
  * `minimum` (`x.y.z`). A prerelease of the minimum is lower than it; a
  * missing, `unknown`, or unparseable version never qualifies. */
 export function appVersionAtLeast(version: string | null | undefined, minimum: string): boolean {
-  const have = RELEASE.exec(version ?? "");
+  const have = RELEASE.exec(version ?? '');
   const need = RELEASE.exec(minimum);
   if (!have || !need) return false;
   for (let part = 1; part <= 3; part += 1) {
@@ -115,7 +117,10 @@ export function appVersionAtLeast(version: string | null | undefined, minimum: s
   return have[4] === undefined || need[4] !== undefined;
 }
 
-export function rejectionActive(snapshot: AccountSnapshot | null | undefined, now: number): boolean {
+export function rejectionActive(
+  snapshot: AccountSnapshot | null | undefined,
+  now: number,
+): boolean {
   const rejectedAt = snapshot?.capacity_rejected_at ?? null;
   return rejectedAt !== null && rejectedAt > now - CAPACITY_GATE_MS && rejectedAt <= now;
 }
@@ -129,16 +134,24 @@ export function snapshotFresh(snapshot: AccountSnapshot | null | undefined, now:
  * free DNS records, whichever is fewer, and never below zero. An unknown DNS
  * count drops that term; an unknown tunnel count makes the room unknown
  * (null) unless the records already show the zone full. */
-export function accountRoom(account: EndpointAccount, snapshot: AccountSnapshot | null | undefined): number | null {
+export function accountRoom(
+  account: EndpointAccount,
+  snapshot: AccountSnapshot | null | undefined,
+): number | null {
   if (!snapshot) return null;
-  const records = snapshot.dns_record_count === null ? null : account.dnsRecordLimit - snapshot.dns_record_count;
+  const records =
+    snapshot.dns_record_count === null ? null : account.dnsRecordLimit - snapshot.dns_record_count;
   if (snapshot.tunnel_count === null) return records !== null && records <= 0 ? 0 : null;
   const tunnels = account.tunnelLimit - snapshot.tunnel_count;
   return Math.max(Math.min(tunnels, records ?? tunnels), 0);
 }
 
 /** Its last scan, still fresh, left no free tunnel or no free DNS record. */
-export function scannedFull(account: EndpointAccount, snapshot: AccountSnapshot | null | undefined, now: number): boolean {
+export function scannedFull(
+  account: EndpointAccount,
+  snapshot: AccountSnapshot | null | undefined,
+  now: number,
+): boolean {
   return snapshotFresh(snapshot, now) && accountRoom(account, snapshot) === 0;
 }
 
@@ -148,11 +161,13 @@ function eligible(
   appVersion: string | null,
   now: number,
 ): boolean {
-  return account.newEndpoints
-    && (account.minAppVersion === null || appVersionAtLeast(appVersion, account.minAppVersion))
-    && !rejectionActive(snapshot, now)
+  return (
+    account.newEndpoints &&
+    (account.minAppVersion === null || appVersionAtLeast(appVersion, account.minAppVersion)) &&
+    !rejectionActive(snapshot, now) &&
     // A new or broken account takes nothing before its first good scan.
-    && snapshotFresh(snapshot, now);
+    snapshotFresh(snapshot, now)
+  );
 }
 
 /** The eligible account with the most room (unknown room ranks after any

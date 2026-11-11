@@ -1,35 +1,53 @@
-import { Code, Copy, Eye, Pencil, Pin, PinOff, RefreshCw, Square, Volume2 } from "lucide-react";
-import { copyText } from "@/lib/copy-text";
-import { t } from "@/lib/i18n";
-import type { ConfigStatus, Group, Message, useStore } from "@/state/store";
-import { ACTION_ICON, type MessageMenuItem } from "@/components/MessageActions";
-import { useSpeakAction } from "@/components/SpeakButton";
+import { Code, Copy, Eye, Pencil, Pin, PinOff, RefreshCw, Square, Volume2 } from 'lucide-react';
+import { copyText } from '@/lib/copy-text';
+import { t } from '@/lib/i18n';
+import type { ConfigStatus, Group, Message, useStore } from '@/state/store';
+import { ACTION_ICON, type MessageMenuItem } from '@/components/MessageActions';
+import { useSpeakAction } from '@/components/SpeakButton';
 
 export type PinAction = { pinned: boolean; onToggle: () => void; hint?: string };
 
-export function roomPin(group: Group, message: Message, dispatch: ReturnType<typeof useStore>["dispatch"]): PinAction | undefined {
+export function roomPin(
+  group: Group,
+  message: Message,
+  dispatch: ReturnType<typeof useStore>['dispatch'],
+): PinAction | undefined {
   if (window.ogb?.remoteClient?.active) return undefined;
   const pinned = group.pinnedMessageId === message.id;
   return {
     pinned,
-    hint: t("room.pinHint"),
-    onToggle: () => dispatch({ type: "patchGroup", groupId: group.id, patch: { pinnedMessageId: pinned ? "" : message.id } }),
+    hint: t('room.pinHint'),
+    onToggle: () =>
+      dispatch({
+        type: 'patchGroup',
+        groupId: group.id,
+        patch: { pinnedMessageId: pinned ? '' : message.id },
+      }),
   };
 }
 
 function pinItem(pin: PinAction | undefined): MessageMenuItem[] {
   if (!pin) return [];
-  return [{
-    key: "pin",
-    icon: pin.pinned ? <PinOff {...ACTION_ICON} /> : <Pin {...ACTION_ICON} />,
-    label: pin.pinned ? t("chat.unpinMessage") : t("chat.pinMessage"),
-    title: pin.pinned ? t("chat.unpinHint") : pin.hint ?? t("chat.pinHint"),
-    onSelect: pin.onToggle,
-  }];
+  return [
+    {
+      key: 'pin',
+      icon: pin.pinned ? <PinOff {...ACTION_ICON} /> : <Pin {...ACTION_ICON} />,
+      label: pin.pinned ? t('chat.unpinMessage') : t('chat.pinMessage'),
+      title: pin.pinned ? t('chat.unpinHint') : (pin.hint ?? t('chat.pinHint')),
+      onSelect: pin.onToggle,
+    },
+  ];
 }
 
 function idItem(messageId: string): MessageMenuItem {
-  return { key: "copy-id", icon: <Copy {...ACTION_ICON} />, label: t("chat.copyMessageId"), onSelect: () => { void copyText(messageId); } };
+  return {
+    key: 'copy-id',
+    icon: <Copy {...ACTION_ICON} />,
+    label: t('chat.copyMessageId'),
+    onSelect: () => {
+      void copyText(messageId);
+    },
+  };
 }
 
 export function useBotMessageMenu({
@@ -49,7 +67,7 @@ export function useBotMessageMenu({
   botId?: string;
   messageId: string;
   voiceId?: string;
-  tts: ConfigStatus["tts"];
+  tts: ConfigStatus['tts'];
   localVoice: boolean;
   canSpeak: boolean;
   viewRaw: boolean;
@@ -61,9 +79,9 @@ export function useBotMessageMenu({
   const items: MessageMenuItem[] = [];
   if (canSpeak && text) {
     items.push({
-      key: "speak",
+      key: 'speak',
       icon: speak.mine ? <Square {...ACTION_ICON} /> : <Volume2 {...ACTION_ICON} />,
-      label: speak.mine ? t("chat.speak.stop") : t("chat.speak.read"),
+      label: speak.mine ? t('chat.speak.stop') : t('chat.speak.read'),
       title: speak.label,
       disabled: !speak.ready,
       onSelect: speak.toggle,
@@ -71,20 +89,44 @@ export function useBotMessageMenu({
   }
   if (text) {
     items.push({
-      key: "raw",
+      key: 'raw',
       icon: viewRaw ? <Eye {...ACTION_ICON} /> : <Code {...ACTION_ICON} />,
-      label: t(viewRaw ? "chat.showRenderedMarkdown" : "chat.showRawMarkdown"),
+      label: t(viewRaw ? 'chat.showRenderedMarkdown' : 'chat.showRawMarkdown'),
       onSelect: onToggleRaw,
     });
   }
-  if (onRegenerate) items.push({ key: "regenerate", icon: <RefreshCw {...ACTION_ICON} />, label: t("chat.regenerate"), onSelect: onRegenerate });
+  if (onRegenerate)
+    items.push({
+      key: 'regenerate',
+      icon: <RefreshCw {...ACTION_ICON} />,
+      label: t('chat.regenerate'),
+      onSelect: onRegenerate,
+    });
   items.push(...pinItem(pin), idItem(messageId));
   return items;
 }
 
-export function userMessageMenu({ messageId, onEdit, pin }: { messageId: string; onEdit?: () => void; pin?: PinAction }): MessageMenuItem[] {
+export function userMessageMenu({
+  messageId,
+  onEdit,
+  pin,
+}: {
+  messageId: string;
+  onEdit?: () => void;
+  pin?: PinAction;
+}): MessageMenuItem[] {
   return [
-    ...(onEdit ? [{ key: "edit", icon: <Pencil {...ACTION_ICON} />, label: t("chat.editMessage"), onSelect: onEdit, idleOnly: true }] : []),
+    ...(onEdit
+      ? [
+          {
+            key: 'edit',
+            icon: <Pencil {...ACTION_ICON} />,
+            label: t('chat.editMessage'),
+            onSelect: onEdit,
+            idleOnly: true,
+          },
+        ]
+      : []),
     ...pinItem(pin),
     idItem(messageId),
   ];

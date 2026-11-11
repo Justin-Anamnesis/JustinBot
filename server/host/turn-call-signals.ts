@@ -1,4 +1,4 @@
-import type { ServerResponse } from "node:http";
+import type { ServerResponse } from 'node:http';
 
 /** Signals for a bot's tool calls that outlive a check: each aborts once its request is gone, or once `sweep` finds the
  * turn's grant no longer active. Security: a revoked grant must reach a call already in flight, not only the next one. */
@@ -13,7 +13,7 @@ export function createTurnCallSignals<Grant>(isActive: (grant: Grant) => boolean
         if (!res.writableEnded) call.abort();
       };
       if (res.closed) onClose();
-      else res.once("close", onClose);
+      else res.once('close', onClose);
       return call.signal;
     },
     /** Called after grants are revoked. */

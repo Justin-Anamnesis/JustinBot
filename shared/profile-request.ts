@@ -7,10 +7,20 @@
  * the user was shown; `expectedRevision` is a hash of the target's whole
  * profile at proposal time so a confirmation fails closed if anything moved.
  */
-export const PROFILE_REQUEST_FIELDS = ["name", "title", "description", "soul", "cwd", "notifications", "speakReplies"] as const;
+export const PROFILE_REQUEST_FIELDS = [
+  'name',
+  'title',
+  'description',
+  'soul',
+  'cwd',
+  'notifications',
+  'speakReplies',
+] as const;
 export type ProfileRequestField = (typeof PROFILE_REQUEST_FIELDS)[number];
-export type ProfileRequestChanges = Partial<Record<Exclude<ProfileRequestField, "notifications" | "speakReplies">, string>> &
-  Partial<Record<"notifications" | "speakReplies", boolean>>;
+export type ProfileRequestChanges = Partial<
+  Record<Exclude<ProfileRequestField, 'notifications' | 'speakReplies'>, string>
+> &
+  Partial<Record<'notifications' | 'speakReplies', boolean>>;
 
 export interface ProfileRequestCardData {
   version: 1;

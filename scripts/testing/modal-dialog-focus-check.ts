@@ -1,11 +1,17 @@
 // Run against a fresh, owned `control-omb ui launch` handle, never the live app:
 // node --experimental-strip-types scripts/testing/modal-dialog-focus-check.ts UI_HANDLE
-import assert from "node:assert/strict";
-import { runControlOmb } from "../control-omb.ts";
+import assert from 'node:assert/strict';
+import { runControlOmb } from '../control-omb.ts';
 
 const handle = process.argv[2];
-assert(handle, "Pass the isolated ui launch handle.");
-const checked = await runControlOmb(["ui", "eval", "--ui", handle, "--js", String.raw`
+assert(handle, 'Pass the isolated ui launch handle.');
+const checked = (await runControlOmb([
+  'ui',
+  'eval',
+  '--ui',
+  handle,
+  '--js',
+  String.raw`
 (async () => {
   const React = (await import('/node_modules/.vite/deps/react.js')).default;
   const {createRoot} = (await import('/node_modules/.vite/deps/react-dom_client.js')).default;
@@ -45,11 +51,12 @@ const checked = await runControlOmb(["ui", "eval", "--ui", handle, "--js", Strin
     return {opened, restored, replaced, restoredAfterReplacement:document.activeElement.id};
   } finally { root.unmount(); host.remove(); }
 })()
-`]) as { result: unknown };
+`,
+])) as { result: unknown };
 assert.deepEqual(checked.result, {
-  opened: "focus-check-first",
-  restored: "focus-check-opener",
-  replaced: "focus-check-second",
-  restoredAfterReplacement: "focus-check-opener",
+  opened: 'focus-check-first',
+  restored: 'focus-check-opener',
+  replaced: 'focus-check-second',
+  restoredAfterReplacement: 'focus-check-opener',
 });
-console.log(JSON.stringify({ ok: true, ...checked.result as object }));
+console.log(JSON.stringify({ ok: true, ...(checked.result as object) }));

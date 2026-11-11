@@ -1,9 +1,9 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import type { Scenario, Step } from "../types.ts";
-import type { SendReceipt, WorldSnapshot } from "../scorers/snapshot.ts";
-import { makeClient, waitUntil } from "./api.ts";
-import type { ApiClient } from "./api-types.ts";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import type { Scenario, Step } from '../types.ts';
+import type { SendReceipt, WorldSnapshot } from '../scorers/snapshot.ts';
+import { makeClient, waitUntil } from './api.ts';
+import type { ApiClient } from './api-types.ts';
 
 export interface WorldContext {
   sends: SendReceipt[];
@@ -16,8 +16,8 @@ export interface WorldContext {
 export abstract class BaseWorld {
   protected api!: ApiClient;
   protected bots = new Map<string, { id: string; threadId: string }>();
-  private evidencePath = "";
-  private gatesDir = "";
+  private evidencePath = '';
+  private gatesDir = '';
   /** Activity prefixes proven live by waitForActivity steps. The server
    * patches a wait chip in place when it settles ("Waiting for its turn..."
    * becomes "Computer free"), so a freeze-time read alone would lose the
@@ -34,18 +34,18 @@ export abstract class BaseWorld {
   }
 
   protected gatePath(gate: string): string {
-    return this.gatesDir === "" ? gate : this.gatesDir + "/" + gate;
+    return this.gatesDir === '' ? gate : this.gatesDir + '/' + gate;
   }
 
   /** Steps may name a bot as "worker" or "@worker"; the plain key is
    * what this.bots and evidence bot ids are recorded under. */
   protected botKey(ref: string): string {
-    return ref.startsWith("@") ? ref.slice(1) : ref;
+    return ref.startsWith('@') ? ref.slice(1) : ref;
   }
 
   protected botId(ref: string): string {
     const bot = this.bots.get(this.botKey(ref));
-    if (bot === undefined) throw new Error("unknown bot reference " + ref);
+    if (bot === undefined) throw new Error('unknown bot reference ' + ref);
     return bot.id;
   }
 
@@ -56,10 +56,12 @@ export abstract class BaseWorld {
 
   /** Deep-resolves "@key" bot references to live ids. */
   protected resolveRefs(value: unknown): unknown {
-    if (typeof value === "string" && value.startsWith("@")) return this.botId(value);
+    if (typeof value === 'string' && value.startsWith('@')) return this.botId(value);
     if (Array.isArray(value)) return value.map((entry) => this.resolveRefs(entry));
-    if (value && typeof value === "object") {
-      return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, this.resolveRefs(entry)]));
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, entry]) => [key, this.resolveRefs(entry)]),
+      );
     }
     return value;
   }
@@ -69,62 +71,86 @@ export abstract class BaseWorld {
    * so it may return a promise. */
   protected evidence(): Array<Record<string, any>> | Promise<Array<Record<string, any>>> {
     if (!existsSync(this.evidencePath)) return [];
-    return readFileSync(this.evidencePath, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
+    return readFileSync(this.evidencePath, 'utf8')
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
   }
 
   protected botState(botKey: string): Promise<any> {
-    return this.api.get("/api/bots?messages=0").then((response) =>
-      response.body.bots.find((bot: any) => bot.id === this.botId(botKey)),
-    );
+    return this.api
+      .get('/api/bots?messages=0')
+      .then((response) => response.body.bots.find((bot: any) => bot.id === this.botId(botKey)));
   }
 
   protected activities(botKey: string): Promise<string[]> {
-    return this.api.get("/api/bots?messages=50").then((response) =>
-      ((response.body.bots.find((bot: any) => bot.id === this.botId(botKey))?.messages ?? []) as Array<any>)
-        .filter((message) => message.kind === "activity")
-        .map((message) => message.tool?.name ?? ""),
-    );
+    return this.api
+      .get('/api/bots?messages=50')
+      .then((response) =>
+        (
+          (response.body.bots.find((bot: any) => bot.id === this.botId(botKey))?.messages ??
+            []) as Array<any>
+        )
+          .filter((message) => message.kind === 'activity')
+          .map((message) => message.tool?.name ?? ''),
+      );
   }
 
-  protected async threadMessages(
-    threadId: string,
-  ): Promise<Array<{ role?: string; text?: string; kind?: string; turnId?: string; tool?: { name?: string; arguments?: Record<string, unknown> } }>> {
-    const response = await this.api.get("/api/threads/" + threadId + "/messages");
-    return (response.body.messages ?? []) as Array<{ text?: string; kind?: string; tool?: { name?: string } }>;
+  protected async threadMessages(threadId: string): Promise<
+    Array<{
+      role?: string;
+      text?: string;
+      kind?: string;
+      turnId?: string;
+      tool?: { name?: string; arguments?: Record<string, unknown> };
+    }>
+  > {
+    const response = await this.api.get('/api/threads/' + threadId + '/messages');
+    return (response.body.messages ?? []) as Array<{
+      text?: string;
+      kind?: string;
+      tool?: { name?: string };
+    }>;
   }
 
   async runStep(step: Step, ctx: WorldContext): Promise<string> {
     switch (step.kind) {
-      case "send": {
+      case 'send': {
         const bot = this.bots.get(this.botKey(step.bot));
-        if (bot === undefined) throw new Error("unknown bot " + step.bot);
-        const response = await this.api.post("/api/bots/" + bot.id + "/messages", { text: step.text, threadId: bot.threadId });
-        if (response.status >= 300) throw new Error("send failed: " + JSON.stringify(response.body));
+        if (bot === undefined) throw new Error('unknown bot ' + step.bot);
+        const response = await this.api.post('/api/bots/' + bot.id + '/messages', {
+          text: step.text,
+          threadId: bot.threadId,
+        });
+        if (response.status >= 300)
+          throw new Error('send failed: ' + JSON.stringify(response.body));
         ctx.sends.push({ bot: step.bot, text: step.text, queued: response.body.queued });
-        return "receipt " + (response.body.queued === true ? "queued" : "immediate");
+        return 'receipt ' + (response.body.queued === true ? 'queued' : 'immediate');
       }
-      case "waitForTurns": {
+      case 'waitForTurns': {
         const key = this.botKey(step.bot);
         await waitUntil(
-          "turns for " + key,
-          async () => (await this.evidence()).filter((turn) => this.botKeyOf(turn.botId) === key).length,
+          'turns for ' + key,
+          async () =>
+            (await this.evidence()).filter((turn) => this.botKeyOf(turn.botId) === key).length,
           (count) => count >= step.count,
           step.timeoutMs ?? 20_000,
         );
-        return step.count + " turn(s) recorded";
+        return step.count + ' turn(s) recorded';
       }
-      case "waitForBusy": {
+      case 'waitForBusy': {
         await waitUntil(
-          "busy=" + step.busy + " for " + step.bot,
+          'busy=' + step.busy + ' for ' + step.bot,
           async () => (await this.botState(step.bot))?.busy,
           (busy) => busy === step.busy,
           step.timeoutMs ?? 20_000,
         );
-        return "busy is " + step.busy;
+        return 'busy is ' + step.busy;
       }
-      case "waitForActivity": {
+      case 'waitForActivity': {
         await waitUntil(
-          "activity " + step.namePrefix + " for " + step.bot,
+          'activity ' + step.namePrefix + ' for ' + step.bot,
           async () => this.activities(step.bot),
           (names) => names.some((name) => name.startsWith(step.namePrefix)),
           step.timeoutMs ?? 20_000,
@@ -133,22 +159,22 @@ export abstract class BaseWorld {
         const facts = this.activityFacts.get(key) ?? new Set<string>();
         facts.add(step.namePrefix);
         this.activityFacts.set(key, facts);
-        return "activity seen";
+        return 'activity seen';
       }
-      case "writeGate": {
-        writeFileSync(this.gatePath(step.gate), "open\n");
-        return "gate " + step.gate + " open";
+      case 'writeGate': {
+        writeFileSync(this.gatePath(step.gate), 'open\n');
+        return 'gate ' + step.gate + ' open';
       }
-      case "installSkill": {
+      case 'installSkill': {
         // Every world passes gatesDir = <dataRoot>/eval-gates, so its parent
         // is the server's OMB_DATA_DIR; skills/ under it is exactly where
         // the server hot-loads user skills on every turn.
-        const root = join(dirname(this.gatesDir), "skills", step.skill.id);
+        const root = join(dirname(this.gatesDir), 'skills', step.skill.id);
         mkdirSync(root, { recursive: true });
         const { skillMd, ...manifest } = step.skill;
-        writeFileSync(join(root, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
-        writeFileSync(join(root, "SKILL.md"), skillMd.endsWith("\n") ? skillMd : skillMd + "\n");
-        return "skill " + step.skill.id + " installed as a user skill (hot-loaded per turn)";
+        writeFileSync(join(root, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
+        writeFileSync(join(root, 'SKILL.md'), skillMd.endsWith('\n') ? skillMd : skillMd + '\n');
+        return 'skill ' + step.skill.id + ' installed as a user skill (hot-loaded per turn)';
       }
       default:
         return this.runWorldStep(step, ctx);
@@ -167,12 +193,12 @@ export abstract class BaseWorld {
       bot: this.botKeyOf(turn.botId),
       index: turn.turnIndex,
       threadId: turn.threadId,
-      system: turn.system ?? "",
+      system: turn.system ?? '',
       prompt: JSON.stringify(turn.prompt ?? null),
       toolCalls: ((turn.evidence ?? []) as Array<any>)
         .filter((entry) => entry?.step)
         .map((entry) => ({
-          tool: entry.step.tool ?? "coordinate_bots",
+          tool: entry.step.tool ?? 'coordinate_bots',
           arguments: entry.step.arguments ?? {},
           errored: Boolean(entry.response?.error || entry.response?.result?.isError),
         })),
@@ -185,7 +211,7 @@ export abstract class BaseWorld {
     }));
     const activeThreads: Record<string, string> = {};
     for (const [key, bot] of this.bots) activeThreads[key] = bot.threadId;
-    const threads: WorldSnapshot["threads"] = {};
+    const threads: WorldSnapshot['threads'] = {};
     const threadIds = new Set<string>(Object.values(activeThreads));
     for (const node of handoffs) if (node.threadId) threadIds.add(node.threadId);
     for (const threadId of threadIds) threads[threadId] = await this.threadMessages(threadId);
@@ -197,7 +223,10 @@ export abstract class BaseWorld {
       threads,
       sends: ctx.sends,
       observations: ctx.observations,
-      activities: (bot) => [...(capturedActivities[bot] ?? []), ...(this.activityFacts.get(bot) ?? [])],
+      activities: (bot) => [
+        ...(capturedActivities[bot] ?? []),
+        ...(this.activityFacts.get(bot) ?? []),
+      ],
       resolve: (value) => this.resolveRefs(value),
     };
   }

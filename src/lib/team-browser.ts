@@ -6,5 +6,5 @@ export function browserScope(team: unknown, threadId: string | undefined): Recor
 
 export function withBrowserScope(path: string, scope: Readonly<Record<string, string>>): string {
   const query = new URLSearchParams(scope).toString();
-  return query ? `${path}${path.includes("?") ? "&" : "?"}${query}` : path;
+  return query ? `${path}${path.includes('?') ? '&' : '?'}${query}` : path;
 }

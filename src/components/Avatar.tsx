@@ -7,41 +7,55 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
-} from "react";
-import { cn } from "@/lib/cn";
-import { CHROME_EYES, CHROME_GRADIENT, MAUS_COLORS, type MausColor, type MausMotion, type MausState } from "@/lib/mascot";
-import { CursorAvatar, type CursorAvatarHandle } from "./CursorAvatar";
-import { avatarCropRadius, botAvatarProfile, clampAvatarFocus, clampAvatarZoom, mascotFaceInk, type BotAvatarCrop, type MascotFaceColor } from "../../shared/bot-avatar";
-import { MASCOT_BODIES, botMascotBody } from "../../shared/mascot-bodies";
-import { isCarvedBody, type BotBodyId } from "../../shared/bot-body";
-import { useFestivalDress, wornBody } from "@/lib/festival-dress";
-import { t } from "@/lib/i18n";
-import { CarvedAvatar } from "./CarvedAvatar";
-import { steelBodyImage } from "@/lib/steel-body";
+} from 'react';
+import { cn } from '@/lib/cn';
+import {
+  CHROME_EYES,
+  CHROME_GRADIENT,
+  MAUS_COLORS,
+  type MausColor,
+  type MausMotion,
+  type MausState,
+} from '@/lib/mascot';
+import { CursorAvatar, type CursorAvatarHandle } from './CursorAvatar';
+import {
+  avatarCropRadius,
+  botAvatarProfile,
+  clampAvatarFocus,
+  clampAvatarZoom,
+  mascotFaceInk,
+  type BotAvatarCrop,
+  type MascotFaceColor,
+} from '../../shared/bot-avatar';
+import { MASCOT_BODIES, botMascotBody } from '../../shared/mascot-bodies';
+import { isCarvedBody, type BotBodyId } from '../../shared/bot-body';
+import { useFestivalDress, wornBody } from '@/lib/festival-dress';
+import { t } from '@/lib/i18n';
+import { CarvedAvatar } from './CarvedAvatar';
+import { steelBodyImage } from '@/lib/steel-body';
 
 export const EYE_SCALE = 1.12;
 export const MOUTH_WEIGHT = 11;
 
 const POINTER_GAZE = { forward: 1, authored: 0.25 };
 
-interface MotionFaces
-  extends Partial<
-    Record<Exclude<MausMotion, "none">, { state?: MausState; blink?: boolean; spin?: number }>
-  > {}
+interface MotionFaces extends Partial<
+  Record<Exclude<MausMotion, 'none'>, { state?: MausState; blink?: boolean; spin?: number }>
+> {}
 
 const MOTION_FACE: MotionFaces = {
-  arrive: { state: "spawning", spin: 900 },
-  switch: { state: "waking", spin: 620 },
-  customize: { state: "proud", blink: true },
-  alert: { state: "alerting" },
-  thinking: { state: "thinking" },
-  working: { state: "working" },
-  launch: { state: "loading" },
-  success: { state: "happy", blink: true },
-  celebrate: { state: "celebrate", spin: 700 },
+  arrive: { state: 'spawning', spin: 900 },
+  switch: { state: 'waking', spin: 620 },
+  customize: { state: 'proud', blink: true },
+  alert: { state: 'alerting' },
+  thinking: { state: 'thinking' },
+  working: { state: 'working' },
+  launch: { state: 'loading' },
+  success: { state: 'happy', blink: true },
+  celebrate: { state: 'celebrate', spin: 700 },
   blink: { blink: true },
-  surprise: { state: "surprised", blink: true },
-  failure: { state: "sad" },
+  surprise: { state: 'surprised', blink: true },
+  failure: { state: 'sad' },
 };
 
 const MOTION_FACE_MS = 1400;
@@ -55,14 +69,14 @@ function mix(hex: string, toward: string, t: number): string {
     return Math.round(va + (vb - va) * t);
   };
   return `#${[channel(16), channel(8), channel(0)]
-    .map((part) => part.toString(16).padStart(2, "0"))
-    .join("")}`;
+    .map((part) => part.toString(16).padStart(2, '0'))
+    .join('')}`;
 }
 
 const gradientFor = (color: MausColor): [string, string, string] => {
-  if (color === "chrome") return CHROME_GRADIENT;
+  if (color === 'chrome') return CHROME_GRADIENT;
   const fill = MAUS_COLORS[color] ?? MAUS_COLORS.green;
-  return [mix(fill, "#ffffff", 0.55), fill, mix(fill, "#000000", 0.42)];
+  return [mix(fill, '#ffffff', 0.55), fill, mix(fill, '#000000', 0.42)];
 };
 
 export function roomAvatarGradient(color: MausColor): [string, string, string] {
@@ -100,7 +114,8 @@ export type MausAvatarProps = {
 };
 
 function MausAvatarComponent(props: MausAvatarProps, ref: React.Ref<MausAvatarHandle>) {
-  const { bodyId, color, size, state, motion, motionKey, gaze, trackPointer, animated, label } = props;
+  const { bodyId, color, size, state, motion, motionKey, gaze, trackPointer, animated, label } =
+    props;
   if (isCarvedBody(bodyId)) {
     return (
       <CarvedAvatar
@@ -125,11 +140,11 @@ function MausAvatarComponent(props: MausAvatarProps, ref: React.Ref<MausAvatarHa
 function GradientAvatarComponent(
   {
     color,
-    state = "idle",
+    state = 'idle',
     expression,
     size = 44,
     label,
-    motion = "none",
+    motion = 'none',
     motionKey = 0,
     turn,
     gaze,
@@ -148,7 +163,7 @@ function GradientAvatarComponent(
   ref: React.Ref<MausAvatarHandle>,
 ) {
   const silhouette = MASCOT_BODIES[botMascotBody(bodyId)];
-  const chrome = color === "chrome";
+  const chrome = color === 'chrome';
   const faceInk = mascotFaceInk(faceColor);
   const inner = useRef<CursorAvatarHandle>(null);
   useImperativeHandle(ref, () => ({
@@ -159,7 +174,7 @@ function GradientAvatarComponent(
 
   const [motionState, setMotionState] = useState<MausState | null>(null);
   useEffect(() => {
-    if (motion === "none" || !animated) return;
+    if (motion === 'none' || !animated) return;
     const beat = MOTION_FACE[motion];
     if (!beat) return;
     if (beat.blink) inner.current?.blink();
@@ -184,10 +199,9 @@ function GradientAvatarComponent(
 
   return (
     <span
-      className="inline-flex shrink-0"
+      className='inline-flex shrink-0'
       onPointerMove={trackPointer && animated ? onPointerMove : undefined}
-      onPointerLeave={trackPointer && animated ? onPointerLeave : undefined}
-    >
+      onPointerLeave={trackPointer && animated ? onPointerLeave : undefined}>
       <CursorAvatar
         ref={inner}
         state={motionState ?? state}
@@ -195,7 +209,11 @@ function GradientAvatarComponent(
         size={size}
         silhouette={silhouette}
         gradient={gradient ?? gradientFor(color)}
-        picture={chrome && !faceInk ? steelBodyImage(silhouette.id, size, globalThis.devicePixelRatio ?? 1) : null}
+        picture={
+          chrome && !faceInk
+            ? steelBodyImage(silhouette.id, size, globalThis.devicePixelRatio ?? 1)
+            : null
+        }
         eyeColor={faceInk ?? (chrome ? CHROME_EYES : undefined)}
         title={label ?? null}
         lookAround={lookAround ?? (forward ? 0 : 1)}
@@ -215,7 +233,7 @@ const GradientAvatar = forwardRef(GradientAvatarComponent);
 
 export const MausAvatar = memo(forwardRef(MausAvatarComponent));
 
-export type BotAvatarProps = Omit<MausAvatarProps, "color" | "gradient"> & {
+export type BotAvatarProps = Omit<MausAvatarProps, 'color' | 'gradient'> & {
   readable?: boolean;
   bot: {
     name?: string;
@@ -230,7 +248,7 @@ export type BotAvatarProps = Omit<MausAvatarProps, "color" | "gradient"> & {
   };
 };
 
-export type BotAvatarOutcome = "flatImage" | "gradientMascot";
+export type BotAvatarOutcome = 'flatImage' | 'gradientMascot';
 
 /** Mirrored name for name by resolveBotAvatarOutcome in ios/Sources/CompanionCore/BotAvatarRendering.swift. */
 export function resolveBotAvatarOutcome(params: {
@@ -239,13 +257,19 @@ export function resolveBotAvatarOutcome(params: {
   imageFailed: boolean;
 }): BotAvatarOutcome {
   const { avatarCrop, hasUrl, imageFailed } = params;
-  if (!hasUrl) return "gradientMascot";
-  if (avatarCrop === "mascot") return "gradientMascot";
-  if (imageFailed) return "gradientMascot";
-  return "flatImage";
+  if (!hasUrl) return 'gradientMascot';
+  if (avatarCrop === 'mascot') return 'gradientMascot';
+  if (imageFailed) return 'gradientMascot';
+  return 'flatImage';
 }
 
-export function BotAvatar({ bot, size = 44, label, readable = false, ...mascotProps }: BotAvatarProps) {
+export function BotAvatar({
+  bot,
+  size = 44,
+  label,
+  readable = false,
+  ...mascotProps
+}: BotAvatarProps) {
   const profile = botAvatarProfile(bot);
   const festival = useFestivalDress();
   const [imageFailed, setImageFailed] = useState(false);
@@ -258,7 +282,7 @@ export function BotAvatar({ bot, size = 44, label, readable = false, ...mascotPr
     imageFailed,
   });
 
-  if (outcome !== "flatImage") {
+  if (outcome !== 'flatImage') {
     return (
       <MausAvatar
         bodyId={wornBody(bot.mascotBody, bot.color, festival)}
@@ -279,17 +303,16 @@ export function BotAvatar({ bot, size = 44, label, readable = false, ...mascotPr
   const origin = `${focusX * 100}% ${focusY * 100}%`;
   return (
     <span
-      className="relative block shrink-0 overflow-hidden bg-raised"
-      style={{ width: size, height: size, borderRadius: radius }}
-    >
+      className='relative block shrink-0 overflow-hidden bg-raised'
+      style={{ width: size, height: size, borderRadius: radius }}>
       <img
         src={profile.avatarUrl}
-        alt={label ?? (bot.name ? t("avatar.alt", { name: bot.name }) : t("avatar.altFallback"))}
+        alt={label ?? (bot.name ? t('avatar.alt', { name: bot.name }) : t('avatar.altFallback'))}
         width={size}
         height={size}
         draggable={false}
         onError={() => setImageFailed(true)}
-        className="block size-full max-w-none object-cover"
+        className='block size-full max-w-none object-cover'
         style={{
           width: size,
           height: size,
@@ -321,13 +344,23 @@ export function InitialsAvatar({
   // A picture that is gone (a restored backup carries the address, not the file) falls back to the initials.
   const [failed, setFailed] = useState<string | null>(null);
   if (avatarUrl && failed !== avatarUrl) {
-    return <img src={avatarUrl} alt="" onError={() => setFailed(avatarUrl)} className={cn("shrink-0 rounded-full object-cover", className)} style={{ width: size, height: size }} />;
+    return (
+      <img
+        src={avatarUrl}
+        alt=''
+        onError={() => setFailed(avatarUrl)}
+        className={cn('shrink-0 rounded-full object-cover', className)}
+        style={{ width: size, height: size }}
+      />
+    );
   }
   return (
     <div
-      className={cn("flex shrink-0 items-center justify-center rounded-full bg-raised text-ink-secondary font-medium", className)}
-      style={{ width: size, height: size, fontSize: fontSize ?? size * 0.38 }}
-    >
+      className={cn(
+        'flex shrink-0 items-center justify-center rounded-full bg-raised text-ink-secondary font-medium',
+        className,
+      )}
+      style={{ width: size, height: size, fontSize: fontSize ?? size * 0.38 }}>
       {fallback ?? initials}
     </div>
   );

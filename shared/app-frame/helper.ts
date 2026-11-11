@@ -12,18 +12,18 @@
 // A page pasted from an SDK build runs its own App beside this one: the helper's request ids are strings
 // ("mausbot:1"), never the SDK's numeric ones, and it answers no host request but teardown, so it never
 // races the SDK's answer.
-import { APP_PROTOCOL_VERSION } from "../app.ts";
+import { APP_PROTOCOL_VERSION } from '../app.ts';
 
 export const APP_THEME_STYLE = [
-  ":root{color-scheme:light dark;",
-  "--color-text-primary:light-dark(#1d1d1f,#ececee);",
-  "--color-text-secondary:light-dark(#5f5f66,#a9a9b2);",
-  "--color-background-primary:light-dark(#ffffff,#1c1c1f);",
-  "--color-background-secondary:light-dark(#f4f4f6,#26262a);",
-  "--color-border-primary:light-dark(#d8d8de,#3a3a40);",
-  "--font-sans:system-ui,-apple-system,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,sans-serif;",
-  "--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}",
-].join("");
+  ':root{color-scheme:light dark;',
+  '--color-text-primary:light-dark(#1d1d1f,#ececee);',
+  '--color-text-secondary:light-dark(#5f5f66,#a9a9b2);',
+  '--color-background-primary:light-dark(#ffffff,#1c1c1f);',
+  '--color-background-secondary:light-dark(#f4f4f6,#26262a);',
+  '--color-border-primary:light-dark(#d8d8de,#3a3a40);',
+  '--font-sans:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;',
+  '--font-mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}',
+].join('');
 
 /** Plain ES2017 with no imports: it runs as written in every browser engine the apps ship in. */
 const helperSource = (room: boolean) => `(function () {

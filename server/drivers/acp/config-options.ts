@@ -1,19 +1,25 @@
-import type { ModelCatalog, ModelVariantOption } from "../../contracts.ts";
+import type { ModelCatalog, ModelVariantOption } from '../../contracts.ts';
 
 type SelectValue = { id: string; label: string; provider?: string };
 
 function record(value: unknown): Record<string, unknown> | undefined {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown> : undefined;
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
 }
 
 function nonempty(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value : undefined;
+  return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
 function configOptions(result: unknown): Record<string, unknown>[] {
   const options = record(result)?.configOptions;
-  return Array.isArray(options) ? options.flatMap((entry) => { const value = record(entry); return value ? [value] : []; }) : [];
+  return Array.isArray(options)
+    ? options.flatMap((entry) => {
+        const value = record(entry);
+        return value ? [value] : [];
+      })
+    : [];
 }
 
 function selectValues(value: unknown): SelectValue[] {
@@ -28,9 +34,17 @@ function selectValues(value: unknown): SelectValue[] {
       if (id && !seen.has(id)) {
         seen.add(id);
         const source = nonempty(entry.provider) ?? provider;
-        values.push({ id, label: nonempty(entry.name) ?? id, ...(source ? { provider: source } : {}) });
+        values.push({
+          id,
+          label: nonempty(entry.name) ?? id,
+          ...(source ? { provider: source } : {}),
+        });
       } else if (!id) {
-        collect(entry.options, nonempty(entry.provider) ?? nonempty(entry.name) ?? nonempty(entry.group) ?? provider, depth + 1);
+        collect(
+          entry.options,
+          nonempty(entry.provider) ?? nonempty(entry.name) ?? nonempty(entry.group) ?? provider,
+          depth + 1,
+        );
       }
     }
   };
@@ -38,9 +52,18 @@ function selectValues(value: unknown): SelectValue[] {
   return values;
 }
 
-export function acpVariantOption(result: unknown): { configId: string; options: ModelVariantOption[]; currentValue?: string } | undefined {
-  const option = configOptions(result).find((entry) => entry.type === "select" && nonempty(entry.id)
-    && (entry.id === "effort" || entry.id === "reasoning_effort" || entry.id === "thought_level" || entry.category === "thought_level"));
+export function acpVariantOption(
+  result: unknown,
+): { configId: string; options: ModelVariantOption[]; currentValue?: string } | undefined {
+  const option = configOptions(result).find(
+    (entry) =>
+      entry.type === 'select' &&
+      nonempty(entry.id) &&
+      (entry.id === 'effort' ||
+        entry.id === 'reasoning_effort' ||
+        entry.id === 'thought_level' ||
+        entry.category === 'thought_level'),
+  );
   if (!option) return;
   const currentValue = nonempty(option.currentValue);
   return {
@@ -50,21 +73,33 @@ export function acpVariantOption(result: unknown): { configId: string; options: 
   };
 }
 
-export function acpModelOption(result: unknown, configId = "model"): {
-  configId?: string;
-  currentValue?: string;
-  options: ModelCatalog["options"];
-} | undefined {
+export function acpModelOption(
+  result: unknown,
+  configId = 'model',
+):
+  | {
+      configId?: string;
+      currentValue?: string;
+      options: ModelCatalog['options'];
+    }
+  | undefined {
   const configs = configOptions(result);
-  const option = configs.find((entry) => entry.type === "select" && entry.id === configId)
-    ?? configs.find((entry) => entry.type === "select" && entry.category === "model" && nonempty(entry.id));
+  const option =
+    configs.find((entry) => entry.type === 'select' && entry.id === configId) ??
+    configs.find(
+      (entry) => entry.type === 'select' && entry.category === 'model' && nonempty(entry.id),
+    );
   if (option) {
     const currentValue = nonempty(option.currentValue);
-    return { configId: option.id as string, options: selectValues(option.options), ...(currentValue ? { currentValue } : {}) };
+    return {
+      configId: option.id as string,
+      options: selectValues(option.options),
+      ...(currentValue ? { currentValue } : {}),
+    };
   }
   const models = record(record(result)?.models);
   if (!models || !Array.isArray(models.availableModels)) return;
-  const options: ModelCatalog["options"] = [];
+  const options: ModelCatalog['options'] = [];
   const seen = new Set<string>();
   for (const raw of models.availableModels) {
     const model = record(raw);
@@ -82,7 +117,7 @@ export function offeredModels(result: unknown, configId: string): string[] {
   return acpModelOption(result, configId)?.options.map(({ id }) => id) ?? [];
 }
 
-const UNANSWERED = Symbol("unanswered");
+const UNANSWERED = Symbol('unanswered');
 
 function answerWithin(answer: Promise<unknown>, ms: number): Promise<unknown> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -103,17 +138,17 @@ export async function surveyModelVariants(
 ): Promise<Map<string, ModelVariantOption[]>> {
   const efforts = new Map<string, ModelVariantOption[]>();
   const sessionId = (session as { sessionId?: unknown } | null)?.sessionId;
-  if (typeof sessionId !== "string") return efforts;
+  if (typeof sessionId !== 'string') return efforts;
   const deadline = Date.now() + budgetMs;
-  for (const id of new Set(offeredModels(session, "model"))) {
+  for (const id of new Set(offeredModels(session, 'model'))) {
     const remaining = deadline - Date.now();
     if (remaining <= 0) break;
     const selected = await answerWithin(
-      request("session/set_config_option", { sessionId, configId: "model", value: id }),
+      request('session/set_config_option', { sessionId, configId: 'model', value: id }),
       remaining,
     );
     if (selected === UNANSWERED) break;
-    if (acpModelOption(selected, "model")?.currentValue !== id) continue;
+    if (acpModelOption(selected, 'model')?.currentValue !== id) continue;
     efforts.set(id, acpVariantOption(selected)?.options ?? []);
   }
   return efforts;

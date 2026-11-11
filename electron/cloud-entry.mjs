@@ -1,7 +1,7 @@
 // An action, not a router: it never carries an address, code or credential.
-export const CLOUD_DEEP_LINK = "openmausbot://cloud";
+export const CLOUD_DEEP_LINK = 'openmausbot://cloud';
 
-export const isCloudDeepLink = value => value === CLOUD_DEEP_LINK;
+export const isCloudDeepLink = (value) => value === CLOUD_DEEP_LINK;
 export function takeCloudDeepLink(argv) {
   let found = false;
   // Relaunch reuses process.argv: consume only this one-shot action, leaving flags and other links untouched.
@@ -14,11 +14,16 @@ export function takeCloudDeepLink(argv) {
 }
 
 export function createCloudEntry({ reveal, open }) {
-  let pending = false, ready = false;
+  let pending = false,
+    ready = false;
   async function deliver() {
     if (!ready || !pending) return false;
     pending = false;
-    try { return await open(); } catch { return false; }
+    try {
+      return await open();
+    } catch {
+      return false;
+    }
   }
   function request() {
     pending = true;
@@ -31,9 +36,9 @@ export function createCloudEntry({ reveal, open }) {
       if (takeCloudDeepLink(argv)) pending = true;
       return pending;
     },
-    fromArgs: argv => takeCloudDeepLink(argv) && request(),
+    fromArgs: (argv) => takeCloudDeepLink(argv) && request(),
     /** False leaves the URL to the other link handlers. */
-    fromUrl: url => isCloudDeepLink(url) && request(),
+    fromUrl: (url) => isCloudDeepLink(url) && request(),
     ready() {
       ready = true;
       return deliver();

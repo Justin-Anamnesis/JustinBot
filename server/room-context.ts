@@ -1,16 +1,20 @@
-import type { ModelCatalog } from "./contracts.ts";
-import { contextWindowFor } from "./context-budget.ts";
-import { sessionIdlePolicy } from "./drivers/session-idle.ts";
-import { serverLine } from "./server-lines.ts";
+import type { ModelCatalog } from './contracts.ts';
+import { contextWindowFor } from './context-budget.ts';
+import { sessionIdlePolicy } from './drivers/session-idle.ts';
+import { serverLine } from './server-lines.ts';
 
 export const DEFAULT_ROOM_COMPACT_AT = 0.9;
 
 export type RoomMemberContext = { tokens: number; window: number; compactRequested?: true };
 
-export function roomCompactTokens(window: number, settings: { autoCompact?: boolean; roomCompactAt?: number } | undefined): number | null {
+export function roomCompactTokens(
+  window: number,
+  settings: { autoCompact?: boolean; roomCompactAt?: number } | undefined,
+): number | null {
   if (settings?.autoCompact === false) return null;
   const at = settings?.roomCompactAt;
-  const value = typeof at === "number" && Number.isFinite(at) && at > 0 ? at : DEFAULT_ROOM_COMPACT_AT;
+  const value =
+    typeof at === 'number' && Number.isFinite(at) && at > 0 ? at : DEFAULT_ROOM_COMPACT_AT;
   return value < 1 ? Math.floor(window * value) : Math.floor(value);
 }
 
@@ -23,10 +27,16 @@ export type RoomContextClock = {
   expired?: (threadId: string) => void;
 };
 
-type RoomReset = { reason: "requested" | "threshold"; percent: number };
+type RoomReset = { reason: 'requested' | 'threshold'; percent: number };
 
 export function roomResetNote(name: string, reset: RoomReset, language?: string): string {
-  return serverLine(language, reset.reason === "requested" ? "server.rooms.compactedRequested" : "server.rooms.compactedThreshold", { bot: name, percent: reset.percent });
+  return serverLine(
+    language,
+    reset.reason === 'requested'
+      ? 'server.rooms.compactedRequested'
+      : 'server.rooms.compactedThreshold',
+    { bot: name, percent: reset.percent },
+  );
 }
 
 export class RoomContextTracker {
@@ -37,12 +47,19 @@ export class RoomContextTracker {
 
   constructor(clock: RoomContextClock = {}) {
     this.clock = clock;
-    this.idleMs = clock.idleMs ?? Math.max(sessionIdlePolicy("CLAUDE").idleMs, sessionIdlePolicy("ACP").idleMs);
+    this.idleMs =
+      clock.idleMs ?? Math.max(sessionIdlePolicy('CLAUDE').idleMs, sessionIdlePolicy('ACP').idleMs);
   }
 
-  record(threadId: string, botId: string, reading: { tokens?: number; window?: number } | undefined, model: string | undefined, catalog?: ModelCatalog): void {
+  record(
+    threadId: string,
+    botId: string,
+    reading: { tokens?: number; window?: number } | undefined,
+    model: string | undefined,
+    catalog?: ModelCatalog,
+  ): void {
     const tokens = reading?.tokens;
-    if (typeof tokens !== "number" || !Number.isFinite(tokens) || tokens <= 0) return;
+    if (typeof tokens !== 'number' || !Number.isFinite(tokens) || tokens <= 0) return;
     const members = this.threads.get(threadId) ?? new Map<string, Measured>();
     const previous = this.live(threadId, botId);
     const instanceId = this.dispatchedOn.get(threadId)?.get(botId);
@@ -70,12 +87,20 @@ export class RoomContextTracker {
     if (!members) return undefined;
     for (const botId of members.keys()) this.live(threadId, botId);
     if (!members.size) return undefined;
-    return Object.fromEntries([...members].map(([botId, { tokens, window, compactRequested }]) =>
-      [botId, { tokens, window, ...(compactRequested ? { compactRequested } : {}) }]));
+    return Object.fromEntries(
+      [...members].map(([botId, { tokens, window, compactRequested }]) => [
+        botId,
+        { tokens, window, ...(compactRequested ? { compactRequested } : {}) },
+      ]),
+    );
   }
 
-  dispatch(threadId: string, botId: string, instanceId: string, settings: { autoCompact?: boolean; roomCompactAt?: number } | undefined):
-    { reset: RoomReset | null; displaced: boolean } {
+  dispatch(
+    threadId: string,
+    botId: string,
+    instanceId: string,
+    settings: { autoCompact?: boolean; roomCompactAt?: number } | undefined,
+  ): { reset: RoomReset | null; displaced: boolean } {
     const reset = this.takeReset(threadId, botId, settings);
     return { reset, displaced: this.dispatched(threadId, botId, instanceId) };
   }
@@ -98,13 +123,21 @@ export class RoomContextTracker {
     return dropped;
   }
 
-  takeReset(threadId: string, botId: string, settings: { autoCompact?: boolean; roomCompactAt?: number } | undefined): RoomReset | null {
+  takeReset(
+    threadId: string,
+    botId: string,
+    settings: { autoCompact?: boolean; roomCompactAt?: number } | undefined,
+  ): RoomReset | null {
     const current = this.live(threadId, botId);
     const members = this.threads.get(threadId);
     if (!members || !current) return null;
     const percent = Math.round((current.tokens / current.window) * 100);
     const limit = roomCompactTokens(current.window, settings);
-    const reason = current.compactRequested ? "requested" : limit !== null && current.tokens >= limit ? "threshold" : null;
+    const reason = current.compactRequested
+      ? 'requested'
+      : limit !== null && current.tokens >= limit
+        ? 'threshold'
+        : null;
     if (!reason) return null;
     members.delete(botId);
     if (!members.size) this.threads.delete(threadId);

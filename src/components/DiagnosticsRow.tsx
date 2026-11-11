@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import { cn } from "@/lib/cn";
-import { t } from "@/lib/i18n";
-import { SettingRow } from "./SettingsPrimitives";
+import { cn } from '@/lib/cn';
+import { t } from '@/lib/i18n';
+import { SettingRow } from './SettingsPrimitives';
 
 /**
  * Where this app's logs are, and the recent part of them to share with support. Security: the report never holds
@@ -10,7 +10,7 @@ import { SettingRow } from "./SettingsPrimitives";
  */
 export function DiagnosticsRow({ simple = false }: { simple?: boolean }) {
   const [exporting, setExporting] = useState(false);
-  const [result, setResult] = useState<{ kind: "success" | "error"; message: string } | null>(null);
+  const [result, setResult] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
   const [folder, setFolder] = useState<string | null>(null);
 
   const exportDiagnostics = async () => {
@@ -19,9 +19,9 @@ export function DiagnosticsRow({ simple = false }: { simple?: boolean }) {
     setResult(null);
     try {
       const path = await window.ogb.exportDiagnostics();
-      if (path) setResult({ kind: "success", message: t("settings.diagnostics.saved", { path }) });
+      if (path) setResult({ kind: 'success', message: t('settings.diagnostics.saved', { path }) });
     } catch (e) {
-      setResult({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      setResult({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
     } finally {
       setExporting(false);
     }
@@ -33,9 +33,13 @@ export function DiagnosticsRow({ simple = false }: { simple?: boolean }) {
     try {
       const opened = await window.ogb.openLogsFolder();
       setFolder(opened.folder);
-      if (!opened.opened) setResult({ kind: "error", message: t("settings.diagnostics.openFailed", { folder: opened.folder }) });
+      if (!opened.opened)
+        setResult({
+          kind: 'error',
+          message: t('settings.diagnostics.openFailed', { folder: opened.folder }),
+        });
     } catch (e) {
-      setResult({ kind: "error", message: e instanceof Error ? e.message : String(e) });
+      setResult({ kind: 'error', message: e instanceof Error ? e.message : String(e) });
     }
   };
 
@@ -43,27 +47,43 @@ export function DiagnosticsRow({ simple = false }: { simple?: boolean }) {
   const here = Boolean(window.ogb?.exportDiagnostics);
   return (
     <SettingRow
-      title={t("settings.diagnostics.title")}
-      subtitle={t(simple ? "settings.simple.diagnostics" : "settings.diagnostics.subtitle")}
-      message={<>
-        {folder && result?.kind !== "error" && <p role="status" data-logs-folder className="break-all text-ink-secondary">{t("settings.diagnostics.logsAt", { folder })}</p>}
-        {result && <p role={result.kind === "error" ? "alert" : "status"} className={cn("break-all", result.kind === "error" ? "text-danger" : "text-success")}>
-          {result.message}
-        </p>}
-        <p data-logs-help className="text-ink-tertiary">{t(here ? "settings.diagnostics.logsHelp" : "settings.diagnostics.elsewhere")}</p>
-      </>}
-    >
-      {here && <div className="flex flex-wrap gap-2">
-        {window.ogb?.openLogsFolder && <button type="button" onClick={() => void openLogs()} className="ui-button">{t("settings.diagnostics.openLogs")}</button>}
-        <button
-          onClick={() => void exportDiagnostics()}
-          disabled={exporting}
-          aria-label={t("settings.diagnostics.aria")}
-          className="ui-button"
-        >
-          {exporting ? t("settings.diagnostics.exporting") : t("settings.diagnostics.export")}
-        </button>
-      </div>}
+      title={t('settings.diagnostics.title')}
+      subtitle={t(simple ? 'settings.simple.diagnostics' : 'settings.diagnostics.subtitle')}
+      message={
+        <>
+          {folder && result?.kind !== 'error' && (
+            <p role='status' data-logs-folder className='break-all text-ink-secondary'>
+              {t('settings.diagnostics.logsAt', { folder })}
+            </p>
+          )}
+          {result && (
+            <p
+              role={result.kind === 'error' ? 'alert' : 'status'}
+              className={cn('break-all', result.kind === 'error' ? 'text-danger' : 'text-success')}>
+              {result.message}
+            </p>
+          )}
+          <p data-logs-help className='text-ink-tertiary'>
+            {t(here ? 'settings.diagnostics.logsHelp' : 'settings.diagnostics.elsewhere')}
+          </p>
+        </>
+      }>
+      {here && (
+        <div className='flex flex-wrap gap-2'>
+          {window.ogb?.openLogsFolder && (
+            <button type='button' onClick={() => void openLogs()} className='ui-button'>
+              {t('settings.diagnostics.openLogs')}
+            </button>
+          )}
+          <button
+            onClick={() => void exportDiagnostics()}
+            disabled={exporting}
+            aria-label={t('settings.diagnostics.aria')}
+            className='ui-button'>
+            {exporting ? t('settings.diagnostics.exporting') : t('settings.diagnostics.export')}
+          </button>
+        </div>
+      )}
     </SettingRow>
   );
 }

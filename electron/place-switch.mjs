@@ -18,14 +18,34 @@ export const PAGE_SETTLE_MS = 30_000;
  * open, read before a switch starts so going back to the place on screen can put it back. `pageSettled()`: settles once
  * the window's page has finished loading (undefined while it isn't loading).
  */
-export function createPlaceSwitch({ changed = () => {}, stop = () => {}, kept = () => null, pageSettled = () => undefined, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
-  let turn = 0, target = null, replacing = false, before = null;
-  const tell = () => { try { changed(); } catch {} };
+export function createPlaceSwitch({
+  changed = () => {},
+  stop = () => {},
+  kept = () => null,
+  pageSettled = () => undefined,
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
+} = {}) {
+  let turn = 0,
+    target = null,
+    replacing = false,
+    before = null;
+  const tell = () => {
+    try {
+      changed();
+    } catch {}
+  };
   async function settled() {
     const loading = pageSettled();
     if (!loading) return;
     let timer = null;
-    await Promise.race([loading, new Promise((done) => { timer = setTimer(done, PAGE_SETTLE_MS); timer?.unref?.(); })]);
+    await Promise.race([
+      loading,
+      new Promise((done) => {
+        timer = setTimer(done, PAGE_SETTLE_MS);
+        timer?.unref?.();
+      }),
+    ]);
     clearTimer(timer);
   }
   return {
@@ -49,14 +69,21 @@ export function createPlaceSwitch({ changed = () => {}, stop = () => {}, kept = 
       replacing = target !== null;
       if (!target) before = kept();
       target = { id };
-      try { stop(); } catch {}
+      try {
+        stop();
+      } catch {}
       tell();
       try {
         return await open(() => mine !== turn);
       } finally {
         if (mine === turn) {
           await settled();
-          if (mine === turn) { target = null; replacing = false; before = null; tell(); }
+          if (mine === turn) {
+            target = null;
+            replacing = false;
+            before = null;
+            tell();
+          }
         }
       }
     },

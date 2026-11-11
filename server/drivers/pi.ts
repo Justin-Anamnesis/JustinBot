@@ -1,27 +1,39 @@
-import { piModelId } from "./pi-model-id.ts";
-import { RuntimeNoticeError, runtimeErrorText } from "./runtime-notice-error.ts";
+import { piModelId } from './pi-model-id.ts';
+import { RuntimeNoticeError, runtimeErrorText } from './runtime-notice-error.ts';
 // The pi coding agent (@earendil-works/pi-coding-agent) over its own stdio JSON-RPC mode
 // (`pi --mode rpc --no-session`), not ACP. pi is BYOK and reads ~/.pi/agent/auth.json itself, so
 // this driver holds no key; resumeCursor is pi's `sessionFile` (switch_session).
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-import { PROVIDER_CREDENTIAL_ENV, stripWorkspaceCredentialEnv } from "../config.ts";
-import { openStartupModelCatalog, unconfirmedModelCatalog, writeStartupModelCache } from "../startup-model-catalog.ts";
-import { augmentedPath } from "../env-path.ts";
-import { describeSpawnFailure, execCliBoxed, killCliTree, spawnCli } from "../procs.ts";
-import { instanceEnvNames } from "../bot-box/env.ts";
+import { PROVIDER_CREDENTIAL_ENV, stripWorkspaceCredentialEnv } from '../config.ts';
+import {
+  openStartupModelCatalog,
+  unconfirmedModelCatalog,
+  writeStartupModelCache,
+} from '../startup-model-catalog.ts';
+import { augmentedPath } from '../env-path.ts';
+import { describeSpawnFailure, execCliBoxed, killCliTree, spawnCli } from '../procs.ts';
+import { instanceEnvNames } from '../bot-box/env.ts';
 import {
   deletePromptSplitReceipt,
   promptHalves,
   readPromptSplitReceipt,
   splitSessionPrompt,
   writePromptSplitReceipt,
-} from "./prompt-split.ts";
-import type { PromptSplitReceipt } from "./prompt-split.ts";
-import { SPAWNED_PROXIES } from "../proxy-paths.ts";
-import { commandSummary, toolDetailPreview } from "../tool-summary.ts";
+} from './prompt-split.ts';
+import type { PromptSplitReceipt } from './prompt-split.ts';
+import { SPAWNED_PROXIES } from '../proxy-paths.ts';
+import { commandSummary, toolDetailPreview } from '../tool-summary.ts';
 
 import type {
   DriverCreateInput,
@@ -34,32 +46,38 @@ import type {
   RuntimeEventListener,
   SendTurnInput,
   SteerOutcome,
-} from "../contracts.ts";
-import { EFFORT_LEVELS } from "../../shared/wire.ts";
-import { newEventId, newId } from "../contracts.ts";
-import { ASK_USER_TOOL, MAX_QUESTION_TEXT, parseAskQuestions, parseChoices, questionAnswersByQuestion } from "../../shared/ask-question.ts";
+} from '../contracts.ts';
+import { EFFORT_LEVELS } from '../../shared/wire.ts';
+import { newEventId, newId } from '../contracts.ts';
+import {
+  ASK_USER_TOOL,
+  MAX_QUESTION_TEXT,
+  parseAskQuestions,
+  parseChoices,
+  questionAnswersByQuestion,
+} from '../../shared/ask-question.ts';
 import {
   decodeInjectId,
   encodeInjectId,
   hostApiKey,
   localHost,
   mergeLocalInject,
-} from "./local-inject.ts";
-import { appendNative } from "./native.ts";
-import { allowsTool, parseToolScope } from "../../shared/tool-scope.ts";
-import { buildMcpServers } from "./pi-mcp-servers.ts";
-import { noticeFailure } from "../chat-notices.ts";
+} from './local-inject.ts';
+import { appendNative } from './native.ts';
+import { allowsTool, parseToolScope } from '../../shared/tool-scope.ts';
+import { buildMcpServers } from './pi-mcp-servers.ts';
+import { noticeFailure } from '../chat-notices.ts';
 
-import { decodePiFrame, PiRpcChunks, piLineReader, readPiPromptImages } from "./pi-rpc.ts";
-import { PiRunUsage, type PiUsage, type TurnUsage } from "./pi-usage.ts";
-export { decodePiFrame, PiRpcChunks, piLineReader } from "./pi-rpc.ts";
+import { decodePiFrame, PiRpcChunks, piLineReader, readPiPromptImages } from './pi-rpc.ts';
+import { PiRunUsage, type PiUsage, type TurnUsage } from './pi-usage.ts';
+export { decodePiFrame, PiRpcChunks, piLineReader } from './pi-rpc.ts';
 
-const DRIVER_KIND = "piAgent";
-const PI_ARGS = ["--mode", "rpc", "--no-session"];
-const PI_MODEL_UPDATE_ARGS = ["update", "--models", "--no-approve"];
+const DRIVER_KIND = 'piAgent';
+const PI_ARGS = ['--mode', 'rpc', '--no-session'];
+const PI_MODEL_UPDATE_ARGS = ['update', '--models', '--no-approve'];
 /** omp's RPC transport caps a frame at 1 MiB and chunks bigger ones only after the client
  *  negotiates protocol 2. Vanilla pi has no handshake frame to wait for. */
-const PI_NEGOTIATE_FRAME = { id: "negotiate", type: "negotiate_protocol", protocolVersion: 2 };
+const PI_NEGOTIATE_FRAME = { id: 'negotiate', type: 'negotiate_protocol', protocolVersion: 2 };
 const PI_PROMPT_RE_ANCHOR_TURNS = 8;
 /** How long to wait after a finished turn_end for agent_end, which some runtimes never send. */
 const PI_AGENT_END_GRACE_MS = 60_000;
@@ -76,17 +94,17 @@ function piNativeLogMessage(message: Record<string, unknown>): Record<string, un
   return {
     ...message,
     images: message.images.map((image) => {
-      if (!image || typeof image !== "object") return image;
+      if (!image || typeof image !== 'object') return image;
       const value = image as Record<string, unknown>;
-      return typeof value.data === "string"
+      return typeof value.data === 'string'
         ? { ...value, data: `[image data: ${value.data.length} base64 chars]` }
         : value;
     }),
   };
 }
 
-export function piThinkingLevel(effort: EffortLevel): (typeof EFFORT_LEVELS)[number] | "off" {
-  return effort === "none" ? "off" : effort;
+export function piThinkingLevel(effort: EffortLevel): (typeof EFFORT_LEVELS)[number] | 'off' {
+  return effort === 'none' ? 'off' : effort;
 }
 
 interface PiModelEntry {
@@ -96,26 +114,27 @@ interface PiModelEntry {
 }
 
 interface PiModelsResponse {
-  type: "response";
-  command: "get_available_models";
+  type: 'response';
+  command: 'get_available_models';
   success: boolean;
   data?: { models?: PiModelEntry[] };
 }
 
 function piCatalogFromFrame(frame: unknown, fallbackDefault: string): ModelCatalog | null {
   const res = frame as PiModelsResponse;
-  if (res?.type !== "response" || res.command !== "get_available_models" || !res.success) return null;
+  if (res?.type !== 'response' || res.command !== 'get_available_models' || !res.success)
+    return null;
   const options: Array<{ id: string; label: string; custom: true; provider: string }> = [];
   for (const m of res.data?.models ?? []) {
     if (!m?.provider || !m?.id) continue;
     const id = `${m.provider}/${m.id}`;
     options.push({ id, label: m.name ?? m.id, custom: true, provider: m.provider });
   }
-  return { default: fallbackDefault || (options[0]?.id ?? ""), options };
+  return { default: fallbackDefault || (options[0]?.id ?? ''), options };
 }
 
-export function parsePiCatalog(stdout: string, fallbackDefault = ""): ModelCatalog {
-  for (const line of stdout.split("\n")) {
+export function parsePiCatalog(stdout: string, fallbackDefault = ''): ModelCatalog {
+  for (const line of stdout.split('\n')) {
     if (!line.trim()) continue;
     let msg: unknown;
     try {
@@ -132,10 +151,10 @@ export function parsePiCatalog(stdout: string, fallbackDefault = ""): ModelCatal
 export function splitPiModel(id: string): { provider: string; modelId: string } | null {
   const inject = decodeInjectId(id);
   if (inject) return { provider: inject.host, modelId: inject.model };
-  if (!id.includes("/")) return null;
-  const [provider, ...rest] = id.split("/");
+  if (!id.includes('/')) return null;
+  const [provider, ...rest] = id.split('/');
   if (!provider || !rest.length) return null;
-  return { provider, modelId: rest.join("/") };
+  return { provider, modelId: rest.join('/') };
 }
 
 export function preferPiInjectRows(catalog: ModelCatalog): ModelCatalog {
@@ -145,15 +164,15 @@ export function preferPiInjectRows(catalog: ModelCatalog): ModelCatalog {
   if (!injectIds.size) return catalog;
   const options = catalog.options.filter((option) => {
     if (decodeInjectId(option.id)) return true;
-    const slash = option.id.indexOf("/");
+    const slash = option.id.indexOf('/');
     if (slash <= 0) return true;
     return !injectIds.has(encodeInjectId(option.id.slice(0, slash), option.id.slice(slash + 1)));
   });
   let def = catalog.default;
   if (def && !options.some((option) => option.id === def)) {
-    const slash = def.indexOf("/");
-    const mapped = slash > 0 ? encodeInjectId(def.slice(0, slash), def.slice(slash + 1)) : "";
-    def = injectIds.has(mapped) ? mapped : (options[0]?.id ?? "");
+    const slash = def.indexOf('/');
+    const mapped = slash > 0 ? encodeInjectId(def.slice(0, slash), def.slice(slash + 1)) : '';
+    def = injectIds.has(mapped) ? mapped : (options[0]?.id ?? '');
   }
   return { default: def, options };
 }
@@ -167,7 +186,7 @@ export async function applyPiLocalCatalog(
 }
 
 function piAgentDir(env: Record<string, string | undefined>): string {
-  return join(env.HOME || env.USERPROFILE || homedir(), ".pi", "agent");
+  return join(env.HOME || env.USERPROFILE || homedir(), '.pi', 'agent');
 }
 
 /** Upsert a live local host into ~/.pi/agent/models.json so `set_model` can reach it. */
@@ -184,12 +203,12 @@ export function ensurePiInjectModel(
 
   const dir = piAgentDir(env);
   mkdirSync(dir, { recursive: true });
-  const path = join(dir, "models.json");
+  const path = join(dir, 'models.json');
   let root: Record<string, unknown> = { providers: {} };
   if (existsSync(path)) {
     try {
-      const parsed = JSON.parse(readFileSync(path, "utf8")) as unknown;
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const parsed = JSON.parse(readFileSync(path, 'utf8')) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         root = parsed as Record<string, unknown>;
       } else {
         return split;
@@ -200,29 +219,31 @@ export function ensurePiInjectModel(
   }
 
   const providers =
-    root.providers && typeof root.providers === "object" && !Array.isArray(root.providers)
+    root.providers && typeof root.providers === 'object' && !Array.isArray(root.providers)
       ? { ...(root.providers as Record<string, unknown>) }
       : {};
   const previous = providers[inject.host];
   const existing: Record<string, unknown> =
-    previous && typeof previous === "object" && !Array.isArray(previous)
+    previous && typeof previous === 'object' && !Array.isArray(previous)
       ? { ...(previous as Record<string, unknown>) }
       : {
           baseUrl: host.baseUrl,
-          api: "openai-completions",
+          api: 'openai-completions',
           apiKey: hostApiKey(host, env),
           compat: { supportsDeveloperRole: false, supportsReasoningEffort: true },
           models: [] as Array<Record<string, unknown>>,
         };
   existing.baseUrl = host.baseUrl;
-  existing.api = typeof existing.api === "string" && existing.api ? existing.api : "openai-completions";
+  existing.api =
+    typeof existing.api === 'string' && existing.api ? existing.api : 'openai-completions';
   existing.apiKey = hostApiKey(host, env);
   if (!existing.compat) {
     existing.compat = { supportsDeveloperRole: false, supportsReasoningEffort: true };
   }
   const models: Array<Record<string, unknown>> = Array.isArray(existing.models)
     ? existing.models.filter(
-        (row): row is Record<string, unknown> => Boolean(row) && typeof row === "object" && !Array.isArray(row),
+        (row): row is Record<string, unknown> =>
+          Boolean(row) && typeof row === 'object' && !Array.isArray(row),
       )
     : [];
   if (!models.some((row) => row.id === inject.model)) {
@@ -230,7 +251,7 @@ export function ensurePiInjectModel(
       id: inject.model,
       name: inject.model,
       reasoning: true,
-      input: ["text"],
+      input: ['text'],
       contextWindow: 131072,
       maxTokens: 16384,
     });
@@ -248,13 +269,13 @@ export function ensurePiInjectModel(
 function readPiDefaultModel(env: Record<string, string | undefined>): string {
   const home = env.HOME || env.USERPROFILE || homedir();
   try {
-    const s = JSON.parse(readFileSync(`${home}/.pi/agent/settings.json`, "utf8")) as {
+    const s = JSON.parse(readFileSync(`${home}/.pi/agent/settings.json`, 'utf8')) as {
       defaultProvider?: string;
       defaultModel?: string;
     };
-    return s.defaultProvider && s.defaultModel ? `${s.defaultProvider}/${s.defaultModel}` : "";
+    return s.defaultProvider && s.defaultModel ? `${s.defaultProvider}/${s.defaultModel}` : '';
   } catch {
-    return "";
+    return '';
   }
 }
 
@@ -265,7 +286,7 @@ export async function fetchPiModels(
   env: Record<string, string | undefined>,
   allowEnv: readonly string[] = [],
 ): Promise<ModelCatalog> {
-  const child = spawnCli(cli, PI_ARGS, { stdio: ["pipe", "pipe", "pipe"], env, box: { allowEnv } });
+  const child = spawnCli(cli, PI_ARGS, { stdio: ['pipe', 'pipe', 'pipe'], env, box: { allowEnv } });
   return new Promise((resolve) => {
     let done = false;
     const fallbackDefault = readPiDefaultModel(env);
@@ -277,24 +298,29 @@ export async function fetchPiModels(
       } catch {}
       resolve(catalog);
     };
-    const timer = setTimeout(() => finish({ default: "", options: [] }), 15_000);
+    const timer = setTimeout(() => finish({ default: '', options: [] }), 15_000);
     timer.unref?.();
     const chunks = new PiRpcChunks();
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", piLineReader((line) => {
-      const frame = decodePiFrame(line, chunks);
-      if (frame?.command !== "get_available_models") return false;
-      clearTimeout(timer);
-      finish(piCatalogFromFrame(frame, fallbackDefault) ?? { default: fallbackDefault, options: [] });
-      return true;
-    }));
-    child.on("error", () => finish({ default: "", options: [] }));
-    child.on("close", () => finish({ default: "", options: [] }));
+    child.stdout.setEncoding('utf8');
+    child.stdout.on(
+      'data',
+      piLineReader((line) => {
+        const frame = decodePiFrame(line, chunks);
+        if (frame?.command !== 'get_available_models') return false;
+        clearTimeout(timer);
+        finish(
+          piCatalogFromFrame(frame, fallbackDefault) ?? { default: fallbackDefault, options: [] },
+        );
+        return true;
+      }),
+    );
+    child.on('error', () => finish({ default: '', options: [] }));
+    child.on('close', () => finish({ default: '', options: [] }));
     try {
       child.stdin.write(`${JSON.stringify(PI_NEGOTIATE_FRAME)}\n`);
-      child.stdin.write(JSON.stringify({ id: "catalog", type: "get_available_models" }) + "\n");
+      child.stdin.write(JSON.stringify({ id: 'catalog', type: 'get_available_models' }) + '\n');
     } catch {
-      finish({ default: "", options: [] });
+      finish({ default: '', options: [] });
     }
   });
 }
@@ -305,7 +331,12 @@ export async function updatePiModelCatalog(
   allowEnv: readonly string[] = [],
 ): Promise<boolean> {
   return new Promise((resolve) => {
-    execCliBoxed(cli, PI_MODEL_UPDATE_ARGS, { env, timeout: 60_000, maxBuffer: 1024 * 1024, box: { allowEnv } }, (error) => resolve(!error));
+    execCliBoxed(
+      cli,
+      PI_MODEL_UPDATE_ARGS,
+      { env, timeout: 60_000, maxBuffer: 1024 * 1024, box: { allowEnv } },
+      (error) => resolve(!error),
+    );
   });
 }
 
@@ -316,18 +347,20 @@ export interface PiConfig {
 }
 
 function decodeConfig(raw: unknown): PiConfig {
-  if (raw === null || raw === undefined) return { cli: "pi", fullAuto: false };
-  if (typeof raw !== "object") throw new Error("pi config must be an object");
+  if (raw === null || raw === undefined) return { cli: 'pi', fullAuto: false };
+  if (typeof raw !== 'object') throw new Error('pi config must be an object');
   const obj = raw as { cli?: unknown; fullAuto?: unknown };
-  if (obj.cli !== undefined && typeof obj.cli !== "string") throw new Error("pi config `cli` must be a string");
-  if (obj.fullAuto !== undefined && typeof obj.fullAuto !== "boolean") throw new Error("pi config `fullAuto` must be a boolean");
+  if (obj.cli !== undefined && typeof obj.cli !== 'string')
+    throw new Error('pi config `cli` must be a string');
+  if (obj.fullAuto !== undefined && typeof obj.fullAuto !== 'boolean')
+    throw new Error('pi config `fullAuto` must be a boolean');
   return {
-    cli: obj.cli && obj.cli.trim() ? obj.cli.trim() : "pi",
+    cli: obj.cli && obj.cli.trim() ? obj.cli.trim() : 'pi',
     fullAuto: obj.fullAuto === true,
   };
 }
 
-const EMPTY: ModelCatalog = { default: "", options: [] };
+const EMPTY: ModelCatalog = { default: '', options: [] };
 
 interface PiEvent {
   type: string;
@@ -350,7 +383,9 @@ interface PiEvent {
   title?: string;
 }
 
-function piEnvironment(source: Record<string, string | undefined>): Record<string, string | undefined> {
+function piEnvironment(
+  source: Record<string, string | undefined>,
+): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = { ...source, PATH: augmentedPath() };
   // pi reads provider keys from its env: an inherited key would flip billing, and workspace
   // credentials are the harness's secrets.
@@ -361,15 +396,15 @@ function piEnvironment(source: Record<string, string | undefined>): Record<strin
 
 export const PiDriver: ProviderDriver<PiConfig> = {
   driverKind: DRIVER_KIND,
-  metadata: { displayName: "pi", supportsMultipleInstances: true, access: "custom" },
+  metadata: { displayName: 'pi', supportsMultipleInstances: true, access: 'custom' },
   install: {
     command: {
-      darwin: "npm install -g @earendil-works/pi-coding-agent",
-      linux: "npm install -g @earendil-works/pi-coding-agent",
-      win32: "npm install -g @earendil-works/pi-coding-agent",
+      darwin: 'npm install -g @earendil-works/pi-coding-agent',
+      linux: 'npm install -g @earendil-works/pi-coding-agent',
+      win32: 'npm install -g @earendil-works/pi-coding-agent',
     },
     needsNode: true,
-    docsUrl: "https://pi.dev",
+    docsUrl: 'https://pi.dev',
   },
   models: EMPTY,
   decodeConfig,
@@ -380,9 +415,14 @@ export const PiDriver: ProviderDriver<PiConfig> = {
     const catalogEnv = piEnvironment({ ...process.env, ...input.environment });
     let models = EMPTY;
     const readModels = async () => {
-      let base = models, listed = false;
+      let base = models,
+        listed = false;
       try {
-        const resolved = await fetchPiModels(config.cli, catalogEnv, instanceEnvNames(input.environment, catalogEnv));
+        const resolved = await fetchPiModels(
+          config.cli,
+          catalogEnv,
+          instanceEnvNames(input.environment, catalogEnv),
+        );
         if (resolved.options.length) [base, listed] = [resolved, true];
       } catch {}
       try {
@@ -391,31 +431,51 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       } catch {
         if (base.options.length) models = base;
       }
-      try { if (!listed) unconfirmedModelCatalog(models); writeStartupModelCache(instanceId, models); } catch {}
+      try {
+        if (!listed) unconfirmedModelCatalog(models);
+        writeStartupModelCache(instanceId, models);
+      } catch {}
     };
     const refreshModels = async () => {
-      await updatePiModelCatalog(config.cli, catalogEnv, instanceEnvNames(input.environment, catalogEnv));
+      await updatePiModelCatalog(
+        config.cli,
+        catalogEnv,
+        instanceEnvNames(input.environment, catalogEnv),
+      );
       await readModels();
     };
-    const startupModelRefresh = (await openStartupModelCatalog({
-      instanceId,
-      use: (catalog) => { models = catalog; },
-      current: () => models,
-      refresh: readModels,
-    }))?.pending ?? null;
+    const startupModelRefresh =
+      (
+        await openStartupModelCatalog({
+          instanceId,
+          use: (catalog) => {
+            models = catalog;
+          },
+          current: () => models,
+          refresh: readModels,
+        })
+      )?.pending ?? null;
 
     const listeners = new Set<RuntimeEventListener>();
-    const active = new Map<string, {
-      stop: () => Promise<void>;
-      turnId: string;
-      pending: Map<string, (decision: { behavior: "allow" | "deny" | "answer"; message?: string }) => void>;
-      child?: { stdin: { write: (s: string) => void } };
-      steer?: (text: string) => Promise<SteerOutcome>;
-    }>();
+    const active = new Map<
+      string,
+      {
+        stop: () => Promise<void>;
+        turnId: string;
+        pending: Map<
+          string,
+          (decision: { behavior: 'allow' | 'deny' | 'answer'; message?: string }) => void
+        >;
+        child?: { stdin: { write: (s: string) => void } };
+        steer?: (text: string) => Promise<SteerOutcome>;
+      }
+    >();
 
     const stopAll = async () => {
-      const results = await Promise.allSettled([...active.values()].map(({ stop }) => Promise.resolve().then(stop)));
-      const failure = results.find((result) => result.status === "rejected");
+      const results = await Promise.allSettled(
+        [...active.values()].map(({ stop }) => Promise.resolve().then(stop)),
+      );
+      const failure = results.find((result) => result.status === 'rejected');
       if (failure) throw failure.reason;
     };
 
@@ -437,38 +497,58 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       const selection = parseToolScope(turn.toolScope);
       if (!selection.ok) throw new Error(selection.error);
       const toolScope = selection.scope;
-      if (active.has(threadId)) throw new Error("a turn is already running on this thread");
+      if (active.has(threadId)) throw new Error('a turn is already running on this thread');
       const fullAuto = turn.approvalMode === undefined ? config.fullAuto : false;
       // Host control always routes through the permission card, full-auto or not.
-      const controlsHost = turn.integrations?.localComputer?.scope === "local-computer";
+      const controlsHost = turn.integrations?.localComputer?.scope === 'local-computer';
       if (controlsHost && fullAuto) {
-        throw new Error("local computer control requires the interactive approval broker");
+        throw new Error('local computer control requires the interactive approval broker');
       }
       const turnId = newId();
-      const pending = new Map<string, (decision: { behavior: "allow" | "deny" | "answer"; message?: string }) => void>();
+      const pending = new Map<
+        string,
+        (decision: { behavior: 'allow' | 'deny' | 'answer'; message?: string }) => void
+      >();
       const askTimers = new Set<ReturnType<typeof setTimeout>>();
       let settled = false;
       let completion: Promise<void> | null = null;
       let endStopReason: string | undefined;
       const runUsage = new PiRunUsage();
-      let completionOutcome: { ok: boolean; stopReason: string; cost?: number; usage?: TurnUsage } | null = null;
+      let completionOutcome: {
+        ok: boolean;
+        stopReason: string;
+        cost?: number;
+        usage?: TurnUsage;
+      } | null = null;
       let endErrorMessage: string | undefined;
       let agentEndTimer: ReturnType<typeof setTimeout> | null = null;
       const images = readPiPromptImages(turn);
 
       // Before any credential-bearing temp file, so a model setup failure leaves nothing to clean up.
-      if (typeof turn.model === "string" && turn.model) {
+      if (typeof turn.model === 'string' && turn.model) {
         ensurePiInjectModel(turn.model, { ...process.env, ...input.environment });
       }
 
       // The MCP config carries credentials: a 0600 temp file removed at settle, never argv.
       // Written on every turn: the extension also carries ask_user.
       const mcpServers = buildMcpServers(turn);
-      const askUser = toolScope === undefined || allowsTool(toolScope, { kind: "native", name: ASK_USER_TOOL });
-      const mcpTempDir = mkdtempSync(join(tmpdir(), "omb-pi-mcp-"));
-      const scopeReadyPath = toolScope !== undefined ? join(mcpTempDir, "scope-ready.json") : undefined;
+      const askUser =
+        toolScope === undefined || allowsTool(toolScope, { kind: 'native', name: ASK_USER_TOOL });
+      const mcpTempDir = mkdtempSync(join(tmpdir(), 'omb-pi-mcp-'));
+      const scopeReadyPath =
+        toolScope !== undefined ? join(mcpTempDir, 'scope-ready.json') : undefined;
       try {
-        writeFileSync(join(mcpTempDir, "mcp.json"), JSON.stringify({ mcpServers: mcpServers ?? {}, toolScope, scopeReadyPath, approvalMode: turn.approvalMode, askUser }), { mode: 0o600 });
+        writeFileSync(
+          join(mcpTempDir, 'mcp.json'),
+          JSON.stringify({
+            mcpServers: mcpServers ?? {},
+            toolScope,
+            scopeReadyPath,
+            approvalMode: turn.approvalMode,
+            askUser,
+          }),
+          { mode: 0o600 },
+        );
       } catch (err) {
         // A partial file could still hold credentials.
         try {
@@ -476,20 +556,25 @@ export const PiDriver: ProviderDriver<PiConfig> = {
         } catch {}
         throw err;
       }
-      const childArgs = [...PI_ARGS, "-e", SPAWNED_PROXIES.piMcpExtension];
+      const childArgs = [...PI_ARGS, '-e', SPAWNED_PROXIES.piMcpExtension];
 
       // spawnCli can throw synchronously, before settle() could remove the credential file.
       const child = (() => {
         try {
-          return spawnCli(config.cli, childArgs, {
-            stdio: ["pipe", "pipe", "pipe"],
-            cwd: turn.cwd,
-            env: piEnvironment({
-              ...process.env,
-              ...input.environment,
-              OMB_MCP_CONFIG: join(mcpTempDir, "mcp.json"),
-            }),
-          }, "bot");
+          return spawnCli(
+            config.cli,
+            childArgs,
+            {
+              stdio: ['pipe', 'pipe', 'pipe'],
+              cwd: turn.cwd,
+              env: piEnvironment({
+                ...process.env,
+                ...input.environment,
+                OMB_MCP_CONFIG: join(mcpTempDir, 'mcp.json'),
+              }),
+            },
+            'bot',
+          );
         } catch (err) {
           try {
             rmSync(mcpTempDir, { recursive: true, force: true });
@@ -497,9 +582,12 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           throw err;
         }
       })();
-      let assistantText = "";
+      let assistantText = '';
       let compactionObserved = false;
-      const responseWaiters = new Map<string, { resolve: (data: unknown) => void; reject: (err: Error) => void; timer?: NodeJS.Timeout }>();
+      const responseWaiters = new Map<
+        string,
+        { resolve: (data: unknown) => void; reject: (err: Error) => void; timer?: NodeJS.Timeout }
+      >();
       // Steers correlate by a unique id, so concurrent steers never share or overwrite a waiter.
       let steerSeq = 0;
       const rejectWaiters = (err: Error) => {
@@ -511,35 +599,48 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       };
       const awaitResponse = (command: string, timeoutMs = 20_000, key = command) =>
         new Promise<unknown>((resolve, reject) => {
-          const timer = timeoutMs === Infinity ? undefined : setTimeout(() => {
-            responseWaiters.delete(key);
-            reject(new Error(`pi ${command} timed out`));
-          }, timeoutMs);
+          const timer =
+            timeoutMs === Infinity
+              ? undefined
+              : setTimeout(() => {
+                  responseWaiters.delete(key);
+                  reject(new Error(`pi ${command} timed out`));
+                }, timeoutMs);
           timer?.unref?.();
           responseWaiters.set(key, { resolve, reject, timer });
         });
-      child.stdin.on("error", () => rejectWaiters(new Error("pi stdin closed")));
+      child.stdin.on('error', () => rejectWaiters(new Error('pi stdin closed')));
       const send = (obj: Record<string, unknown>) => {
-        appendNative(threadId, { dir: "out", source: "pi.rpc", msg: piNativeLogMessage(obj) });
-        child.stdin.write(JSON.stringify(obj) + "\n");
+        appendNative(threadId, { dir: 'out', source: 'pi.rpc', msg: piNativeLogMessage(obj) });
+        child.stdin.write(JSON.stringify(obj) + '\n');
       };
       // Vanilla pi refuses the unknown command; no waiter is keyed for the reply.
       send(PI_NEGOTIATE_FRAME);
 
       const flushAssistantText = () => {
         const text = assistantText;
-        assistantText = "";
+        assistantText = '';
         if (!text.trim()) return;
-        emit({ ...base(threadId, turnId), type: "item.completed", itemType: "assistant_text", text });
+        emit({
+          ...base(threadId, turnId),
+          type: 'item.completed',
+          itemType: 'assistant_text',
+          text,
+        });
       };
 
-      const settle = (ok: boolean, stopReason?: string | null, usage = runUsage.usage): Promise<void> => {
+      const settle = (
+        ok: boolean,
+        stopReason?: string | null,
+        usage = runUsage.usage,
+      ): Promise<void> => {
         if (completion) return completion;
-        const outcome = completionOutcome ??= {
-          ok, stopReason: stopReason ?? (ok ? "end_turn" : "failed"),
+        const outcome = (completionOutcome ??= {
+          ok,
+          stopReason: stopReason ?? (ok ? 'end_turn' : 'failed'),
           ...(usage ? { usage } : {}),
           ...(runUsage.cost === undefined ? {} : { cost: runUsage.cost }),
-        };
+        });
         settled = true;
         if (agentEndTimer) {
           clearTimeout(agentEndTimer);
@@ -553,8 +654,9 @@ export const PiDriver: ProviderDriver<PiConfig> = {
         } catch {}
         completion = (async () => {
           // The TERM grace lets Pi end the detached tool processes it started; a CLI that ignores TERM is killed after it.
-          if (!await killCliTree(child)) throw new Error("Pi process termination could not be confirmed");
-          rejectWaiters(new Error("pi turn ended"));
+          if (!(await killCliTree(child)))
+            throw new Error('Pi process termination could not be confirmed');
+          rejectWaiters(new Error('pi turn ended'));
           try {
             rmSync(mcpTempDir, { recursive: true, force: true });
           } catch {}
@@ -562,65 +664,70 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           flushAssistantText();
           emit({
             ...base(threadId, turnId),
-            type: "turn.completed",
+            type: 'turn.completed',
             ...outcome,
           });
         })();
         void completion.catch((error: Error) => {
           completion = null;
-          emit({ ...base(threadId, turnId), type: "runtime.error", message: error.message });
+          emit({ ...base(threadId, turnId), type: 'runtime.error', message: error.message });
         });
         return completion;
       };
 
       const finishRun = () => {
         const sr = endStopReason;
-        if (sr === "error" || sr === "failed") {
+        if (sr === 'error' || sr === 'failed') {
           emit({
             ...base(threadId, turnId),
-            type: "runtime.error",
-            message: String(endErrorMessage ?? "pi turn failed").slice(0, 2_000),
+            type: 'runtime.error',
+            message: String(endErrorMessage ?? 'pi turn failed').slice(0, 2_000),
           });
-          settle(false, "failed", runUsage.usage);
+          settle(false, 'failed', runUsage.usage);
           return;
         }
-        settle(true, sr === "cancelled" || sr === "aborted" ? "cancelled" : "end_turn", runUsage.usage);
+        settle(
+          true,
+          sr === 'cancelled' || sr === 'aborted' ? 'cancelled' : 'end_turn',
+          runUsage.usage,
+        );
       };
 
       const stop = () => {
         try {
-          send({ type: "abort" });
+          send({ type: 'abort' });
         } catch {}
-        return settle(true, "cancelled");
+        return settle(true, 'cancelled');
       };
 
       // pi queues a steer into the running agent without aborting the step, answers success only after
       // session.steer() accepted it, and echoes each frame's id.
       const steerActiveTurn = async (text: string): Promise<SteerOutcome> => {
-        if (settled || child.exitCode !== null || child.signalCode !== null) return "refused";
+        if (settled || child.exitCode !== null || child.signalCode !== null) return 'refused';
         let ack: Promise<unknown>;
         try {
           const id = `steer:${++steerSeq}`;
-          ack = awaitResponse("steer", 20_000, id);
-          send({ type: "steer", id, message: text });
+          ack = awaitResponse('steer', 20_000, id);
+          send({ type: 'steer', id, message: text });
         } catch {
-          return "refused";
+          return 'refused';
         }
         try {
           await ack;
-          return "steered";
+          return 'steered';
         } catch (error) {
-          return error instanceof PiRpcRefusalError ? "refused" : "indeterminate";
+          return error instanceof PiRpcRefusalError ? 'refused' : 'indeterminate';
         }
       };
       active.set(threadId, { stop, turnId, pending, child, steer: steerActiveTurn });
 
       const onEvent = (evt: PiEvent) => {
-        appendNative(threadId, { dir: "in", source: "pi.rpc", msg: evt });
+        appendNative(threadId, { dir: 'in', source: 'pi.rpc', msg: evt });
         if (settled) return;
         switch (evt.type) {
-          case "response": {
-            const key = typeof evt.id === "string" && responseWaiters.has(evt.id) ? evt.id : evt.command;
+          case 'response': {
+            const key =
+              typeof evt.id === 'string' && responseWaiters.has(evt.id) ? evt.id : evt.command;
             if (key && responseWaiters.has(key)) {
               const waiter = responseWaiters.get(key)!;
               responseWaiters.delete(key);
@@ -630,57 +737,73 @@ export const PiDriver: ProviderDriver<PiConfig> = {
             }
             return;
           }
-          case "message_update": {
+          case 'message_update': {
             const e = evt.assistantMessageEvent;
             if (!e) return;
-            if (e.type === "text_delta" && typeof e.delta === "string") {
+            if (e.type === 'text_delta' && typeof e.delta === 'string') {
               assistantText += e.delta;
-              emit({ ...base(threadId, turnId), type: "content.delta", streamKind: "assistant_text", delta: e.delta });
-            } else if (e.type === "thinking_delta" && typeof e.delta === "string") {
-              emit({ ...base(threadId, turnId), type: "content.delta", streamKind: "reasoning_text", delta: e.delta });
+              emit({
+                ...base(threadId, turnId),
+                type: 'content.delta',
+                streamKind: 'assistant_text',
+                delta: e.delta,
+              });
+            } else if (e.type === 'thinking_delta' && typeof e.delta === 'string') {
+              emit({
+                ...base(threadId, turnId),
+                type: 'content.delta',
+                streamKind: 'reasoning_text',
+                delta: e.delta,
+              });
             }
             return;
           }
-          case "tool_execution_start": {
+          case 'tool_execution_start': {
             flushAssistantText();
             emit({
               ...base(threadId, turnId),
-              type: "item.started",
-              itemType: "tool",
+              type: 'item.started',
+              itemType: 'tool',
               itemId: evt.toolCallId,
-              title: String(evt.toolName ?? "tool").slice(0, 80),
+              title: String(evt.toolName ?? 'tool').slice(0, 80),
               summary: commandSummary(evt.args),
               input: toolDetailPreview(evt.args),
             });
             return;
           }
-          case "tool_execution_end": {
+          case 'tool_execution_end': {
             emit({
               ...base(threadId, turnId),
-              type: "item.completed",
-              itemType: "tool",
+              type: 'item.completed',
+              itemType: 'tool',
               itemId: evt.toolCallId,
               ok: !evt.isError,
               output: toolDetailPreview(evt.result),
             });
             return;
           }
-          case "extension_ui_request": {
+          case 'extension_ui_request': {
             // pi floods setWidget/setStatus; only select/confirm/input wait for an answer.
-            if (evt.method === "select" || evt.method === "confirm" || evt.method === "input") {
+            if (evt.method === 'select' || evt.method === 'confirm' || evt.method === 'input') {
               flushAssistantText();
               const reqId = evt.id ?? newId();
-              const isSelect = evt.method === "select";
-              const isQuestion = isSelect || evt.method === "input";
-              const selectOptions: string[] = isSelect && Array.isArray(evt.options)
-                ? evt.options.filter((option): option is string => typeof option === "string") : [];
-              const summary = String(evt.title ?? (isQuestion ? "pi has a question" : "pi wants confirmation")).slice(0, isQuestion ? MAX_QUESTION_TEXT : 200);
+              const isSelect = evt.method === 'select';
+              const isQuestion = isSelect || evt.method === 'input';
+              const selectOptions: string[] =
+                isSelect && Array.isArray(evt.options)
+                  ? evt.options.filter((option): option is string => typeof option === 'string')
+                  : [];
+              const summary = String(
+                evt.title ?? (isQuestion ? 'pi has a question' : 'pi wants confirmation'),
+              ).slice(0, isQuestion ? MAX_QUESTION_TEXT : 200);
               const question = isSelect
                 ? (parseAskQuestions({
                     questions: [{ question: summary, options: selectOptions }],
                   }) ?? [])[0]
                 : undefined;
-              const choices = question?.options.length ? question.options.map((option) => option.label) : undefined;
+              const choices = question?.options.length
+                ? question.options.map((option) => option.label)
+                : undefined;
               let timer: ReturnType<typeof setTimeout> | undefined;
               // Register BEFORE emitting: the harness may auto-approve inside its synchronous request.opened listener.
               pending.set(reqId, (decision) => {
@@ -688,25 +811,39 @@ export const PiDriver: ProviderDriver<PiConfig> = {
                   clearTimeout(timer);
                   askTimers.delete(timer);
                 }
-                if (decision.behavior === "deny") send({ type: "extension_ui_response", id: reqId, cancelled: true });
+                if (decision.behavior === 'deny')
+                  send({ type: 'extension_ui_response', id: reqId, cancelled: true });
                 else if (isQuestion) {
                   const value = question
-                    ? questionAnswersByQuestion(decision.message ?? "", [question])[question.question] ?? decision.message ?? ""
-                    : decision.message ?? "";
+                    ? (questionAnswersByQuestion(decision.message ?? '', [question])[
+                        question.question
+                      ] ??
+                      decision.message ??
+                      '')
+                    : (decision.message ?? '');
                   // pi expects the original option, not the capped display label; never guess between two.
-                  const matched = selectOptions.filter(option => parseChoices([option], 1)?.[0] === value);
-                  send(matched.length > 1
-                    ? { type: "extension_ui_response", id: reqId, cancelled: true }
-                    : { type: "extension_ui_response", id: reqId, value: matched[0] ?? value });
-                }
-                else send({ type: "extension_ui_response", id: reqId, confirmed: true });
+                  const matched = selectOptions.filter(
+                    (option) => parseChoices([option], 1)?.[0] === value,
+                  );
+                  send(
+                    matched.length > 1
+                      ? { type: 'extension_ui_response', id: reqId, cancelled: true }
+                      : { type: 'extension_ui_response', id: reqId, value: matched[0] ?? value },
+                  );
+                } else send({ type: 'extension_ui_response', id: reqId, confirmed: true });
               });
               if (!isQuestion) {
                 timer = setTimeout(() => {
                   if (timer) askTimers.delete(timer);
                   if (!pending.delete(reqId)) return;
-                  send({ type: "extension_ui_response", id: reqId, cancelled: true });
-                  emit({ ...base(threadId, turnId), requestId: reqId, type: "request.resolved", behavior: "deny", source: "timeout" });
+                  send({ type: 'extension_ui_response', id: reqId, cancelled: true });
+                  emit({
+                    ...base(threadId, turnId),
+                    requestId: reqId,
+                    type: 'request.resolved',
+                    behavior: 'deny',
+                    source: 'timeout',
+                  });
                 }, 15 * 60_000);
                 askTimers.add(timer);
                 timer.unref?.();
@@ -714,9 +851,9 @@ export const PiDriver: ProviderDriver<PiConfig> = {
               emit({
                 ...base(threadId, turnId),
                 requestId: reqId,
-                type: "request.opened",
-                requestType: isQuestion ? "question" : "permission",
-                tool: String(evt.title ?? "pi"),
+                type: 'request.opened',
+                requestType: isQuestion ? 'question' : 'permission',
+                tool: String(evt.title ?? 'pi'),
                 summary,
                 ...(choices ? { choices } : {}),
                 ...(question ? { questions: [question] } : {}),
@@ -724,24 +861,33 @@ export const PiDriver: ProviderDriver<PiConfig> = {
             }
             return;
           }
-          case "compaction_start":
-          case "compaction_end":
-          case "auto_compaction_start":
-          case "auto_compaction_end": {
+          case 'compaction_start':
+          case 'compaction_end':
+          case 'auto_compaction_start':
+          case 'auto_compaction_end': {
             if (agentEndTimer) clearTimeout(agentEndTimer);
             agentEndTimer = null;
-            if (sessionReady && sessionFile) { // pi compaction (manual or automatic) can absorb the turn that carried the standing prompt
+            if (sessionReady && sessionFile) {
+              // pi compaction (manual or automatic) can absorb the turn that carried the standing prompt
               compactionObserved = true;
-              deletePromptSplitReceipt("pi", JSON.stringify([threadId, sessionFile]));
+              deletePromptSplitReceipt('pi', JSON.stringify([threadId, sessionFile]));
             }
-            if (evt.type.endsWith("compaction_end") && typeof (evt as { result?: { summary?: unknown } }).result?.summary === "string" && /\S/.test((evt as { result: { summary: string } }).result.summary) && !(evt as { aborted?: boolean }).aborted && !(evt as { errorMessage?: string }).errorMessage) { flushAssistantText(); emit({ ...base(threadId, turnId), type: "context.compacted" }); }
+            if (
+              evt.type.endsWith('compaction_end') &&
+              typeof (evt as { result?: { summary?: unknown } }).result?.summary === 'string' &&
+              /\S/.test((evt as { result: { summary: string } }).result.summary) &&
+              !(evt as { aborted?: boolean }).aborted &&
+              !(evt as { errorMessage?: string }).errorMessage
+            ) {
+              flushAssistantText();
+              emit({ ...base(threadId, turnId), type: 'context.compacted' });
+            }
             return;
           }
-          case "message_end":
-            if (evt.message?.role === "assistant") runUsage.add(evt.message.usage);
+          case 'message_end':
+            if (evt.message?.role === 'assistant') runUsage.add(evt.message.usage);
             return;
-          case "turn_end":
-          {
+          case 'turn_end': {
             // A killed child can still flush one buffered frame after the turn settled.
             if (settled) return;
             if (agentEndTimer) clearTimeout(agentEndTimer);
@@ -749,7 +895,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
             const sr = evt.message?.stopReason;
             runUsage.endTurn(evt.usage ?? evt.message?.usage);
             // toolUse: pi ran a tool and auto-continues; the next turn_end carries the outcome.
-            if (sr === "toolUse" || sr === "tool_use" || sr === "tool_calls") return;
+            if (sr === 'toolUse' || sr === 'tool_use' || sr === 'tool_calls') return;
             endStopReason = sr;
             endErrorMessage = evt.message?.errorMessage;
             // pi can schedule maintenance (overflow-recovery compaction) after the final turn_end;
@@ -758,13 +904,13 @@ export const PiDriver: ProviderDriver<PiConfig> = {
             agentEndTimer.unref?.();
             return;
           }
-          case "turn_start":
-          case "agent_start": {
+          case 'turn_start':
+          case 'agent_start': {
             if (agentEndTimer) clearTimeout(agentEndTimer);
             agentEndTimer = null;
             return;
           }
-          case "agent_end": {
+          case 'agent_end': {
             // Non-terminal agent_end: upstream pi sets willRetry: true before an automatic retry; the omp
             // fork sets isTerminal: false while maintenance or async delivery is scheduled.
             if (agentEndTimer) clearTimeout(agentEndTimer);
@@ -773,7 +919,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
             finishRun();
             return;
           }
-          case "agent_settled": {
+          case 'agent_settled': {
             // upstream pi's explicit fully-settled guarantee: no retry or queued continuation remains.
             if (agentEndTimer) {
               clearTimeout(agentEndTimer);
@@ -788,40 +934,57 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       };
 
       const chunks = new PiRpcChunks();
-      child.stdout.setEncoding("utf8");
-      child.stdout.on("data", piLineReader((line) => {
-        const frame = decodePiFrame(line, chunks);
-        if (!frame) return;
-        try {
-          onEvent(frame as unknown as PiEvent);
-        } catch {}
-      }));
-      child.on("error", (err) => {
+      child.stdout.setEncoding('utf8');
+      child.stdout.on(
+        'data',
+        piLineReader((line) => {
+          const frame = decodePiFrame(line, chunks);
+          if (!frame) return;
+          try {
+            onEvent(frame as unknown as PiEvent);
+          } catch {}
+        }),
+      );
+      child.on('error', (err) => {
         const fail = describeSpawnFailure(err as NodeJS.ErrnoException, config.cli, turn.cwd);
         rejectWaiters(new Error(fail.message));
-        emit({ ...base(threadId, turnId), type: "runtime.error", message: fail.message, setup: fail.setup });
+        emit({
+          ...base(threadId, turnId),
+          type: 'runtime.error',
+          message: fail.message,
+          setup: fail.setup,
+        });
         settle(false);
       });
-      child.on("close", () => {
-        rejectWaiters(new Error("pi process exited before replying"));
+      child.on('close', () => {
+        rejectWaiters(new Error('pi process exited before replying'));
         settle(false);
       });
 
-      emit({ ...base(threadId, turnId), type: "turn.started" });
+      emit({ ...base(threadId, turnId), type: 'turn.started' });
 
       // The resumeCursor is pi's sessionFile, which switch_session takes as `sessionPath`.
-      const sessionPath = typeof turn.resumeCursor === "string" ? turn.resumeCursor : null;
+      const sessionPath = typeof turn.resumeCursor === 'string' ? turn.resumeCursor : null;
       let sessionFile = sessionPath;
       let sessionId: string | null = sessionFile;
       let sessionReady = false;
       let sessionOpened = false;
       let confirmedModel: string | null = null;
       try {
-        const command = sessionPath ? "switch_session" : "new_session";
+        const command = sessionPath ? 'switch_session' : 'new_session';
         const hsPromise = awaitResponse(command, Infinity);
-        send(sessionPath ? { type: "switch_session", sessionPath } : { type: "new_session" });
-        const slow = setTimeout(() => emit({ ...base(threadId, turnId), type: "runtime.notice", ...noticeFailure("chat.notice.piSessionSlow") }), PI_SESSION_SLOW_MS);
-        const hs = (await hsPromise.finally(() => clearTimeout(slow))) as { sessionFile?: string; sessionId?: string } | undefined;
+        send(sessionPath ? { type: 'switch_session', sessionPath } : { type: 'new_session' });
+        const slow = setTimeout(
+          () =>
+            emit({
+              ...base(threadId, turnId),
+              type: 'runtime.notice',
+              ...noticeFailure('chat.notice.piSessionSlow'),
+            }),
+          PI_SESSION_SLOW_MS,
+        );
+        const hs = (await hsPromise.finally(() => clearTimeout(slow))) as
+          { sessionFile?: string; sessionId?: string } | undefined;
         if (hs?.sessionFile) sessionFile = hs.sessionFile;
         sessionId = sessionFile ?? hs?.sessionId ?? null;
         sessionReady = true;
@@ -831,16 +994,25 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       }
       if (settled) return { turnId };
 
-      const chosen = typeof turn.model === "string" ? splitPiModel(turn.model) : null;
+      const chosen = typeof turn.model === 'string' ? splitPiModel(turn.model) : null;
       if (chosen) {
         try {
-          const modelPromise = awaitResponse("set_model");
-          send({ type: "set_model", provider: chosen.provider, modelId: chosen.modelId });
+          const modelPromise = awaitResponse('set_model');
+          send({ type: 'set_model', provider: chosen.provider, modelId: chosen.modelId });
           confirmedModel = piModelId(await modelPromise);
-          if (!confirmedModel) throw new RuntimeNoticeError("Pi did not confirm the selected model", "chat.notice.piModelNotConfirmed");
+          if (!confirmedModel)
+            throw new RuntimeNoticeError(
+              'Pi did not confirm the selected model',
+              'chat.notice.piModelNotConfirmed',
+            );
         } catch (error) {
           if (!settled) {
-            emit({ ...base(threadId, turnId), type: "runtime.error", message: String((error as Error).message), text: runtimeErrorText(error) });
+            emit({
+              ...base(threadId, turnId),
+              type: 'runtime.error',
+              message: String((error as Error).message),
+              text: runtimeErrorText(error),
+            });
             await settle(false);
           }
           return { turnId };
@@ -848,20 +1020,26 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       }
       if (!chosen) {
         try {
-          const statePromise = awaitResponse("get_state");
-          send({ type: "get_state" });
-          const state = await statePromise as { model?: unknown } | undefined;
+          const statePromise = awaitResponse('get_state');
+          send({ type: 'get_state' });
+          const state = (await statePromise) as { model?: unknown } | undefined;
           confirmedModel = piModelId(state?.model);
         } catch {}
       }
       if (settled) return { turnId };
-      if (sessionOpened) emit({ ...base(threadId, turnId), type: "session.started", sessionId, model: confirmedModel });
+      if (sessionOpened)
+        emit({
+          ...base(threadId, turnId),
+          type: 'session.started',
+          sessionId,
+          model: confirmedModel,
+        });
 
       // After the model: the supported level set is model-dependent.
       if (turn.effort) {
         try {
-          const levelPromise = awaitResponse("set_thinking_level");
-          send({ type: "set_thinking_level", level: piThinkingLevel(turn.effort) });
+          const levelPromise = awaitResponse('set_thinking_level');
+          send({ type: 'set_thinking_level', level: piThinkingLevel(turn.effort) });
           await levelPromise;
         } catch {}
       }
@@ -870,12 +1048,19 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       if (scopeReadyPath) {
         let ready = false;
         try {
-          const receipt = JSON.parse(readFileSync(scopeReadyPath, "utf8")) as { ok?: unknown; toolScope?: unknown };
-          ready = receipt.ok === true && JSON.stringify(receipt.toolScope) === JSON.stringify(toolScope);
-        } catch { /* Missing or malformed readiness is never a grant. */ }
+          const receipt = JSON.parse(readFileSync(scopeReadyPath, 'utf8')) as {
+            ok?: unknown;
+            toolScope?: unknown;
+          };
+          ready =
+            receipt.ok === true && JSON.stringify(receipt.toolScope) === JSON.stringify(toolScope);
+        } catch {
+          /* Missing or malformed readiness is never a grant. */
+        }
         if (!ready) {
-          const message = "Pi tool selection enforcement is unavailable. Update Pi and check the OpenMausBot extension before retrying.";
-          emit({ ...base(threadId, turnId), type: "runtime.error", message });
+          const message =
+            'Pi tool selection enforcement is unavailable. Update Pi and check the OpenMausBot extension before retrying.';
+          emit({ ...base(threadId, turnId), type: 'runtime.error', message });
           settle(false);
           throw new Error(message);
         }
@@ -889,7 +1074,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
         const composed = splitSessionPrompt(
           halves.stable,
           halves.volatile,
-          readPromptSplitReceipt("pi", receiptKey),
+          readPromptSplitReceipt('pi', receiptKey),
           turn.system,
           turn.text,
           Boolean(turn.mentionTurn),
@@ -901,21 +1086,21 @@ export const PiDriver: ProviderDriver<PiConfig> = {
         message = turn.system ? `${turn.system}\n\n${turn.text}` : turn.text;
       }
       try {
-          // pi answers the prompt only after preflight accepts it, and rejects it while a compaction runs.
-        const accepted = awaitResponse("prompt", 120_000);
-        send({ type: "prompt", message, ...(images.length ? { images } : {}) });
+        // pi answers the prompt only after preflight accepts it, and rejects it while a compaction runs.
+        const accepted = awaitResponse('prompt', 120_000);
+        send({ type: 'prompt', message, ...(images.length ? { images } : {}) });
         void accepted.then(
           () => {
             if (!pendingReceipt || compactionObserved) return;
             try {
-              writePromptSplitReceipt("pi", pendingReceipt.key, pendingReceipt.receipt);
+              writePromptSplitReceipt('pi', pendingReceipt.key, pendingReceipt.receipt);
             } catch {}
           },
           (err: Error) => {
             if (settled) return;
             emit({
               ...base(threadId, turnId),
-              type: "runtime.error",
+              type: 'runtime.error',
               message: String(err?.message ?? err).slice(0, 2_000),
             });
             settle(false);
@@ -924,7 +1109,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       } catch (err) {
         emit({
           ...base(threadId, turnId),
-          type: "runtime.error",
+          type: 'runtime.error',
           message: String((err as Error)?.message ?? err).slice(0, 2_000),
         });
         settle(false);
@@ -935,13 +1120,13 @@ export const PiDriver: ProviderDriver<PiConfig> = {
 
     const snapshot = async (): Promise<ProviderSnapshot> => {
       const version = await new Promise<string | null>((resolve) => {
-        const child = spawnCli(config.cli, ["--version"], {
-          stdio: ["ignore", "pipe", "pipe"],
+        const child = spawnCli(config.cli, ['--version'], {
+          stdio: ['ignore', 'pipe', 'pipe'],
           env: piEnvironment({ ...process.env, ...input.environment }),
         });
-        let out = "";
-        child.stdout?.setEncoding("utf8");
-        child.stdout?.on("data", (c: string) => (out += c));
+        let out = '';
+        child.stdout?.setEncoding('utf8');
+        child.stdout?.on('data', (c: string) => (out += c));
         const timer = setTimeout(() => {
           try {
             killCliTree(child);
@@ -949,18 +1134,18 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           resolve(null);
         }, 8000);
         timer.unref?.();
-        child.on("error", () => {
+        child.on('error', () => {
           clearTimeout(timer);
           resolve(null);
         });
-        child.on("close", () => {
+        child.on('close', () => {
           clearTimeout(timer);
           resolve(out.trim() || null);
         });
       });
-      if (!version) return { state: "unavailable", reason: `\`${config.cli}\` CLI not found` };
+      if (!version) return { state: 'unavailable', reason: `\`${config.cli}\` CLI not found` };
       // pi manages its own credentials; there is no sign-in to probe.
-      return { state: "available", version, authenticated: true };
+      return { state: 'available', version, authenticated: true };
     };
 
     return {
@@ -977,7 +1162,7 @@ export const PiDriver: ProviderDriver<PiConfig> = {
       adapter: {
         provider: DRIVER_KIND,
         capabilities: {
-          sessionModelSwitch: "in-session",
+          sessionModelSwitch: 'in-session',
           // pi core has no MCP client of its own.
           agentsMcp: true,
           computerMcp: true,
@@ -985,34 +1170,43 @@ export const PiDriver: ProviderDriver<PiConfig> = {
           phoneMcp: true,
           customMcp: true,
           browserMcp: true,
-          dataMcp: true, emailMcp: true, deviceMcp: true,
+          dataMcp: true,
+          emailMcp: true,
+          deviceMcp: true,
           localComputerMcp: true,
           images: true,
           nativeImageInput: true,
           // pi rejects an unsupported level and the turn keeps the engine default.
           effortLevels: EFFORT_LEVELS,
-          queueing: true, askTool: { kind: "native", name: "ask_user" },
+          queueing: true,
+          askTool: { kind: 'native', name: 'ask_user' },
         },
         sendTurn,
-        interruptTurn: async (threadId) => { await active.get(threadId)?.stop(); },
+        interruptTurn: async (threadId) => {
+          await active.get(threadId)?.stop();
+        },
         respondToRequest: async (threadId, requestId, decision) => {
           const entry = active.get(threadId);
           const answer = entry?.pending.get(requestId);
-          if (!entry || !answer) return "unavailable";
+          if (!entry || !answer) return 'unavailable';
           entry.pending.delete(requestId);
           answer({ behavior: decision.behavior, message: decision.message });
           emit({
             ...base(threadId, entry.turnId),
             requestId,
-            type: "request.resolved",
+            type: 'request.resolved',
             behavior: decision.behavior,
-            source: "user",
+            source: 'user',
           });
-          return decision.behavior === "allow" ? "allowed-once" : decision.behavior === "answer" ? "answered" : "rejected";
+          return decision.behavior === 'allow'
+            ? 'allowed-once'
+            : decision.behavior === 'answer'
+              ? 'answered'
+              : 'rejected';
         },
         steer: async (threadId, text) => {
           const entry = active.get(threadId);
-          return entry?.steer ? await entry.steer(text) : "refused";
+          return entry?.steer ? await entry.steer(text) : 'refused';
         },
         hasSession: (threadId) => active.has(threadId),
         stopAll,

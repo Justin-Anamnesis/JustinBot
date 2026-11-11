@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from 'react';
 
-export type PickerPane = "main" | "custom";
+export type PickerPane = 'main' | 'custom';
 
 export interface PickerPaneInput {
   /** The engine on the picker's rail, and the rail pick that put it there (null: the bot's own engine). */
@@ -22,7 +22,7 @@ export interface PickerPaneInput {
  * moves back to them from the local pane it fell to, unless the bot runs a local model. */
 export function usePickerPane(input: PickerPaneInput, onRailChange: () => void) {
   const { instanceId, railId, hasOfficialModels, customOnly, selectedIsCustom, reading } = input;
-  const [pane, setPane] = useState<PickerPane>("main");
+  const [pane, setPane] = useState<PickerPane>('main');
   const seen = useRef({ instanceId, hasOfficialModels });
   const railChanged = useRef(onRailChange);
   railChanged.current = onRailChange;
@@ -31,14 +31,14 @@ export function usePickerPane(input: PickerPaneInput, onRailChange: () => void) 
     seen.current = { instanceId, hasOfficialModels };
     const none = customOnly || !hasOfficialModels;
     if (railId !== null && railId !== instanceId) {
-      setPane(none ? "custom" : "main");
+      setPane(none ? 'custom' : 'main');
       railChanged.current();
     } else if (none) {
-      setPane("custom");
+      setPane('custom');
     } else if (before.instanceId === instanceId && !before.hasOfficialModels && !selectedIsCustom) {
-      setPane("main");
+      setPane('main');
     }
   }, [railId, instanceId, hasOfficialModels, customOnly, selectedIsCustom]);
   const loading = reading && !hasOfficialModels && !customOnly;
-  return { pane: loading ? "main" as const : pane, setPane, loading };
+  return { pane: loading ? ('main' as const) : pane, setPane, loading };
 }

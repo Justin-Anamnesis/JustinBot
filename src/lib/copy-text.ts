@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-export type CopyResult = "copied" | "empty" | "failed";
-export type CopyFeedback = "idle" | "copied" | "failed";
+export type CopyResult = 'copied' | 'empty' | 'failed';
+export type CopyFeedback = 'idle' | 'copied' | 'failed';
 
 export const COPY_FEEDBACK_MS = 1200;
 
@@ -20,7 +20,10 @@ function writeWeb(text: string): Promise<boolean> {
     const timer = setTimeout(() => finish(false), WEB_WRITE_TIMEOUT_MS);
     try {
       if (!navigator.clipboard?.writeText) return finish(false);
-      Promise.resolve(navigator.clipboard.writeText(text)).then(() => finish(true), () => finish(false));
+      Promise.resolve(navigator.clipboard.writeText(text)).then(
+        () => finish(true),
+        () => finish(false),
+      );
     } catch {
       finish(false);
     }
@@ -33,18 +36,23 @@ function writeWeb(text: string): Promise<boolean> {
  * select-then-copy path works. No-op outside a real DOM.
  */
 function writeLegacy(text: string): boolean {
-  if (typeof document === "undefined" || !document.body || typeof document.execCommand !== "function") return false;
+  if (
+    typeof document === 'undefined' ||
+    !document.body ||
+    typeof document.execCommand !== 'function'
+  )
+    return false;
   const active = document.activeElement as HTMLElement | null;
-  const area = document.createElement("textarea");
+  const area = document.createElement('textarea');
   area.value = text;
-  area.setAttribute("readonly", "");
-  area.style.position = "fixed";
-  area.style.left = "-9999px";
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.left = '-9999px';
   try {
     document.body.appendChild(area);
     area.select();
     area.setSelectionRange(0, text.length);
-    return document.execCommand("copy");
+    return document.execCommand('copy');
   } catch {
     return false;
   } finally {
@@ -55,13 +63,13 @@ function writeLegacy(text: string): boolean {
 
 /** Web Clipboard API, then the desktop bridge, then legacy execCommand (insecure-context mobile). Never throws. */
 export async function copyText(text: string): Promise<CopyResult> {
-  if (!text.trim()) return "empty";
-  if (await writeWeb(text)) return "copied";
+  if (!text.trim()) return 'empty';
+  if (await writeWeb(text)) return 'copied';
   try {
-    if (typeof window !== "undefined" && (await window.ogb?.copyText?.(text)) === true) return "copied";
-  } catch {
-  }
-  return writeLegacy(text) ? "copied" : "failed";
+    if (typeof window !== 'undefined' && (await window.ogb?.copyText?.(text)) === true)
+      return 'copied';
+  } catch {}
+  return writeLegacy(text) ? 'copied' : 'failed';
 }
 
 interface CopyFeedbackOptions {
@@ -89,23 +97,23 @@ export function createCopyFeedback({
   };
 
   return {
-    async click(text: string): Promise<CopyResult | "busy"> {
-      if (pending) return "busy";
+    async click(text: string): Promise<CopyResult | 'busy'> {
+      if (pending) return 'busy';
       pending = true;
       let result: CopyResult;
       try {
         result = await copy(text);
       } catch {
-        result = "failed";
+        result = 'failed';
       } finally {
         pending = false;
       }
-      if (disposed || result === "empty") return result;
+      if (disposed || result === 'empty') return result;
       clear();
-      onChange(result === "copied" ? "copied" : "failed");
+      onChange(result === 'copied' ? 'copied' : 'failed');
       timer = setTimer(() => {
         timer = undefined;
-        onChange("idle");
+        onChange('idle');
       }, resetMs);
       return result;
     },
@@ -117,7 +125,7 @@ export function createCopyFeedback({
 }
 
 export function useCopyFeedback(text: string) {
-  const [state, setState] = useState<CopyFeedback>("idle");
+  const [state, setState] = useState<CopyFeedback>('idle');
   const controller = useRef<ReturnType<typeof createCopyFeedback> | null>(null);
   useEffect(() => {
     const next = createCopyFeedback({ copy: copyText, onChange: setState });

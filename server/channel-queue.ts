@@ -1,19 +1,19 @@
 // Follow-ups sent while a channel works stay off the transcript until it settles, so the current responder cannot appear
 // to answer words it never saw.
 
-import { newId } from "./contracts.ts";
-import { chatFollowups, saveChatFollowup, settleChatFollowups } from "./message-db.ts";
-import { drainCoalesceHead, DRAIN_COALESCE_MAX_ITEMS } from "./admission.ts";
-import type { ResolvedSender } from "../shared/wire.ts";
-import type { UsageTrigger } from "./usage-ledger.ts";
+import { newId } from './contracts.ts';
+import { chatFollowups, saveChatFollowup, settleChatFollowups } from './message-db.ts';
+import { drainCoalesceHead, DRAIN_COALESCE_MAX_ITEMS } from './admission.ts';
+import type { ResolvedSender } from '../shared/wire.ts';
+import type { UsageTrigger } from './usage-ledger.ts';
 
 export interface ChannelQueueItem {
   id: string;
   text: string;
   replyToId?: string;
   sendId?: string;
-  mode: "chat" | "goal";
-  via?: "api";
+  mode: 'chat' | 'goal';
+  via?: 'api';
   sender?: ResolvedSender;
   trigger?: UsageTrigger;
   reaction?: string;
@@ -31,17 +31,17 @@ const queues = new Map<string, ChannelQueueEntry>();
 
 export function restoreChannelMessages(): void {
   queues.clear();
-  for (const row of chatFollowups("channel")) {
-    if (row.status !== "pending") continue;
+  for (const row of chatFollowups('channel')) {
+    if (row.status !== 'pending') continue;
     const entry = queues.get(row.threadId) ?? { groupId: row.ownerId, items: [] };
-    if (entry.groupId !== row.ownerId) throw new Error("queued task belongs to another channel");
+    if (entry.groupId !== row.ownerId) throw new Error('queued task belongs to another channel');
     // a channel line is only ever stamped "api"; "call" belongs to 1:1 rows
     const { via, ...payload } = row.payload;
     entry.items.push({
       ...payload,
-      ...(via === "api" ? { via } : {}),
+      ...(via === 'api' ? { via } : {}),
       id: row.id,
-      mode: row.payload.mode ?? "chat",
+      mode: row.payload.mode ?? 'chat',
       queuedAt: row.payload.queuedAt ?? Date.now(),
     });
     queues.set(row.threadId, entry);
@@ -59,8 +59,8 @@ export function queueChannelMessage(
   options: {
     replyToId?: string;
     sendId?: string;
-    mode?: "chat" | "goal";
-    via?: "api";
+    mode?: 'chat' | 'goal';
+    via?: 'api';
     sender?: ResolvedSender;
     trigger?: UsageTrigger;
     reaction?: string;
@@ -68,13 +68,13 @@ export function queueChannelMessage(
   } = {},
 ): QueuedChannelMessage {
   const entry = queues.get(threadId) ?? { groupId, items: [] };
-  if (entry.groupId !== groupId) throw new Error("queued task belongs to another channel");
+  if (entry.groupId !== groupId) throw new Error('queued task belongs to another channel');
   const item: ChannelQueueItem = {
     id: newId(),
     text,
     replyToId: options.replyToId,
     sendId: options.sendId,
-    mode: options.mode ?? "chat",
+    mode: options.mode ?? 'chat',
     via: options.via,
     sender: options.sender,
     trigger: options.trigger,
@@ -82,7 +82,7 @@ export function queueChannelMessage(
     ...(options.mentions?.length ? { mentions: options.mentions } : {}),
     queuedAt: Date.now(),
   };
-  saveChatFollowup({ id: item.id, kind: "channel", ownerId: groupId, threadId, payload: item });
+  saveChatFollowup({ id: item.id, kind: 'channel', ownerId: groupId, threadId, payload: item });
   entry.items.push(item);
   queues.set(threadId, entry);
   return { id: item.id };
@@ -99,9 +99,15 @@ export function queuedChannelMessage(
 }
 
 /** The waiting line under that id, and the conversation it waits in. */
-export function channelQueueItem(groupId: string, queueId: string): { threadId: string; item: ChannelQueueItem } | null {
+export function channelQueueItem(
+  groupId: string,
+  queueId: string,
+): { threadId: string; item: ChannelQueueItem } | null {
   for (const [threadId, entry] of queues) {
-    const item = entry.groupId === groupId ? entry.items.find((candidate) => candidate.id === queueId) : undefined;
+    const item =
+      entry.groupId === groupId
+        ? entry.items.find((candidate) => candidate.id === queueId)
+        : undefined;
     if (item) return { threadId, item };
   }
   return null;
@@ -112,7 +118,7 @@ export function cancelChannelMessage(groupId: string, queueId: string): boolean 
     if (entry.groupId !== groupId) continue;
     const items = entry.items.filter((item) => item.id !== queueId);
     if (items.length === entry.items.length) continue;
-    settleChatFollowups([queueId], "cancelled");
+    settleChatFollowups([queueId], 'cancelled');
     if (items.length === 0) queues.delete(threadId);
     else queues.set(threadId, { groupId, items });
     return true;
@@ -128,7 +134,11 @@ export interface HeldChannelQueue {
 
 /** The entry leaves first, so a room settling meanwhile can never also drain the same words. Only the head group can be
  * lifted, and the caller must either restore the held queue or settle its head group. */
-export function holdChannelQueue(groupId: string, threadId: string, queueId: string): HeldChannelQueue | null {
+export function holdChannelQueue(
+  groupId: string,
+  threadId: string,
+  queueId: string,
+): HeldChannelQueue | null {
   const entry = queues.get(threadId);
   if (!entry || entry.groupId !== groupId || entry.items[0]?.id !== queueId) return null;
   queues.delete(threadId);
@@ -138,7 +148,8 @@ export function holdChannelQueue(groupId: string, threadId: string, queueId: str
 /** Words queued while the hold was open keep their place behind the restored items. */
 export function restoreHeldChannelQueue(held: HeldChannelQueue): void {
   const existing = queues.get(held.threadId);
-  if (existing && existing.groupId !== held.groupId) throw new Error("queued task belongs to another channel");
+  if (existing && existing.groupId !== held.groupId)
+    throw new Error('queued task belongs to another channel');
   queues.set(held.threadId, {
     groupId: held.groupId,
     items: existing ? [...held.items, ...existing.items] : held.items,
@@ -164,10 +175,14 @@ export function resolveHeldReplyTarget<T>(
 export function settleHeldChannelQueueHead(held: HeldChannelQueue): void {
   const head = headChannelGroup(held.items);
   const rest = held.items.slice(head.length);
-  settleChatFollowups(head.map((item) => item.id), null);
+  settleChatFollowups(
+    head.map((item) => item.id),
+    null,
+  );
   if (rest.length === 0) return;
   const existing = queues.get(held.threadId);
-  if (existing && existing.groupId !== held.groupId) throw new Error("queued task belongs to another channel");
+  if (existing && existing.groupId !== held.groupId)
+    throw new Error('queued task belongs to another channel');
   queues.set(held.threadId, {
     groupId: held.groupId,
     items: existing ? [...rest, ...existing.items] : rest,
@@ -177,7 +192,11 @@ export function settleHeldChannelQueueHead(held: HeldChannelQueue): void {
 /** Removing first makes repeated settle notifications harmless. */
 export function drainChannelMessages(
   isWorking: (groupId: string, threadId: string) => boolean,
-  run: (input: { groupId: string; threadId: string; items: ChannelQueueItem[] }) => void | Promise<void>,
+  run: (input: {
+    groupId: string;
+    threadId: string;
+    items: ChannelQueueItem[];
+  }) => void | Promise<void>,
 ): void {
   for (const [threadId, entry] of queues) {
     if (isWorking(entry.groupId, threadId)) continue;
@@ -187,29 +206,40 @@ export function drainChannelMessages(
     }
     const group = headChannelGroup(entry.items);
     const ids = group.map((item) => item.id);
-    settleChatFollowups(ids, "dispatching");
+    settleChatFollowups(ids, 'dispatching');
     entry.items.splice(0, group.length);
     if (entry.items.length === 0) queues.delete(threadId);
     let running: void | Promise<void>;
-    try { running = run({ groupId: entry.groupId, threadId, items: group }); }
-    catch (error) { console.warn("channel-queue: queued dispatch threw", error); running = Promise.reject(error); }
-    void Promise.resolve(running).then(
-      () => settleChatFollowups(ids, null),
-      () => settleChatFollowups(ids, "interrupted"),
-    ).catch((error) => console.warn("channel-queue: could not settle durable follow-up", error));
+    try {
+      running = run({ groupId: entry.groupId, threadId, items: group });
+    } catch (error) {
+      console.warn('channel-queue: queued dispatch threw', error);
+      running = Promise.reject(error);
+    }
+    void Promise.resolve(running)
+      .then(
+        () => settleChatFollowups(ids, null),
+        () => settleChatFollowups(ids, 'interrupted'),
+      )
+      .catch((error) => console.warn('channel-queue: could not settle durable follow-up', error));
   }
 }
 
 export function headChannelGroup(items: readonly ChannelQueueItem[]): ChannelQueueItem[] {
-  return drainCoalesceHead(items, coalesceIdentity, (item) => item.queuedAt, DRAIN_COALESCE_MAX_ITEMS);
+  return drainCoalesceHead(
+    items,
+    coalesceIdentity,
+    (item) => item.queuedAt,
+    DRAIN_COALESCE_MAX_ITEMS,
+  );
 }
 
 /** An API send has no person behind it and never merges, nor does a goal; unattributed local sends are one identity. */
 function coalesceIdentity(item: ChannelQueueItem): string {
-  if (item.via === "api") return `api:${item.id}`;
-  if (item.mode !== "chat") return `mode:${item.mode}:${item.id}`;
+  if (item.via === 'api') return `api:${item.id}`;
+  if (item.mode !== 'chat') return `mode:${item.mode}:${item.id}`;
   if (item.sender) return `person:${item.sender.id ?? item.sender.name}`;
-  return "person:local";
+  return 'person:local';
 }
 
 export function queuedChannelSends(threadId: string): number {

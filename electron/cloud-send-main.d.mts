@@ -1,12 +1,24 @@
-import type { CloudMoveCheck, CloudSendOutcome, CloudSendSession, CloudSendSnapshot } from "./cloud-send.mjs";
+import type {
+  CloudMoveCheck,
+  CloudSendOutcome,
+  CloudSendSession,
+  CloudSendSnapshot,
+} from './cloud-send.mjs';
 
-interface CloudTarget { origin: string; grant(): Promise<{ origin: string; code: string }> }
+interface CloudTarget {
+  origin: string;
+  grant(): Promise<{ origin: string; code: string }>;
+}
 
-export function openOwnerSession(target: CloudTarget, fetchImpl: typeof fetch, options?: { label?: string; background?: boolean }): Promise<CloudSendSession>;
+export function openOwnerSession(
+  target: CloudTarget,
+  fetchImpl: typeof fetch,
+  options?: { label?: string; background?: boolean },
+): Promise<CloudSendSession>;
 
 export function installCloudSend(deps: {
   ipcMain: { handle(channel: string, handler: (...args: any[]) => unknown): void };
-  cloudPage(event: unknown): "local" | "cloud" | null;
+  cloudPage(event: unknown): 'local' | 'cloud' | null;
   server(): { postMessage(message: unknown): void } | null | undefined;
   local(route: string, init?: { method?: string }): Promise<Response>;
   home(): CloudTarget | null;
@@ -14,7 +26,10 @@ export function installCloudSend(deps: {
   reconnect(origin: string): Promise<boolean>;
   power: { asleep(): boolean };
   file(): string;
-  window(): { isDestroyed(): boolean; webContents: { send(channel: string, value: unknown): void; mainFrame: { url: string } } } | null;
+  window(): {
+    isDestroyed(): boolean;
+    webContents: { send(channel: string, value: unknown): void; mainFrame: { url: string } };
+  } | null;
   localOrigin(): string;
   fetch?: typeof fetch;
   t?(key: string, params?: Record<string, string | number>): string;

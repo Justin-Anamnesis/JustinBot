@@ -1,9 +1,9 @@
-import type { AppState } from "@/state/store";
+import type { AppState } from '@/state/store';
 
-type ShownChatState = Pick<AppState, "activeView" | "selectedId" | "bots" | "groups">;
+type ShownChatState = Pick<AppState, 'activeView' | 'selectedId' | 'bots' | 'groups'>;
 
 export function shownChatIsUnread(state: ShownChatState): boolean {
-  if (state.activeView !== "chat" || !state.selectedId) return false;
+  if (state.activeView !== 'chat' || !state.selectedId) return false;
   const group = state.groups.find((candidate) => candidate.id === state.selectedId);
   if (group) return group.unread;
   const bot = state.bots.find((candidate) => candidate.id === state.selectedId);

@@ -1,17 +1,23 @@
 // Live calls' settings in config.json: schema, type and environment overrides, kept out of server/config.ts.
-import { z } from "zod";
+import { z } from 'zod';
 
-export const LIVE_KEY_NEEDS_ENDPOINT = "Save the Azure endpoint first: a Live key works only with the endpoint it was saved for.";
-const NOWHERE = "nowhere";
+export const LIVE_KEY_NEEDS_ENDPOINT =
+  'Save the Azure endpoint first: a Live key works only with the endpoint it was saved for.';
+const NOWHERE = 'nowhere';
 
 /** Live calls: `key` is a key for Live calls only; with `provider` "openai" (the default) a call without one uses `openai.key`, with "azure" it is the Azure resource's key and is required. `keyFor` says where `key` may go (`liveKeyTarget`): the server sets it when the key is saved and never takes it from a request; absent, the key is from before Azure was offered, so OpenAI's. `azureEndpoint` is the resource URL and `azureDeployment` the gpt-live-1 deployment name. `voice` is a GPT-Live voice. */
 export const liveConfigSchema = z.object({
   key: z.string().optional(),
   keyFor: z.string().max(300).optional(),
-  provider: z.enum(["openai", "azure"]).optional(),
+  provider: z.enum(['openai', 'azure']).optional(),
   azureEndpoint: z.string().trim().max(300).optional(),
   azureDeployment: z.string().trim().max(64).optional(),
-  voice: z.string().trim().max(40).regex(/^[a-z]*$/, "a Live voice is a lowercase built-in voice name").optional(),
+  voice: z
+    .string()
+    .trim()
+    .max(40)
+    .regex(/^[a-z]*$/, 'a Live voice is a lowercase built-in voice name')
+    .optional(),
   readTypedReplies: z.boolean().optional(),
   idleMinutes: z.number().int().min(1).max(60).optional(),
 });
@@ -19,7 +25,7 @@ export const liveConfigSchema = z.object({
 export interface LiveConfig {
   key?: string;
   keyFor?: string;
-  provider?: "openai" | "azure";
+  provider?: 'openai' | 'azure';
   azureEndpoint?: string;
   azureDeployment?: string;
   voice?: string;
@@ -29,9 +35,9 @@ export interface LiveConfig {
 
 /** Where a key saved now may go: "openai", or "azure:<host>"; null while Azure is chosen with no endpoint to tie it to. */
 export function liveKeyTarget(live: LiveConfig | undefined): string | null {
-  if (live?.provider !== "azure") return "openai";
+  if (live?.provider !== 'azure') return 'openai';
   try {
-    const host = new URL(live.azureEndpoint?.trim() ?? "").host.toLowerCase();
+    const host = new URL(live.azureEndpoint?.trim() ?? '').host.toLowerCase();
     return host ? `azure:${host}` : null;
   } catch {
     return null;
@@ -42,7 +48,7 @@ export function liveKeyTarget(live: LiveConfig | undefined): string | null {
 export function usableLiveKey(live: LiveConfig | undefined): string | undefined {
   const key = live?.key?.trim();
   const target = liveKeyTarget(live);
-  return key && target && (live?.keyFor ?? "openai") === target ? key : undefined;
+  return key && target && (live?.keyFor ?? 'openai') === target ? key : undefined;
 }
 
 /** What to save for a change to `live`: a new key is tied to where calls now go, and any other change of where they go
@@ -55,10 +61,15 @@ export function liveSavePatch(current: LiveConfig | undefined, patch: LiveConfig
     if (!target) throw Object.assign(new Error(LIVE_KEY_NEEDS_ENDPOINT), { status: 400 });
     return { ...asked, keyFor: target };
   }
-  return asked.key !== undefined || target !== liveKeyTarget(current) ? { ...asked, key: "", keyFor: NOWHERE } : asked;
+  return asked.key !== undefined || target !== liveKeyTarget(current)
+    ? { ...asked, key: '', keyFor: NOWHERE }
+    : asked;
 }
 
-export function liveConfigWithEnv(live: LiveConfig | undefined, env: NodeJS.ProcessEnv = process.env): LiveConfig {
+export function liveConfigWithEnv(
+  live: LiveConfig | undefined,
+  env: NodeJS.ProcessEnv = process.env,
+): LiveConfig {
   const next = { ...live };
   const envKey = env.OMB_OPENAI_LIVE_KEY;
   if (envKey !== undefined) {
@@ -67,20 +78,30 @@ export function liveConfigWithEnv(live: LiveConfig | undefined, env: NodeJS.Proc
     next.key = envKey;
   }
   const provider = env.OMB_LIVE_PROVIDER?.trim().toLowerCase();
-  if (provider === "openai" || provider === "azure") next.provider = provider;
-  if (env.OMB_AZURE_OPENAI_LIVE_ENDPOINT !== undefined) next.azureEndpoint = env.OMB_AZURE_OPENAI_LIVE_ENDPOINT.trim();
-  if (env.OMB_AZURE_OPENAI_LIVE_DEPLOYMENT !== undefined) next.azureDeployment = env.OMB_AZURE_OPENAI_LIVE_DEPLOYMENT.trim();
+  if (provider === 'openai' || provider === 'azure') next.provider = provider;
+  if (env.OMB_AZURE_OPENAI_LIVE_ENDPOINT !== undefined)
+    next.azureEndpoint = env.OMB_AZURE_OPENAI_LIVE_ENDPOINT.trim();
+  if (env.OMB_AZURE_OPENAI_LIVE_DEPLOYMENT !== undefined)
+    next.azureDeployment = env.OMB_AZURE_OPENAI_LIVE_DEPLOYMENT.trim();
   // Set together in the environment, the key and the Azure endpoint are the operator's own pairing. A `keyFor` from the
   // file stands: saves mirror settings into the environment, so they must not be able to pair a forgotten key.
-  if (envKey?.trim() && provider === "azure" && env.OMB_AZURE_OPENAI_LIVE_ENDPOINT?.trim() && next.keyFor === undefined) next.keyFor = liveKeyTarget(next) ?? NOWHERE;
+  if (
+    envKey?.trim() &&
+    provider === 'azure' &&
+    env.OMB_AZURE_OPENAI_LIVE_ENDPOINT?.trim() &&
+    next.keyFor === undefined
+  )
+    next.keyFor = liveKeyTarget(next) ?? NOWHERE;
   return next;
 }
 
 /** The non-secret Live settings a settings patch mirrors into the environment. */
-export function liveSettingEnv(live: LiveConfig | undefined): Array<[value: string | undefined, name: string]> {
+export function liveSettingEnv(
+  live: LiveConfig | undefined,
+): Array<[value: string | undefined, name: string]> {
   return [
-    [live?.provider, "OMB_LIVE_PROVIDER"],
-    [live?.azureEndpoint, "OMB_AZURE_OPENAI_LIVE_ENDPOINT"],
-    [live?.azureDeployment, "OMB_AZURE_OPENAI_LIVE_DEPLOYMENT"],
+    [live?.provider, 'OMB_LIVE_PROVIDER'],
+    [live?.azureEndpoint, 'OMB_AZURE_OPENAI_LIVE_ENDPOINT'],
+    [live?.azureDeployment, 'OMB_AZURE_OPENAI_LIVE_DEPLOYMENT'],
   ];
 }

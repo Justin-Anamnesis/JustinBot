@@ -1,4 +1,4 @@
-import type { CompileContext, Extension, Token } from "mdast-util-from-markdown";
+import type { CompileContext, Extension, Token } from 'mdast-util-from-markdown';
 
 // Markdown reads a backslash before punctuation as an escape, so a link to
 // C:\Users\me\.openmausbot\report.md would lose the separator before
@@ -9,7 +9,7 @@ import type { CompileContext, Extension, Token } from "mdast-util-from-markdown"
 
 const destinations = new WeakSet<object>();
 const DRIVE = /^[A-Za-z]:(?:[\\/]|$)/;
-const STILL_ESCAPES = new Set(["\\", "(", ")", "<", ">"]);
+const STILL_ESCAPES = new Set(['\\', '(', ')', '<', '>']);
 
 function enterDestination(this: CompileContext): undefined {
   this.buffer();
@@ -20,9 +20,10 @@ function exitCharacterEscapeValue(this: CompileContext, token: Token): undefined
   // The text node `characterEscape` opened, as mdast's own data handler pops it.
   const tail = this.stack.pop() as unknown as { value: string; position: { end: unknown } };
   const value = this.sliceSerialize(token);
-  const separator = destinations.has(this.stack[this.stack.length - 1]!)
-    && DRIVE.test(tail.value)
-    && !STILL_ESCAPES.has(value);
+  const separator =
+    destinations.has(this.stack[this.stack.length - 1]!) &&
+    DRIVE.test(tail.value) &&
+    !STILL_ESCAPES.has(value);
   tail.value += separator ? `\\${value}` : value;
   tail.position.end = { line: token.end.line, column: token.end.column, offset: token.end.offset };
 }

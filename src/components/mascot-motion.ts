@@ -1,5 +1,5 @@
-import { FACE_BOX, type Ring } from "./cursor-face-data";
-import type { CursorState, StateEffects } from "./CursorAvatar";
+import { FACE_BOX, type Ring } from './cursor-face-data';
+import type { CursorState, StateEffects } from './CursorAvatar';
 
 export const FULL_FRAME_MS = 1000 / 60;
 export const FRAME_SLACK_MS = 4;
@@ -71,7 +71,7 @@ export const MOTION = {
   alerting: { jitter: [2.6, 85] },
   dragging: { tilt: -6, sway: [2, 900] },
   bouncing: { bob: [12, 560], squash: 0.45 },
-  "powering-down": { settle: 0.05, tilt: 4 },
+  'powering-down': { settle: 0.05, tilt: 4 },
 } satisfies Record<CursorState, BodyMotion>;
 
 const easeOutBack = (t: number) => {
@@ -83,7 +83,7 @@ const easeOutBack = (t: number) => {
 const easeInOut = (t: number) => (t < 0.5 ? 2 * t * t : 1 - 2 * (1 - t) * (1 - t));
 
 export function bodyTransform(motion: BodyMotion, elapsed: number, strength: number): string {
-  if (strength <= 0) return "";
+  if (strength <= 0) return '';
   const centre = FACE_BOX / 2;
   const ground = FACE_BOX;
   const wave = (period: number, phase = 0) => Math.sin((elapsed / period) * Math.PI * 2 + phase);
@@ -137,12 +137,16 @@ export function bodyTransform(motion: BodyMotion, elapsed: number, strength: num
   if (dx || dy) parts.push(`translate(${dx.toFixed(2)} ${dy.toFixed(2)})`);
   if (rotation) parts.push(`rotate(${rotation.toFixed(2)} ${centre} ${centre})`);
   if (scale !== 1) {
-    parts.push(`translate(${centre} ${centre}) scale(${scale.toFixed(4)}) translate(${-centre} ${-centre})`);
+    parts.push(
+      `translate(${centre} ${centre}) scale(${scale.toFixed(4)}) translate(${-centre} ${-centre})`,
+    );
   }
   if (sx !== 1 || sy !== 1) {
-    parts.push(`translate(${centre} ${ground}) scale(${sx.toFixed(4)} ${sy.toFixed(4)}) translate(${-centre} ${-ground})`);
+    parts.push(
+      `translate(${centre} ${ground}) scale(${sx.toFixed(4)} ${sy.toFixed(4)}) translate(${-centre} ${-ground})`,
+    );
   }
-  return parts.join(" ");
+  return parts.join(' ');
 }
 
 export interface CadenceInput {
@@ -172,17 +176,23 @@ export function bodyPxPerMs(motion: BodyMotion, strength: number, px: number): n
   let speed = 0;
   if (motion.bob) {
     speed += loopSpeed(motion.bob[0] * strength, motion.bob[1], px);
-    if (motion.squash) speed += loopSpeed(motion.squash * strength * 0.5 * FACE_BOX, motion.bob[1], px);
+    if (motion.squash)
+      speed += loopSpeed(motion.squash * strength * 0.5 * FACE_BOX, motion.bob[1], px);
   }
-  if (motion.sway) speed += loopSpeed(motion.sway[0] * strength * DEGREE * BODY_RADIUS, motion.sway[1], px);
-  if (motion.pulse) speed += loopSpeed(motion.pulse[0] * strength * BODY_RADIUS, motion.pulse[1], px);
+  if (motion.sway)
+    speed += loopSpeed(motion.sway[0] * strength * DEGREE * BODY_RADIUS, motion.sway[1], px);
+  if (motion.pulse)
+    speed += loopSpeed(motion.pulse[0] * strength * BODY_RADIUS, motion.pulse[1], px);
   if (motion.circle) speed += loopSpeed(motion.circle[0] * strength, motion.circle[1], px);
   if (motion.jitter) speed += loopSpeed(motion.jitter[0] * strength, motion.jitter[1] * 0.63, px);
   return speed;
 }
 
 function bodyTransient(motion: BodyMotion, elapsed: number): boolean {
-  return Boolean(motion.enter && elapsed < motion.enter[1]) || (motion.settle !== undefined && elapsed < SETTLE_MS);
+  return (
+    Boolean(motion.enter && elapsed < motion.enter[1]) ||
+    (motion.settle !== undefined && elapsed < SETTLE_MS)
+  );
 }
 
 export function nextFrameAt(now: number, interval: number): number {
@@ -205,7 +215,10 @@ function smoothFrameAt(now: number, input: CadenceInput): number {
   if (strength > 0 && input.showEffects && (effects?.confetti || effects?.trails)) return full;
   if (strength > 0 && bodyTransient(motion, elapsed)) return full;
   const px = input.sizePx / VIEW_SPAN;
-  const due = nextFrameAt(now, frameIntervalFor(bodyPxPerMs(motion, strength, px) + input.faceUnitsPerMs * px));
+  const due = nextFrameAt(
+    now,
+    frameIntervalFor(bodyPxPerMs(motion, strength, px) + input.faceUnitsPerMs * px),
+  );
   const glyph = input.showGlyphs ? effects?.glyph : undefined;
   if (!glyph) return due;
   const position = elapsed % glyph.period;
@@ -216,9 +229,16 @@ function smoothFrameAt(now: number, input: CadenceInput): number {
   return Math.min(due, now + fadingOut - position);
 }
 
-export function morphUnitsPerMs(velocity: number, morph: number, stiffness: number, travel: number): number {
+export function morphUnitsPerMs(
+  velocity: number,
+  morph: number,
+  stiffness: number,
+  travel: number,
+): number {
   if (morph >= 1) return 0;
-  return (Math.max(Math.abs(velocity), CRITICAL_SPRING_PEAK * stiffness * (1 - morph)) / 1000) * travel;
+  return (
+    (Math.max(Math.abs(velocity), CRITICAL_SPRING_PEAK * stiffness * (1 - morph)) / 1000) * travel
+  );
 }
 
 export function faceTravelUnits(
@@ -226,10 +246,14 @@ export function faceTravelUnits(
   to: { rings: Ring[]; mouth: number[]; gaze: number[] },
 ): number {
   let travel = 0;
-  from.rings.forEach((ring, eye) => ring.forEach((point, i) => {
-    const target = to.rings[eye][i];
-    travel = Math.max(travel, Math.hypot(target[0] - point[0], target[1] - point[1]));
-  }));
-  from.mouth.forEach((value, i) => { travel = Math.max(travel, Math.abs(to.mouth[i] - value)); });
+  from.rings.forEach((ring, eye) =>
+    ring.forEach((point, i) => {
+      const target = to.rings[eye][i];
+      travel = Math.max(travel, Math.hypot(target[0] - point[0], target[1] - point[1]));
+    }),
+  );
+  from.mouth.forEach((value, i) => {
+    travel = Math.max(travel, Math.abs(to.mouth[i] - value));
+  });
   return travel + Math.hypot(to.gaze[0] - from.gaze[0], to.gaze[1] - from.gaze[1]);
 }

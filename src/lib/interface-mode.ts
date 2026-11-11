@@ -1,9 +1,9 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import { hasPriorRun } from "./prior-run";
-import { SIMPLE_ONLY } from "./simple-only";
+import { hasPriorRun } from './prior-run';
+import { SIMPLE_ONLY } from './simple-only';
 
-export const ADVANCED_MODE_KEY = "omb-advanced-mode";
+export const ADVANCED_MODE_KEY = 'omb-advanced-mode';
 
 let sessionChoice: boolean | undefined;
 const listeners = new Set<() => void>();
@@ -22,8 +22,8 @@ export function readAdvancedMode(): boolean {
   try {
     const store = storage();
     const stored = store?.getItem(ADVANCED_MODE_KEY);
-    if (stored === "1") return true;
-    if (stored === "0") return false;
+    if (stored === '1') return true;
+    if (stored === '0') return false;
     return hasPriorRun(store);
   } catch {
     return false;
@@ -33,8 +33,7 @@ export function readAdvancedMode(): boolean {
 export function settleAdvancedModeDefault(): void {
   try {
     if (storage()?.getItem(ADVANCED_MODE_KEY) == null) setAdvancedMode(readAdvancedMode());
-  } catch {
-  }
+  } catch {}
 }
 
 function notify() {
@@ -50,13 +49,13 @@ function onStorage(event: StorageEvent) {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (listeners.size === 1 && typeof window !== "undefined") {
-    window.addEventListener("storage", onStorage);
+  if (listeners.size === 1 && typeof window !== 'undefined') {
+    window.addEventListener('storage', onStorage);
   }
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && typeof window !== "undefined") {
-      window.removeEventListener("storage", onStorage);
+    if (listeners.size === 0 && typeof window !== 'undefined') {
+      window.removeEventListener('storage', onStorage);
     }
   };
 }
@@ -65,9 +64,8 @@ export function setAdvancedMode(enabled: boolean): void {
   if (SIMPLE_ONLY) return;
   sessionChoice = enabled;
   try {
-    storage()?.setItem(ADVANCED_MODE_KEY, enabled ? "1" : "0");
-  } catch {
-  }
+    storage()?.setItem(ADVANCED_MODE_KEY, enabled ? '1' : '0');
+  } catch {}
   notify();
 }
 

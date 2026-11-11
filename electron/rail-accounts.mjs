@@ -6,14 +6,23 @@
 // With one account nothing here changes the rail at all.
 
 /** A place of no Cloud: an account with nothing on the rail still has one way to reach it. */
-export const ACCOUNT_PLACE = "account:";
-const ACTIVE = "active", HAND = "hand";
+export const ACCOUNT_PLACE = 'account:';
+const ACTIVE = 'active',
+  HAND = 'hand';
 
 /** The account's places as the rail shows them now, to keep while it waits: what they are and how they look, nothing that would
  * need asking again and nothing to act on but opening. This computer and a server saved by hand aren't any account's. */
 export function accountRows(rows) {
-  return rows.filter((row) => row.opens && row.kind !== "computer" && !row.forget && !row.account)
-    .map(({ id, name, color, kind, ended }) => ({ id, name, color, kind, opens: true, ...(ended ? { ended: true } : {}) }));
+  return rows
+    .filter((row) => row.opens && row.kind !== 'computer' && !row.forget && !row.account)
+    .map(({ id, name, color, kind, ended }) => ({
+      id,
+      name,
+      color,
+      kind,
+      opens: true,
+      ...(ended ? { ended: true } : {}),
+    }));
 }
 
 /**
@@ -34,15 +43,41 @@ export function withAccounts(all, { saved, email = null, accounts = [] }) {
     return true;
   };
   const rowsOf = (account) => {
-    const mark = { account: account.id, group: account.id, email: account.email, ...(account.signIn ? { signIn: true } : {}) };
-    const rows = account.rows.filter((row) => first(account, row)).map((row) => ({ ...row, ...mark }));
-    return rows.length ? rows : [{ id: `${ACCOUNT_PLACE}${account.id}`, name: account.email, color: null, kind: "account", opens: true, ...mark }];
+    const mark = {
+      account: account.id,
+      group: account.id,
+      email: account.email,
+      ...(account.signIn ? { signIn: true } : {}),
+    };
+    const rows = account.rows
+      .filter((row) => first(account, row))
+      .map((row) => ({ ...row, ...mark }));
+    return rows.length
+      ? rows
+      : [
+          {
+            id: `${ACCOUNT_PLACE}${account.id}`,
+            name: account.email,
+            color: null,
+            kind: 'account',
+            opens: true,
+            ...mark,
+          },
+        ];
   };
-  const isComputer = (row) => row.kind === "computer";
+  const isComputer = (row) => row.kind === 'computer';
   // The first claim to a Cloud two accounts share is the account in use's, whatever the order they show in.
   const waited = accounts.map((account) => ({ email: account.email, rows: rowsOf(account) }));
-  const own = all.filter((row) => !isComputer(row) && !row.forget).map((row) => ({ ...row, group: ACTIVE, ...(email ? { email } : {}) }));
+  const own = all
+    .filter((row) => !isComputer(row) && !row.forget)
+    .map((row) => ({ ...row, group: ACTIVE, ...(email ? { email } : {}) }));
   // In a fixed order, so a click that makes another account the one in use doesn't move the row under the pointer.
-  const groups = [...(own.length ? [{ email: email ?? "", rows: own }] : []), ...waited].sort((a, b) => a.email.localeCompare(b.email));
-  return [...all.filter(isComputer), ...groups.flatMap((group) => group.rows), ...all.filter((row) => row.forget).map((row) => ({ ...row, group: HAND }))];
+  const groups = [...(own.length ? [{ email: email ?? '', rows: own }] : []), ...waited].sort(
+    (a, b) => a.email.localeCompare(b.email),
+  );
+  return [
+    ...all.filter(isComputer),
+    ...groups.flatMap((group) => group.rows),
+    ...all.filter((row) => row.forget).map((row) => ({ ...row, group: HAND })),
+  ];
 }

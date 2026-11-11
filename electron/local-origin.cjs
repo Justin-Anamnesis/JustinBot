@@ -2,7 +2,7 @@
 let localOrigin = null;
 
 function setLocalOrigin(origin) {
-  localOrigin = typeof origin === "string" && origin ? origin : null;
+  localOrigin = typeof origin === 'string' && origin ? origin : null;
 }
 
 function getLocalOrigin() {
@@ -14,10 +14,10 @@ function senderOrigin(event) {
   // Electron can briefly report an empty main-frame URL mid-navigation: fall back to WebContents for that exact main frame
   // only. A child frame with an empty URL still fails closed.
   const emptyKnownChild =
-    event?.senderFrame &&
-    event?.sender?.mainFrame &&
-    event.senderFrame !== event.sender.mainFrame;
-  const url = frameUrl || (!emptyKnownChild && typeof event?.sender?.getURL === "function" ? event.sender.getURL() : "");
+    event?.senderFrame && event?.sender?.mainFrame && event.senderFrame !== event.sender.mainFrame;
+  const url =
+    frameUrl ||
+    (!emptyKnownChild && typeof event?.sender?.getURL === 'function' ? event.sender.getURL() : '');
   try {
     return new URL(url).origin;
   } catch {
@@ -32,7 +32,8 @@ function isLocalSender(event) {
 
 function localOnly(channel, handler) {
   return (event, ...args) => {
-    if (!isLocalSender(event)) throw new Error(`${channel} is only available while using the local server`);
+    if (!isLocalSender(event))
+      throw new Error(`${channel} is only available while using the local server`);
     return handler(event, ...args);
   };
 }
@@ -47,4 +48,11 @@ function localOnlySync(channel, handler, denied = false) {
   };
 }
 
-module.exports = { getLocalOrigin, isLocalSender, localOnly, localOnlySync, senderOrigin, setLocalOrigin };
+module.exports = {
+  getLocalOrigin,
+  isLocalSender,
+  localOnly,
+  localOnlySync,
+  senderOrigin,
+  setLocalOrigin,
+};

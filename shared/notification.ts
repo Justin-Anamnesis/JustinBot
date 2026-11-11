@@ -1,40 +1,40 @@
 /** The notification wire shape: what the harness decides is worth
  * interrupting someone for, emitted as the `notify` live frame. */
 export type NotifyKind =
-  | "approval"
-  | "question"
-  | "done"
-  | "routine-failed"
-  | "routine-deferred"
-  | "turn-failed"
+  | 'approval'
+  | 'question'
+  | 'done'
+  | 'routine-failed'
+  | 'routine-deferred'
+  | 'turn-failed'
   /** A run failed, stalled or could not start and no Chief of Staff was
    * there to take it: the person is the one who has to look. */
-  | "incident"
+  | 'incident'
   /** A bot asked the person to sign in to a website themselves
    * (request_sign_in): it waits on their hands, at the place it works. */
-  | "sign-in"
+  | 'sign-in'
   /** A bot asked the person for a password or key on a secure card (request_credential): its work rests on them until
    * they save it or say no. */
-  | "secret"
+  | 'secret'
   /** A delegated request settled and the coordinator auto-resumed the person's
    * own conversation with the results; both are internal, so without this it
    * sits silent until the resume's first token. A teammate's own step in a
    * longer chain sends none: nothing there waits on the person. */
-  | "delegation-settled"
+  | 'delegation-settled'
   /** A bot's settled room reply tagged the person (`@you` or their profile name). Rooms only. On a Team Cloud also
    * a teammate tagged by name, or a message a bot passed on to them, with `forPerson`. */
-  | "mention"
+  | 'mention'
   /** The workspace crossed its monthly spend warning or reached its cap.
    * Sent to admins only, at most once per month for each. */
-  | "spend"
+  | 'spend'
   /** The main agent's brief has something new that needs the person, or a
    * meeting prep or reminder it posted with no AI turn. Personal installs only. */
-  | "brief"
+  | 'brief'
   /** A wait a bot set up (wait_until) fired: what it was waiting for happened. */
-  | "wait"
+  | 'wait'
   /** Something OpenMausBot changed on its own that the person hears about
    * once: a tool turned off for the bots it doesn't start for. */
-  | "notice";
+  | 'notice';
 
 export interface Notification {
   kind: NotifyKind;

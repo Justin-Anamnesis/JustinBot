@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 const MAX_ALLOWED_ORIGINS = 20;
 const secretSchema = z.string().min(32);
@@ -7,7 +7,7 @@ const cloudflareResourceIdSchema = z.string().regex(/^[0-9a-f]{32}$/i);
 const emailSchema = z.email().max(254);
 const originsSchema = z.string();
 
-export type TunnelReclaimMode = "on" | "observe";
+export type TunnelReclaimMode = 'on' | 'observe';
 
 export interface CapacityConfig {
   /** Scheduled cleanup rows processed per cron run. */
@@ -95,12 +95,21 @@ function boundedIntegerVar(
   minimum: number,
   maximum: number,
 ): number {
-  if (value === undefined || value === null || value === "") return fallback;
-  const text = typeof value === "number" ? String(value) : value;
-  const parsed = typeof text === "string" && /^[0-9]{1,9}$/.test(text.trim()) ? Number(text.trim()) : Number.NaN;
+  if (value === undefined || value === null || value === '') return fallback;
+  const text = typeof value === 'number' ? String(value) : value;
+  const parsed =
+    typeof text === 'string' && /^[0-9]{1,9}$/.test(text.trim()) ? Number(text.trim()) : Number.NaN;
   if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
     // A tuning value must never take sign-in and pairing down: use the default.
-    console.error(JSON.stringify({ message: "invalid capacity setting; using the default", setting: label, minimum, maximum, fallback }));
+    console.error(
+      JSON.stringify({
+        message: 'invalid capacity setting; using the default',
+        setting: label,
+        minimum,
+        maximum,
+        fallback,
+      }),
+    );
     return fallback;
   }
   return parsed;
@@ -108,11 +117,16 @@ function boundedIntegerVar(
 
 function reclaimMode(value: unknown): TunnelReclaimMode {
   // Unset or invalid: observe only. Reclaiming is switched on deliberately.
-  if (value === "on" || value === "observe") return value;
-  if (value !== undefined && value !== null && value !== "") {
-    console.error(JSON.stringify({ message: "invalid OMB_TUNNEL_RECLAIM; observing only", allowed: ["on", "observe"] }));
+  if (value === 'on' || value === 'observe') return value;
+  if (value !== undefined && value !== null && value !== '') {
+    console.error(
+      JSON.stringify({
+        message: 'invalid OMB_TUNNEL_RECLAIM; observing only',
+        allowed: ['on', 'observe'],
+      }),
+    );
   }
-  return "observe";
+  return 'observe';
 }
 
 /** Optional tuning variables, each with a safe default. */
@@ -120,39 +134,42 @@ export function readCapacityConfig(env: Partial<Record<string, unknown>>): Capac
   return {
     cleanupSweepLimit: boundedIntegerVar(
       env.OMB_CLEANUP_SWEEP_LIMIT,
-      "OMB_CLEANUP_SWEEP_LIMIT",
+      'OMB_CLEANUP_SWEEP_LIMIT',
       DEFAULT_CLEANUP_SWEEP_LIMIT,
       1,
       MAX_CLEANUP_SWEEP_LIMIT,
     ),
     dnsRecordLimit: boundedIntegerVar(
       env.OMB_DNS_RECORD_LIMIT,
-      "OMB_DNS_RECORD_LIMIT",
+      'OMB_DNS_RECORD_LIMIT',
       DEFAULT_DNS_RECORD_LIMIT,
       1,
       10_000_000,
     ),
-    offlineReclaimMs: boundedIntegerVar(
-      env.OMB_TUNNEL_OFFLINE_RECLAIM_DAYS,
-      "OMB_TUNNEL_OFFLINE_RECLAIM_DAYS",
-      DEFAULT_OFFLINE_RECLAIM_DAYS,
-      MIN_OFFLINE_RECLAIM_DAYS,
-      365,
-    ) * DAY_MS,
-    reclaimMode: reclaimMode(env.OMB_TUNNEL_RECLAIM),
-    reclaimPreviewMs: env.OMB_TUNNEL_RECLAIM_PREVIEW_DAYS === undefined || env.OMB_TUNNEL_RECLAIM_PREVIEW_DAYS === null
-      || env.OMB_TUNNEL_RECLAIM_PREVIEW_DAYS === ""
-      ? null
-      : boundedIntegerVar(
-        env.OMB_TUNNEL_RECLAIM_PREVIEW_DAYS,
-        "OMB_TUNNEL_RECLAIM_PREVIEW_DAYS",
-        0,
+    offlineReclaimMs:
+      boundedIntegerVar(
+        env.OMB_TUNNEL_OFFLINE_RECLAIM_DAYS,
+        'OMB_TUNNEL_OFFLINE_RECLAIM_DAYS',
+        DEFAULT_OFFLINE_RECLAIM_DAYS,
         MIN_OFFLINE_RECLAIM_DAYS,
         365,
-      ) * DAY_MS || null,
+      ) * DAY_MS,
+    reclaimMode: reclaimMode(env.OMB_TUNNEL_RECLAIM),
+    reclaimPreviewMs:
+      env.OMB_TUNNEL_RECLAIM_PREVIEW_DAYS === undefined ||
+      env.OMB_TUNNEL_RECLAIM_PREVIEW_DAYS === null ||
+      env.OMB_TUNNEL_RECLAIM_PREVIEW_DAYS === ''
+        ? null
+        : boundedIntegerVar(
+            env.OMB_TUNNEL_RECLAIM_PREVIEW_DAYS,
+            'OMB_TUNNEL_RECLAIM_PREVIEW_DAYS',
+            0,
+            MIN_OFFLINE_RECLAIM_DAYS,
+            365,
+          ) * DAY_MS || null,
     tunnelLimit: boundedIntegerVar(
       env.OMB_TUNNEL_LIMIT,
-      "OMB_TUNNEL_LIMIT",
+      'OMB_TUNNEL_LIMIT',
       DEFAULT_TUNNEL_LIMIT,
       1,
       10_000_000,
@@ -168,12 +185,12 @@ function exactHTTPSOrigin(value: string, label: string): string {
     throw new Error(`${label} must be a valid HTTPS origin`);
   }
   if (
-    url.protocol !== "https:"
-    || url.username
-    || url.password
-    || url.pathname !== "/"
-    || url.search
-    || url.hash
+    url.protocol !== 'https:' ||
+    url.username ||
+    url.password ||
+    url.pathname !== '/' ||
+    url.search ||
+    url.hash
   ) {
     throw new Error(`${label} must be an exact HTTPS origin`);
   }
@@ -183,15 +200,15 @@ function exactHTTPSOrigin(value: string, label: string): string {
 function hostnameSuffix(value: string): string {
   // 34-byte opaque label plus the separating dot must remain within the
   // 253-byte DNS hostname limit.
-  if (value !== value.toLowerCase() || value.length > 218 || value.endsWith(".")) {
-    throw new Error("COMPANION_HOST_SUFFIX must be a lowercase DNS suffix");
+  if (value !== value.toLowerCase() || value.length > 218 || value.endsWith('.')) {
+    throw new Error('COMPANION_HOST_SUFFIX must be a lowercase DNS suffix');
   }
-  const labels = value.split(".");
+  const labels = value.split('.');
   if (
-    labels.length < 2
-    || labels.some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))
+    labels.length < 2 ||
+    labels.some((label) => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))
   ) {
-    throw new Error("COMPANION_HOST_SUFFIX must be a valid DNS suffix");
+    throw new Error('COMPANION_HOST_SUFFIX must be a valid DNS suffix');
   }
   return value;
 }
@@ -226,16 +243,16 @@ export function readEndpointAccounts(
   primary: EndpointAccount,
 ): { accounts: EndpointAccount[]; issues: string[] } {
   const raw = env.CLOUDFLARE_ENDPOINT_ACCOUNTS;
-  if (raw === undefined || raw === null || raw === "") return { accounts: [], issues: [] };
+  if (raw === undefined || raw === null || raw === '') return { accounts: [], issues: [] };
   let entries: unknown = raw;
-  if (typeof raw === "string") {
+  if (typeof raw === 'string') {
     try {
       entries = JSON.parse(raw);
     } catch {
-      return { accounts: [], issues: ["accounts_json"] };
+      return { accounts: [], issues: ['accounts_json'] };
     }
   }
-  if (!Array.isArray(entries)) return { accounts: [], issues: ["accounts_json"] };
+  if (!Array.isArray(entries)) return { accounts: [], issues: ['accounts_json'] };
 
   const accounts: EndpointAccount[] = [];
   const issues: string[] = [];
@@ -265,9 +282,9 @@ export function readEndpointAccounts(
     const accountId = parsed.data.accountId.toLowerCase();
     const zoneId = parsed.data.zoneId.toLowerCase();
     if (
-      used.accountIds.has(accountId)
-      || used.zoneIds.has(zoneId)
-      || used.suffixes.has(companionHostSuffix)
+      used.accountIds.has(accountId) ||
+      used.zoneIds.has(zoneId) ||
+      used.suffixes.has(companionHostSuffix)
     ) {
       issues.push(`${label}_duplicate`);
       continue;
@@ -296,36 +313,37 @@ export function readEndpointAccounts(
 
 export function readConfig(env: Env): ControlPlaneConfig {
   if (!secretSchema.safeParse(env.BETTER_AUTH_SECRET).success) {
-    throw new Error("BETTER_AUTH_SECRET must contain at least 32 characters");
+    throw new Error('BETTER_AUTH_SECRET must contain at least 32 characters');
   }
 
   const emailFrom = emailSchema.safeParse(env.EMAIL_FROM);
-  if (!emailFrom.success) throw new Error("EMAIL_FROM must be a valid email address");
+  if (!emailFrom.success) throw new Error('EMAIL_FROM must be a valid email address');
 
-  const authBaseURL = exactHTTPSOrigin(env.BETTER_AUTH_URL, "BETTER_AUTH_URL");
+  const authBaseURL = exactHTTPSOrigin(env.BETTER_AUTH_URL, 'BETTER_AUTH_URL');
   const origins = originsSchema.safeParse(env.ALLOWED_ORIGINS);
-  if (!origins.success) throw new Error("ALLOWED_ORIGINS must be a comma-separated string");
-  const values = origins.data.split(",")
+  if (!origins.success) throw new Error('ALLOWED_ORIGINS must be a comma-separated string');
+  const values = origins.data
+    .split(',')
     .map((value) => value.trim())
     .filter(Boolean);
   if (values.length > MAX_ALLOWED_ORIGINS) {
-    throw new Error("ALLOWED_ORIGINS contains too many entries");
+    throw new Error('ALLOWED_ORIGINS contains too many entries');
   }
-  const allowedOrigins = new Set(values.map((value) => exactHTTPSOrigin(value, "ALLOWED_ORIGINS")));
+  const allowedOrigins = new Set(values.map((value) => exactHTTPSOrigin(value, 'ALLOWED_ORIGINS')));
   allowedOrigins.add(authBaseURL);
 
   if (!cloudflareResourceIdSchema.safeParse(env.CLOUDFLARE_ACCOUNT_ID).success) {
-    throw new Error("CLOUDFLARE_ACCOUNT_ID must be a 32-character Cloudflare ID");
+    throw new Error('CLOUDFLARE_ACCOUNT_ID must be a 32-character Cloudflare ID');
   }
   if (!cloudflareResourceIdSchema.safeParse(env.CLOUDFLARE_ZONE_ID).success) {
-    throw new Error("CLOUDFLARE_ZONE_ID must be a 32-character Cloudflare ID");
+    throw new Error('CLOUDFLARE_ZONE_ID must be a 32-character Cloudflare ID');
   }
   if (!cloudflareTokenSchema.safeParse(env.CLOUDFLARE_API_TOKEN).success) {
-    throw new Error("CLOUDFLARE_API_TOKEN is missing or invalid");
+    throw new Error('CLOUDFLARE_API_TOKEN is missing or invalid');
   }
   const hostSuffix = z.string().min(1).max(218).safeParse(env.COMPANION_HOST_SUFFIX);
   if (!hostSuffix.success) {
-    throw new Error("COMPANION_HOST_SUFFIX must be a lowercase DNS suffix");
+    throw new Error('COMPANION_HOST_SUFFIX must be a lowercase DNS suffix');
   }
 
   const vars = env as unknown as Partial<Record<string, unknown>>;

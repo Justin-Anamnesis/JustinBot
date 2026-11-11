@@ -1,13 +1,13 @@
-const fs = require("node:fs");
-const { randomUUID } = require("node:crypto");
-const path = require("node:path");
+const fs = require('node:fs');
+const { randomUUID } = require('node:crypto');
+const path = require('node:path');
 
 function createCuaConnectionStore({
   getUserData,
   fileSystem = fs,
   temporaryId = randomUUID,
   processId = process.pid,
-  fileName = "cua-connection.json",
+  fileName = 'cua-connection.json',
 }) {
   let connection = null;
 
@@ -29,8 +29,8 @@ function createCuaConnectionStore({
         } catch {
           // Windows does not expose meaningful POSIX directory modes.
         }
-        handle = fileSystem.openSync(temporaryPath, "wx", 0o600);
-        fileSystem.writeFileSync(handle, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+        handle = fileSystem.openSync(temporaryPath, 'wx', 0o600);
+        fileSystem.writeFileSync(handle, `${JSON.stringify(next, null, 2)}\n`, 'utf8');
         fileSystem.fsyncSync(handle);
         fileSystem.closeSync(handle);
         handle = undefined;
@@ -48,8 +48,7 @@ function createCuaConnectionStore({
         }
         try {
           fileSystem.unlinkSync(temporaryPath);
-        } catch {
-        }
+        } catch {}
         throw error;
       }
 

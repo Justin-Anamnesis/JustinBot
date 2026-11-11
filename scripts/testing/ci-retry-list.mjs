@@ -1,7 +1,7 @@
 // The known-flaky list (ci-retry-list.json) and how a test is matched to it.
-import { readFileSync } from "node:fs";
-import { dirname, join, relative, sep } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from 'node:fs';
+import { dirname, join, relative, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** Retries a listed test gets in CI: three attempts in all. */
 export const CI_RETRIES = 2;
@@ -12,16 +12,16 @@ export const CI_RETRIES = 2;
  * @returns {RetryEntry[]} */
 export function loadRetryList(env = process.env) {
   const path = env.OMB_VITEST_RETRY_LIST || DEFAULT_LIST;
-  return JSON.parse(readFileSync(path, "utf8")).tests;
+  return JSON.parse(readFileSync(path, 'utf8')).tests;
 }
 
 /** A plain path, never `new URL(…)`: in a jsdom or happy-dom test file the
  * global URL is the DOM's, and fs refuses its URL objects. */
-const DEFAULT_LIST = join(dirname(fileURLToPath(import.meta.url)), "ci-retry-list.json");
+const DEFAULT_LIST = join(dirname(fileURLToPath(import.meta.url)), 'ci-retry-list.json');
 
 /** CI sets CI=true; a developer's run never retries. */
 export function retriesInCi(env = process.env) {
-  return /^(1|true)$/i.test(env.CI ?? "");
+  return /^(1|true)$/i.test(env.CI ?? '');
 }
 
 /** A test's file relative to the vitest root (forward slashes) and its full
@@ -30,8 +30,8 @@ export function retriesInCi(env = process.env) {
  * @param {{ name: string, file: { filepath: string }, suite?: { name: string, suite?: unknown, filepath?: string } }} task */
 export function testIdentity(root, task) {
   const names = [];
-  for (let node = task; node && !("filepath" in node); node = node.suite) names.unshift(node.name);
-  return { file: relative(root, task.file.filepath).split(sep).join("/"), test: names.join(" > ") };
+  for (let node = task; node && !('filepath' in node); node = node.suite) names.unshift(node.name);
+  return { file: relative(root, task.file.filepath).split(sep).join('/'), test: names.join(' > ') };
 }
 
 /** @param {RetryEntry[]} list @param {{ file: string, test: string }} identity */

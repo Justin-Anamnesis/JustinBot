@@ -1,18 +1,24 @@
 // Fan-in event bus — port of upstream's ProviderService fan-in + EventNdjsonLogger tee, minus Effect.
-import { appendFile } from "node:fs/promises";
-import { join } from "node:path";
+import { appendFile } from 'node:fs/promises';
+import { join } from 'node:path';
 
-import { EVENTS_DIR } from "../config.ts";
-import { flushNativeLog } from "../drivers/native.ts";
-import { redactSecrets } from "../redact.ts";
-import { batchSaves } from "../save-batch.ts";
-import { capThreadLog, currentThreadLogCap } from "../thread-log-rotation.ts";
-import { newId, type ProviderAdapter, type ProviderInstance, type RuntimeEvent, type RuntimeEventListener } from "../contracts.ts";
-import { LiveSteps } from "./live-steps.ts";
-import { ProgressGate } from "./progress-gate.ts";
+import { EVENTS_DIR } from '../config.ts';
+import { flushNativeLog } from '../drivers/native.ts';
+import { redactSecrets } from '../redact.ts';
+import { batchSaves } from '../save-batch.ts';
+import { capThreadLog, currentThreadLogCap } from '../thread-log-rotation.ts';
+import {
+  newId,
+  type ProviderAdapter,
+  type ProviderInstance,
+  type RuntimeEvent,
+  type RuntimeEventListener,
+} from '../contracts.ts';
+import { LiveSteps } from './live-steps.ts';
+import { ProgressGate } from './progress-gate.ts';
 
 const INCOMPLETE_LOG_MESSAGE =
-  "Canonical event history is incomplete: OpenMausBot could not write one or more events to disk. Live updates will continue.";
+  'Canonical event history is incomplete: OpenMausBot could not write one or more events to disk. Live updates will continue.';
 
 const DELTA_MERGE_MS = 50;
 
@@ -31,28 +37,47 @@ const defaultAppend: EventLogAppend = (path, data, options) => appendFile(path, 
 
 type QueuedLog = { event: RuntimeEvent; line: string; bytes: number };
 
-type TextDelta = Extract<RuntimeEvent, { type: "content.delta" }>;
+type TextDelta = Extract<RuntimeEvent, { type: 'content.delta' }>;
 
 function sameStream(a: TextDelta, b: TextDelta): boolean {
-  return a.provider === b.provider && a.providerInstanceId === b.providerInstanceId && a.turnId === b.turnId &&
-    a.itemId === b.itemId && a.streamKind === b.streamKind && a.synthetic === b.synthetic;
+  return (
+    a.provider === b.provider &&
+    a.providerInstanceId === b.providerInstanceId &&
+    a.turnId === b.turnId &&
+    a.itemId === b.itemId &&
+    a.streamKind === b.streamKind &&
+    a.synthetic === b.synthetic
+  );
 }
 
 /** What changes the chat's status line, and so makes a waiting status report stale; a heartbeat or a token count does not. */
-const STATUS_LINE_EVENTS = new Set<RuntimeEvent["type"]>(["turn.started", "content.delta", "item.started", "item.completed", "request.opened"]);
+const STATUS_LINE_EVENTS = new Set<RuntimeEvent['type']>([
+  'turn.started',
+  'content.delta',
+  'item.started',
+  'item.completed',
+  'request.opened',
+]);
 
 function isTerminalEvent(event: RuntimeEvent): boolean {
-  if (event.type === "turn.completed" || event.type === "cap.exhausted" || event.type === "session.exited") {
+  if (
+    event.type === 'turn.completed' ||
+    event.type === 'cap.exhausted' ||
+    event.type === 'session.exited'
+  ) {
     return true;
   }
-  return event.type === "runtime.error" && event.terminal === true;
+  return event.type === 'runtime.error' && event.terminal === true;
 }
 
 export class EventBus {
   private listeners = new Set<RuntimeEventListener>();
   private unsubscribes = new Map<string, () => void>();
   private pendingLogWarnings = new Map<string, RuntimeEvent>();
-  private pendingText = new Map<string, { event: TextDelta; timer: ReturnType<typeof setTimeout> }>();
+  private pendingText = new Map<
+    string,
+    { event: TextDelta; timer: ReturnType<typeof setTimeout> }
+  >();
   private readonly appendLog: EventLogAppend;
   private queued: QueuedLog[] = [];
   private queuedBytes = 0;
@@ -68,7 +93,8 @@ export class EventBus {
   private readonly adapters = new Map<string, ProviderAdapter>();
   private readonly steps = new LiveSteps({
     offer: (event) => this.progress.offer(event),
-    enginePid: (event) => this.adapters.get(event.providerInstanceId ?? "")?.enginePid?.(event.threadId),
+    enginePid: (event) =>
+      this.adapters.get(event.providerInstanceId ?? '')?.enginePid?.(event.threadId),
   });
 
   private readonly gate?: (event: RuntimeEvent) => boolean;
@@ -97,18 +123,19 @@ export class EventBus {
   }
 
   publish(raw: RuntimeEvent) {
-    if (raw.type === "turn.progress") {
+    if (raw.type === 'turn.progress') {
       this.progress.offer(this.steps.progress(raw));
       return;
     }
-    if (raw.type === "item.output") {
+    if (raw.type === 'item.output') {
       this.steps.output(raw);
       return;
     }
     const event = this.steps.observe(raw, isTerminalEvent(raw));
-    if (STATUS_LINE_EVENTS.has(event.type) || isTerminalEvent(event)) this.progress.supersede(event.threadId, isTerminalEvent(event));
+    if (STATUS_LINE_EVENTS.has(event.type) || isTerminalEvent(event))
+      this.progress.supersede(event.threadId, isTerminalEvent(event));
     const pending = this.pendingText.get(event.threadId);
-    if (event.type === "content.delta") {
+    if (event.type === 'content.delta') {
       if (pending && sameStream(pending.event, event)) {
         pending.event = { ...pending.event, delta: pending.event.delta + event.delta };
         return;
@@ -136,7 +163,10 @@ export class EventBus {
       timer = setTimeout(() => resolve(false), ms);
     });
     try {
-      return await Promise.race([this.flush().then(() => this.pendingLogWarnings.size === 0), timeout]);
+      return await Promise.race([
+        this.flush().then(() => this.pendingLogWarnings.size === 0),
+        timeout,
+      ]);
     } finally {
       clearTimeout(timer);
     }
@@ -172,7 +202,7 @@ export class EventBus {
         this.queuedLogWarnings.set(event.threadId, warning);
         // Queued before delivery: listeners may publish synchronously.
         this.push(warning);
-        console.error("bus: canonical event log queue is full");
+        console.error('bus: canonical event log queue is full');
         this.deliver(warning);
       }
       return;
@@ -181,7 +211,11 @@ export class EventBus {
     this.push(event, line, bytes);
   }
 
-  private push(event: RuntimeEvent, line = JSON.stringify(redactSecrets(event)), bytes = Buffer.byteLength(line)) {
+  private push(
+    event: RuntimeEvent,
+    line = JSON.stringify(redactSecrets(event)),
+    bytes = Buffer.byteLength(line),
+  ) {
     this.queued.push({ event, line, bytes });
     this.queuedBytes += bytes;
     this.kick();
@@ -197,13 +231,15 @@ export class EventBus {
         return;
       }
       this.pumping = true;
-      void this.drain().catch((error: unknown) => {
-        console.error("bus: canonical event log drain failed", error);
-      }).finally(() => {
-        this.pumping = false;
-        if (this.queued.length > 0) this.kick();
-        else this.settleDrain();
-      });
+      void this.drain()
+        .catch((error: unknown) => {
+          console.error('bus: canonical event log drain failed', error);
+        })
+        .finally(() => {
+          this.pumping = false;
+          if (this.queued.length > 0) this.kick();
+          else this.settleDrain();
+        });
     });
   }
 
@@ -244,7 +280,7 @@ export class EventBus {
     if (warning) lines.unshift(JSON.stringify(warning));
     const file = join(EVENTS_DIR, `${threadId}.ndjson`);
     try {
-      await this.appendLog(file, lines.join("\n") + "\n", { mode: 0o600 });
+      await this.appendLog(file, lines.join('\n') + '\n', { mode: 0o600 });
       if (warning) this.pendingLogWarnings.delete(threadId);
       capThreadLog(file, currentThreadLogCap());
     } catch (error) {
@@ -263,7 +299,7 @@ export class EventBus {
       threadId: event.threadId,
       createdAt: new Date().toISOString(),
       turnId: event.turnId,
-      type: "runtime.error",
+      type: 'runtime.error',
       message: INCOMPLETE_LOG_MESSAGE,
     };
   }
@@ -273,7 +309,7 @@ export class EventBus {
     if (this.pendingLogWarnings.has(event.threadId)) return;
     const warning = this.logWarning(event);
     this.pendingLogWarnings.set(event.threadId, warning);
-    console.error("bus: canonical event log write failed", error);
+    console.error('bus: canonical event log write failed', error);
     this.deliver(warning);
   }
 
@@ -283,7 +319,7 @@ export class EventBus {
         try {
           listener(event);
         } catch (e) {
-          console.error("bus: listener threw", e);
+          console.error('bus: listener threw', e);
         }
       }
     });

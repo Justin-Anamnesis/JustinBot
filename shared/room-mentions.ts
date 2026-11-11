@@ -1,4 +1,4 @@
-import { isMentionBoundary, isMentionNameContinuation } from "./mention-boundary.ts";
+import { isMentionBoundary, isMentionNameContinuation } from './mention-boundary.ts';
 
 /** The most bot ids one send may carry as picks from the @ list. */
 export const MENTION_PICKS_MAX = 20;
@@ -25,15 +25,20 @@ export function resolveMentions<T extends { id?: string; name: string; hidden?: 
     .sort((a, b) => b.name.length - a.name.length);
   const bots: T[] = [];
   const ambiguous: T[][] = [];
-  for (let at = text.indexOf("@"); at !== -1; at = text.indexOf("@", at + 1)) {
+  for (let at = text.indexOf('@'); at !== -1; at = text.indexOf('@', at + 1)) {
     if (!isMentionBoundary(text, at)) continue;
-    const named = (peer: T) => text.slice(at + 1, at + 1 + peer.name.length).toLowerCase() === peer.name.toLowerCase();
-    const hit = candidates.find((peer) => named(peer) && !isMentionNameContinuation(text.slice(at + 1 + peer.name.length)));
+    const named = (peer: T) =>
+      text.slice(at + 1, at + 1 + peer.name.length).toLowerCase() === peer.name.toLowerCase();
+    const hit = candidates.find(
+      (peer) => named(peer) && !isMentionNameContinuation(text.slice(at + 1 + peer.name.length)),
+    );
     if (!hit) continue;
     const sharing = candidates.filter((peer) => peer.name.toLowerCase() === hit.name.toLowerCase());
     const chosen = sharing.filter((peer) => peer.id !== undefined && picked.includes(peer.id));
-    if (sharing.length > 1 && !chosen.length && !ambiguous.some((group) => group[0] === sharing[0])) ambiguous.push(sharing);
-    for (const peer of sharing.length > 1 && chosen.length ? chosen : sharing) if (!bots.includes(peer)) bots.push(peer);
+    if (sharing.length > 1 && !chosen.length && !ambiguous.some((group) => group[0] === sharing[0]))
+      ambiguous.push(sharing);
+    for (const peer of sharing.length > 1 && chosen.length ? chosen : sharing)
+      if (!bots.includes(peer)) bots.push(peer);
   }
   return { bots, ambiguous };
 }
@@ -42,6 +47,6 @@ export function resolveMentions<T extends { id?: string; name: string; hidden?: 
 export function parseMentionPicks(value: unknown): string[] | undefined | null {
   if (value === undefined || value === null) return undefined;
   if (!Array.isArray(value) || value.length > MENTION_PICKS_MAX) return null;
-  if (!value.every((id) => typeof id === "string" && /^[\w-]{1,128}$/.test(id))) return null;
+  if (!value.every((id) => typeof id === 'string' && /^[\w-]{1,128}$/.test(id))) return null;
   return [...new Set(value as string[])];
 }

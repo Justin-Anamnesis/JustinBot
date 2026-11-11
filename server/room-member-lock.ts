@@ -47,6 +47,7 @@ export class RoomMemberLock {
 
   private notify(botId: string): void {
     // A snapshot: a woken waiter may unsubscribe, or a new one subscribe, during this loop.
+    // prettier-ignore
     // oxlint-disable-next-line unicorn/no-useless-spread
     for (const listener of [...this.listeners]) {
       try {

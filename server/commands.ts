@@ -1,7 +1,7 @@
 // The receipt is written in the same SQLite transaction as the command's own rows, so only synchronous writes to this
 // database belong in `apply`. Files, provider calls, caches and broadcasts are not transactional: prepare replay-safe files
 // before and publish after. A receipt does not make external side effects exactly-once.
-import { readCommandReceipt, withCommandReceipt } from "./message-db.ts";
+import { readCommandReceipt, withCommandReceipt } from './message-db.ts';
 
 export interface Command {
   /** Stable, dotted name of the mutation: "digest.append", "hook.ingest". */
@@ -31,5 +31,10 @@ export function runCommand<T>(command: Command, apply: () => T, now: () => numbe
 export function commandReceipt<T = unknown>(kind: string, key: string): CommandReceipt<T> | null {
   const stored = readCommandReceipt(kind, key);
   if (!stored) return null;
-  return { kind: stored.kind, key: stored.key, at: stored.at, result: JSON.parse(stored.result) as T };
+  return {
+    kind: stored.kind,
+    key: stored.key,
+    at: stored.at,
+    result: JSON.parse(stored.result) as T,
+  };
 }

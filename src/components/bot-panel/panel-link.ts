@@ -1,7 +1,14 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import type { Action, BotSettingsSection } from "@/state/store";
-import { isSimplePage, PAGES, sectionTarget, type PageId, type PanelTarget, type SimplePageId } from "./page-registry";
+import type { Action, BotSettingsSection } from '@/state/store';
+import {
+  isSimplePage,
+  PAGES,
+  sectionTarget,
+  type PageId,
+  type PanelTarget,
+  type SimplePageId,
+} from './page-registry';
 
 /**
  * A named open of a bot's settings. The store keeps only the section, which the Simple bot panel maps to one tab or
@@ -29,8 +36,18 @@ export function openBotSettings(
   section: BotSettingsSection,
   options: { botId?: string; page?: PageId; anchor?: string } = {},
 ): void {
-  latest = { section, ...(options.page ? { page: options.page } : {}), ...(options.anchor ? { anchor: options.anchor } : {}), nonce: (latest?.nonce ?? 0) + 1 };
-  dispatch({ type: "toggleSettings", open: true, section, ...(options.botId !== undefined ? { botId: options.botId } : {}) });
+  latest = {
+    section,
+    ...(options.page ? { page: options.page } : {}),
+    ...(options.anchor ? { anchor: options.anchor } : {}),
+    nonce: (latest?.nonce ?? 0) + 1,
+  };
+  dispatch({
+    type: 'toggleSettings',
+    open: true,
+    section,
+    ...(options.botId !== undefined ? { botId: options.botId } : {}),
+  });
   for (const watch of Array.from(watchers)) watch();
 }
 
@@ -49,7 +66,7 @@ export function usePanelLink(): PanelLink | null {
 }
 
 /** Pages Advanced mode has that Simple mode folds into another page. */
-const SIMPLE_ALIAS: Partial<Record<PageId, SimplePageId>> = { mcp: "apps" };
+const SIMPLE_ALIAS: Partial<Record<PageId, SimplePageId>> = { mcp: 'apps' };
 
 /** Where a named open of `section` lands: the link's page when it came with one for that section and Simple mode draws
  * that page, else the section's place, at the link's card when it named one. */

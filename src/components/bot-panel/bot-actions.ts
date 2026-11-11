@@ -1,13 +1,13 @@
-import { useRef, useState } from "react";
+import { useRef, useState } from 'react';
 
-import { t } from "@/lib/i18n";
-import { useCopyFeedback } from "@/lib/copy-text";
-import { botUnreadThreadIds, markBotRead } from "@/lib/folder-read";
-import { useShowThreads } from "@/lib/thread-preferences";
-import { api, useStore, type Bot } from "@/state/store";
-import { announceArchiveNotice, archiveBotWithNotice } from "../bot-archive";
-import { moveBotsToSection } from "../bot-sections";
-import { currentArchivableBot, type BotConfirmKind } from "../Sidebar";
+import { t } from '@/lib/i18n';
+import { useCopyFeedback } from '@/lib/copy-text';
+import { botUnreadThreadIds, markBotRead } from '@/lib/folder-read';
+import { useShowThreads } from '@/lib/thread-preferences';
+import { api, useStore, type Bot } from '@/state/store';
+import { announceArchiveNotice, archiveBotWithNotice } from '../bot-archive';
+import { moveBotsToSection } from '../bot-sections';
+import { currentArchivableBot, type BotConfirmKind } from '../Sidebar';
 
 export function useBotActions(bot: Bot) {
   const { state, dispatch } = useStore();
@@ -20,13 +20,14 @@ export function useBotActions(bot: Bot) {
 
   const visibleBotCount = state.bots.filter((candidate) => !candidate.hidden).length;
   const archiveHint = bot.chiefOfStaff
-    ? t("sidebar.bot.archiveBlockedChief")
+    ? t('sidebar.bot.archiveBlockedChief')
     : visibleBotCount <= 1
-      ? t("sidebar.bot.archiveBlockedLast")
+      ? t('sidebar.bot.archiveBlockedLast')
       : undefined;
 
-  const togglePin = () => dispatch({ type: "updateBot", botId: bot.id, patch: { pinned: !bot.pinned } });
-  const duplicate = () => dispatch({ type: "duplicateBot", botId: bot.id });
+  const togglePin = () =>
+    dispatch({ type: 'updateBot', botId: bot.id, patch: { pinned: !bot.pinned } });
+  const duplicate = () => dispatch({ type: 'duplicateBot', botId: bot.id });
 
   const markAllRead = async () => {
     if (readInFlight.current) return;
@@ -34,9 +35,9 @@ export function useBotActions(bot: Bot) {
     setReading(true);
     setReadError(null);
     try {
-      await markBotRead(bot, api, (updated) => dispatch({ type: "botPatched", bot: updated }));
+      await markBotRead(bot, api, (updated) => dispatch({ type: 'botPatched', bot: updated }));
     } catch (error) {
-      const guidance = t("sidebar.bot.markAllReadFailed");
+      const guidance = t('sidebar.bot.markAllReadFailed');
       setReadError(error instanceof Error ? `${guidance} ${error.message}` : guidance);
     } finally {
       readInFlight.current = false;
@@ -55,26 +56,27 @@ export function useBotActions(bot: Bot) {
       showThreads,
       notify: (notice) => {
         // With no sidebar on screen (the calendar), a failure still has to be said somewhere.
-        if (!announceArchiveNotice(notice) && notice?.error) dispatch({ type: "error", message: notice.text });
+        if (!announceArchiveNotice(notice) && notice?.error)
+          dispatch({ type: 'error', message: notice.text });
       },
     });
   };
 
   const requestArchive = () => {
-    if (currentArchivableBot(state.bots, bot.id)) setConfirm("archive");
+    if (currentArchivableBot(state.bots, bot.id)) setConfirm('archive');
   };
 
   const confirmed = () => {
     const kind = confirm;
     setConfirm(null);
     if (!kind) return;
-    dispatch({ type: "toggleSettings", open: false });
-    if (kind === "archive") void archive();
-    else dispatch({ type: "deleteBot", botId: bot.id });
+    dispatch({ type: 'toggleSettings', open: false });
+    if (kind === 'archive') void archive();
+    else dispatch({ type: 'deleteBot', botId: bot.id });
   };
 
   const moveToTeam = (section: string) => {
-    if ((bot.section?.trim() ?? "") !== section) moveBotsToSection(dispatch, [bot.id], section);
+    if ((bot.section?.trim() ?? '') !== section) moveBotsToSection(dispatch, [bot.id], section);
   };
 
   return {
@@ -89,7 +91,7 @@ export function useBotActions(bot: Bot) {
     archiveBlocked: archiveHint !== undefined,
     archiveHint,
     requestArchive,
-    requestDelete: () => setConfirm("delete"),
+    requestDelete: () => setConfirm('delete'),
     confirm,
     cancelConfirm: () => setConfirm(null),
     confirmed,

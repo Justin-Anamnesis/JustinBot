@@ -1,9 +1,9 @@
-import type { KeyObject } from "node:crypto";
-import type { Limits } from "./config.ts";
-import type { HostBudgets, Hosts } from "./hosts.ts";
-import type { Logger } from "./log.ts";
-import type { Metrics } from "./metrics.ts";
-import type { Heartbeat } from "./socket.ts";
+import type { KeyObject } from 'node:crypto';
+import type { Limits } from './config.ts';
+import type { HostBudgets, Hosts } from './hosts.ts';
+import type { Logger } from './log.ts';
+import type { Metrics } from './metrics.ts';
+import type { Heartbeat } from './socket.ts';
 
 /** What every connection handler shares on one node. */
 export interface Context {

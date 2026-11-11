@@ -1,10 +1,14 @@
-import { t } from "./i18n";
-import { computerDeviceText } from "./computer-device";
-import type { LocaleKey } from "@/locales";
+import { t } from './i18n';
+import { computerDeviceText } from './computer-device';
+import type { LocaleKey } from '@/locales';
 import {
-  computerAskHeadline, computerAskReasonLine, needsTheApp, turnsOnFromHere, type ComputerAskCard,
-} from "../../shared/computer-ask";
-import type { OptionCardData } from "../../shared/wire";
+  computerAskHeadline,
+  computerAskReasonLine,
+  needsTheApp,
+  turnsOnFromHere,
+  type ComputerAskCard,
+} from '../../shared/computer-ask';
+import type { OptionCardData } from '../../shared/wire';
 
 export interface ComputerAskWords {
   /** Who wants what, from which computer. */
@@ -21,28 +25,33 @@ export interface ComputerAskWords {
   outcome?: string;
 }
 
-const OUTCOME: Partial<Record<ComputerAskCard["state"], LocaleKey>> = {
-  "turning-on": "computerAsk.state.turningOn",
-  on: "computerAsk.state.on",
-  declined: "computerAsk.state.declined",
-  ended: "computerAsk.state.ended",
+const OUTCOME: Partial<Record<ComputerAskCard['state'], LocaleKey>> = {
+  'turning-on': 'computerAsk.state.turningOn',
+  on: 'computerAsk.state.on',
+  declined: 'computerAsk.state.declined',
+  ended: 'computerAsk.state.ended',
 };
 
 /** A bot's ask to turn on what it needs from the person's computer, in their language; undefined for any other card. */
-export function computerAskWords(card: Pick<OptionCardData, "computerAsk"> | undefined, name: string): ComputerAskWords | undefined {
+export function computerAskWords(
+  card: Pick<OptionCardData, 'computerAsk'> | undefined,
+  name: string,
+): ComputerAskWords | undefined {
   const ask = card?.computerAsk;
   if (!ask) return undefined;
   const headline = computerAskHeadline(ask);
   const reason = computerAskReasonLine(ask, name);
-  const failed = ask.state === "failed";
+  const failed = ask.state === 'failed';
   const outcome = OUTCOME[ask.state];
   const device = computerDeviceText(ask.device);
   return {
     line: t(headline.key as LocaleKey, { ...headline.params, device, name }),
     ...(ask.why ? { why: ask.why } : {}),
-    reason: `${failed ? `${t("computerAsk.state.failed")} ` : ""}${t(reason.key as LocaleKey, { ...reason.params, device })}`,
-    ...(turnsOnFromHere(ask.reason) ? { turnOn: t(failed ? "computerAsk.action.tryAgain" : "computerAsk.action.turnOn") } : {}),
-    ...(needsTheApp(ask.reason) ? { getApp: t("computerAsk.action.getApp") } : {}),
+    reason: `${failed ? `${t('computerAsk.state.failed')} ` : ''}${t(reason.key as LocaleKey, { ...reason.params, device })}`,
+    ...(turnsOnFromHere(ask.reason)
+      ? { turnOn: t(failed ? 'computerAsk.action.tryAgain' : 'computerAsk.action.turnOn') }
+      : {}),
+    ...(needsTheApp(ask.reason) ? { getApp: t('computerAsk.action.getApp') } : {}),
     ...(outcome ? { outcome: t(outcome, { name }) } : {}),
   };
 }

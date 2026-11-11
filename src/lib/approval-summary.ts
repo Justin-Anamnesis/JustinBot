@@ -1,8 +1,10 @@
-import { t } from "@/lib/i18n";
-import type { OptionCardData } from "@/state/store";
-import { noticeText } from "./activity-text";
+import { t } from '@/lib/i18n';
+import type { OptionCardData } from '@/state/store';
+import { noticeText } from './activity-text';
 
-export function approvalDetailText(card: Pick<OptionCardData, "subtitle" | "summaryCode" | "summaryParams">): string {
+export function approvalDetailText(
+  card: Pick<OptionCardData, 'subtitle' | 'summaryCode' | 'summaryParams'>,
+): string {
   return noticeText(card.summaryCode, card.subtitle, card.summaryParams);
 }
 
@@ -16,23 +18,25 @@ const SUMMARY_GROUPS = 3;
 /** Per call, `App · Label` then its JSON arguments; JSON.stringify never writes a raw newline. */
 export function parseOutboundCalls(subtitle: string): OutboundCall[] {
   const calls: OutboundCall[] = [];
-  for (const block of subtitle.split("\n\n")) {
-    const heading = (block.split("\n")[0] ?? "").trim();
+  for (const block of subtitle.split('\n\n')) {
+    const heading = (block.split('\n')[0] ?? '').trim();
     if (!heading) return [];
-    const at = heading.indexOf(" · ");
+    const at = heading.indexOf(' · ');
     if (at < 0) {
       calls.push({ app: null, label: heading });
       continue;
     }
     const app = heading.slice(0, at).trim();
-    const label = heading.slice(at + " · ".length).trim();
+    const label = heading.slice(at + ' · '.length).trim();
     if (!app || !label) return [];
     calls.push({ app, label });
   }
   return calls;
 }
 
-export function outboundCalls(card: Pick<OptionCardData, "outboundRequest" | "subtitle">): OutboundCall[] {
+export function outboundCalls(
+  card: Pick<OptionCardData, 'outboundRequest' | 'subtitle'>,
+): OutboundCall[] {
   if (!card.outboundRequest) return [];
   const calls = card.outboundRequest.calls;
   if (calls && calls.length > 0) return calls;
@@ -58,9 +62,9 @@ export function collapseOutboundCalls(calls: OutboundCall[], namingApps: boolean
     const count = counts.get(JSON.stringify([call.app, call.label])) ?? 1;
     return count > 1 ? `${name} ×${count}` : name;
   });
-  const line = parts.join(", ");
+  const line = parts.join(', ');
   const hidden = order.length - parts.length;
-  return hidden > 0 ? `${line}, ${t("approval.outbound.more", { count: hidden })}` : line;
+  return hidden > 0 ? `${line}, ${t('approval.outbound.more', { count: hidden })}` : line;
 }
 
 export interface OutboundSummary {
@@ -69,21 +73,25 @@ export interface OutboundSummary {
   opaque?: true;
 }
 
-const OPAQUE_TOOL = "COMPOSIO_PROXY_EXECUTE";
+const OPAQUE_TOOL = 'COMPOSIO_PROXY_EXECUTE';
 
-export function outboundSummary(card: Pick<OptionCardData, "outboundRequest" | "subtitle">): OutboundSummary | undefined {
+export function outboundSummary(
+  card: Pick<OptionCardData, 'outboundRequest' | 'subtitle'>,
+): OutboundSummary | undefined {
   if (!card.outboundRequest) return undefined;
   const calls = outboundCalls(card);
   const app = outboundApp(calls);
   if (card.outboundRequest.tool === OPAQUE_TOOL) {
     return {
-      headline: t("approval.outbound.runCode", { app: app ?? card.outboundRequest.app ?? "Composio" }),
-      summary: "",
+      headline: t('approval.outbound.runCode', {
+        app: app ?? card.outboundRequest.app ?? 'Composio',
+      }),
+      summary: '',
       opaque: true,
     };
   }
   return {
-    headline: app ? t("approval.outbound.sendTo", { app }) : t("approval.outbound.sendOnBehalf"),
+    headline: app ? t('approval.outbound.sendTo', { app }) : t('approval.outbound.sendOnBehalf'),
     summary: collapseOutboundCalls(calls, app === null),
   };
 }
@@ -94,5 +102,5 @@ const COMPOSIO_TOOL = /^[A-Z][A-Z0-9]+_([A-Z0-9_]+)$/;
 export function composioActionPhrase(tool: string): string | undefined {
   const match = COMPOSIO_TOOL.exec(tool);
   if (!match) return undefined;
-  return match[1]!.replace(/_+/g, " ").trim().toLowerCase() || undefined;
+  return match[1]!.replace(/_+/g, ' ').trim().toLowerCase() || undefined;
 }

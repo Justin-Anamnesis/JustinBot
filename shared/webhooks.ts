@@ -1,6 +1,6 @@
 /** Webhook wire shapes: triggers and delivery attempts as they ride the REST
  * snapshot and the `webhook` / `webhook.attempt` live frames. */
-import type { RoutineRunOn } from "./routines.ts";
+import type { RoutineRunOn } from './routines.ts';
 
 export interface WebhookTrigger {
   id: string;
@@ -57,7 +57,7 @@ export interface WebhookVerificationSample {
   preview: string;
 }
 
-export type WebhookAttemptOutcome = "accepted" | "captured" | "duplicate" | "ignored" | "rejected";
+export type WebhookAttemptOutcome = 'accepted' | 'captured' | 'duplicate' | 'ignored' | 'rejected';
 
 export interface WebhookAttempt {
   id: string;
@@ -79,4 +79,3 @@ export interface WebhookIngressStatus {
   baseUrl: string;
   error?: string;
 }
-

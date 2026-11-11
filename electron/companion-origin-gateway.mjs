@@ -1,15 +1,15 @@
 // The hosted connector never reaches the LAN listener on :8810, only this guardian-owned gateway to the exact sidecar's socket.
-import fs from "node:fs";
-import http from "node:http";
-import os from "node:os";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
+import fs from 'node:fs';
+import http from 'node:http';
+import os from 'node:os';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
-export const MANAGED_COMPANION_ORIGIN_HOST = "127.0.0.1";
+export const MANAGED_COMPANION_ORIGIN_HOST = '127.0.0.1';
 export const MANAGED_COMPANION_ORIGIN_PORT = 8812;
 
-const RUNTIME_PREFIX = "omb-companion-origin-";
-const SOCKET_NAME = "origin.sock";
+const RUNTIME_PREFIX = 'omb-companion-origin-';
+const SOCKET_NAME = 'origin.sock';
 
 const currentUserId = () => {
   if (process.getuid) return process.getuid();
@@ -19,8 +19,8 @@ const currentUserId = () => {
 
 export function validCompanionOriginTarget(target, platform = process.platform) {
   if (!Number.isSafeInteger(target?.pid) || target.pid <= 0) return false;
-  if (Object.prototype.toString.call(target?.socketPath) !== "[object String]") return false;
-  if (platform === "win32") {
+  if (Object.prototype.toString.call(target?.socketPath) !== '[object String]') return false;
+  if (platform === 'win32') {
     return /^\\\\\.\\pipe\\openmausbot-companion-origin-[1-9][0-9]*-[0-9a-f-]{36}$/i.test(
       target.socketPath,
     );
@@ -40,7 +40,7 @@ export function createCompanionOriginEndpoint({
   temporaryRoot,
   currentUid = currentUserId(),
 } = {}) {
-  if (platform === "win32") {
+  if (platform === 'win32') {
     return Object.freeze({
       pid: processId,
       socketPath: `\\\\.\\pipe\\openmausbot-companion-origin-${processId}-${identifier()}`,
@@ -49,7 +49,7 @@ export function createCompanionOriginEndpoint({
   }
 
   // Darwin's sockaddr_un path is short; /tmp (realpath /private/tmp) stays below it even with a long userData.
-  const root = temporaryRoot ?? fileSystem.realpathSync("/tmp");
+  const root = temporaryRoot ?? fileSystem.realpathSync('/tmp');
   const directory = fileSystem.mkdtempSync(path.join(root, RUNTIME_PREFIX));
   try {
     fileSystem.chmodSync(directory, 0o700);
@@ -59,11 +59,11 @@ export function createCompanionOriginEndpoint({
       stat.isSymbolicLink() ||
       (currentUid !== undefined && stat.uid !== currentUid)
     ) {
-      throw new Error("The companion origin directory is unsafe");
+      throw new Error('The companion origin directory is unsafe');
     }
     const socketPath = path.join(directory, SOCKET_NAME);
     if (Buffer.byteLength(socketPath) > 96) {
-      throw new Error("The companion origin socket path is too long");
+      throw new Error('The companion origin socket path is too long');
     }
     return Object.freeze({ pid: processId, socketPath, directory });
   } catch (error) {
@@ -79,7 +79,7 @@ export function cleanupCompanionOriginEndpoint(
   endpoint,
   { platform = process.platform, fileSystem = fs, currentUid = currentUserId() } = {},
 ) {
-  if (platform === "win32" || !endpoint?.directory) return;
+  if (platform === 'win32' || !endpoint?.directory) return;
   const directory = endpoint.directory;
   if (
     path.basename(directory).startsWith(RUNTIME_PREFIX) === false ||
@@ -107,18 +107,14 @@ export function cleanupCompanionOriginEndpoint(
         fileSystem.unlinkSync(endpoint.socketPath);
       }
     } catch (error) {
-      if (error?.code !== "ENOENT") return;
+      if (error?.code !== 'ENOENT') return;
     }
     fileSystem.rmdirSync(directory);
-  } catch {
-  }
+  } catch {}
 }
 
 /** Every terminal request/response event settles: a pending probe would wedge the serialized start and stop. */
-export function companionOriginHealth(
-  target,
-  { request = http.request, timeoutMs = 1_000 } = {},
-) {
+export function companionOriginHealth(target, { request = http.request, timeoutMs = 1_000 } = {}) {
   return new Promise((resolve) => {
     let settled = false;
     const finish = (value) => {
@@ -128,16 +124,16 @@ export function companionOriginHealth(
     };
     const outgoing = request(
       {
-        headers: { accept: "application/json" },
-        method: "GET",
-        path: "/api/health",
+        headers: { accept: 'application/json' },
+        method: 'GET',
+        path: '/api/health',
         socketPath: target.socketPath,
         timeout: timeoutMs,
       },
       (response) => {
         const chunks = [];
         let size = 0;
-        response.on("data", (chunk) => {
+        response.on('data', (chunk) => {
           size += chunk.length;
           if (size > 4096) {
             finish(false);
@@ -146,87 +142,89 @@ export function companionOriginHealth(
             chunks.push(chunk);
           }
         });
-        response.on("end", () => {
+        response.on('end', () => {
           if (response.statusCode !== 200) return finish(false);
           try {
-            finish(JSON.parse(Buffer.concat(chunks).toString("utf8"))?.app === "openmausbot");
+            finish(JSON.parse(Buffer.concat(chunks).toString('utf8'))?.app === 'openmausbot');
           } catch {
             finish(false);
           }
         });
-        response.once("aborted", () => finish(false));
-        response.once("error", () => finish(false));
-        response.once("close", () => finish(false));
+        response.once('aborted', () => finish(false));
+        response.once('error', () => finish(false));
+        response.once('close', () => finish(false));
       },
     );
-    outgoing.once("timeout", () => {
+    outgoing.once('timeout', () => {
       finish(false);
       outgoing.destroy();
     });
-    outgoing.once("error", () => finish(false));
-    outgoing.once("close", () => finish(false));
+    outgoing.once('error', () => finish(false));
+    outgoing.once('close', () => finish(false));
     outgoing.end();
   });
 }
 
 function unavailable(response) {
   if (response.headersSent) return response.destroy();
-  const body = JSON.stringify({ error: "companion origin unavailable" });
+  const body = JSON.stringify({ error: 'companion origin unavailable' });
   response.writeHead(503, {
-    "cache-control": "private, no-store",
-    "content-length": Buffer.byteLength(body),
-    "content-type": "application/json",
+    'cache-control': 'private, no-store',
+    'content-length': Buffer.byteLength(body),
+    'content-type': 'application/json',
   });
   response.end(body);
 }
 
 const HOP_BY_HOP_HEADERS = new Set([
-  "connection",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "proxy-connection",
-  "te",
-  "trailer",
-  "transfer-encoding",
-  "upgrade",
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'proxy-connection',
+  'te',
+  'trailer',
+  'transfer-encoding',
+  'upgrade',
 ]);
 
 function endToEndHeaders(headers = {}) {
   const blocked = new Set(HOP_BY_HOP_HEADERS);
   const connection = Array.isArray(headers.connection)
-    ? headers.connection.join(",")
-    : String(headers.connection ?? "");
-  for (const name of connection.split(",")) blocked.add(name.trim().toLowerCase());
+    ? headers.connection.join(',')
+    : String(headers.connection ?? '');
+  for (const name of connection.split(',')) blocked.add(name.trim().toLowerCase());
   return Object.fromEntries(
-    Object.entries(headers).filter(([name, value]) => value !== undefined && !blocked.has(name.toLowerCase())),
+    Object.entries(headers).filter(
+      ([name, value]) => value !== undefined && !blocked.has(name.toLowerCase()),
+    ),
   );
 }
 
 function upgradeHeaders(headers = {}) {
-  if (String(headers.upgrade ?? "").toLowerCase() !== "websocket") return null;
+  if (String(headers.upgrade ?? '').toLowerCase() !== 'websocket') return null;
   return {
     ...endToEndHeaders(headers),
-    connection: "Upgrade",
-    upgrade: "websocket",
+    connection: 'Upgrade',
+    upgrade: 'websocket',
   };
 }
 
 function writeUpgrade(socket, response) {
   const lines = [];
   for (const name of [
-    "upgrade",
-    "connection",
-    "sec-websocket-accept",
-    "sec-websocket-protocol",
-    "sec-websocket-extensions",
+    'upgrade',
+    'connection',
+    'sec-websocket-accept',
+    'sec-websocket-protocol',
+    'sec-websocket-extensions',
   ]) {
     const value = response.headers[name];
-    if (typeof value === "string") lines.push(`${name}: ${value}`);
+    if (typeof value === 'string') lines.push(`${name}: ${value}`);
   }
   socket.write(
-    `HTTP/1.1 ${response.statusCode ?? 101} ${response.statusMessage ?? "Switching Protocols"}\r\n`
-      + `${lines.join("\r\n")}\r\n\r\n`,
+    `HTTP/1.1 ${response.statusCode ?? 101} ${response.statusMessage ?? 'Switching Protocols'}\r\n` +
+      `${lines.join('\r\n')}\r\n\r\n`,
   );
 }
 
@@ -246,7 +244,7 @@ export function createCompanionOriginGateway({
   upstreamTimeoutMs = 30_000,
 } = {}) {
   if (!validCompanionOriginTarget(target)) {
-    throw new Error("The companion origin target is invalid");
+    throw new Error('The companion origin target is invalid');
   }
   let accepting = true;
   let listening = false;
@@ -270,43 +268,45 @@ export function createCompanionOriginGateway({
           return unavailable(outgoing);
         }
         outgoing.writeHead(response.statusCode ?? 502, endToEndHeaders(response.headers));
-          // `pipe` does not carry source failures: a sidecar restart mid-response must tear down the client response.
-        response.once("error", () => outgoing.destroy());
-        response.once("aborted", () => outgoing.destroy());
-        response.once("close", () => {
+        // `pipe` does not carry source failures: a sidecar restart mid-response must tear down the client response.
+        response.once('error', () => outgoing.destroy());
+        response.once('aborted', () => outgoing.destroy());
+        response.once('close', () => {
           if (!response.complete) outgoing.destroy();
         });
         response.pipe(outgoing);
       },
     );
-    upstream.once("timeout", () => upstream.destroy(new Error("companion origin timed out")));
-    upstream.once("error", () => unavailable(outgoing));
-    incoming.once("aborted", () => upstream.destroy());
-    outgoing.once("close", () => upstream.destroy());
+    upstream.once('timeout', () => upstream.destroy(new Error('companion origin timed out')));
+    upstream.once('error', () => unavailable(outgoing));
+    incoming.once('aborted', () => upstream.destroy());
+    outgoing.once('close', () => upstream.destroy());
     incoming.pipe(upstream);
   });
-  server.on("upgrade", (incoming, socket, head) => {
+  server.on('upgrade', (incoming, socket, head) => {
     // Node removes its own error listener from a socket it hands to `upgrade`.
-    socket.on("error", () => socket.destroy());
+    socket.on('error', () => socket.destroy());
     if (!accepting || !isTargetAlive(target)) return socket.destroy();
     const headers = upgradeHeaders(incoming.headers);
-    if (!headers || incoming.method !== "GET") return socket.destroy();
+    if (!headers || incoming.method !== 'GET') return socket.destroy();
     upgradedSockets.add(socket);
     let remoteSocket = null;
     const release = () => {
       upgradedSockets.delete(socket);
       if (remoteSocket) upgradedSockets.delete(remoteSocket);
     };
-    socket.once("close", release);
+    socket.once('close', release);
     const upstream = request({
       headers,
-      method: "GET",
+      method: 'GET',
       path: incoming.url,
       socketPath: target.socketPath,
       timeout: upstreamTimeoutMs,
     });
-    upstream.once("timeout", () => upstream.destroy(new Error("companion origin upgrade timed out")));
-    upstream.once("upgrade", (response, remote, remoteHead) => {
+    upstream.once('timeout', () =>
+      upstream.destroy(new Error('companion origin upgrade timed out')),
+    );
+    upstream.once('upgrade', (response, remote, remoteHead) => {
       upstream.setTimeout(0);
       remote.setTimeout(0);
       if (!accepting || !isTargetAlive(target)) {
@@ -322,22 +322,22 @@ export function createCompanionOriginGateway({
         socket.destroy();
         remote.destroy();
       };
-      socket.on("error", teardown);
-      remote.on("error", teardown);
-      remote.once("close", release);
+      socket.on('error', teardown);
+      remote.on('error', teardown);
+      remote.once('close', release);
       if (head.length) remote.write(head);
       if (remoteHead.length) socket.write(remoteHead);
       socket.pipe(remote).pipe(socket);
     });
-    upstream.once("response", (response) => {
+    upstream.once('response', (response) => {
       response.resume();
       socket.destroy();
     });
-    upstream.once("error", () => socket.destroy());
-    socket.once("close", () => upstream.destroy());
+    upstream.once('error', () => socket.destroy());
+    socket.once('close', () => upstream.destroy());
     upstream.end();
   });
-  server.on("clientError", (_error, socket) => socket.destroy());
+  server.on('clientError', (_error, socket) => socket.destroy());
 
   const serialize = (work) => {
     const next = transition.then(work, work);
@@ -354,15 +354,15 @@ export function createCompanionOriginGateway({
         if (listening) return server.address();
         await new Promise((resolve, reject) => {
           const onError = (error) => {
-            server.off("listening", onListening);
+            server.off('listening', onListening);
             reject(error);
           };
           const onListening = () => {
-            server.off("error", onError);
+            server.off('error', onError);
             resolve();
           };
-          server.once("error", onError);
-          server.once("listening", onListening);
+          server.once('error', onError);
+          server.once('listening', onListening);
           server.listen({ exclusive: true, host: originHost, port: originPort });
         });
         listening = true;

@@ -1,8 +1,8 @@
-import type { Bot, BotAnnouncement, Group } from "@/state/store";
+import type { Bot, BotAnnouncement, Group } from '@/state/store';
 
-type FolderBot = Pick<Bot, "id" | "threadId" | "unread" | "tasks">;
-type DepartmentBot = FolderBot & Pick<Bot, "section" | "hidden">;
-type DepartmentGroup = Pick<Group, "id" | "unread" | "section" | "dm">;
+type FolderBot = Pick<Bot, 'id' | 'threadId' | 'unread' | 'tasks'>;
+type DepartmentBot = FolderBot & Pick<Bot, 'section' | 'hidden'>;
+type DepartmentGroup = Pick<Group, 'id' | 'unread' | 'section' | 'dm'>;
 
 export function botUnreadThreadIds(bot: FolderBot): string[] {
   if (!bot.tasks?.length) return bot.unread ? [bot.threadId] : [];
@@ -13,7 +13,11 @@ export function botUnreadThreadIds(bot: FolderBot): string[] {
 
 export function folderUnreadThreadIds(bot: FolderBot, projectId: string): string[] {
   return (bot.tasks ?? [])
-    .filter((task) => task.projectId === projectId && (task.unread ?? (task.threadId === bot.threadId && bot.unread)))
+    .filter(
+      (task) =>
+        task.projectId === projectId &&
+        (task.unread ?? (task.threadId === bot.threadId && bot.unread)),
+    )
     .map((task) => task.threadId);
 }
 
@@ -42,7 +46,7 @@ async function markThreadsRead(
 ): Promise<void> {
   for (const threadId of threadIds) {
     const result = await request(`/api/bots/${botId}/read`, {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify({ threadId }),
     });
     onRead(result.bot);
@@ -50,9 +54,16 @@ async function markThreadsRead(
 }
 
 /** What a department's "Mark all as read" covers: its shown bots, each with every conversation, and its group chats. */
-export function departmentUnread(name: string, bots: readonly DepartmentBot[], groups: readonly DepartmentGroup[]): { bots: DepartmentBot[]; groups: DepartmentGroup[] } {
+export function departmentUnread(
+  name: string,
+  bots: readonly DepartmentBot[],
+  groups: readonly DepartmentGroup[],
+): { bots: DepartmentBot[]; groups: DepartmentGroup[] } {
   return {
-    bots: bots.filter((bot) => !bot.hidden && (bot.section?.trim() || "") === name && botUnreadThreadIds(bot).length > 0),
+    bots: bots.filter(
+      (bot) =>
+        !bot.hidden && (bot.section?.trim() || '') === name && botUnreadThreadIds(bot).length > 0,
+    ),
     groups: groups.filter((group) => !group.dm && group.section === name && group.unread),
   };
 }
@@ -60,13 +71,21 @@ export function departmentUnread(name: string, bots: readonly DepartmentBot[], g
 /** One request at a time, so a failure keeps every read before it. */
 export async function markDepartmentRead(
   unread: { bots: readonly DepartmentBot[]; groups: readonly DepartmentGroup[] },
-  request: (path: string, init?: RequestInit) => Promise<{ bot?: BotAnnouncement; group?: Partial<Group> & { id: string } }>,
+  request: (
+    path: string,
+    init?: RequestInit,
+  ) => Promise<{ bot?: BotAnnouncement; group?: Partial<Group> & { id: string } }>,
   onBot: (bot: BotAnnouncement) => void,
   onGroup: (group: Partial<Group> & { id: string }) => void,
 ): Promise<void> {
-  for (const bot of unread.bots) await markBotRead(bot, request as (path: string, init?: RequestInit) => Promise<{ bot: BotAnnouncement }>, onBot);
+  for (const bot of unread.bots)
+    await markBotRead(
+      bot,
+      request as (path: string, init?: RequestInit) => Promise<{ bot: BotAnnouncement }>,
+      onBot,
+    );
   for (const group of unread.groups) {
-    const result = await request(`/api/groups/${group.id}/read`, { method: "POST" });
+    const result = await request(`/api/groups/${group.id}/read`, { method: 'POST' });
     if (result.group) onGroup(result.group);
   }
 }

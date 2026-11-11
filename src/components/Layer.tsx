@@ -1,5 +1,13 @@
-import { createContext, useCallback, useContext, useLayoutEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
 
 let opened = 0;
 const modals: number[] = [];
@@ -20,11 +28,19 @@ export function Layer({ modal = false, children }: { modal?: boolean; children: 
     if (!modal) return;
     modals.push(order);
     modals.sort((a, b) => a - b);
-    return () => { modals.splice(modals.indexOf(order), 1); };
+    return () => {
+      modals.splice(modals.indexOf(order), 1);
+    };
   }, [modal, order]);
   const outer = useContext(ModalLayer);
-  const onServer = useSyncExternalStore(never, () => false, () => true);
-  const content = <ModalLayer.Provider value={modal ? order : outer}>{children}</ModalLayer.Provider>;
+  const onServer = useSyncExternalStore(
+    never,
+    () => false,
+    () => true,
+  );
+  const content = (
+    <ModalLayer.Provider value={modal ? order : outer}>{children}</ModalLayer.Provider>
+  );
   return onServer ? content : createPortal(content, document.body);
 }
 

@@ -1,25 +1,38 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { DISCOVERY_CLIENT_NAME, discoverAcpModels, resolveCustomAcpModels } from "./custom-model-catalog.ts";
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { basename, join } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  DISCOVERY_CLIENT_NAME,
+  discoverAcpModels,
+  resolveCustomAcpModels,
+} from './custom-model-catalog.ts';
 
 /** Lets a test see a process that reports it would not stop; the real stop still runs. */
 const stop = vi.hoisted(() => ({ refuses: false }));
-vi.mock("../../procs.ts", async (original) => {
-  const procs = await original<typeof import("../../procs.ts")>();
-  return { ...procs, killCliTree: async (...args: Parameters<typeof procs.killCliTree>) => (await procs.killCliTree(...args)) && !stop.refuses };
+vi.mock('../../procs.ts', async (original) => {
+  const procs = await original<typeof import('../../procs.ts')>();
+  return {
+    ...procs,
+    killCliTree: async (...args: Parameters<typeof procs.killCliTree>) =>
+      (await procs.killCliTree(...args)) && !stop.refuses,
+  };
 });
 
 const scratch: string[] = [];
-afterEach(async () => { stop.refuses = false; await Promise.all(scratch.splice(0).map((path) => rm(path, { recursive: true, force: true }))); });
+afterEach(async () => {
+  stop.refuses = false;
+  await Promise.all(scratch.splice(0).map((path) => rm(path, { recursive: true, force: true })));
+});
 
-async function fake(mode = "normal") {
-  const cwd = await mkdtemp(join(tmpdir(), "omb-catalog-test-"));
+async function fake(mode = 'normal') {
+  const cwd = await mkdtemp(join(tmpdir(), 'omb-catalog-test-'));
   scratch.push(cwd);
-  const cli = join(cwd, "fake.mjs");
-  const dump = join(cwd, "requests.jsonl");
-  await writeFile(cli, `import { appendFileSync } from 'node:fs';
+  const cli = join(cwd, 'fake.mjs');
+  const dump = join(cwd, 'requests.jsonl');
+  await writeFile(
+    cli,
+    `import { appendFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 let current='deep';
 const mode=process.env.CATALOG_MODE;
@@ -59,68 +72,100 @@ for await(const line of createInterface({input:process.stdin})){
  emit({jsonrpc:'2.0',id:msg.id,error:{code:-32601,message:'unexpected method'}});
 }
 appendFileSync(process.env.CATALOG_DUMP,JSON.stringify({eof:true})+'\\n');
-if(mode==='ignore-eof')setInterval(()=>{},1000);`);
+if(mode==='ignore-eof')setInterval(()=>{},1000);`,
+  );
   return {
     config: { cli: `${JSON.stringify(process.execPath)} ${JSON.stringify(cli)}` },
     env: { ...process.env, HOME: cwd, USERPROFILE: cwd, CATALOG_MODE: mode, CATALOG_DUMP: dump },
-    requests: async () => (await readFile(dump, "utf8")).trim().split("\n").map((line) => JSON.parse(line) as Record<string, any>)
-      .filter((entry) => entry.pid === undefined && !entry.eof),
-    log: async () => (await readFile(dump, "utf8")).trim().split("\n").map((line) => JSON.parse(line) as Record<string, any>),
+    requests: async () =>
+      (await readFile(dump, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as Record<string, any>)
+        .filter((entry) => entry.pid === undefined && !entry.eof),
+    log: async () =>
+      (await readFile(dump, 'utf8'))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as Record<string, any>),
   };
 }
 
-describe("custom ACP catalog discovery (isolated fake CLI)", () => {
-  it("discovers model-specific variants without prompts, tools, MCP or shared config edits", async () => {
+describe('custom ACP catalog discovery (isolated fake CLI)', () => {
+  it('discovers model-specific variants without prompts, tools, MCP or shared config edits', async () => {
     const fixture = await fake();
     const catalog = await resolveCustomAcpModels(fixture.env, fixture.config);
-    expect(catalog).toEqual({ default: "agent-default", options: [
-      { id: "agent-default", label: "Agent default", custom: true },
-      { id: "deep", label: "Deep", custom: true, variants: [{ id: "max", label: "Max" }] },
-      { id: "flash", label: "Flash", custom: true, variants: [{ id: "low", label: "Low" }] },
-      { id: "silent", label: "Silent", custom: true }, { id: "rejected", label: "Rejected", custom: true },
-    ] });
+    expect(catalog).toEqual({
+      default: 'agent-default',
+      options: [
+        { id: 'agent-default', label: 'Agent default', custom: true },
+        { id: 'deep', label: 'Deep', custom: true, variants: [{ id: 'max', label: 'Max' }] },
+        { id: 'flash', label: 'Flash', custom: true, variants: [{ id: 'low', label: 'Low' }] },
+        { id: 'silent', label: 'Silent', custom: true },
+        { id: 'rejected', label: 'Rejected', custom: true },
+      ],
+    });
     const requests = await fixture.requests();
     expect(requests.filter((r) => r.method).map((r) => r.method)).toEqual([
-      "initialize", "session/new", "session/set_config_option", "session/set_config_option", "session/set_config_option",
+      'initialize',
+      'session/new',
+      'session/set_config_option',
+      'session/set_config_option',
+      'session/set_config_option',
     ]);
-    expect(requests[0].params.clientCapabilities).toEqual({ fs: { readTextFile: false, writeTextFile: false }, terminal: false });
-    expect(requests.find((r) => r.method === "session/new")?.params.mcpServers).toEqual([]);
+    expect(requests[0].params.clientCapabilities).toEqual({
+      fs: { readTextFile: false, writeTextFile: false },
+      terminal: false,
+    });
+    expect(requests.find((r) => r.method === 'session/new')?.params.mcpServers).toEqual([]);
     expect(requests.find((r) => r.id === 900)?.error.code).toBe(-32601);
-    expect(requests.find((r) => r.id === 901)?.result.outcome.outcome).toBe("cancelled");
-    await expect(readFile(requests[0].cwd)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(requests.find((r) => r.id === 901)?.result.outcome.outcome).toBe('cancelled');
+    await expect(readFile(requests[0].cwd)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it("never attaches the previous model's effort when a switch was not confirmed", async () => {
-    const fixture = await fake("stale");
+    const fixture = await fake('stale');
     const catalog = await resolveCustomAcpModels(fixture.env, fixture.config);
-    expect(catalog.options.find((m) => m.id === "flash")).toEqual({ id: "flash", label: "Flash", custom: true });
+    expect(catalog.options.find((m) => m.id === 'flash')).toEqual({
+      id: 'flash',
+      label: 'Flash',
+      custom: true,
+    });
   });
 
-  it("accepts a matching fresh config update when the native setter returns an empty result", async () => {
-    const fixture = await fake("notification");
+  it('accepts a matching fresh config update when the native setter returns an empty result', async () => {
+    const fixture = await fake('notification');
     const catalog = await resolveCustomAcpModels(fixture.env, fixture.config);
-    expect(catalog.options.find((m) => m.id === "flash")?.variants).toEqual([{ id: "low", label: "Low" }]);
+    expect(catalog.options.find((m) => m.id === 'flash')?.variants).toEqual([
+      { id: 'low', label: 'Low' },
+    ]);
   });
 
-  it("discovers legacy catalogs through session/set_model without assuming a config ID", async () => {
-    const fixture = await fake("legacy");
+  it('discovers legacy catalogs through session/set_model without assuming a config ID', async () => {
+    const fixture = await fake('legacy');
     const catalog = await resolveCustomAcpModels(fixture.env, fixture.config);
-    expect(catalog.options.find((m) => m.id === "flash")?.variants).toEqual([{ id: "low", label: "Low" }]);
+    expect(catalog.options.find((m) => m.id === 'flash')?.variants).toEqual([
+      { id: 'low', label: 'Low' },
+    ]);
     const requests = await fixture.requests();
-    expect(requests.filter((r) => r.method === "session/set_model")).toHaveLength(3);
-    expect(requests.some((r) => r.method === "session/set_config_option")).toBe(false);
+    expect(requests.filter((r) => r.method === 'session/set_model')).toHaveLength(3);
+    expect(requests.some((r) => r.method === 'session/set_config_option')).toBe(false);
   });
 
-  it("returns a safe failure and cleans up when the native process exits", async () => {
-    const fixture = await fake("exit");
-    await expect(resolveCustomAcpModels(fixture.env, fixture.config)).rejects.toThrow("closed during model discovery");
+  it('returns a safe failure and cleans up when the native process exits', async () => {
+    const fixture = await fake('exit');
+    await expect(resolveCustomAcpModels(fixture.env, fixture.config)).rejects.toThrow(
+      'closed during model discovery',
+    );
     const requests = await fixture.requests();
-    await expect(readFile(requests[0].cwd)).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readFile(requests[0].cwd)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
-  it("fails instead of replacing a previous catalog with an empty response", async () => {
-    const fixture = await fake("no-models");
-    await expect(resolveCustomAcpModels(fixture.env, fixture.config)).rejects.toThrow("did not advertise any models");
+  it('fails instead of replacing a previous catalog with an empty response', async () => {
+    const fixture = await fake('no-models');
+    await expect(resolveCustomAcpModels(fixture.env, fixture.config)).rejects.toThrow(
+      'did not advertise any models',
+    );
   });
 
   it("hands the agent's session to forgetSession once the process has stopped, and never before", async () => {
@@ -128,8 +173,10 @@ describe("custom ACP catalog discovery (isolated fake CLI)", () => {
     const forgetSession = vi.fn(async () => {});
     await discoverAcpModels(fixture.env, fixture.config.cli, [], { forgetSession });
     expect(forgetSession).toHaveBeenCalledOnce();
-    const [session] = forgetSession.mock.calls[0] as unknown as [{ sessionId: string; cwd: string; env: unknown }];
-    expect(session.sessionId).toBe("fake-session");
+    const [session] = forgetSession.mock.calls[0] as unknown as [
+      { sessionId: string; cwd: string; env: unknown },
+    ];
+    expect(session.sessionId).toBe('fake-session');
     expect(basename(session.cwd)).toMatch(/^omb-acp-models-/);
     // macOS reports the agent's cwd through /private; the folder name is the same either way.
     expect(basename(session.cwd)).toBe(basename((await fixture.requests())[0].cwd));
@@ -138,24 +185,30 @@ describe("custom ACP catalog discovery (isolated fake CLI)", () => {
 
     stop.refuses = true;
     const stuck = vi.fn(async () => {});
-    await expect(discoverAcpModels(fixture.env, fixture.config.cli, [], { forgetSession: stuck })).rejects.toThrow("could not be stopped");
+    await expect(
+      discoverAcpModels(fixture.env, fixture.config.cli, [], { forgetSession: stuck }),
+    ).rejects.toThrow('could not be stopped');
     expect(stuck).not.toHaveBeenCalled();
   });
 
-  it("deletes its session over ACP when the agent offers session/delete, and then skips forgetSession", async () => {
-    const fixture = await fake("deletes");
+  it('deletes its session over ACP when the agent offers session/delete, and then skips forgetSession', async () => {
+    const fixture = await fake('deletes');
     const forgetSession = vi.fn(async () => {});
     await discoverAcpModels(fixture.env, fixture.config.cli, [], { forgetSession });
-    const deletes = (await fixture.requests()).filter((request) => request.method === "session/delete");
-    expect(deletes.map((request) => request.params.sessionId)).toEqual(["fake-session"]);
+    const deletes = (await fixture.requests()).filter(
+      (request) => request.method === 'session/delete',
+    );
+    expect(deletes.map((request) => request.params.sessionId)).toEqual(['fake-session']);
     expect(forgetSession).not.toHaveBeenCalled();
 
     const plain = await fake();
     await discoverAcpModels(plain.env, plain.config.cli, []);
-    expect((await plain.requests()).some((request) => request.method === "session/delete")).toBe(false);
+    expect((await plain.requests()).some((request) => request.method === 'session/delete')).toBe(
+      false,
+    );
   });
 
-  it("stops a custom agent at once, and lets an agent asked to exit gracefully read EOF first", async () => {
+  it('stops a custom agent at once, and lets an agent asked to exit gracefully read EOF first', async () => {
     const custom = await fake();
     await resolveCustomAcpModels(custom.env, custom.config);
     expect((await custom.log()).some((entry) => entry.eof)).toBe(false);
@@ -164,8 +217,8 @@ describe("custom ACP catalog discovery (isolated fake CLI)", () => {
     expect((await graceful.log()).some((entry) => entry.eof)).toBe(true);
   });
 
-  it("still stops an agent that ignores EOF, once the grace period is over", async () => {
-    const fixture = await fake("ignore-eof");
+  it('still stops an agent that ignores EOF, once the grace period is over', async () => {
+    const fixture = await fake('ignore-eof');
     await discoverAcpModels(fixture.env, fixture.config.cli, [], { exitGraceMs: 50 });
     const log = await fixture.log();
     expect(log.some((entry) => entry.eof)).toBe(true);
@@ -173,45 +226,47 @@ describe("custom ACP catalog discovery (isolated fake CLI)", () => {
     expect(() => process.kill(pid, 0)).toThrow();
   }, 20_000);
 
-  it("bounds malformed output and still removes its isolated workspace", async () => {
-    const fixture = await fake("flood");
-    await expect(resolveCustomAcpModels(fixture.env, fixture.config)).rejects.toThrow("line limit");
+  it('bounds malformed output and still removes its isolated workspace', async () => {
+    const fixture = await fake('flood');
+    await expect(resolveCustomAcpModels(fixture.env, fixture.config)).rejects.toThrow('line limit');
     const requests = await fixture.requests();
-    await expect(readFile(requests[0].cwd)).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readFile(requests[0].cwd)).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
-  it("skips discovered entries whose id or label is not a usable slug, and never sends them back to the agent", async () => {
-    const fixture = await fake("hostile");
+  it('skips discovered entries whose id or label is not a usable slug, and never sends them back to the agent', async () => {
+    const fixture = await fake('hostile');
     const catalog = await discoverAcpModels(fixture.env, fixture.config.cli, []);
     expect(catalog.options).toEqual([
-      { id: "ok-model", label: "ok-model" },
-      { id: "good-model", label: "Good Model" },
+      { id: 'ok-model', label: 'ok-model' },
+      { id: 'good-model', label: 'Good Model' },
     ]);
-    expect(catalog.default).toBe("good-model");
+    expect(catalog.default).toBe('good-model');
     const sent = JSON.stringify(await fixture.requests());
-    expect(sent).not.toContain("../.openmausbot");
-    expect(sent).not.toContain("bad\u0000id");
-    expect(sent).not.toContain("x".repeat(500));
+    expect(sent).not.toContain('../.openmausbot');
+    expect(sent).not.toContain('bad\u0000id');
+    expect(sent).not.toContain('x'.repeat(500));
   });
 
-  it("never lets an unusable session model become the catalog default", async () => {
-    const fixture = await fake("hostile-default");
+  it('never lets an unusable session model become the catalog default', async () => {
+    const fixture = await fake('hostile-default');
     const catalog = await discoverAcpModels(fixture.env, fixture.config.cli, []);
-    expect(catalog.default).toBe("ok-model");
-    expect(catalog.options.map((option) => option.id)).toEqual(["ok-model", "good-model"]);
+    expect(catalog.default).toBe('ok-model');
+    expect(catalog.options.map((option) => option.id)).toEqual(['ok-model', 'good-model']);
   });
 
-  it("rejects a custom catalog whose every discovered id was unusable instead of leaving only the default", async () => {
-    const fixture = await fake("hostile-all");
-    await expect(resolveCustomAcpModels(fixture.env, fixture.config)).rejects.toThrow("did not advertise any usable models");
+  it('rejects a custom catalog whose every discovered id was unusable instead of leaving only the default', async () => {
+    const fixture = await fake('hostile-all');
+    await expect(resolveCustomAcpModels(fixture.env, fixture.config)).rejects.toThrow(
+      'did not advertise any usable models',
+    );
   });
 
-  it("rejects bidirectional controls and control characters in labels, and falls back to the id", async () => {
-    const fixture = await fake("hostile-labels");
+  it('rejects bidirectional controls and control characters in labels, and falls back to the id', async () => {
+    const fixture = await fake('hostile-labels');
     const catalog = await discoverAcpModels(fixture.env, fixture.config.cli, []);
     expect(catalog.options).toEqual([
-      { id: "plain-model", label: "plain-model" },
-      { id: "good-model", label: "Good Model" },
+      { id: 'plain-model', label: 'plain-model' },
+      { id: 'good-model', label: 'Good Model' },
     ]);
   });
 });

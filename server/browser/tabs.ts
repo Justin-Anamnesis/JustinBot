@@ -3,10 +3,10 @@
 // The tab record follows pingdotgg/t3code@00cdceb1 apps/server/src/preview/ServerBrowser.ts (ServerTab), MIT License,
 // Copyright (c) 2026 T3 Tools Inc. (full text in third_party/t3-code/LICENSE); modified: one record per page of the
 // CDP driver.
-import type { CdpPage } from "./cdp/page.ts";
-import { SessionControl } from "./session-control.ts";
+import type { CdpPage } from './cdp/page.ts';
+import { SessionControl } from './session-control.ts';
 
-export type TabOrigin = "agent" | "person" | "page" | "restored";
+export type TabOrigin = 'agent' | 'person' | 'page' | 'restored';
 
 export interface Tab {
   readonly id: string;

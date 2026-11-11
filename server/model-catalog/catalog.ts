@@ -24,12 +24,12 @@
  * SOFTWARE.
  */
 
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { writeFileAtomic } from "../atomic.ts";
-import { OPENAI_COMPATIBLE_NPM, PROVIDER_PRESETS, type ProviderPreset } from "./presets.ts";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { writeFileAtomic } from '../atomic.ts';
+import { OPENAI_COMPATIBLE_NPM, PROVIDER_PRESETS, type ProviderPreset } from './presets.ts';
 import {
   MODEL_CATALOG_SCHEMA,
   catalogStats,
@@ -38,16 +38,16 @@ import {
   unpackCatalog,
   type CatalogProviders,
   type ModelCatalogDocument,
-} from "./trim.ts";
+} from './trim.ts';
 
-export const MODELS_DEV_URL = "https://models.dev/api.json";
+export const MODELS_DEV_URL = 'https://models.dev/api.json';
 export const CATALOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const CATALOG_FETCH_TIMEOUT_MS = 10_000;
 export const CATALOG_MAX_BYTES = 20 * 1024 * 1024;
-export const CATALOG_DISABLE_ENV = "OMB_DISABLE_MODEL_CATALOG_FETCH";
-export const SNAPSHOT_FILE = "models-dev.snapshot.json";
+export const CATALOG_DISABLE_ENV = 'OMB_DISABLE_MODEL_CATALOG_FETCH';
+export const SNAPSHOT_FILE = 'models-dev.snapshot.json';
 
-export type CatalogOrigin = "cache" | "opencode" | "snapshot" | "empty";
+export type CatalogOrigin = 'cache' | 'opencode' | 'snapshot' | 'empty';
 
 export interface ModelCatalog {
   origin: CatalogOrigin;
@@ -56,7 +56,7 @@ export interface ModelCatalog {
   providers: CatalogProviders;
 }
 
-export type CatalogRefreshResult = "disabled" | "fresh" | "updated" | "not-modified" | "failed";
+export type CatalogRefreshResult = 'disabled' | 'fresh' | 'updated' | 'not-modified' | 'failed';
 
 export interface ModelCatalogOptions {
   dataDir: string;
@@ -74,39 +74,40 @@ export interface ModelCatalogOptions {
 
 /** Our cache, under providers/ so backups and Move to Cloud leave it out. */
 export function modelCatalogCachePath(dataDir: string): string {
-  return join(dataDir, "providers", "model-providers", "models-dev.json");
+  return join(dataDir, 'providers', 'model-providers', 'models-dev.json');
 }
 
 /** Where OpenCode keeps models.dev (xdg-basedir's cache dir, on every OS). */
 export function openCodeCatalogCachePath(env: NodeJS.ProcessEnv = process.env): string {
-  return join(env.XDG_CACHE_HOME || join(homedir(), ".cache"), "opencode", "models.json");
+  return join(env.XDG_CACHE_HOME || join(homedir(), '.cache'), 'opencode', 'models.json');
 }
 
 /** Beside this module in a checkout; under model-catalog/ beside the bundled server. */
 function readBundledSnapshot(): string | undefined {
   const here = dirname(fileURLToPath(import.meta.url));
-  for (const path of [join(here, SNAPSHOT_FILE), join(here, "model-catalog", SNAPSHOT_FILE)]) {
-    if (existsSync(path)) return readFileSync(path, "utf8");
+  for (const path of [join(here, SNAPSHOT_FILE), join(here, 'model-catalog', SNAPSHOT_FILE)]) {
+    if (existsSync(path)) return readFileSync(path, 'utf8');
   }
   return undefined;
 }
 
+// prettier-ignore
 // eslint-disable-next-line no-control-regex
 const CONTROL = /[\u0000-\u001f\u007f]/u;
 // An ETag is echoed back in a request header: keep only a plain, short one.
 const safeEtag = (value: unknown): string | undefined =>
-  typeof value === "string" && value.length <= 256 && !CONTROL.test(value) ? value : undefined;
+  typeof value === 'string' && value.length <= 256 && !CONTROL.test(value) ? value : undefined;
 
 const time = (value: unknown): number | undefined => {
-  if (typeof value !== "string") return undefined;
+  if (typeof value !== 'string') return undefined;
   const parsed = Date.parse(value);
   return Number.isNaN(parsed) ? undefined : parsed;
 };
 
-const message = (error: unknown) => error instanceof Error ? error.message : String(error);
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 interface Candidate {
-  origin: Exclude<CatalogOrigin, "empty">;
+  origin: Exclude<CatalogOrigin, 'empty'>;
   updatedAt: number;
   providers: () => unknown;
 }
@@ -131,34 +132,53 @@ export class ModelCatalogStore {
   }
 
   get fetchDisabled(): boolean {
-    return Boolean(this.options.fetchDisabled) || (this.options.env ?? process.env)[CATALOG_DISABLE_ENV] === "1";
+    return (
+      Boolean(this.options.fetchDisabled) ||
+      (this.options.env ?? process.env)[CATALOG_DISABLE_ENV] === '1'
+    );
   }
 
   /** The newest usable catalog. Never throws; worst case an empty catalog. */
   get(): ModelCatalog {
     if (this.memo) return this.memo;
-    const candidates = [this.ownCache(), this.openCodeCache(), this.snapshot()]
-      .filter((candidate): candidate is Candidate => candidate !== undefined);
+    const candidates = [this.ownCache(), this.openCodeCache(), this.snapshot()].filter(
+      (candidate): candidate is Candidate => candidate !== undefined,
+    );
     // Stable sort: on equal times the listed order (cache, OpenCode, snapshot) wins.
     candidates.sort((a, b) => b.updatedAt - a.updatedAt);
     for (const candidate of candidates) {
       let drops = 0;
-      const providers = trimModelsDevCatalog(candidate.providers(), { onDrop: () => { drops += 1; } });
+      const providers = trimModelsDevCatalog(candidate.providers(), {
+        onDrop: () => {
+          drops += 1;
+        },
+      });
       if (!Object.keys(providers).length) {
         this.log(`the ${candidate.origin} catalog held no usable providers; trying the next one`);
         continue;
       }
-      if (drops) this.log(`left out ${drops} ${candidate.origin} catalog entries that were malformed or contained { or }`);
-      this.memo = { origin: candidate.origin, updatedAt: new Date(candidate.updatedAt).toISOString(), providers };
+      if (drops)
+        this.log(
+          `left out ${drops} ${candidate.origin} catalog entries that were malformed or contained { or }`,
+        );
+      this.memo = {
+        origin: candidate.origin,
+        updatedAt: new Date(candidate.updatedAt).toISOString(),
+        providers,
+      };
       return this.memo;
     }
-    this.memo = { origin: "empty", updatedAt: new Date(0).toISOString(), providers: trimModelsDevCatalog(undefined) };
+    this.memo = {
+      origin: 'empty',
+      updatedAt: new Date(0).toISOString(),
+      providers: trimModelsDevCatalog(undefined),
+    };
     return this.memo;
   }
 
   /** Skipped while the cache is under 24 hours old, unless `force`. Concurrent calls share one request. Never throws. */
   refresh(options: { force?: boolean } = {}): Promise<CatalogRefreshResult> {
-    if (this.fetchDisabled) return Promise.resolve("disabled");
+    if (this.fetchDisabled) return Promise.resolve('disabled');
     this.inflight ??= this.fetchAndStore(Boolean(options.force)).finally(() => {
       this.inflight = undefined;
     });
@@ -168,34 +188,54 @@ export class ModelCatalogStore {
   private readDocument(): { doc: ModelCatalogDocument; updatedAt: number } | undefined {
     if (!existsSync(this.cachePath)) return undefined;
     try {
-      if (statSync(this.cachePath).size > (this.options.maxBytes ?? CATALOG_MAX_BYTES)) throw new Error("too large");
-      const doc = JSON.parse(readFileSync(this.cachePath, "utf8")) as ModelCatalogDocument;
+      if (statSync(this.cachePath).size > (this.options.maxBytes ?? CATALOG_MAX_BYTES))
+        throw new Error('too large');
+      const doc = JSON.parse(readFileSync(this.cachePath, 'utf8')) as ModelCatalogDocument;
       const updatedAt = time(doc?.updatedAt);
-      if (doc?.schema !== MODEL_CATALOG_SCHEMA || updatedAt === undefined || !doc.providers) throw new Error("unrecognised format");
+      if (doc?.schema !== MODEL_CATALOG_SCHEMA || updatedAt === undefined || !doc.providers)
+        throw new Error('unrecognised format');
       return { doc, updatedAt };
     } catch (error) {
       this.log(`removed an unreadable catalog cache (${message(error)})`);
-      try { rmSync(this.cachePath, { force: true }); } catch { }
+      try {
+        rmSync(this.cachePath, { force: true });
+      } catch {}
       return undefined;
     }
   }
 
   private ownCache(): Candidate | undefined {
     const cached = this.readDocument();
-    return cached && { origin: "cache", updatedAt: cached.updatedAt, providers: () => unpackCatalog(cached.doc.providers) };
+    return (
+      cached && {
+        origin: 'cache',
+        updatedAt: cached.updatedAt,
+        providers: () => unpackCatalog(cached.doc.providers),
+      }
+    );
   }
 
   private openCodeCache(): Candidate | undefined {
-    const path = this.options.openCodeCachePath === undefined
-      ? openCodeCatalogCachePath(this.options.env ?? process.env)
-      : this.options.openCodeCachePath;
+    const path =
+      this.options.openCodeCachePath === undefined
+        ? openCodeCatalogCachePath(this.options.env ?? process.env)
+        : this.options.openCodeCachePath;
     if (!path) return undefined;
     try {
       const stat = statSync(path);
-      if (!stat.isFile() || stat.size > (this.options.maxBytes ?? CATALOG_MAX_BYTES)) return undefined;
-      return { origin: "opencode", updatedAt: stat.mtimeMs, providers: () => {
-        try { return JSON.parse(readFileSync(path, "utf8")); } catch { return undefined; }
-      } };
+      if (!stat.isFile() || stat.size > (this.options.maxBytes ?? CATALOG_MAX_BYTES))
+        return undefined;
+      return {
+        origin: 'opencode',
+        updatedAt: stat.mtimeMs,
+        providers: () => {
+          try {
+            return JSON.parse(readFileSync(path, 'utf8'));
+          } catch {
+            return undefined;
+          }
+        },
+      };
     } catch {
       return undefined;
     }
@@ -205,13 +245,14 @@ export class ModelCatalogStore {
     try {
       const text = (this.options.readSnapshot ?? readBundledSnapshot)();
       if (text === undefined) {
-        this.log("the bundled catalog snapshot is missing");
+        this.log('the bundled catalog snapshot is missing');
         return undefined;
       }
       const doc = JSON.parse(text) as ModelCatalogDocument;
       const updatedAt = time(doc?.updatedAt);
-      if (doc?.schema !== MODEL_CATALOG_SCHEMA || updatedAt === undefined) throw new Error("unrecognised format");
-      return { origin: "snapshot", updatedAt, providers: () => unpackCatalog(doc.providers) };
+      if (doc?.schema !== MODEL_CATALOG_SCHEMA || updatedAt === undefined)
+        throw new Error('unrecognised format');
+      return { origin: 'snapshot', updatedAt, providers: () => unpackCatalog(doc.providers) };
     } catch (error) {
       this.log(`could not read the bundled catalog snapshot (${message(error)})`);
       return undefined;
@@ -221,35 +262,53 @@ export class ModelCatalogStore {
   private async fetchAndStore(force: boolean): Promise<CatalogRefreshResult> {
     const cached = this.readDocument();
     const age = cached ? this.now - cached.updatedAt : Infinity;
-    if (!force && age >= 0 && age < CATALOG_MAX_AGE_MS) return "fresh";
+    if (!force && age >= 0 && age < CATALOG_MAX_AGE_MS) return 'fresh';
     try {
       const etag = cached ? safeEtag(cached.doc.source?.etag) : undefined;
       const response = await this.download(etag);
       if (response.status === 304) {
-        if (!cached) throw new Error("models.dev answered 304 without a cached copy");
+        if (!cached) throw new Error('models.dev answered 304 without a cached copy');
         this.write({ ...cached.doc, updatedAt: new Date(this.now).toISOString() });
         this.memo = undefined;
-        return "not-modified";
+        return 'not-modified';
       }
       let raw: unknown;
-      try { raw = JSON.parse(response.text); } catch { throw new Error("models.dev returned invalid JSON"); }
+      try {
+        raw = JSON.parse(response.text);
+      } catch {
+        throw new Error('models.dev returned invalid JSON');
+      }
       let drops = 0;
-      const providers = trimModelsDevCatalog(raw, { onDrop: () => { drops += 1; } });
-      if (!Object.keys(providers).length) throw new Error("models.dev returned no usable providers");
+      const providers = trimModelsDevCatalog(raw, {
+        onDrop: () => {
+          drops += 1;
+        },
+      });
+      if (!Object.keys(providers).length)
+        throw new Error('models.dev returned no usable providers');
       this.write({
         schema: MODEL_CATALOG_SCHEMA,
         updatedAt: new Date(this.now).toISOString(),
-        source: { name: "models.dev", url: MODELS_DEV_URL, license: "MIT", ...(response.etag ? { etag: response.etag } : {}) },
+        source: {
+          name: 'models.dev',
+          url: MODELS_DEV_URL,
+          license: 'MIT',
+          ...(response.etag ? { etag: response.etag } : {}),
+        },
         providers: packCatalog(providers),
       });
       this.memo = undefined;
       const stats = catalogStats(providers);
-      this.log(`updated from models.dev: ${stats.providers} providers, ${stats.models} models` +
-        (drops ? `; left out ${drops} entries that were malformed or contained { or }` : ""));
-      return "updated";
+      this.log(
+        `updated from models.dev: ${stats.providers} providers, ${stats.models} models` +
+          (drops ? `; left out ${drops} entries that were malformed or contained { or }` : ''),
+      );
+      return 'updated';
     } catch (error) {
-      this.log(`could not refresh from models.dev (${message(error)}); keeping the current catalog`);
-      return "failed";
+      this.log(
+        `could not refresh from models.dev (${message(error)}); keeping the current catalog`,
+      );
+      return 'failed';
     }
   }
 
@@ -258,15 +317,24 @@ export class ModelCatalogStore {
     writeFileAtomic(this.cachePath, JSON.stringify(doc));
   }
 
-  private async download(etag: string | undefined): Promise<{ status: 200; text: string; etag?: string } | { status: 304 }> {
+  private async download(
+    etag: string | undefined,
+  ): Promise<{ status: 200; text: string; etag?: string } | { status: 304 }> {
     const maxBytes = this.options.maxBytes ?? CATALOG_MAX_BYTES;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.options.timeoutMs ?? CATALOG_FETCH_TIMEOUT_MS);
+    const timer = setTimeout(
+      () => controller.abort(),
+      this.options.timeoutMs ?? CATALOG_FETCH_TIMEOUT_MS,
+    );
     try {
       const response = await (this.options.fetch ?? fetch)(MODELS_DEV_URL, {
-        headers: { accept: "application/json", "user-agent": "OpenMausBot", ...(etag ? { "if-none-match": etag } : {}) },
+        headers: {
+          accept: 'application/json',
+          'user-agent': 'OpenMausBot',
+          ...(etag ? { 'if-none-match': etag } : {}),
+        },
         // The catalog comes from models.dev only.
-        redirect: "error",
+        redirect: 'error',
         signal: controller.signal,
       });
       if (response.status === 304 && etag) {
@@ -277,15 +345,15 @@ export class ModelCatalogStore {
         void response.body?.cancel().catch(() => {});
         throw new Error(`models.dev returned HTTP ${response.status}`);
       }
-      const declared = Number(response.headers.get("content-length"));
+      const declared = Number(response.headers.get('content-length'));
       if (Number.isFinite(declared) && declared > maxBytes) {
         void response.body?.cancel().catch(() => {});
         throw new Error(`models.dev sent more than ${maxBytes} bytes`);
       }
       const text = await readCapped(response, maxBytes);
-      return { status: 200, text, etag: safeEtag(response.headers.get("etag")) };
+      return { status: 200, text, etag: safeEtag(response.headers.get('etag')) };
     } catch (error) {
-      if (controller.signal.aborted) throw new Error("models.dev did not answer in time");
+      if (controller.signal.aborted) throw new Error('models.dev did not answer in time');
       throw error;
     } finally {
       clearTimeout(timer);
@@ -294,11 +362,11 @@ export class ModelCatalogStore {
 }
 
 async function readCapped(response: Response, maxBytes: number): Promise<string> {
-  if (!response.body) return "";
+  if (!response.body) return '';
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let total = 0;
-  let text = "";
+  let text = '';
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -328,13 +396,21 @@ export interface CatalogEntry {
   preset?: ProviderPreset;
 }
 
-function presetNpm(preset: ProviderPreset, provider: CatalogProviders[string] | undefined): string | undefined {
+function presetNpm(
+  preset: ProviderPreset,
+  provider: CatalogProviders[string] | undefined,
+): string | undefined {
   if (preset.npm) return preset.npm;
   if (!provider?.npm) return undefined;
-  return provider.api === undefined || provider.api === preset.api ? provider.npm : OPENAI_COMPATIBLE_NPM;
+  return provider.api === undefined || provider.api === preset.api
+    ? provider.npm
+    : OPENAI_COMPATIBLE_NPM;
 }
 
-export function catalogEntries(catalog: ModelCatalog, presets: readonly ProviderPreset[] = PROVIDER_PRESETS): CatalogEntry[] {
+export function catalogEntries(
+  catalog: ModelCatalog,
+  presets: readonly ProviderPreset[] = PROVIDER_PRESETS,
+): CatalogEntry[] {
   const entries: CatalogEntry[] = [];
   const covered = new Set<string>();
   for (const preset of presets) {
@@ -358,14 +434,22 @@ export function catalogEntries(catalog: ModelCatalog, presets: readonly Provider
   }
   for (const provider of Object.values(catalog.providers)) {
     if (covered.has(provider.id) || presets.some((preset) => preset.id === provider.id)) continue;
-    const entry: CatalogEntry = { id: provider.id, catalogId: provider.id, label: provider.name, env: provider.env, modelCount: Object.keys(provider.models).length };
+    const entry: CatalogEntry = {
+      id: provider.id,
+      catalogId: provider.id,
+      label: provider.name,
+      env: provider.env,
+      modelCount: Object.keys(provider.models).length,
+    };
     if (provider.npm) entry.npm = provider.npm;
     if (provider.api) entry.api = provider.api;
     if (provider.doc) entry.doc = provider.doc;
     entries.push(entry);
   }
-  return entries.sort((a, b) =>
-    (a.recommended ?? Infinity) - (b.recommended ?? Infinity) ||
-    a.label.localeCompare(b.label, "en", { sensitivity: "base" }) ||
-    a.id.localeCompare(b.id));
+  return entries.sort(
+    (a, b) =>
+      (a.recommended ?? Infinity) - (b.recommended ?? Infinity) ||
+      a.label.localeCompare(b.label, 'en', { sensitivity: 'base' }) ||
+      a.id.localeCompare(b.id),
+  );
 }

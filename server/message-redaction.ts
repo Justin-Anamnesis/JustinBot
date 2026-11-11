@@ -1,22 +1,30 @@
-import { redactParams, redactSecretsInText } from "./redact.ts";
-import { scrubbedSkillRequest } from "./skill-request-card.ts";
-import type { ProfileRequestChanges } from "../shared/profile-request.ts";
-import type { OptionCardData, WireMessage } from "../shared/wire.ts";
+import { redactParams, redactSecretsInText } from './redact.ts';
+import { scrubbedSkillRequest } from './skill-request-card.ts';
+import type { ProfileRequestChanges } from '../shared/profile-request.ts';
+import type { OptionCardData, WireMessage } from '../shared/wire.ts';
 
 /** Bot-authored text is scrubbed of secrets before it is stored (the transcript replays into every rebuild); what the user typed stays as typed. */
-export function redactBotAuthored<T extends Omit<WireMessage, "id" | "at"> & { at?: number }>(message: T): T {
-  if (message.role !== "bot") return message;
+export function redactBotAuthored<T extends Omit<WireMessage, 'id' | 'at'> & { at?: number }>(
+  message: T,
+): T {
+  if (message.role !== 'bot') return message;
   const out = { ...message };
-  if (out.dataResult) out.dataResult = {
-    ...out.dataResult,
-    title: redactSecretsInText(out.dataResult.title),
-    ...(out.dataResult.sql === undefined ? {} : { sql: redactSecretsInText(out.dataResult.sql) }),
-  };
-  if (typeof out.text === "string") out.text = redactSecretsInText(out.text);
+  if (out.dataResult)
+    out.dataResult = {
+      ...out.dataResult,
+      title: redactSecretsInText(out.dataResult.title),
+      ...(out.dataResult.sql === undefined ? {} : { sql: redactSecretsInText(out.dataResult.sql) }),
+    };
+  if (typeof out.text === 'string') out.text = redactSecretsInText(out.text);
   if (out.textParams) out.textParams = redactParams(out.textParams);
-  if (out.compaction) out.compaction = { ...out.compaction, summary: redactSecretsInText(out.compaction.summary) };
+  if (out.compaction)
+    out.compaction = { ...out.compaction, summary: redactSecretsInText(out.compaction.summary) };
   if (out.tool?.name) {
-    out.tool = { ...out.tool, name: redactSecretsInText(out.tool.name), ...(out.tool.nameParams ? { nameParams: redactParams(out.tool.nameParams) } : {}) };
+    out.tool = {
+      ...out.tool,
+      name: redactSecretsInText(out.tool.name),
+      ...(out.tool.nameParams ? { nameParams: redactParams(out.tool.nameParams) } : {}),
+    };
     if (out.tool.summary) out.tool.summary = redactSecretsInText(out.tool.summary);
     if (out.tool.summaryParams) out.tool.summaryParams = redactParams(out.tool.summaryParams);
   }
@@ -40,15 +48,18 @@ export function redactBotAuthored<T extends Omit<WireMessage, "id" | "at"> & { a
   if (out.card) {
     const card = { ...out.card } as OptionCardData & { summary?: string };
     card.title = redactSecretsInText(card.title);
-    if (typeof card.subtitle === "string") card.subtitle = redactSecretsInText(card.subtitle);
+    if (typeof card.subtitle === 'string') card.subtitle = redactSecretsInText(card.subtitle);
     if (card.summaryParams) card.summaryParams = redactParams(card.summaryParams);
-    if (typeof card.summary === "string") card.summary = redactSecretsInText(card.summary);
-    if (typeof card.held === "string") card.held = redactSecretsInText(card.held);
-    if (typeof card.answeredText === "string") card.answeredText = redactSecretsInText(card.answeredText);
-    if (card.commandAllowlist && (
-      redactSecretsInText(card.commandAllowlist.command) !== card.commandAllowlist.command ||
-      redactSecretsInText(card.commandAllowlist.cwd) !== card.commandAllowlist.cwd
-    )) delete card.commandAllowlist;
+    if (typeof card.summary === 'string') card.summary = redactSecretsInText(card.summary);
+    if (typeof card.held === 'string') card.held = redactSecretsInText(card.held);
+    if (typeof card.answeredText === 'string')
+      card.answeredText = redactSecretsInText(card.answeredText);
+    if (
+      card.commandAllowlist &&
+      (redactSecretsInText(card.commandAllowlist.command) !== card.commandAllowlist.command ||
+        redactSecretsInText(card.commandAllowlist.cwd) !== card.commandAllowlist.cwd)
+    )
+      delete card.commandAllowlist;
     if (card.questionRequest) {
       card.questionRequest = {
         ...card.questionRequest,
@@ -68,29 +79,30 @@ export function redactBotAuthored<T extends Omit<WireMessage, "id" | "at"> & { a
       const operation = card.routineRequest.operation;
       card.routineRequest = {
         ...card.routineRequest,
-        operation: operation.action === "create"
-          ? {
-              ...operation,
-              routine: {
-                ...operation.routine,
-                name: redactSecretsInText(operation.routine.name),
-                instructions: redactSecretsInText(operation.routine.instructions),
-              },
-            }
-          : operation.action === "update"
+        operation:
+          operation.action === 'create'
             ? {
                 ...operation,
-                changes: {
-                  ...operation.changes,
-                  ...(typeof operation.changes.name === "string"
-                    ? { name: redactSecretsInText(operation.changes.name) }
-                    : {}),
-                  ...(typeof operation.changes.instructions === "string"
-                    ? { instructions: redactSecretsInText(operation.changes.instructions) }
-                    : {}),
+                routine: {
+                  ...operation.routine,
+                  name: redactSecretsInText(operation.routine.name),
+                  instructions: redactSecretsInText(operation.routine.instructions),
                 },
               }
-            : { ...operation },
+            : operation.action === 'update'
+              ? {
+                  ...operation,
+                  changes: {
+                    ...operation.changes,
+                    ...(typeof operation.changes.name === 'string'
+                      ? { name: redactSecretsInText(operation.changes.name) }
+                      : {}),
+                    ...(typeof operation.changes.instructions === 'string'
+                      ? { instructions: redactSecretsInText(operation.changes.instructions) }
+                      : {}),
+                  },
+                }
+              : { ...operation },
       };
     }
     if (card.skillRequest) card.skillRequest = scrubbedSkillRequest(card.skillRequest);
@@ -98,7 +110,8 @@ export function redactBotAuthored<T extends Omit<WireMessage, "id" | "at"> & { a
       const scrubChanges = (changes: ProfileRequestChanges): ProfileRequestChanges => {
         const out = { ...changes };
         for (const [key, value] of Object.entries(changes)) {
-          if (typeof value === "string") (out as Record<string, string | boolean>)[key] = redactSecretsInText(value);
+          if (typeof value === 'string')
+            (out as Record<string, string | boolean>)[key] = redactSecretsInText(value);
         }
         return out;
       };
@@ -125,12 +138,18 @@ export function redactBotAuthored<T extends Omit<WireMessage, "id" | "at"> & { a
       ...out.secret,
       label: redactSecretsInText(out.secret.label),
       description: redactSecretsInText(out.secret.description),
-      ...(out.secret.descriptionParts ? { descriptionParts: {
-        ...out.secret.descriptionParts,
-        reason: redactSecretsInText(out.secret.descriptionParts.reason),
-        bot: redactSecretsInText(out.secret.descriptionParts.bot),
-      } } : {}),
-      ...(out.secret.reason !== undefined ? { reason: redactSecretsInText(out.secret.reason) } : {}),
+      ...(out.secret.descriptionParts
+        ? {
+            descriptionParts: {
+              ...out.secret.descriptionParts,
+              reason: redactSecretsInText(out.secret.descriptionParts.reason),
+              bot: redactSecretsInText(out.secret.descriptionParts.bot),
+            },
+          }
+        : {}),
+      ...(out.secret.reason !== undefined
+        ? { reason: redactSecretsInText(out.secret.reason) }
+        : {}),
       error: out.secret.error ? redactSecretsInText(out.secret.error) : undefined,
     };
   }

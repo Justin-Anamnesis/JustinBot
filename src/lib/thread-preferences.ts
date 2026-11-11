@@ -1,8 +1,8 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import { useAdvancedMode } from "./interface-mode";
+import { useAdvancedMode } from './interface-mode';
 
-export const SHOW_THREADS_KEY = "omb-show-threads";
+export const SHOW_THREADS_KEY = 'omb-show-threads';
 
 let sessionChoice: boolean | undefined;
 const listeners = new Set<() => void>();
@@ -18,7 +18,7 @@ function storage(): Storage | undefined {
 function showThreads(): boolean {
   if (sessionChoice !== undefined) return sessionChoice;
   try {
-    return storage()?.getItem(SHOW_THREADS_KEY) !== "0";
+    return storage()?.getItem(SHOW_THREADS_KEY) !== '0';
   } catch {
     return true;
   }
@@ -37,13 +37,13 @@ function onStorage(event: StorageEvent) {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (listeners.size === 1 && typeof window !== "undefined") {
-    window.addEventListener("storage", onStorage);
+  if (listeners.size === 1 && typeof window !== 'undefined') {
+    window.addEventListener('storage', onStorage);
   }
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && typeof window !== "undefined") {
-      window.removeEventListener("storage", onStorage);
+    if (listeners.size === 0 && typeof window !== 'undefined') {
+      window.removeEventListener('storage', onStorage);
     }
   };
 }
@@ -51,9 +51,8 @@ function subscribe(listener: () => void): () => void {
 export function setShowThreads(enabled: boolean): void {
   sessionChoice = enabled;
   try {
-    storage()?.setItem(SHOW_THREADS_KEY, enabled ? "1" : "0");
-  } catch {
-  }
+    storage()?.setItem(SHOW_THREADS_KEY, enabled ? '1' : '0');
+  } catch {}
   notify();
 }
 

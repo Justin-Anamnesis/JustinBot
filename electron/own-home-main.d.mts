@@ -1,22 +1,50 @@
-import type { OneHomeView } from "./one-home.mjs";
+import type { OneHomeView } from './one-home.mjs';
 
 /** A server of the person's own as their bots' home, chosen once. */
-export interface OwnHomeChoice { v: 1; id: string; origin: string; environmentId: string; name: string; at: number }
+export interface OwnHomeChoice {
+  v: 1;
+  id: string;
+  origin: string;
+  environmentId: string;
+  name: string;
+  at: number;
+}
 /** A saved place, as main keeps it (environments.cjs). */
-export interface SavedPlace { id: string; kind: string; name: string; origin?: string; home?: true; team?: unknown; cloud?: unknown }
+export interface SavedPlace {
+  id: string;
+  kind: string;
+  name: string;
+  origin?: string;
+  home?: true;
+  team?: unknown;
+  cloud?: unknown;
+}
 type Answer = { ok: boolean; status: number; body: any };
 
 export declare const OWNER_KNOWN_MS: number;
 export declare const OWNER_RETRY_MS: number;
 export function parseChoice(value: unknown): OwnHomeChoice | null;
-export function handSaved(entry: unknown): entry is SavedPlace & { kind: "remote"; origin: string };
-export function serverRequests(place: { origin: string }, fetchImpl: typeof fetch): {
+export function handSaved(entry: unknown): entry is SavedPlace & { kind: 'remote'; origin: string };
+export function serverRequests(
+  place: { origin: string },
+  fetchImpl: typeof fetch,
+): {
   request(method: string, route: string, init?: RequestInit): Promise<Response>;
   call(method: string, route: string, body?: unknown): Promise<Answer>;
   /** The server's word on this window's sign-in there. */
-  who(): Promise<{ signedIn: boolean; own: boolean; environmentId: string | null; takesMove: boolean; status: number }>;
+  who(): Promise<{
+    signedIn: boolean;
+    own: boolean;
+    environmentId: string | null;
+    takesMove: boolean;
+    status: number;
+  }>;
 };
-export function openServerSession(chosen: OwnHomeChoice, fetchImpl: typeof fetch, t?: (key: string, params?: Record<string, string | number>) => string): Promise<{
+export function openServerSession(
+  chosen: OwnHomeChoice,
+  fetchImpl: typeof fetch,
+  t?: (key: string, params?: Record<string, string | number>) => string,
+): Promise<{
   call(method: string, route: string, body?: unknown): Promise<Answer>;
   upload(route: string, bytes: Uint8Array, type: string): Promise<Answer>;
   fetch(route: string, init?: RequestInit): Promise<Response>;

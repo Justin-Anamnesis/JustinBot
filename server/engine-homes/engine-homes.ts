@@ -1,16 +1,22 @@
 // The engine homes of a Team Cloud at run time. A turn's spawns run inside its conversation (`within`, set around each
 // adapter's sendTurn and keep-warm ping), and procs.ts asks `forSpawn` for the home of that conversation's audience. Off a
 // Team Cloud nothing is started and every spawn keeps the server's HOME.
-import { AsyncLocalStorage } from "node:async_hooks";
-import { mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { join, relative } from "node:path";
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { mkdirSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join, relative } from 'node:path';
 
-import type { Audience } from "../audience.ts";
-import type { ProviderInstance } from "../contracts.ts";
-import { audienceHome, audienceHomeKey, audienceHomes, homedSpawn, type HomedSpawn } from "./layout.ts";
-import { migrateEngineHomes, type MigrationResult, type MigrationThread } from "./migrate.ts";
-import { syncSignIns } from "./sign-ins.ts";
+import type { Audience } from '../audience.ts';
+import type { ProviderInstance } from '../contracts.ts';
+import {
+  audienceHome,
+  audienceHomeKey,
+  audienceHomes,
+  homedSpawn,
+  type HomedSpawn,
+} from './layout.ts';
+import { migrateEngineHomes, type MigrationResult, type MigrationThread } from './migrate.ts';
+import { syncSignIns } from './sign-ins.ts';
 
 export interface EngineHomesSetup {
   dataDir: string;
@@ -57,13 +63,23 @@ export class EngineHomes {
     if (!setup) return null;
     if (this.#migration) return this.#migration;
     try {
-      this.#migration = migrateEngineHomes({ dataDir: setup.dataDir, serverHome: setup.serverHome, env: setup.env ?? process.env, threads: setup.threads, audienceOf: setup.audienceOf });
+      this.#migration = migrateEngineHomes({
+        dataDir: setup.dataDir,
+        serverHome: setup.serverHome,
+        env: setup.env ?? process.env,
+        threads: setup.threads,
+        audienceOf: setup.audienceOf,
+      });
       if (this.#migration.ran || this.#migration.swept) {
-        (setup.log ?? console.log)(`engine homes: moved ${this.#migration.moved} session files to their conversations, held ${this.#migration.held}, deleted ${this.#migration.swept} held folders past their time`);
+        (setup.log ?? console.log)(
+          `engine homes: moved ${this.#migration.moved} session files to their conversations, held ${this.#migration.held}, deleted ${this.#migration.swept} held folders past their time`,
+        );
       }
     } catch (error) {
       this.#migration = { ran: false, moved: 0, held: 0, swept: 0 };
-      (setup.log ?? console.warn)(`engine homes: the move from the server's home failed: ${error instanceof Error ? error.message : String(error)}`);
+      (setup.log ?? console.warn)(
+        `engine homes: the move from the server's home failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
     return this.#migration;
   }
@@ -73,7 +89,13 @@ export class EngineHomes {
   everyHome(env: Record<string, string | undefined>): Array<Record<string, string | undefined>> {
     const setup = this.#setup;
     if (!setup) return [env];
-    return [env, ...audienceHomes(setup.dataDir).map((home) => homedSpawn(env, { dataDir: setup.dataDir, serverHome: setup.serverHome, home }).env)];
+    return [
+      env,
+      ...audienceHomes(setup.dataDir).map(
+        (home) =>
+          homedSpawn(env, { dataDir: setup.dataDir, serverHome: setup.serverHome, home }).env,
+      ),
+    ];
   }
 
   /** On a Team Cloud, inside a conversation: the spawn with HOME and the engines' folders in its audience's home, the
@@ -96,19 +118,31 @@ export class EngineHomes {
 export const engineHomes = new EngineHomes();
 
 /** On a Team Cloud, every turn, keep-warm ping and warm summary of this instance runs inside its conversation. */
-export function withEngineHomes(instance: ProviderInstance, homes: EngineHomes = engineHomes): ProviderInstance {
+export function withEngineHomes(
+  instance: ProviderInstance,
+  homes: EngineHomes = engineHomes,
+): ProviderInstance {
   if (!homes.active()) return instance;
   const adapter = instance.adapter;
   const warm = adapter.cacheKeepWarm;
-  (instance as { adapter: ProviderInstance["adapter"] }).adapter = {
+  (instance as { adapter: ProviderInstance['adapter'] }).adapter = {
     ...adapter,
     sendTurn: (input) => homes.within(input.threadId, () => adapter.sendTurn(input)),
-    ...(warm ? { cacheKeepWarm: {
-      ...warm,
-      ping: (threadId, options) => homes.within(threadId, () => warm.ping(threadId, options)),
-      // A summary forks the conversation's session, which lives in its audience's home, and starts the bot's servers there.
-      ...(warm.compact ? { compact: (threadId, options) => homes.within(threadId, () => warm.compact!(threadId, options)) } : {}),
-    } } : {}),
+    ...(warm
+      ? {
+          cacheKeepWarm: {
+            ...warm,
+            ping: (threadId, options) => homes.within(threadId, () => warm.ping(threadId, options)),
+            // A summary forks the conversation's session, which lives in its audience's home, and starts the bot's servers there.
+            ...(warm.compact
+              ? {
+                  compact: (threadId, options) =>
+                    homes.within(threadId, () => warm.compact!(threadId, options)),
+                }
+              : {}),
+          },
+        }
+      : {}),
   };
   return instance;
 }

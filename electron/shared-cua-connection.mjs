@@ -3,6 +3,16 @@
  * verified invocation in `mcp` and the environment it was verified with in `commandEnv`. Null when there is none. */
 export function sharedCuaConnection(connection) {
   if (connection?.mcpCommand) return Array.isArray(connection.mcpArgs) ? connection : null;
-  if (connection?.status !== "ready" || typeof connection.mcp?.command !== "string" || !connection.mcp.command || !Array.isArray(connection.mcp.args)) return null;
-  return { mcpCommand: connection.mcp.command, mcpArgs: connection.mcp.args, mcpEnv: connection.mcp.env ?? connection.commandEnv };
+  if (
+    connection?.status !== 'ready' ||
+    typeof connection.mcp?.command !== 'string' ||
+    !connection.mcp.command ||
+    !Array.isArray(connection.mcp.args)
+  )
+    return null;
+  return {
+    mcpCommand: connection.mcp.command,
+    mcpArgs: connection.mcp.args,
+    mcpEnv: connection.mcp.env ?? connection.commandEnv,
+  };
 }

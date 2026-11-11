@@ -11,19 +11,19 @@
 //
 // Each conversation keeps its starter (thread-starters.json, a hash): what other records still name it (a decision's
 // row, a usage trace) stays someone else's, so no admin ever reads it there either.
-import { existsSync, readdirSync, rmSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, readdirSync, rmSync } from 'node:fs';
+import { basename, join } from 'node:path';
 
-import { defaultBotPerson, type DefaultBotFields } from "../../shared/default-bot.ts";
-import type { AdminActionRow } from "../admin-activity.ts";
-import { memberAudience, type Audience } from "../audience.ts";
-import { forgetDefaultBot } from "../default-bot.ts";
-import { audienceHome } from "../engine-homes/layout.ts";
-import { forgetBotMemoryJournal, journalFile } from "../memory-journal.ts";
-import { deleteBotMemoryFiles } from "../message-db.ts";
-import { personKey } from "../person-key.ts";
-import { removeMemoryLayer, type MemoryLayerRecords } from "./delete-leftovers.ts";
-import { memberUploads } from "./member-uploads.ts";
+import { defaultBotPerson, type DefaultBotFields } from '../../shared/default-bot.ts';
+import type { AdminActionRow } from '../admin-activity.ts';
+import { memberAudience, type Audience } from '../audience.ts';
+import { forgetDefaultBot } from '../default-bot.ts';
+import { audienceHome } from '../engine-homes/layout.ts';
+import { forgetBotMemoryJournal, journalFile } from '../memory-journal.ts';
+import { deleteBotMemoryFiles } from '../message-db.ts';
+import { personKey } from '../person-key.ts';
+import { removeMemoryLayer, type MemoryLayerRecords } from './delete-leftovers.ts';
+import { memberUploads } from './member-uploads.ts';
 
 /** A file in attachments/, by its URL or by its path (as JSON escapes it) a sent document's tag carries. */
 const ATTACHMENT = /attachments(?:\/|\\)+([A-Za-z0-9][\w.-]{0,200})/g;
@@ -40,7 +40,13 @@ export const memoryLayerRecords: MemoryLayerRecords = {
 export interface TeamMemberLeftDeps {
   dataDir: string;
   store: {
-    readonly bots: ReadonlyArray<{ id: string; avatarUrl?: string | null; tasks?: ReadonlyArray<{ threadId: string }> } & DefaultBotFields>;
+    readonly bots: ReadonlyArray<
+      {
+        id: string;
+        avatarUrl?: string | null;
+        tasks?: ReadonlyArray<{ threadId: string }>;
+      } & DefaultBotFields
+    >;
     messagesFor(threadId: string): readonly unknown[];
   };
   /** The conversations a person opened (thread-starters.json). */
@@ -65,7 +71,14 @@ export interface TeamMemberLeftDeps {
   forgetConnections(person: string): void | Promise<void>;
   /** Every routine: `home` is the person whose private chat it lives in (routine-home.ts), `writer` who last wrote it,
    * `files` the attachments/ names it carries. */
-  routines(): ReadonlyArray<{ id: string; name: string; botId: string; home: string | null; writer: string | undefined; files: readonly string[] }>;
+  routines(): ReadonlyArray<{
+    id: string;
+    name: string;
+    botId: string;
+    home: string | null;
+    writer: string | undefined;
+    files: readonly string[];
+  }>;
   deleteRoutine(id: string): void;
   /** The routine runs as `to`'s from now on (a person key), or nobody's, whose asks go to the Admins (null); it stops
    * reporting into a chat of `left`, the person who left. */
@@ -75,17 +88,30 @@ export interface TeamMemberLeftDeps {
   /** Who looks after the bot (an address), else null. */
   ownerOf(botId: string): string | null;
   /** One row of the team's admin activity. */
-  record(row: Omit<AdminActionRow, "at" | "actor">): void;
+  record(row: Omit<AdminActionRow, 'at' | 'actor'>): void;
 }
 
-export type TeamMemberLeftResult = { chats: number; layers: number; sessions: number; files: number; browsers: boolean; bots: number; botsKept: number; routines: number; routinesHandedOver: number; botsHandedBack: number };
+export type TeamMemberLeftResult = {
+  chats: number;
+  layers: number;
+  sessions: number;
+  files: number;
+  browsers: boolean;
+  bots: number;
+  botsKept: number;
+  routines: number;
+  routinesHandedOver: number;
+  botsHandedBack: number;
+};
 
-export function createTeamMemberLeft(deps: TeamMemberLeftDeps): (email: string) => Promise<TeamMemberLeftResult> {
-  const workspaces = join(deps.dataDir, "workspaces");
-  const attachments = join(deps.dataDir, "attachments");
+export function createTeamMemberLeft(
+  deps: TeamMemberLeftDeps,
+): (email: string) => Promise<TeamMemberLeftResult> {
+  const workspaces = join(deps.dataDir, 'workspaces');
+  const attachments = join(deps.dataDir, 'attachments');
   return async (email) => {
-    const person = personKey({ id: "", email });
-    if (!PERSON.test(person)) throw new Error("not a person key");
+    const person = personKey({ id: '', email });
+    if (!PERSON.test(person)) throw new Error('not a person key');
     // First, so nothing of theirs is opened, written or streamed while it goes.
     const sessions = deps.revokeSessions(email);
     const address = email.trim().toLowerCase();
@@ -93,23 +119,38 @@ export function createTeamMemberLeft(deps: TeamMemberLeftDeps): (email: string) 
     // Before their chats go: which routine lives in one is read from those chats.
     const everyRoutine = deps.routines();
     const ownRoutines = everyRoutine.filter((routine) => routine.home === person);
-    const written = everyRoutine.filter((routine) => routine.home === null && routine.writer === person);
+    const written = everyRoutine.filter(
+      (routine) => routine.home === null && routine.writer === person,
+    );
     for (const routine of written) {
       const owner = deps.ownerOf(routine.botId);
       const to = owner && owner !== address ? owner : null;
-      deps.handRoutine(routine.id, person, to === null ? null : personKey({ id: "", email: to }));
-      deps.record({ category: "bot", action: "routine.handover", target: { kind: "routine", id: routine.id, name: routine.name }, after: { owner: to } });
+      deps.handRoutine(routine.id, person, to === null ? null : personKey({ id: '', email: to }));
+      deps.record({
+        category: 'bot',
+        action: 'routine.handover',
+        target: { kind: 'routine', id: routine.id, name: routine.name },
+        after: { owner: to },
+      });
     }
     for (const routine of ownRoutines) deps.deleteRoutine(routine.id);
-    const mine = new Set(deps.openedBy(person).filter((threadId) => deps.privateTo(threadId) === person));
+    const mine = new Set(
+      deps.openedBy(person).filter((threadId) => deps.privateTo(threadId) === person),
+    );
     let chats = 0;
-    const files = new Set<string>([...memberUploads(deps.dataDir, person), ...ownRoutines.flatMap((routine) => routine.files)]);
+    const files = new Set<string>([
+      ...memberUploads(deps.dataDir, person),
+      ...ownRoutines.flatMap((routine) => routine.files),
+    ]);
     const noteFiles = (threadId: string) => {
-      for (const match of JSON.stringify(deps.store.messagesFor(threadId)).matchAll(ATTACHMENT)) files.add(match[1]!);
+      for (const match of JSON.stringify(deps.store.messagesFor(threadId)).matchAll(ATTACHMENT))
+        files.add(match[1]!);
     };
     let bots = 0;
     let botsKept = 0;
-    for (const bot of deps.store.bots.filter((candidate) => candidate.defaultBot && defaultBotPerson(candidate) === address)) {
+    for (const bot of deps.store.bots.filter(
+      (candidate) => candidate.defaultBot && defaultBotPerson(candidate) === address,
+    )) {
       const threads = (bot.tasks ?? []).map((task) => task.threadId);
       threads.forEach(noteFiles);
       await deps.stopBot(bot.id).catch(() => {});
@@ -122,7 +163,9 @@ export function createTeamMemberLeft(deps: TeamMemberLeftDeps): (email: string) 
     }
     forgetDefaultBot(deps.dataDir, address);
     for (const bot of deps.store.bots) {
-      const threads = (bot.tasks ?? []).map((task) => task.threadId).filter((threadId) => mine.has(threadId));
+      const threads = (bot.tasks ?? [])
+        .map((task) => task.threadId)
+        .filter((threadId) => mine.has(threadId));
       if (!threads.length) continue;
       for (const threadId of threads) {
         if (deps.busy(bot.id, threadId)) await deps.stop(bot.id, threadId).catch(() => {});
@@ -136,23 +179,52 @@ export function createTeamMemberLeft(deps: TeamMemberLeftDeps): (email: string) 
     let removed = 0;
     for (const name of files) {
       const url = `/api/attachments/${name}`;
-      if (name.includes("..") || !existsSync(join(attachments, name)) || routineFiles.has(name) || deps.threadsReferencing(name).length || deps.store.bots.some((bot) => bot.avatarUrl === url)) continue;
+      if (
+        name.includes('..') ||
+        !existsSync(join(attachments, name)) ||
+        routineFiles.has(name) ||
+        deps.threadsReferencing(name).length ||
+        deps.store.bots.some((bot) => bot.avatarUrl === url)
+      )
+        continue;
       deps.deleteAttachment(basename(name));
       removed++;
     }
     let layers = 0;
     let entries: string[] = [];
-    try { entries = readdirSync(workspaces); } catch {}
+    try {
+      entries = readdirSync(workspaces);
+    } catch {}
     for (const layer of entries.filter((entry) => entry.endsWith(`--member-${person}`))) {
       removeMemoryLayer(deps.dataDir, layer, memoryLayerRecords);
       layers++;
     }
-    rmSync(join(deps.dataDir, "people", person), { recursive: true, force: true });
+    rmSync(join(deps.dataDir, 'people', person), { recursive: true, force: true });
     rmSync(audienceHome(deps.dataDir, memberAudience(person)), { recursive: true, force: true });
-    await Promise.resolve(deps.forgetConnections(person)).catch((error: unknown) => { console.warn(`[team] a leaving member's connections were not all removed: ${error instanceof Error ? error.message : String(error)}`); });
+    await Promise.resolve(deps.forgetConnections(person)).catch((error: unknown) => {
+      console.warn(
+        `[team] a leaving member's connections were not all removed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    });
     const browsers = await deps.eraseBrowsers(memberAudience(person)).catch(() => false);
     // Counts of shared things only: nothing here says what was theirs alone.
-    deps.record({ category: "people", action: "member.left", target: { kind: "person", name: address }, after: { botsHandedBack, routinesHandedOver: written.length } });
-    return { chats, layers, sessions, files: removed, browsers, bots, botsKept, routines: ownRoutines.length, routinesHandedOver: written.length, botsHandedBack };
+    deps.record({
+      category: 'people',
+      action: 'member.left',
+      target: { kind: 'person', name: address },
+      after: { botsHandedBack, routinesHandedOver: written.length },
+    });
+    return {
+      chats,
+      layers,
+      sessions,
+      files: removed,
+      browsers,
+      bots,
+      botsKept,
+      routines: ownRoutines.length,
+      routinesHandedOver: written.length,
+      botsHandedBack,
+    };
   };
 }

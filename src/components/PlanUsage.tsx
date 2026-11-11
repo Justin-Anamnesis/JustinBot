@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, RefreshCw } from "lucide-react";
-import { api } from "@/state/store";
-import { t } from "@/lib/i18n";
-import { cn } from "@/lib/cn";
-import { Card, SIMPLE_CARD } from "./SettingsPrimitives";
-import { UsageSummaryCard } from "./CloudUsageMeter";
-import { formatPlanSpend, type PlanSpend } from "@/lib/plan-spend";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Loader2, RefreshCw } from 'lucide-react';
+import { api } from '@/state/store';
+import { t } from '@/lib/i18n';
+import { cn } from '@/lib/cn';
+import { Card, SIMPLE_CARD } from './SettingsPrimitives';
+import { UsageSummaryCard } from './CloudUsageMeter';
+import { formatPlanSpend, type PlanSpend } from '@/lib/plan-spend';
 
 interface PlanWindow {
   available: boolean;
@@ -50,7 +50,7 @@ function formatResetDistance(resetsAt: string | null, now: number): string | nul
   const at = Date.parse(resetsAt);
   if (!Number.isFinite(at) || at <= now) return null;
   const minutes = Math.floor((at - now) / 60_000);
-  if (minutes < 1) return "less than a minute";
+  if (minutes < 1) return 'less than a minute';
   const days = Math.floor(minutes / 1440);
   const hours = Math.floor((minutes % 1440) / 60);
   const mins = minutes % 60;
@@ -79,30 +79,32 @@ function dueResetDeadlines(report: PlanUsageReport, now: number, seen: Set<strin
 }
 
 function usageTone(used: number): string {
-  if (used >= 90) return "bg-danger";
-  if (used >= 70) return "bg-warning";
-  return "bg-success";
+  if (used >= 90) return 'bg-danger';
+  if (used >= 70) return 'bg-warning';
+  return 'bg-success';
 }
 
 function windowLabel(label: string): string {
-  if (label === "5-hour") return t("planUsage.fiveHour");
-  if (label === "Weekly") return t("planUsage.weekly");
-  if (label === "Monthly spend") return t("planUsage.monthlySpend");
+  if (label === '5-hour') return t('planUsage.fiveHour');
+  if (label === 'Weekly') return t('planUsage.weekly');
+  if (label === 'Monthly spend') return t('planUsage.monthlySpend');
   return label;
 }
 
-function providerLabel(provider: Pick<PlanProvider, "name">): string {
+function providerLabel(provider: Pick<PlanProvider, 'name'>): string {
   const normalized = provider.name.trim().toLowerCase();
-  if (normalized === "chatgpt plan") return t("planUsage.provider.chatgptPlan");
-  if (normalized === "claude (api key)") return t("planUsage.provider.claudeApiKey");
+  if (normalized === 'chatgpt plan') return t('planUsage.provider.chatgptPlan');
+  if (normalized === 'claude (api key)') return t('planUsage.provider.claudeApiKey');
   return provider.name;
 }
 
-function providerError(provider: Pick<PlanProvider, "error">): string | null {
+function providerError(provider: Pick<PlanProvider, 'error'>): string | null {
   const message = provider.error?.trim();
   if (!message) return null;
   const signIn = /^Sign in again in (.+)$/i.exec(message);
-  return signIn ? t("planUsage.signInAgain", { provider: providerLabel({ name: signIn[1]! }) }) : message;
+  return signIn
+    ? t('planUsage.signInAgain', { provider: providerLabel({ name: signIn[1]! }) })
+    : message;
 }
 
 function WindowRow({
@@ -121,31 +123,45 @@ function WindowRow({
   const when = window.available ? formatResetDistance(window.resetsAt, now) : null;
   const used = window.usedPercent ?? 0;
   const headline = usedHeadline
-    ? window.usedPercent == null ? null : t("planUsage.used", { used: Math.round(window.usedPercent) })
-    : window.remainingPercent == null ? null : t("planUsage.left", { remaining: Math.round(window.remainingPercent) });
+    ? window.usedPercent == null
+      ? null
+      : t('planUsage.used', { used: Math.round(window.usedPercent) })
+    : window.remainingPercent == null
+      ? null
+      : t('planUsage.left', { remaining: Math.round(window.remainingPercent) });
   return (
-    <div className="grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1">
-      <div className="text-[12px] text-ink-secondary">{label}</div>
+    <div className='grid grid-cols-[4.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-1'>
+      <div className='text-[12px] text-ink-secondary'>{label}</div>
       {window.available && headline ? (
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-baseline gap-x-2 text-[13px] text-ink">
-            <span className="tabular-nums">{headline}</span>
-            {detail && <span data-plan-spend className="text-[12px] tabular-nums text-ink-secondary">{detail}</span>}
-            {when && <span className="text-[12px] text-ink-secondary">{t("planUsage.resetsIn", { when })}</span>}
+        <div className='min-w-0'>
+          <div className='flex flex-wrap items-baseline gap-x-2 text-[13px] text-ink'>
+            <span className='tabular-nums'>{headline}</span>
+            {detail && (
+              <span data-plan-spend className='text-[12px] tabular-nums text-ink-secondary'>
+                {detail}
+              </span>
+            )}
+            {when && (
+              <span className='text-[12px] text-ink-secondary'>
+                {t('planUsage.resetsIn', { when })}
+              </span>
+            )}
           </div>
           <div
-            className="mt-1 h-1.5 overflow-hidden rounded-full bg-inset"
-            role="meter"
+            className='mt-1 h-1.5 overflow-hidden rounded-full bg-inset'
+            role='meter'
             aria-label={label}
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={Math.round(Math.min(100, Math.max(0, used)))}
-          >
-            <div className={cn("h-full rounded-full", usageTone(used))} style={{ width: `${Math.min(100, Math.max(0, used))}%` }} />
+            aria-valuenow={Math.round(Math.min(100, Math.max(0, used)))}>
+            <div
+              className={cn('h-full rounded-full', usageTone(used))}
+              style={{ width: `${Math.min(100, Math.max(0, used))}%` }}
+            />
           </div>
         </div>
       ) : (
-        <div className="text-[12px] text-ink-secondary">{t("planUsage.notReported")}</div>
+        <div className='text-[12px] text-ink-secondary'>{t('planUsage.notReported')}</div>
       )}
     </div>
   );
@@ -154,19 +170,21 @@ function WindowRow({
 function usePlanUsage() {
   const [report, setReport] = useState<PlanUsageReport | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [now, setNow] = useState(() => Date.now());
   const refreshedDeadlines = useRef(new Set<string>());
 
   const load = useCallback(async (refresh = false) => {
     setLoading(true);
-    setError("");
+    setError('');
     try {
-      const data = await api<PlanUsageReport>(refresh ? "/api/plan-usage?refresh=1" : "/api/plan-usage");
+      const data = await api<PlanUsageReport>(
+        refresh ? '/api/plan-usage?refresh=1' : '/api/plan-usage',
+      );
       setReport(data);
       setNow(Date.now());
     } catch (cause) {
-      setError(cause instanceof Error && cause.message ? cause.message : t("planUsage.fetchError"));
+      setError(cause instanceof Error && cause.message ? cause.message : t('planUsage.fetchError'));
     } finally {
       setLoading(false);
     }
@@ -193,15 +211,22 @@ function usePlanUsage() {
 }
 
 /** The budget of a plan with no weekly window, to stand in for the weekly figure. */
-export function monthlySpend(report: Pick<PlanUsageReport, "providers"> | null): { provider: PlanProvider; budget: PlanExtra } | null {
+export function monthlySpend(
+  report: Pick<PlanUsageReport, 'providers'> | null,
+): { provider: PlanProvider; budget: PlanExtra } | null {
   for (const provider of report?.providers ?? []) {
-    const budget = provider.ok && !provider.weekly.available ? provider.extra.find((extra) => extra.label === "Monthly spend") : undefined;
+    const budget =
+      provider.ok && !provider.weekly.available
+        ? provider.extra.find((extra) => extra.label === 'Monthly spend')
+        : undefined;
     if (budget) return { provider, budget };
   }
   return null;
 }
 
-export function busiestWeekly(report: Pick<PlanUsageReport, "providers"> | null): { provider: PlanProvider; used: number } | null {
+export function busiestWeekly(
+  report: Pick<PlanUsageReport, 'providers'> | null,
+): { provider: PlanProvider; used: number } | null {
   let busiest: { provider: PlanProvider; used: number } | null = null;
   for (const provider of report?.providers ?? []) {
     const used = provider.ok && provider.weekly.available ? provider.weekly.usedPercent : null;
@@ -218,18 +243,36 @@ export function PlanUsageSummary() {
   if (spending) {
     const name = providerLabel(spending.provider);
     const used = Math.round(Math.min(100, Math.max(0, spending.budget.usedPercent)));
-    return <UsageSummaryCard kind="plan" title={t("settings.simple.billing.monthlySpend", { provider: name })} percent={used} label={`${name}: ${t("planUsage.used", { used })}`}
-      note={spending.budget.spend ? formatPlanSpend(spending.budget.spend) : null} />;
+    return (
+      <UsageSummaryCard
+        kind='plan'
+        title={t('settings.simple.billing.monthlySpend', { provider: name })}
+        percent={used}
+        label={`${name}: ${t('planUsage.used', { used })}`}
+        note={spending.budget.spend ? formatPlanSpend(spending.budget.spend) : null}
+      />
+    );
   }
   if (!busiest) {
-    return <section data-usage-summary="own-ai" className={cn(SIMPLE_CARD, "px-4 py-3.5 text-[14px] leading-5 text-ink-secondary")}>{t("settings.simple.billing.ownAi")}</section>;
+    return (
+      <section
+        data-usage-summary='own-ai'
+        className={cn(SIMPLE_CARD, 'px-4 py-3.5 text-[14px] leading-5 text-ink-secondary')}>
+        {t('settings.simple.billing.ownAi')}
+      </section>
+    );
   }
   const percent = Math.round(Math.min(100, Math.max(0, busiest.used)));
   const when = formatResetDistance(busiest.provider.weekly.resetsAt, now);
   const name = providerLabel(busiest.provider);
   return (
-    <UsageSummaryCard kind="plan" title={t("settings.simple.billing.weekly", { provider: name })} percent={percent} label={`${name}: ${t("planUsage.used", { used: percent })}`}
-      note={when ? t("planUsage.resetsIn", { when }) : null} />
+    <UsageSummaryCard
+      kind='plan'
+      title={t('settings.simple.billing.weekly', { provider: name })}
+      percent={percent}
+      label={`${name}: ${t('planUsage.used', { used: percent })}`}
+      note={when ? t('planUsage.resetsIn', { when }) : null}
+    />
   );
 }
 
@@ -237,36 +280,49 @@ export function PlanUsage() {
   const { report, loading, error, now, load } = usePlanUsage();
 
   return (
-    <Card title={t("planUsage.title")} subtitle={t("planUsage.subtitle")}>
-      <div className="mb-3 flex justify-end">
+    <Card title={t('planUsage.title')} subtitle={t('planUsage.subtitle')}>
+      <div className='mb-3 flex justify-end'>
         <button
-          type="button"
+          type='button'
           onClick={() => void load(true)}
           disabled={loading}
-          aria-label={t("planUsage.refresh")}
-          title={t("planUsage.refresh")}
-          className="rounded-md p-2 text-ink-secondary hover:bg-control hover:text-ink disabled:opacity-50"
-        >
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          aria-label={t('planUsage.refresh')}
+          title={t('planUsage.refresh')}
+          className='rounded-md p-2 text-ink-secondary hover:bg-control hover:text-ink disabled:opacity-50'>
+          {loading ? <Loader2 size={14} className='animate-spin' /> : <RefreshCw size={14} />}
         </button>
       </div>
-      {loading && !report && <p role="status" className="text-[13px] text-ink-secondary">{t("planUsage.loading")}</p>}
-      {error && <p role="alert" className="mb-3 text-[13px] text-danger">{error}</p>}
+      {loading && !report && (
+        <p role='status' className='text-[13px] text-ink-secondary'>
+          {t('planUsage.loading')}
+        </p>
+      )}
+      {error && (
+        <p role='alert' className='mb-3 text-[13px] text-danger'>
+          {error}
+        </p>
+      )}
       {report && report.providers.length === 0 && (
-        <p className="text-[13px] text-ink-secondary">{t("planUsage.empty")}</p>
+        <p className='text-[13px] text-ink-secondary'>{t('planUsage.empty')}</p>
       )}
       {report && report.providers.length > 0 && (
-        <div className="flex flex-col gap-4">
+        <div className='flex flex-col gap-4'>
           {report.providers.map((provider) => (
-            <div key={provider.id} className="border-t border-hairline/30 pt-3 first:border-t-0 first:pt-0">
-              <div className="mb-2 flex min-w-0 items-baseline gap-2">
-                <span className="truncate text-[14px] font-medium text-ink">{providerLabel(provider)}</span>
-                {provider.plan && <span className="truncate text-[12px] text-ink-secondary">{provider.plan}</span>}
+            <div
+              key={provider.id}
+              className='border-t border-hairline/30 pt-3 first:border-t-0 first:pt-0'>
+              <div className='mb-2 flex min-w-0 items-baseline gap-2'>
+                <span className='truncate text-[14px] font-medium text-ink'>
+                  {providerLabel(provider)}
+                </span>
+                {provider.plan && (
+                  <span className='truncate text-[12px] text-ink-secondary'>{provider.plan}</span>
+                )}
               </div>
               {provider.ok ? (
-                <div className="flex flex-col gap-2">
-                  <WindowRow label={t("planUsage.fiveHour")} window={provider.fiveHour} now={now} />
-                  <WindowRow label={t("planUsage.weekly")} window={provider.weekly} now={now} />
+                <div className='flex flex-col gap-2'>
+                  <WindowRow label={t('planUsage.fiveHour')} window={provider.fiveHour} now={now} />
+                  <WindowRow label={t('planUsage.weekly')} window={provider.weekly} now={now} />
                   {provider.extra.map((extra, index) => (
                     <WindowRow
                       key={`${extra.label}-${index}`}
@@ -283,11 +339,15 @@ export function PlanUsage() {
                     />
                   ))}
                   {(provider.models ?? []).length > 0 && (
-                    <div className="mt-1 flex flex-col gap-2">
-                      <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-secondary">{t("planUsage.byModel")}</div>
+                    <div className='mt-1 flex flex-col gap-2'>
+                      <div className='text-[11px] font-medium uppercase tracking-[0.08em] text-ink-secondary'>
+                        {t('planUsage.byModel')}
+                      </div>
                       {(provider.models ?? []).map((model) => (
-                        <div key={model.name} className="flex flex-col gap-1">
-                          <div className="truncate text-[13px] font-medium text-ink">{model.name}</div>
+                        <div key={model.name} className='flex flex-col gap-1'>
+                          <div className='truncate text-[13px] font-medium text-ink'>
+                            {model.name}
+                          </div>
                           {model.windows.map((entry, index) => (
                             <WindowRow
                               key={`${model.name}-${entry.label}-${index}`}
@@ -308,7 +368,7 @@ export function PlanUsage() {
                   )}
                 </div>
               ) : (
-                <p className="text-[13px] text-danger">{providerError(provider)}</p>
+                <p className='text-[13px] text-danger'>{providerError(provider)}</p>
               )}
             </div>
           ))}

@@ -1,22 +1,39 @@
 // A Team Cloud member's busy times, for their assistant to say when they are free. Read through the member's own Google
 // Calendar connection, made when Google Calendar is an app each person connects for themselves; never the team's.
 // Security: only start and end times leave this module, never a title, a place, a description or who is invited.
-import { createConnectedReads, type CalendarEvent, type ConnectedReadDeps } from "../connected-reads.ts";
-import type { PersonAppsAccess } from "../team-connections.ts";
-import type { Busy } from "./representative.ts";
+import {
+  createConnectedReads,
+  type CalendarEvent,
+  type ConnectedReadDeps,
+} from '../connected-reads.ts';
+import type { PersonAppsAccess } from '../team-connections.ts';
+import type { Busy } from './representative.ts';
 
 export interface PersonCalendarDeps<Access = PersonAppsAccess> {
   /** The member's own connected-apps access while Google Calendar is each person's own here; null otherwise. */
   access(person: string): Access | null;
   connected(access: Access): Promise<boolean>;
-  relay(payload: unknown, transportSessionId: string | undefined, signal: AbortSignal, access: Access): ReturnType<ConnectedReadDeps["relay"]>;
+  relay(
+    payload: unknown,
+    transportSessionId: string | undefined,
+    signal: AbortSignal,
+    access: Access,
+  ): ReturnType<ConnectedReadDeps['relay']>;
 }
 
 /** Busy times, merged where they touch: every event the person did not decline and that is not cancelled. A day-long
  * event marks a day, not busy hours, so it is left out, as calendars count it free. */
 export function busyTimes(events: readonly CalendarEvent[]): Busy[] {
-  const slots = events.filter((event) => !event.allDay && event.status !== "cancelled" && !event.selfDeclined && event.end > event.start)
-    .map((event) => ({ start: event.start, end: event.end })).sort((a, b) => a.start - b.start);
+  const slots = events
+    .filter(
+      (event) =>
+        !event.allDay &&
+        event.status !== 'cancelled' &&
+        !event.selfDeclined &&
+        event.end > event.start,
+    )
+    .map((event) => ({ start: event.start, end: event.end }))
+    .sort((a, b) => a.start - b.start);
   const merged: Busy[] = [];
   for (const slot of slots) {
     const last = merged.at(-1);

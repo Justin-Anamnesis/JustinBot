@@ -7,9 +7,15 @@ export interface SseRecorder {
   close(): void;
 }
 
-export async function openSse(url: string, headers: Record<string, string> = {}): Promise<SseRecorder> {
+export async function openSse(
+  url: string,
+  headers: Record<string, string> = {},
+): Promise<SseRecorder> {
   const controller = new AbortController();
-  const res = await fetch(url, { headers: { accept: "text/event-stream", ...headers }, signal: controller.signal });
+  const res = await fetch(url, {
+    headers: { accept: 'text/event-stream', ...headers },
+    signal: controller.signal,
+  });
   if (!res.ok || !res.body) {
     controller.abort();
     throw new Error(`SSE connect failed: ${res.status}`);
@@ -35,21 +41,21 @@ export async function openSse(url: string, headers: Record<string, string> = {})
   };
 
   void (async () => {
-    let buffer = "";
+    let buffer = '';
     try {
       for (;;) {
         const { done, value } = await reader.read();
         if (done) {
-          finish(new Error("SSE stream closed before a matching frame arrived"));
+          finish(new Error('SSE stream closed before a matching frame arrived'));
           break;
         }
         buffer += decoder.decode(value, { stream: true });
         let split: number;
         // frames are separated by a blank line; keepalives are comments
-        while ((split = buffer.indexOf("\n\n")) !== -1) {
+        while ((split = buffer.indexOf('\n\n')) !== -1) {
           const chunk = buffer.slice(0, split);
           buffer = buffer.slice(split + 2);
-          const data = chunk.split("\n").find((line) => line.startsWith("data: "));
+          const data = chunk.split('\n').find((line) => line.startsWith('data: '));
           if (!data) continue;
           let frame: unknown;
           try {
@@ -67,7 +73,7 @@ export async function openSse(url: string, headers: Record<string, string> = {})
         }
       }
     } catch (error) {
-      if (!closed) finish(error instanceof Error ? error : new Error("SSE stream read failed"));
+      if (!closed) finish(error instanceof Error ? error : new Error('SSE stream read failed'));
     }
   })();
 
@@ -76,14 +82,15 @@ export async function openSse(url: string, headers: Record<string, string> = {})
     until(pred, timeoutMs = 10_000) {
       const seen = frames.find(pred);
       if (seen) return Promise.resolve(seen);
-      if (closed) return Promise.reject(new Error("SSE stream closed before a matching frame arrived"));
+      if (closed)
+        return Promise.reject(new Error('SSE stream closed before a matching frame arrived'));
       return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
           const index = waiters.indexOf(waiter);
           if (index !== -1) waiters.splice(index, 1);
           reject(
             new Error(
-              `no matching frame within ${timeoutMs}ms; saw: ${frames.map((f) => f?.kind).join(", ") || "(none)"}`,
+              `no matching frame within ${timeoutMs}ms; saw: ${frames.map((f) => f?.kind).join(', ') || '(none)'}`,
             ),
           );
         }, timeoutMs);
@@ -94,7 +101,7 @@ export async function openSse(url: string, headers: Record<string, string> = {})
     },
     close: () => {
       if (closed) return;
-      finish(new Error("SSE stream closed before a matching frame arrived"));
+      finish(new Error('SSE stream closed before a matching frame arrived'));
       controller.abort();
     },
   };

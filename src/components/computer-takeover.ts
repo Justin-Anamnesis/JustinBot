@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { LocalizedPanelError } from "@/lib/computer-messages";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { LocalizedPanelError } from '@/lib/computer-messages';
 
 export interface TakeoverSnapshot {
   held: boolean;
@@ -13,9 +13,12 @@ const RELEASE_SETTLE_MS = 1_500;
 const JOIN_TIMEOUT_MS = 200_000;
 
 /** `crypto.randomUUID` exists only in secure contexts, and a phone may reach the app over plain LAN http. */
-const newLeaseId = () => Array.from(crypto.getRandomValues(new Uint8Array(18)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+const newLeaseId = () =>
+  Array.from(crypto.getRandomValues(new Uint8Array(18)), (byte) =>
+    byte.toString(16).padStart(2, '0'),
+  ).join('');
 
-type Request = (action: "take" | "release", controlLeaseId?: string) => Promise<TakeoverSnapshot>;
+type Request = (action: 'take' | 'release', controlLeaseId?: string) => Promise<TakeoverSnapshot>;
 
 function releaseWhenClosed(tab: Window, release: () => void): void {
   const watch = window.setInterval(() => {
@@ -27,7 +30,14 @@ function releaseWhenClosed(tab: Window, release: () => void): void {
 
 /** A provider-hosted desktop (a Boat) ships its own viewer, so it opens in the app's viewer window or its own tab. A
  * stuck join gives the computer back instead of leaving the bot waiting. */
-export async function openProviderDesktop({ botId, title, held, request, join, current }: {
+export async function openProviderDesktop({
+  botId,
+  title,
+  held,
+  request,
+  join,
+  current,
+}: {
   botId: string;
   title: string;
   held: boolean;
@@ -40,41 +50,49 @@ export async function openProviderDesktop({ botId, title, held, request, join, c
   // Plain web opens its blank tab synchronously, inside the user gesture; the packaged app uses the Electron viewer window.
   let fallbackTab: Window | null = null;
   if (!window.ogb?.desktopViewer && !window.ogb?.openExternal) {
-    fallbackTab = window.open("", "_blank");
+    fallbackTab = window.open('', '_blank');
     if (fallbackTab) fallbackTab.opener = null;
   }
-  const changed = () => new DOMException("The selected conversation changed", "AbortError");
+  const changed = () => new DOMException('The selected conversation changed', 'AbortError');
   try {
     if (!held) {
       lease = newLeaseId();
-      if (!(await request("take", lease)).held) throw new LocalizedPanelError("computer.err.confirmControl");
+      if (!(await request('take', lease)).held)
+        throw new LocalizedPanelError('computer.err.confirmControl');
     }
     if (!current()) throw changed();
     const { joinUrl } = await join(AbortSignal.timeout(JOIN_TIMEOUT_MS));
-    const viewerUrl = typeof joinUrl === "string" && joinUrl ? joinUrl : null;
+    const viewerUrl = typeof joinUrl === 'string' && joinUrl ? joinUrl : null;
     if (!current()) throw changed();
-    if (!viewerUrl) throw new LocalizedPanelError("computer.err.noDesktopLink");
+    if (!viewerUrl) throw new LocalizedPanelError('computer.err.noDesktopLink');
     if (window.ogb?.desktopViewer) {
-      if (!(await window.ogb.desktopViewer.open(viewerUrl, title, botId))) throw new LocalizedPanelError("computer.err.openDesktop");
+      if (!(await window.ogb.desktopViewer.open(viewerUrl, title, botId)))
+        throw new LocalizedPanelError('computer.err.openDesktop');
     } else if (fallbackTab) {
       fallbackTab.location.replace(viewerUrl);
       const taken = lease;
-      if (taken) releaseWhenClosed(fallbackTab, () => void request("release", taken).catch(() => {}));
+      if (taken)
+        releaseWhenClosed(fallbackTab, () => void request('release', taken).catch(() => {}));
     } else if (window.ogb?.openExternal) {
-      if (!(await window.ogb.openExternal(viewerUrl))) throw new LocalizedPanelError("computer.err.openDesktopLink");
-    } else if (!window.open(viewerUrl, "_blank", "noopener")) {
-      throw new LocalizedPanelError("computer.err.popupBlocked");
+      if (!(await window.ogb.openExternal(viewerUrl)))
+        throw new LocalizedPanelError('computer.err.openDesktopLink');
+    } else if (!window.open(viewerUrl, '_blank', 'noopener')) {
+      throw new LocalizedPanelError('computer.err.popupBlocked');
     }
   } catch (error) {
     fallbackTab?.close();
-    if (lease) await request("release", lease).catch(() => {});
+    if (lease) await request('release', lease).catch(() => {});
     throw error;
   }
 }
 
 function post(path: string, body: unknown): void {
-  void fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), keepalive: true })
-    .catch(() => {});
+  void fetch(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+    keepalive: true,
+  }).catch(() => {});
 }
 
 /**
@@ -82,7 +100,13 @@ function post(path: string, body: unknown): void {
  * bot's computer calls wait. Leaving it in any way (Hand back, closing the panel or the page, another conversation)
  * gives the computer back, but only a hold this view took: another device's stays.
  */
-export function useComputerTakeover({ botId, session, held, request, viewerClose }: {
+export function useComputerTakeover({
+  botId,
+  session,
+  held,
+  request,
+  viewerClose,
+}: {
   botId: string;
   /** The bot, conversation and computer being watched; a new one ends a session started on the old. */
   session: string;
@@ -108,18 +132,21 @@ export function useComputerTakeover({ botId, session, held, request, viewerClose
     lease.current = null;
     end();
     if (!mine) return;
-    post(`/api/bots/${botId}/computer/control`, { action: "release", controlLeaseId: mine.id });
+    post(`/api/bots/${botId}/computer/control`, { action: 'release', controlLeaseId: mine.id });
     if (mine.viewerClose) post(mine.viewerClose, {});
   }, [botId, end]);
 
-  const take = useCallback(async (expand = false) => {
-    const id = newLeaseId();
-    const snap = await request("take", id);
-    if (!snap.held) throw new LocalizedPanelError("computer.err.confirmControl");
-    lease.current = snap.owned ? { id, viewerClose: closeRef.current } : null;
-    setHere(true);
-    setExpanded(expand);
-  }, [request]);
+  const take = useCallback(
+    async (expand = false) => {
+      const id = newLeaseId();
+      const snap = await request('take', id);
+      if (!snap.held) throw new LocalizedPanelError('computer.err.confirmControl');
+      lease.current = snap.owned ? { id, viewerClose: closeRef.current } : null;
+      setHere(true);
+      setExpanded(expand);
+    },
+    [request],
+  );
 
   const handBack = useCallback(async () => {
     const close = lease.current?.viewerClose ?? closeRef.current;
@@ -127,7 +154,7 @@ export function useComputerTakeover({ botId, session, held, request, viewerClose
     end();
     setHandingBack(true);
     try {
-      await request("release");
+      await request('release');
     } finally {
       setHandingBack(false);
       if (close) post(close, {});
@@ -136,8 +163,8 @@ export function useComputerTakeover({ botId, session, held, request, viewerClose
 
   useEffect(() => leave, [session, leave]);
   useEffect(() => {
-    window.addEventListener("pagehide", leave);
-    return () => window.removeEventListener("pagehide", leave);
+    window.addEventListener('pagehide', leave);
+    return () => window.removeEventListener('pagehide', leave);
   }, [leave]);
   useEffect(() => {
     if (!here || held) return;

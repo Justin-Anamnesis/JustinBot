@@ -2,7 +2,7 @@ export interface SseFanoutClient {
   res: {
     write(chunk: string): boolean;
     writableLength: number;
-    once(event: "drain", listener: () => void): unknown;
+    once(event: 'drain', listener: () => void): unknown;
   };
   backpressured: boolean;
   /** The client's idempotent lifecycle owner: it leaves the fanout and stops the heartbeat before ending the response. */
@@ -12,26 +12,30 @@ export interface SseFanoutClient {
 /** Past this, cut the client loose; its EventSource reconnects and replays via Last-Event-ID. */
 export const SSE_MAX_BUFFERED_BYTES = 4 * 1024 * 1024;
 
-export type SseFanoutOutcome = "sent" | "dropped" | "disconnected";
+export type SseFanoutOutcome = 'sent' | 'dropped' | 'disconnected';
 
 /** Only screen captures are skipped while backpressured; durable events are always written, or the client is disconnected to replay them. */
-export function deliverSseFrame(client: SseFanoutClient, kind: string, frame: string): SseFanoutOutcome {
+export function deliverSseFrame(
+  client: SseFanoutClient,
+  kind: string,
+  frame: string,
+): SseFanoutOutcome {
   if (client.res.writableLength > SSE_MAX_BUFFERED_BYTES) {
     client.close();
-    return "disconnected";
+    return 'disconnected';
   }
-  if (client.backpressured && kind === "screen") return "dropped";
+  if (client.backpressured && kind === 'screen') return 'dropped';
   try {
     if (!client.res.write(frame) && !client.backpressured) {
       // write() returns false past the 16 KB highWaterMark, which one screen frame clears: it means "not drained yet", and without the drain listener the flag latches forever.
       client.backpressured = true;
-      client.res.once("drain", () => {
+      client.res.once('drain', () => {
         client.backpressured = false;
       });
     }
-    return "sent";
+    return 'sent';
   } catch {
-    return "disconnected";
+    return 'disconnected';
   }
 }
 
@@ -40,13 +44,16 @@ export interface SseHeartbeatStream {
   end(): void;
   writableEnded: boolean;
   destroyed: boolean;
-  on(event: "error", listener: (error: Error) => void): unknown;
+  on(event: 'error', listener: (error: Error) => void): unknown;
 }
 
-const SSE_HEARTBEAT_FRAME = `: keepalive\n\ndata: ${JSON.stringify({ kind: "ping" })}\n\n`;
+const SSE_HEARTBEAT_FRAME = `: keepalive\n\ndata: ${JSON.stringify({ kind: 'ping' })}\n\n`;
 
 /** Heartbeats `res` while `live()` holds. The returned close stops the heartbeat and runs `onClose` once, before the response ends; it runs by itself when the stream ends, errors or stops being live. */
-export function openSseHeartbeat(res: SseHeartbeatStream, options: { everyMs: number; live: () => boolean; onClose: () => void }): () => void {
+export function openSseHeartbeat(
+  res: SseHeartbeatStream,
+  options: { everyMs: number; live: () => boolean; onClose: () => void },
+): () => void {
   let open = true;
   const close = () => {
     if (!open) return;
@@ -64,6 +71,6 @@ export function openSseHeartbeat(res: SseHeartbeatStream, options: { everyMs: nu
     }
   }, options.everyMs);
   // Node reports a failed write, such as one after end, as an asynchronous 'error' event on the response; unhandled, it exits the process.
-  res.on("error", close);
+  res.on('error', close);
   return close;
 }

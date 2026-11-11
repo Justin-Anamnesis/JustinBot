@@ -2,13 +2,16 @@
  * permission mode, passed through: OpenMausBot never decides a permission
  * itself (Full access aside, which answers residual prompts because that is
  * what the person granted). The order is the order the selector shows. */
-export const APPROVAL_MODES = ["ask", "edits", "auto", "full", "custom"] as const;
+export const APPROVAL_MODES = ['ask', 'edits', 'auto', 'full', 'custom'] as const;
 
 export type ApprovalMode = (typeof APPROVAL_MODES)[number];
 
 /** Whether work at `level` lets nothing through that `limit` would stop; "custom" is comparable only to itself. */
 export const levelWithin = (level: ApprovalMode, limit: ApprovalMode): boolean =>
-  level === limit || (level !== "custom" && limit !== "custom" && APPROVAL_MODES.indexOf(level) < APPROVAL_MODES.indexOf(limit));
+  level === limit ||
+  (level !== 'custom' &&
+    limit !== 'custom' &&
+    APPROVAL_MODES.indexOf(level) < APPROVAL_MODES.indexOf(limit));
 
 /** Only providers with an implemented permission mapping may expose a level.
  * `edits` (auto-accept edits) exists where the engine has such a mode:
@@ -20,8 +23,11 @@ export const levelWithin = (level: ApprovalMode, limit: ApprovalMode): boolean =
  * chat-completions family, ACP agents such as Kimi or Hermes, Pi's computer
  * confirms). */
 export function supportsApprovalMode(driverKind: string | undefined, mode: ApprovalMode): boolean {
-  if (mode === "custom") return driverKind === "codex";
-  if (mode === "edits") return ["claudeAgent", "grokAgent", "antigravityAgent", "qwenAgent", "geminiAgent"].includes(driverKind ?? "");
+  if (mode === 'custom') return driverKind === 'codex';
+  if (mode === 'edits')
+    return ['claudeAgent', 'grokAgent', 'antigravityAgent', 'qwenAgent', 'geminiAgent'].includes(
+      driverKind ?? '',
+    );
   return true;
 }
 
@@ -35,16 +41,24 @@ export function modelSwitchNeedsAsk(
   fromDriver: string | undefined,
   toDriver: string | undefined,
 ): boolean {
-  return !supportsApprovalMode(toDriver, mode) || (mode === "custom" && fromDriver !== toDriver);
+  return !supportsApprovalMode(toDriver, mode) || (mode === 'custom' && fromDriver !== toDriver);
 }
 
 export function hasNativeAutoReview(driverKind: string | undefined): boolean {
   // Qwen Code's `--approval-mode auto` is an LLM classifier that approves
   // safe actions and blocks risky ones — a reviewer, not a rubber stamp.
-  return ["codex", "claudeAgent", "cursorAgent", "grokAgent", "qwenAgent"].includes(driverKind ?? "");
+  return ['codex', 'claudeAgent', 'cursorAgent', 'grokAgent', 'qwenAgent'].includes(
+    driverKind ?? '',
+  );
 }
 
-const APPROVAL_RANK: Record<ApprovalMode, number> = { ask: 0, edits: 1, auto: 2, full: 3, custom: 4 };
+const APPROVAL_RANK: Record<ApprovalMode, number> = {
+  ask: 0,
+  edits: 1,
+  auto: 2,
+  full: 3,
+  custom: 4,
+};
 
 export interface ApprovalFields {
   approvalMode?: ApprovalMode;
@@ -54,7 +68,8 @@ export interface ApprovalFields {
 
 export function threadApproval(thread: ApprovalFields, bot: ApprovalFields): ApprovalFields {
   return {
-    approvalMode: thread.approvalMode ?? (thread.autoApprove === undefined ? bot.approvalMode : undefined),
+    approvalMode:
+      thread.approvalMode ?? (thread.autoApprove === undefined ? bot.approvalMode : undefined),
     autoApprove: thread.autoApprove ?? bot.autoApprove,
     alwaysAllow: structuredClone(thread.alwaysAllow ?? bot.alwaysAllow),
   };
@@ -65,14 +80,14 @@ export function approvalModeWidens(from: ApprovalMode, to: ApprovalMode): boolea
 }
 
 export function isApprovalMode(value: unknown): value is ApprovalMode {
-  return typeof value === "string" && (APPROVAL_MODES as readonly string[]).includes(value);
+  return typeof value === 'string' && (APPROVAL_MODES as readonly string[]).includes(value);
 }
 
 /** The level a bot or conversation runs at until a person picks one: Full
  * access, as in t3code (its DEFAULT_RUNTIME_MODE). Each provider maps it to
  * its own most permissive mode; a real question or a missing credential
  * still reaches a person. */
-export const DEFAULT_APPROVAL_MODE: ApprovalMode = "full";
+export const DEFAULT_APPROVAL_MODE: ApprovalMode = 'full';
 
 let defaultApprovalMode: ApprovalMode = DEFAULT_APPROVAL_MODE;
 
@@ -93,20 +108,24 @@ export function approvalModeFor(bot: {
   threadId?: string;
 }): ApprovalMode {
   const grant = bot.approvalGrant;
-  const otherThread = grant && typeof grant === "object" && "threadOnly" in grant && grant.threadOnly === true &&
-    "threadId" in grant && typeof grant.threadId === "string" && typeof bot.threadId === "string" && grant.threadId !== bot.threadId;
-  if (grant && !otherThread) return "ask";
+  const otherThread =
+    grant &&
+    typeof grant === 'object' &&
+    'threadOnly' in grant &&
+    grant.threadOnly === true &&
+    'threadId' in grant &&
+    typeof grant.threadId === 'string' &&
+    typeof bot.threadId === 'string' &&
+    grant.threadId !== bot.threadId;
+  if (grant && !otherThread) return 'ask';
   if (isApprovalMode(bot.approvalMode)) return bot.approvalMode;
-  if (bot.autoApprove === true) return "auto";
-  return bot.approvalMode === undefined ? defaultApprovalMode : "ask";
+  if (bot.autoApprove === true) return 'auto';
+  return bot.approvalMode === undefined ? defaultApprovalMode : 'ask';
 }
 
 /** A private late-grant recovery may revoke an elevated mode even after a
  * turn began. It can only move to the fail-closed Ask mode, and it also stops
  * the running turn, which a native engine would otherwise finish elevated. */
-export function isEmergencyApprovalDowngrade(
-  current: ApprovalMode,
-  next: ApprovalMode,
-): boolean {
-  return next === "ask" && (current === "full" || current === "custom");
+export function isEmergencyApprovalDowngrade(current: ApprovalMode, next: ApprovalMode): boolean {
+  return next === 'ask' && (current === 'full' || current === 'custom');
 }

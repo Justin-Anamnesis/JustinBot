@@ -2,7 +2,7 @@
  * thing: who opened the panel and where focus belongs while it is up. A panel
  * is a lazy screen, so the intent is recorded on open and taken by the panel's
  * first render, never by a timer on the opener's side. */
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, type RefObject } from 'react';
 
 export type ComputerPanelOpen = {
   botId: string;
@@ -50,13 +50,16 @@ function entryTab(root: HTMLElement | null): HTMLElement | null {
 /** The first thing a keyboard user should reach: the active tab, or the close
  * button when the panel has no tab row. */
 export function focusComputerPanelEntry(root: HTMLElement | null): void {
-  (entryTab(root) ?? root?.querySelector<HTMLElement>("[data-computer-panel-close]"))?.focus();
+  (entryTab(root) ?? root?.querySelector<HTMLElement>('[data-computer-panel-close]'))?.focus();
 }
 
 /** A panel's side of the hand-off: the one-shot intent is taken on the first
  * render, the entry point is focused a frame later, and the ring then follows
  * `selection` (the panel's own tab) until the keyboard user leaves the tab row. */
-export function useComputerPanelEntry(botId: string, selection?: unknown): RefObject<HTMLElement | null> {
+export function useComputerPanelEntry(
+  botId: string,
+  selection?: unknown,
+): RefObject<HTMLElement | null> {
   const panelRef = useRef<HTMLElement>(null);
   // One shot per open, and it must survive React's double-invoked development effects.
   const entryFocus = useRef<boolean | undefined>(undefined);
@@ -75,7 +78,11 @@ export function useComputerPanelEntry(botId: string, selection?: unknown): RefOb
   useEffect(() => {
     if (!following.current) return;
     const active = document.activeElement;
-    if (!(active instanceof HTMLElement) || active.getAttribute("role") !== "tab" || !panelRef.current?.contains(active)) {
+    if (
+      !(active instanceof HTMLElement) ||
+      active.getAttribute('role') !== 'tab' ||
+      !panelRef.current?.contains(active)
+    ) {
       following.current = false;
       return;
     }
@@ -92,7 +99,7 @@ function onScreen(element: HTMLElement): boolean {
 /** The sidebar row survives the panel, but at narrow widths the sidebar is an
  * off-canvas drawer: focusing the row there would focus something unseen. */
 function sidebarBotRow(botId: string): HTMLElement | null {
-  for (const row of document.querySelectorAll<HTMLElement>("[data-sidebar-bot-row]")) {
+  for (const row of document.querySelectorAll<HTMLElement>('[data-sidebar-bot-row]')) {
     if (row.dataset.sidebarBotRow === botId && onScreen(row)) return row;
   }
   return null;
@@ -102,9 +109,11 @@ function sidebarBotRow(botId: string): HTMLElement | null {
  * unmounting drops focus to the body, and the panel is gone by then. */
 export function releaseComputerPanelFocus(root: HTMLElement | null, botId: string): void {
   if (!root || !root.contains(document.activeElement)) return;
-  const target = opener?.botId === botId && opener.element?.isConnected ? opener.element
-    : document.querySelector<HTMLElement>('[data-tour="computer"]')
-      ?? sidebarBotRow(botId)
-      ?? document.querySelector<HTMLElement>('[data-tour="composer"] textarea');
+  const target =
+    opener?.botId === botId && opener.element?.isConnected
+      ? opener.element
+      : (document.querySelector<HTMLElement>('[data-tour="computer"]') ??
+        sidebarBotRow(botId) ??
+        document.querySelector<HTMLElement>('[data-tour="composer"] textarea'));
   target?.focus();
 }

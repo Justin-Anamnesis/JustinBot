@@ -1,11 +1,9 @@
 export const DEFAULT_MCP_CALL_TIMEOUT_MINUTES = 10;
 export const MIN_MCP_CALL_TIMEOUT_MINUTES = 1;
 export const MAX_MCP_CALL_TIMEOUT_MINUTES = 60;
-export const MCP_CALL_TIMEOUT_INPUT_ERROR = "Enter a whole number from 1 to 60.";
+export const MCP_CALL_TIMEOUT_INPUT_ERROR = 'Enter a whole number from 1 to 60.';
 
-export type McpCallTimeoutInput =
-  | { ok: true; minutes: number }
-  | { ok: false; error: string };
+export type McpCallTimeoutInput = { ok: true; minutes: number } | { ok: false; error: string };
 
 export function parseMcpCallTimeoutMinutes(value: string): McpCallTimeoutInput {
   const trimmed = value.trim();
@@ -17,6 +15,8 @@ export function parseMcpCallTimeoutMinutes(value: string): McpCallTimeoutInput {
   return { ok: true, minutes };
 }
 
-export function mcpCallTimeoutMinutes(config: { mcp?: { callTimeoutMinutes?: number } } | null | undefined): number {
+export function mcpCallTimeoutMinutes(
+  config: { mcp?: { callTimeoutMinutes?: number } } | null | undefined,
+): number {
   return config?.mcp?.callTimeoutMinutes ?? DEFAULT_MCP_CALL_TIMEOUT_MINUTES;
 }

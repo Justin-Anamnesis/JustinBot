@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const roomContextSettings = {
   /** Start a fresh session before a room turn once context reaches this (fraction or tokens); default 0.9. */
@@ -13,7 +13,7 @@ export function roomSessionsEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   const override = env.OMB_ROOM_SESSIONS?.trim();
-  if (override === "1") return true;
-  if (override === "0") return false;
+  if (override === '1') return true;
+  if (override === '0') return false;
   return settings?.roomSessions === true;
 }

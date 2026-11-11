@@ -1,9 +1,9 @@
 // Coalesces turn.progress for the bus. An engine can report a tool call's input dozens of times a second; the chat's
 // status line needs a frame only when what it shows changes, and never more than a few a second.
-import { progressKey } from "../../shared/turn-progress.ts";
-import type { RuntimeEvent } from "../contracts.ts";
+import { progressKey } from '../../shared/turn-progress.ts';
+import type { RuntimeEvent } from '../contracts.ts';
 
-export type ProgressEvent = Extract<RuntimeEvent, { type: "turn.progress" }>;
+export type ProgressEvent = Extract<RuntimeEvent, { type: 'turn.progress' }>;
 
 /** The least time between two frames for one thread. */
 export const PROGRESS_FRAME_MS = 400;
@@ -22,7 +22,10 @@ export class ProgressGate {
   private readonly frameMs: number;
 
   // No parameter properties: Node's type-stripping cannot transform them.
-  constructor(send: (event: ProgressEvent) => void, options: { now?: () => number; frameMs?: number } = {}) {
+  constructor(
+    send: (event: ProgressEvent) => void,
+    options: { now?: () => number; frameMs?: number } = {},
+  ) {
     this.send = send;
     this.now = options.now ?? Date.now;
     this.frameMs = options.frameMs ?? PROGRESS_FRAME_MS;
@@ -32,7 +35,7 @@ export class ProgressGate {
   offer(event: ProgressEvent): void {
     let gate = this.threads.get(event.threadId);
     if (!gate) {
-      gate = { shown: "", sentAt: -Infinity, pending: null, timer: null };
+      gate = { shown: '', sentAt: -Infinity, pending: null, timer: null };
       this.threads.set(event.threadId, gate);
     }
     if (progressKey(event) === gate.shown) {
@@ -62,7 +65,7 @@ export class ProgressGate {
     const gate = this.threads.get(threadId);
     if (!gate) return;
     this.release(gate);
-    gate.shown = "";
+    gate.shown = '';
     if (ended) this.threads.delete(threadId);
   }
 

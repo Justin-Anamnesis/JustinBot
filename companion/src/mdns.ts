@@ -1,13 +1,18 @@
 // mDNS / DNS-SD responder (RFC 6762/6763), answer-only: it neither browses
 // nor probes for name conflicts (§8.1).
-import { createHash } from "node:crypto";
-import { createSocket } from "node:dgram";
-import { hostname, networkInterfaces } from "node:os";
+import { createHash } from 'node:crypto';
+import { createSocket } from 'node:dgram';
+import { hostname, networkInterfaces } from 'node:os';
 
-import { lanInterfaces } from "./listener.ts";
-import { directRoutes, isPrivateLanAddress, isTailnetAddress, tailnetInterfaceAddresses } from "./direct-routes.ts";
+import { lanInterfaces } from './listener.ts';
+import {
+  directRoutes,
+  isPrivateLanAddress,
+  isTailnetAddress,
+  tailnetInterfaceAddresses,
+} from './direct-routes.ts';
 
-const MDNS_ADDRESS = "224.0.0.251";
+const MDNS_ADDRESS = '224.0.0.251';
 const MDNS_PORT = 5353;
 /** RFC 6762 §10: host records are short-lived, service records are not. */
 const TTL_HOST = 120;
@@ -18,8 +23,8 @@ const GOODBYE_FLUSH_MS = 250;
 
 function toIpv4(address: string): number | null {
   // A udp4 socket can hand back the mapped form on some platforms.
-  const plain = address.replace(/^::ffff:/i, "").split("%")[0];
-  const parts = plain.split(".");
+  const plain = address.replace(/^::ffff:/i, '').split('%')[0];
+  const parts = plain.split('.');
   if (parts.length !== 4) return null;
   let out = 0;
   for (const part of parts) {
@@ -39,11 +44,11 @@ export function isOnLink(from: string, interfaces = networkInterfaces()): boolea
   if (source === null) return false;
   for (const entries of Object.values(interfaces)) {
     for (const entry of entries ?? []) {
-      if (entry.family !== "IPv4") continue;
+      if (entry.family !== 'IPv4') continue;
       const address = toIpv4(entry.address);
       const mask = toIpv4(entry.netmask);
       if (address === null || mask === null) continue;
-      if ((((source ^ address) & mask) >>> 0) === 0) return true;
+      if (((source ^ address) & mask) >>> 0 === 0) return true;
     }
   }
   return false;
@@ -56,8 +61,7 @@ const FLUSH = 0x8000;
 /** Top bit of a question's class: "answer me directly, not to the group." */
 const QU = 0x8000;
 /** The meta-query browsers use to enumerate service types on a network. */
-export const SERVICE_ENUMERATION = "_services._dns-sd._udp.local";
-
+export const SERVICE_ENUMERATION = '_services._dns-sd._udp.local';
 
 export interface Question {
   name: string;
@@ -80,8 +84,8 @@ export type ResourceRecord =
 
 export function encodeName(name: string): Buffer {
   const chunks: Buffer[] = [];
-  for (const label of name.split(".").filter(Boolean)) {
-    const bytes = Buffer.from(label, "utf8");
+  for (const label of name.split('.').filter(Boolean)) {
+    const bytes = Buffer.from(label, 'utf8');
     if (bytes.length > 63) throw new Error(`label longer than 63 bytes: ${label}`);
     chunks.push(Buffer.from([bytes.length]), bytes);
   }
@@ -99,29 +103,29 @@ function decodeName(buf: Buffer, start: number): { name: string; offset: number 
   let hops = 0;
 
   for (;;) {
-    if (pos >= buf.length) throw new Error("truncated name");
+    if (pos >= buf.length) throw new Error('truncated name');
     const length = buf[pos];
     if (length === 0) {
       if (!jumped) end = pos + 1;
       break;
     }
     if ((length & 0xc0) === 0xc0) {
-      if (pos + 1 >= buf.length) throw new Error("truncated pointer");
+      if (pos + 1 >= buf.length) throw new Error('truncated pointer');
       const target = ((length & 0x3f) << 8) | buf[pos + 1];
       if (!jumped) end = pos + 2;
       jumped = true;
       // a packet is free to point at itself; we are not free to follow it
-      if (++hops > 16) throw new Error("compression pointer loop");
+      if (++hops > 16) throw new Error('compression pointer loop');
       pos = target;
       continue;
     }
     const from = pos + 1;
-    if (from + length > buf.length) throw new Error("truncated label");
-    labels.push(buf.toString("utf8", from, from + length));
+    if (from + length > buf.length) throw new Error('truncated label');
+    labels.push(buf.toString('utf8', from, from + length));
     pos = from + length;
     if (!jumped) end = pos;
   }
-  return { name: labels.join("."), offset: end };
+  return { name: labels.join('.'), offset: end };
 }
 
 /** Every byte here is unauthenticated, so a malformed packet must be a `null`,
@@ -159,12 +163,16 @@ function mayFlush(record: ResourceRecord, legacy: boolean): boolean {
 }
 
 /** `ttlOverride` 0 sends a goodbye: "forget what I told you". */
-function encodeRecord(record: ResourceRecord, ttlOverride: number | undefined, flush: boolean): Buffer {
+function encodeRecord(
+  record: ResourceRecord,
+  ttlOverride: number | undefined,
+  flush: boolean,
+): Buffer {
   let rdata: Buffer;
   let ttl: number;
   switch (record.type) {
     case TYPE.A: {
-      const octets = record.data.split(".").map(Number);
+      const octets = record.data.split('.').map(Number);
       if (octets.length !== 4 || octets.some((o) => !Number.isInteger(o) || o < 0 || o > 255)) {
         throw new Error(`not an IPv4 address: ${record.data}`);
       }
@@ -178,7 +186,7 @@ function encodeRecord(record: ResourceRecord, ttlOverride: number | undefined, f
       break;
     case TYPE.TXT: {
       const entries = record.data.map((entry) => {
-        const bytes = Buffer.from(entry, "utf8");
+        const bytes = Buffer.from(entry, 'utf8');
         if (bytes.length > 255) throw new Error(`TXT entry longer than 255 bytes: ${entry}`);
         return Buffer.concat([Buffer.from([bytes.length]), bytes]);
       });
@@ -236,7 +244,6 @@ export function encodeResponse(
     ...additionals.map((record) => encodeRecord(record, opts.ttl, mayFlush(record, legacy))),
   ]);
 }
-
 
 export interface ServiceInfo {
   /** what a picker on the phone shows */
@@ -325,26 +332,26 @@ export function answersFor(
   return { answers: deduped, additionals: dedupe(additionals, deduped) };
 }
 
-
 /** No dots, no control characters, at most 63 bytes of UTF-8. */
-export function dnsLabel(text: string, fallback = "OpenMausBot"): string {
+export function dnsLabel(text: string, fallback = 'OpenMausBot'): string {
   let label = text
+    // prettier-ignore
     // oxlint-disable-next-line no-control-regex -- control characters are not valid in a DNS label
-    .replace(/[\u0000-\u001f\u007f]/g, "")
-    .replace(/\./g, " ")
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .replace(/\./g, ' ')
     .trim();
-  while (Buffer.byteLength(label, "utf8") > 63) label = label.slice(0, -1).trimEnd();
+  while (Buffer.byteLength(label, 'utf8') > 63) label = label.slice(0, -1).trimEnd();
   return label || fallback;
 }
 
 /** DNS-SD limits are bytes (63 per label, 255 per TXT entry), not UTF-16 code
  * units; iterating keeps whole code points. */
 export function clampBytes(text: string, limit: number): string {
-  if (Buffer.byteLength(text, "utf8") <= limit) return text;
-  let out = "";
+  if (Buffer.byteLength(text, 'utf8') <= limit) return text;
+  let out = '';
   let size = 0;
   for (const character of text) {
-    const width = Buffer.byteLength(character, "utf8");
+    const width = Buffer.byteLength(character, 'utf8');
     if (size + width > limit) break;
     out += character;
     size += width;
@@ -354,7 +361,7 @@ export function clampBytes(text: string, limit: number): string {
 
 /** Not `<hostname>.local`: on macOS mDNSResponder owns and defends that name. */
 export function defaultHostName(machine = hostname()): string {
-  const digest = createHash("sha256").update(machine).digest("hex").slice(0, 8);
+  const digest = createHash('sha256').update(machine).digest('hex').slice(0, 8);
   return `openmausbot-${digest}.local`;
 }
 
@@ -365,25 +372,35 @@ export function defaultHostName(machine = hostname()): string {
 const MAC_TUNNEL_INTERFACE = /^(utun|ipsec|ppp)\d*$/i;
 
 /** Bonjour is part of Same Wi-Fi: nothing is advertised while it is off, never the tailnet address, and never a Mac's tunnel. */
-export function advertisableAddresses(interfaces = networkInterfaces(), platform = process.platform): string[] {
+export function advertisableAddresses(
+  interfaces = networkInterfaces(),
+  platform = process.platform,
+): string[] {
   if (!directRoutes().wifi) return [];
   const tailnet = tailnetInterfaceAddresses();
   return lanInterfaces(interfaces)
-    .filter((entry) => platform !== "darwin" || !MAC_TUNNEL_INTERFACE.test(entry.name))
+    .filter((entry) => platform !== 'darwin' || !MAC_TUNNEL_INTERFACE.test(entry.name))
     .map((entry) => entry.address)
     .filter((address) => !isTailnetAddress(address, tailnet) && isPrivateLanAddress(address));
 }
 
-
 export interface ResponderSocket {
-  on(event: "error", listener: (error: Error) => void): void;
-  on(event: "message", listener: (message: Buffer, remote: { address: string; port: number }) => void): void;
-  once(event: "error", listener: (error: Error) => void): void;
+  on(event: 'error', listener: (error: Error) => void): void;
+  on(
+    event: 'message',
+    listener: (message: Buffer, remote: { address: string; port: number }) => void,
+  ): void;
+  once(event: 'error', listener: (error: Error) => void): void;
   bind(port: number, callback?: () => void): void;
   setMulticastTTL(ttl: number): void;
   addMembership(group: string, membershipInterface?: string): void;
   setMulticastInterface(multicastInterface: string): void;
-  send(packet: Buffer, port: number, address: string, callback?: (error: Error | null) => void): void;
+  send(
+    packet: Buffer,
+    port: number,
+    address: string,
+    callback?: (error: Error | null) => void,
+  ): void;
   close(callback?: () => void): void;
   address(): { port: number };
 }
@@ -410,7 +427,8 @@ export class MdnsResponder {
   constructor(options: ResponderOptions = {}) {
     this.port = options.port ?? MDNS_PORT;
     this.multicast = options.multicast ?? true;
-    this.socketFactory = options.socketFactory ?? (() => createSocket({ type: "udp4", reuseAddr: true }));
+    this.socketFactory =
+      options.socketFactory ?? (() => createSocket({ type: 'udp4', reuseAddr: true }));
     this.platform = options.platform ?? process.platform;
   }
 
@@ -437,58 +455,52 @@ export class MdnsResponder {
 
     const socket = this.socketFactory();
     // An unhandled socket 'error' event is an uncaught exception.
-    socket.on("error", () => void this.stop());
-    socket.on("message", (buf, remote) => this.handle(buf, remote.address, remote.port));
+    socket.on('error', () => void this.stop());
+    socket.on('message', (buf, remote) => this.handle(buf, remote.address, remote.port));
 
     try {
       await new Promise<void>((resolve, reject) => {
-        socket.once("error", reject);
+        socket.once('error', reject);
         socket.bind(this.port, () => resolve());
       });
     } catch {
       try {
         socket.close();
-      } catch {
-      }
+      } catch {}
       return false;
     }
     // stop() ran while the bind was pending: it found no socket to close, so close this one.
     if (stops !== this.stops) {
       try {
         socket.close();
-      } catch {
-      }
+      } catch {}
       return false;
     }
 
     if (this.multicast) {
       try {
         socket.setMulticastTTL(MULTICAST_TTL);
-      } catch {
-      }
+      } catch {}
       // Join per interface: the default route is not necessarily the phone's network.
       let joined = false;
       for (const address of service.addresses) {
         try {
           socket.addMembership(MDNS_ADDRESS, address);
           joined = true;
-        } catch {
-        }
+        } catch {}
       }
       if (!joined) {
         // On a Mac the default route may be a VPN tunnel (see MAC_TUNNEL_INTERFACE),
         // so there is no fallback: with no group joined, discovery is not running.
-        if (this.platform === "darwin") {
+        if (this.platform === 'darwin') {
           try {
             socket.close();
-          } catch {
-          }
+          } catch {}
           return false;
         }
         try {
           socket.addMembership(MDNS_ADDRESS);
-        } catch {
-        }
+        } catch {}
       }
     }
 
@@ -526,10 +538,15 @@ export class MdnsResponder {
         const timer = setTimeout(finish, GOODBYE_FLUSH_MS);
         timer.unref?.();
         try {
-          this.send(socket, encodeResponse(announcement(service), [], { ttl: 0 }), service.addresses, () => {
-            clearTimeout(timer);
-            finish();
-          });
+          this.send(
+            socket,
+            encodeResponse(announcement(service), [], { ttl: 0 }),
+            service.addresses,
+            () => {
+              clearTimeout(timer);
+              finish();
+            },
+          );
         } catch {
           clearTimeout(timer);
           finish();
@@ -549,8 +566,7 @@ export class MdnsResponder {
     if (!this.socket || !this.service) return;
     try {
       this.send(this.socket, encodeResponse(announcement(this.service)), this.service.addresses);
-    } catch {
-    }
+    } catch {}
   }
 
   private handle(buf: Buffer, from: string, fromPort: number) {
@@ -576,8 +592,7 @@ export class MdnsResponder {
       // The kernel routes unicast replies; only group sends are pinned.
       if (unicast) this.socket.send(packet, fromPort, from);
       else this.send(this.socket, packet, this.service.addresses);
-    } catch {
-    }
+    } catch {}
   }
 
   /** Always to port 5353, once per advertised interface: a bare group send

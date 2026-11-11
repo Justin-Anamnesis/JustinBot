@@ -3,7 +3,15 @@
  * failed refresh; the relay keeps spliced sessions through an expired control socket anyway. */
 const MINUTE_MS = 60_000;
 const UNAVAILABLE_RETRY_MS = 30 * MINUTE_MS;
-const BACKOFF_MS = [MINUTE_MS, 2 * MINUTE_MS, 4 * MINUTE_MS, 8 * MINUTE_MS, 16 * MINUTE_MS, 32 * MINUTE_MS, 60 * MINUTE_MS];
+const BACKOFF_MS = [
+  MINUTE_MS,
+  2 * MINUTE_MS,
+  4 * MINUTE_MS,
+  8 * MINUTE_MS,
+  16 * MINUTE_MS,
+  32 * MINUTE_MS,
+  60 * MINUTE_MS,
+];
 const MIN_REFRESH_MS = MINUTE_MS;
 const RELAY_HOST = /^relay[1-9][0-9]?\.openmausbot\.com$/;
 const HOST_ID = /^[A-Za-z0-9_-]{22}$/;
@@ -17,12 +25,23 @@ const defaultSetTimer = (callback, milliseconds) => {
 
 /** The control plane's 200 body, or null when any field is off. */
 export function validRelayGrant(payload) {
-  if (!payload || typeof payload !== "object") return null;
+  if (!payload || typeof payload !== 'object') return null;
   const { token, hostId, nodes, expiresAt, refreshAfter } = payload;
-  if (typeof token !== "string" || token.length > 2_048 || !TOKEN.test(token)) return null;
-  if (typeof hostId !== "string" || !HOST_ID.test(hostId)) return null;
-  if (!Array.isArray(nodes) || nodes.length < 1 || nodes.length > 4 || !nodes.every((node) => typeof node === "string" && RELAY_HOST.test(node))) return null;
-  if (!Number.isSafeInteger(expiresAt) || !Number.isSafeInteger(refreshAfter) || refreshAfter > expiresAt) return null;
+  if (typeof token !== 'string' || token.length > 2_048 || !TOKEN.test(token)) return null;
+  if (typeof hostId !== 'string' || !HOST_ID.test(hostId)) return null;
+  if (
+    !Array.isArray(nodes) ||
+    nodes.length < 1 ||
+    nodes.length > 4 ||
+    !nodes.every((node) => typeof node === 'string' && RELAY_HOST.test(node))
+  )
+    return null;
+  if (
+    !Number.isSafeInteger(expiresAt) ||
+    !Number.isSafeInteger(refreshAfter) ||
+    refreshAfter > expiresAt
+  )
+    return null;
   return { token, hostId, nodes: [...nodes], expiresAt, refreshAfter };
 }
 
@@ -55,16 +74,17 @@ export function createRelayTokenService({
   async function attempt() {
     try {
       const next = validRelayGrant(await fetchGrant());
-      if (!next) throw Object.assign(new Error("invalid relay grant"), { code: "invalid_response" });
+      if (!next)
+        throw Object.assign(new Error('invalid relay grant'), { code: 'invalid_response' });
       failures = 0;
       if (!running) return;
       publish(next);
       schedule(Math.max(MIN_REFRESH_MS, next.refreshAfter - now()));
     } catch (error) {
       if (!running) return;
-      const code = error?.code ?? "";
-      if (code === "relay_unavailable" || code === "signed_out" || error?.status === 401) {
-        log(`relay token ${code || "refused"}`);
+      const code = error?.code ?? '';
+      if (code === 'relay_unavailable' || code === 'signed_out' || error?.status === 401) {
+        log(`relay token ${code || 'refused'}`);
         publish(null);
         return schedule(jitter(UNAVAILABLE_RETRY_MS));
       }
@@ -72,7 +92,7 @@ export function createRelayTokenService({
       const retryAfter = Number.isSafeInteger(error?.retryAfterMs) ? error.retryAfterMs : 0;
       schedule(Math.max(retryAfter, jitter(BACKOFF_MS[Math.min(failures, BACKOFF_MS.length - 1)])));
       failures += 1;
-      log(`relay token failed: ${code || "unknown"}`);
+      log(`relay token failed: ${code || 'unknown'}`);
     }
   }
 

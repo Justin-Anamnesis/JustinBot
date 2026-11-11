@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   listLocalSystemVoices,
@@ -9,7 +9,7 @@ import {
   resolveLocalSystemVoice,
   setRemoteSystemVoice,
   setRemoteVoiceProvider,
-} from "./local-voice";
+} from './local-voice';
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -26,14 +26,14 @@ function memoryStorage(): Storage {
 }
 
 const voices = [
-  { voiceURI: "com.apple.voice.samantha", name: "Samantha", lang: "en-US" },
-  { voiceURI: "com.apple.voice.daniel", name: "Daniel", lang: "en-GB" },
+  { voiceURI: 'com.apple.voice.samantha', name: 'Samantha', lang: 'en-US' },
+  { voiceURI: 'com.apple.voice.daniel', name: 'Daniel', lang: 'en-GB' },
 ] as SpeechSynthesisVoice[];
 
 beforeEach(() => {
-  vi.stubGlobal("localStorage", memoryStorage());
-  vi.stubGlobal("window", {
-    ogb: { platform: "darwin", remoteClient: { active: true } },
+  vi.stubGlobal('localStorage', memoryStorage());
+  vi.stubGlobal('window', {
+    ogb: { platform: 'darwin', remoteClient: { active: true } },
     SpeechSynthesisUtterance: class {},
     speechSynthesis: { getVoices: () => voices },
   });
@@ -41,31 +41,31 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("paired desktop voice preferences", () => {
-  it("defaults a paired Mac to its local installed voices", () => {
+describe('paired desktop voice preferences', () => {
+  it('defaults a paired Mac to its local installed voices', () => {
     expect(localSystemVoicesAvailable()).toBe(true);
-    expect(remoteVoiceProvider()).toBe("system");
+    expect(remoteVoiceProvider()).toBe('system');
     expect(localSystemVoiceActive()).toBe(true);
     expect(listLocalSystemVoices()).toEqual([
-      { id: "com.apple.voice.samantha", label: "Samantha", description: "en-US" },
-      { id: "com.apple.voice.daniel", label: "Daniel", description: "en-GB" },
+      { id: 'com.apple.voice.samantha', label: 'Samantha', description: 'en-US' },
+      { id: 'com.apple.voice.daniel', label: 'Daniel', description: 'en-GB' },
     ]);
   });
 
-  it("keeps engine and per-agent voice choices on this device", () => {
-    setRemoteSystemVoice("bot-1", "com.apple.voice.samantha");
-    expect(remoteSystemVoice("bot-1")).toBe("com.apple.voice.samantha");
-    expect(resolveLocalSystemVoice("com.apple.voice.samantha")).toBe(voices[0]);
+  it('keeps engine and per-agent voice choices on this device', () => {
+    setRemoteSystemVoice('bot-1', 'com.apple.voice.samantha');
+    expect(remoteSystemVoice('bot-1')).toBe('com.apple.voice.samantha');
+    expect(resolveLocalSystemVoice('com.apple.voice.samantha')).toBe(voices[0]);
 
-    setRemoteVoiceProvider("host");
-    expect(remoteVoiceProvider()).toBe("host");
+    setRemoteVoiceProvider('host');
+    expect(remoteVoiceProvider()).toBe('host');
     expect(localSystemVoiceActive()).toBe(false);
-    expect(remoteSystemVoice("bot-1")).toBe("com.apple.voice.samantha");
+    expect(remoteSystemVoice('bot-1')).toBe('com.apple.voice.samantha');
   });
 
-  it("never offers Mac voices on a Windows client", () => {
-    vi.stubGlobal("window", {
-      ogb: { platform: "win32", remoteClient: { active: true } },
+  it('never offers Mac voices on a Windows client', () => {
+    vi.stubGlobal('window', {
+      ogb: { platform: 'win32', remoteClient: { active: true } },
       SpeechSynthesisUtterance: class {},
       speechSynthesis: { getVoices: () => voices },
     });

@@ -1,4 +1,4 @@
-export { DESKTOP_PORTS } from "./desktop-ports.mjs";
+export { DESKTOP_PORTS } from './desktop-ports.mjs';
 export declare const DESKTOP_NOTICES: readonly string[];
 export interface DesktopNoticesState {
   /** Notices this desktop has shown and someone closed, on whichever page of its window; This computer's own workspace
@@ -40,13 +40,13 @@ export interface DesktopPrefs {
   setLanguage(language: unknown): boolean;
   /** Random, made and saved on first use. */
   installId(): string;
-  updatesConsent(): import("./updates-consent.mjs").UpdatesConsentRecord | null;
+  updatesConsent(): import('./updates-consent.mjs').UpdatesConsentRecord | null;
   /** False, and nothing saved, for a record updates-consent.mjs would not read back. */
   setUpdatesConsent(value: unknown): boolean;
   /** True until switched off. */
   talkShortcut(): boolean;
   setTalkShortcut(enabled: boolean): void;
-  talkKey(): import("./talk-shortcut.mjs").TalkKeyId;
+  talkKey(): import('./talk-shortcut.mjs').TalkKeyId;
   /** False, and nothing saved, for anything but a key id in talk-keys.mjs. */
   setTalkKey(id: unknown): boolean;
   /** The Quick asks chat made on this server (keyed by its data folder), null until one is saved. */
@@ -65,10 +65,22 @@ export interface WindowFrameState {
   /** The choice changes this window only when the app starts again (Windows). */
   restart: boolean;
 }
-type Files = Pick<typeof import("node:fs"), "readFileSync" | "writeFileSync" | "renameSync" | "rmSync">;
-export declare function jsonFile(file: string, files?: Files): { read(): unknown; write(value: unknown): void };
-export declare function createDesktopPrefs(options: { read(): unknown; write(value: unknown): void }): DesktopPrefs;
-export declare function createDesktopText(app: { getPath(name: "userData"): string; isReady(): boolean; getLocale(): string }, prefs?: DesktopPrefs): {
+type Files = Pick<
+  typeof import('node:fs'),
+  'readFileSync' | 'writeFileSync' | 'renameSync' | 'rmSync'
+>;
+export declare function jsonFile(
+  file: string,
+  files?: Files,
+): { read(): unknown; write(value: unknown): void };
+export declare function createDesktopPrefs(options: {
+  read(): unknown;
+  write(value: unknown): void;
+}): DesktopPrefs;
+export declare function createDesktopText(
+  app: { getPath(name: 'userData'): string; isReady(): boolean; getLocale(): string },
+  prefs?: DesktopPrefs,
+): {
   prefs: DesktopPrefs;
   language(): string;
   t(key: string, params?: Record<string, string | number>): string;
@@ -86,10 +98,13 @@ export declare function relabelDesktop(options: {
 export declare function registerDesktopPrefs(options: {
   /** Used instead of making a store from read/write. */
   prefs?: DesktopPrefs;
-  ipcMain: { handle(channel: string, handler: (event: unknown, ...args: unknown[]) => unknown): void; on(channel: string, listener: (event: { returnValue?: unknown }) => void): void };
+  ipcMain: {
+    handle(channel: string, handler: (event: unknown, ...args: unknown[]) => unknown): void;
+    on(channel: string, listener: (event: { returnValue?: unknown }) => void): void;
+  };
   read?(): unknown;
   write?(value: unknown): void;
-  page(event: unknown): "local" | "cloud" | "server" | null;
+  page(event: unknown): 'local' | 'cloud' | 'server' | null;
   cloudOffered(): Promise<boolean>;
   localConfig?(): unknown;
   languageChanged?(language: string, sender: unknown): void;
@@ -101,7 +116,7 @@ export declare function registerDesktopPrefs(options: {
    * the app to start again; `changed()`, the pages hear it. */
   frame?: { made(): boolean | null; restarts: boolean; changed(): void } | null;
   /** The MausBot Cloud sign-in client: with it, the product-updates question is asked and its answer kept here. */
-  cloudAccount?(): import("./updates-consent.mjs").UpdatesConsentClient | null;
+  cloudAccount?(): import('./updates-consent.mjs').UpdatesConsentClient | null;
   now?: () => number;
   systemName?(): Promise<string | null>;
-}): import("./updates-consent.mjs").UpdatesConsent | null;
+}): import('./updates-consent.mjs').UpdatesConsent | null;

@@ -1,14 +1,19 @@
 // The key itself is never kept, only a hash of it beside the provider's base URL.
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 
-export const KEY_REJECTED_REASON = "The provider rejected this key. Change it in Settings → API keys.";
+export const KEY_REJECTED_REASON =
+  'The provider rejected this key. Change it in Settings → API keys.';
 
 const rejected = new Set<string>();
 const listeners = new Set<() => void>();
 
-const fingerprint = (key: string) => createHash("sha256").update(key.trim()).digest("hex").slice(0, 32);
-const markOf = (url: string, key: string) => `${url.trim().replace(/\/+$/, "")} ${fingerprint(key)}`;
-const changed = () => { for (const listener of listeners) listener(); };
+const fingerprint = (key: string) =>
+  createHash('sha256').update(key.trim()).digest('hex').slice(0, 32);
+const markOf = (url: string, key: string) =>
+  `${url.trim().replace(/\/+$/, '')} ${fingerprint(key)}`;
+const changed = () => {
+  for (const listener of listeners) listener();
+};
 
 export function keyRejected(url: string, key: string): boolean {
   return rejected.size > 0 && rejected.has(markOf(url, key));
@@ -40,8 +45,11 @@ export function onKeyRejectionChange(listener: () => void): () => void {
 
 /** xAI answers a wrong key with HTTP 400, not 401. */
 export function rejectsKey(status: number, body: string): boolean {
-  if (/\b(?:quota|billing|credits?|rate.?limit|insufficient.?(?:balance|funds))\b/i.test(body)) return false;
+  if (/\b(?:quota|billing|credits?|rate.?limit|insufficient.?(?:balance|funds))\b/i.test(body))
+    return false;
   if (status === 401) return true;
   if (status !== 400 && status !== 403) return false;
-  return /\binvalid_api_key\b|\b(?:invalid|incorrect|revoked|expired|disabled|deactivated)[ _-]?(?:api[ _-]?)?key\b|\bapi[ _-]?key (?:is |was |has been )?(?:invalid|incorrect|revoked|expired|disabled|not valid)\b/i.test(body);
+  return /\binvalid_api_key\b|\b(?:invalid|incorrect|revoked|expired|disabled|deactivated)[ _-]?(?:api[ _-]?)?key\b|\bapi[ _-]?key (?:is |was |has been )?(?:invalid|incorrect|revoked|expired|disabled|not valid)\b/i.test(
+    body,
+  );
 }

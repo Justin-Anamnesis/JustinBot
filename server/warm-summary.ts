@@ -34,7 +34,7 @@ export interface WarmSummaryTarget {
 /** `native`: the engine's own compaction (Claude Code's /compact on a fork); `harness`: OpenMausBot's fold, for engines
  * whose context it rebuilds. `soon`: the next turn would summarize at its start anyway. */
 export interface WarmSummaryPlan {
-  way: "native" | "harness";
+  way: 'native' | 'harness';
   soon: boolean;
 }
 
@@ -51,7 +51,11 @@ export interface WarmSummaryDeps {
   /** Why not now. `retry`: it may pass in minutes (a busy bot, a routine due); otherwise the next turn here arms it again. */
   hold(target: WarmSummaryTarget): { reason: string; retry: boolean } | null;
   /** Writes and applies the summary. `awaited()`: a turn is waiting for it, so the turn's own setup is no reason to drop it. */
-  run(target: WarmSummaryTarget, plan: WarmSummaryPlan, control: { signal: AbortSignal; awaited(): boolean }): Promise<WarmSummaryOutcome>;
+  run(
+    target: WarmSummaryTarget,
+    plan: WarmSummaryPlan,
+    control: { signal: AbortSignal; awaited(): boolean },
+  ): Promise<WarmSummaryOutcome>;
   log?(line: string): void;
 }
 
@@ -79,8 +83,12 @@ export interface WarmSummaryState {
 
 export function createWarmSummary(deps: WarmSummaryDeps) {
   const scale = deps.timeScale && deps.timeScale > 0 && deps.timeScale <= 1 ? deps.timeScale : 1;
-  const [idleMs, soonMs, retryMs, giveUpMs] = [WARM_SUMMARY_IDLE_MS, WARM_SUMMARY_SOON_MS, WARM_SUMMARY_RETRY_MS, WARM_SUMMARY_GIVE_UP_MS]
-    .map((ms) => Math.max(1, Math.round(ms * scale)));
+  const [idleMs, soonMs, retryMs, giveUpMs] = [
+    WARM_SUMMARY_IDLE_MS,
+    WARM_SUMMARY_SOON_MS,
+    WARM_SUMMARY_RETRY_MS,
+    WARM_SUMMARY_GIVE_UP_MS,
+  ].map((ms) => Math.max(1, Math.round(ms * scale)));
   const pending = new Map<string, Pending>();
   const last = new Map<string, { at: number; outcome: string }>();
   let disposed = false;
@@ -102,14 +110,17 @@ export function createWarmSummary(deps: WarmSummaryDeps) {
   const schedule = (p: Pending, ms: number) => {
     p.timer?.cancel();
     p.dueAt = deps.now() + ms;
-    p.timer = deps.after(ms, () => { void fire(p); });
+    p.timer = deps.after(ms, () => {
+      void fire(p);
+    });
   };
 
   const fire = async (p: Pending): Promise<void> => {
     p.timer = null;
     p.dueAt = null;
     if (disposed || pending.get(p.target.threadId) !== p || p.run) return;
-    if (deps.now() - p.turnEndedAt >= giveUpMs) return drop(p, "skipped: the prompt cache has gone cold");
+    if (deps.now() - p.turnEndedAt >= giveUpMs)
+      return drop(p, 'skipped: the prompt cache has gone cold');
     const held = deps.hold(p.target);
     if (held) {
       if (held.retry && deps.now() + retryMs - p.turnEndedAt < giveUpMs) {
@@ -124,18 +135,25 @@ export function createWarmSummary(deps: WarmSummaryDeps) {
     run.done = (async () => {
       let outcome: WarmSummaryOutcome;
       try {
-        outcome = await deps.run(p.target, p.plan, { signal: controller.signal, awaited: () => run.awaited });
+        outcome = await deps.run(p.target, p.plan, {
+          signal: controller.signal,
+          awaited: () => run.awaited,
+        });
       } catch (error) {
         outcome = { ok: false, reason: error instanceof Error ? error.message : String(error) };
       }
       if (p.run === run) p.run = null;
       if (pending.get(p.target.threadId) !== p) return;
-      if (outcome.ok) return drop(p, "summarized");
-      if (outcome.retry && !controller.signal.aborted && deps.now() + retryMs - p.turnEndedAt < giveUpMs) {
+      if (outcome.ok) return drop(p, 'summarized');
+      if (
+        outcome.retry &&
+        !controller.signal.aborted &&
+        deps.now() + retryMs - p.turnEndedAt < giveUpMs
+      ) {
         note(p.target.threadId, `waiting: ${outcome.reason}`);
         return schedule(p, retryMs);
       }
-      drop(p, `${controller.signal.aborted ? "abandoned" : "failed"}: ${outcome.reason}`);
+      drop(p, `${controller.signal.aborted ? 'abandoned' : 'failed'}: ${outcome.reason}`);
     })();
     await run.done;
   };
@@ -150,7 +168,14 @@ export function createWarmSummary(deps: WarmSummaryDeps) {
       if (!turn.ok) return;
       const plan = deps.plan(target, turn.contextTokens);
       if (!plan) return;
-      const p: Pending = { target, plan, turnEndedAt: deps.now(), dueAt: null, timer: null, run: null };
+      const p: Pending = {
+        target,
+        plan,
+        turnEndedAt: deps.now(),
+        dueAt: null,
+        timer: null,
+        run: null,
+      };
       pending.set(target.threadId, p);
       schedule(p, plan.soon ? soonMs : idleMs);
     },
@@ -168,30 +193,35 @@ export function createWarmSummary(deps: WarmSummaryDeps) {
 
     /** Called by a turn's setup before it reads its session: waits for a summary the turn would otherwise write at its start,
      * and abandons any other, so the turn never waits for a summary it did not need. */
-    async beforeTurn(threadId: string, stillWanted: () => boolean = () => true): Promise<"none" | "abandoned" | "waited" | "gave-up"> {
+    async beforeTurn(
+      threadId: string,
+      stillWanted: () => boolean = () => true,
+    ): Promise<'none' | 'abandoned' | 'waited' | 'gave-up'> {
       const p = pending.get(threadId);
-      if (!p) return "none";
+      if (!p) return 'none';
       if (!p.run) {
         drop(p);
-        return "none";
+        return 'none';
       }
       const run = p.run;
       if (!p.plan.soon) {
         deps.log?.(`warm summary ${threadId}: a turn that does not need it starts now`);
         run.controller.abort();
-        return "abandoned";
+        return 'abandoned';
       }
       deps.log?.(`warm summary ${threadId}: a turn waits for it`);
       run.awaited = true;
       const deadline = deps.now() + WARM_SUMMARY_TURN_WAIT_MS;
       let settled = false;
-      void run.done.then(() => { settled = true; });
+      void run.done.then(() => {
+        settled = true;
+      });
       while (!settled && stillWanted() && deps.now() < deadline) {
         await Promise.race([run.done, new Promise((resolve) => setTimeout(resolve, 250))]);
       }
-      if (settled) return "waited";
+      if (settled) return 'waited';
       run.controller.abort();
-      return "gave-up";
+      return 'gave-up';
     },
 
     /** The person has this conversation in front of them: a summary the next turn would need anyway starts now. */
@@ -210,14 +240,26 @@ export function createWarmSummary(deps: WarmSummaryDeps) {
     },
 
     forgetBot(botId: string): void {
-      for (const p of pending.values()) if (p.target.botId === botId) { p.run?.controller.abort(); drop(p); }
+      for (const p of pending.values())
+        if (p.target.botId === botId) {
+          p.run?.controller.abort();
+          drop(p);
+        }
     },
 
     state(threadId: string): WarmSummaryState | undefined {
       const p = pending.get(threadId);
       const done = last.get(threadId);
-      if (!p) return done ? { plan: { way: "native", soon: false }, dueAt: null, running: false, last: done } : undefined;
-      return { plan: p.plan, dueAt: p.dueAt, running: Boolean(p.run), ...(done ? { last: done } : {}) };
+      if (!p)
+        return done
+          ? { plan: { way: 'native', soon: false }, dueAt: null, running: false, last: done }
+          : undefined;
+      return {
+        plan: p.plan,
+        dueAt: p.dueAt,
+        running: Boolean(p.run),
+        ...(done ? { last: done } : {}),
+      };
     },
 
     dispose(): void {

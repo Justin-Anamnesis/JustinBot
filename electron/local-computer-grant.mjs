@@ -2,12 +2,15 @@
 // connection over the child's private utility-process port, which no other process on the computer can read or write,
 // and sends it again whenever the driver changes. The connection file the app also keeps grants nothing: a server reads
 // this computer only from this message (server/desktop-computer.ts), so a second OpenMausBot server never finds it.
-export const LOCAL_COMPUTER_GRANT = "openmausbot:local-computer";
+export const LOCAL_COMPUTER_GRANT = 'openmausbot:local-computer';
 
 export function localComputerGrantMessage(connection) {
   return {
     type: LOCAL_COMPUTER_GRANT,
-    connection: connection && typeof connection === "object" && !Array.isArray(connection) ? connection : null,
+    connection:
+      connection && typeof connection === 'object' && !Array.isArray(connection)
+        ? connection
+        : null,
   };
 }
 
@@ -28,7 +31,7 @@ export function createLocalComputerGrant({ connection, log = () => {} }) {
   return Object.freeze({
     attach(proc, isCurrent) {
       target = proc;
-      current = typeof isCurrent === "function" ? isCurrent : () => true;
+      current = typeof isCurrent === 'function' ? isCurrent : () => true;
       send();
     },
     changed: send,

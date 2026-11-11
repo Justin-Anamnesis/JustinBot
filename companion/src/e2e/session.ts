@@ -1,6 +1,6 @@
 // One encrypted session over any message transport: the handshake, then records carrying yamux frames, each stream
 // a Node Duplex. The computer pipes every stream to its own origin socket; the phone hands streams to an HTTP stack.
-import { Duplex } from "node:stream";
+import { Duplex } from 'node:stream';
 
 import {
   CLOSE,
@@ -17,9 +17,19 @@ import {
   type PskCandidate,
   type SessionKeys,
   type TransportByte,
-} from "./noise.ts";
-import { b64u } from "./credentials.ts";
-import { decodeFrame, encodeFrame, GO_AWAY, Mux, PING_INTERVAL_MS, PING_TIMEOUT_MS, YamuxError, type Frame, type Role } from "./yamux.ts";
+} from './noise.ts';
+import { b64u } from './credentials.ts';
+import {
+  decodeFrame,
+  encodeFrame,
+  GO_AWAY,
+  Mux,
+  PING_INTERVAL_MS,
+  PING_TIMEOUT_MS,
+  YamuxError,
+  type Frame,
+  type Role,
+} from './yamux.ts';
 
 /** A sender stops writing records while the socket holds more than this. */
 export const SEND_BUFFER_HIGH = 1024 * 1024;
@@ -81,10 +91,14 @@ export class MuxStream extends Duplex {
     this.#session = session;
     this.streamId = streamId;
     // A reset reaches whoever listens; without a listener it must not take the process down.
-    this.on("error", noop);
+    this.on('error', noop);
   }
 
-  override _write(chunk: Buffer, _encoding: BufferEncoding, done: (error?: Error | null) => void): void {
+  override _write(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    done: (error?: Error | null) => void,
+  ): void {
     this.#pending = chunk;
     this.#pendingDone = done;
     this.flush();
@@ -109,7 +123,7 @@ export class MuxStream extends Duplex {
     const pendingDone = this.#pendingDone;
     this.#pending = null;
     this.#pendingDone = null;
-    pendingDone?.(error ?? new Error("stream reset"));
+    pendingDone?.(error ?? new Error('stream reset'));
     done(error);
   }
 
@@ -124,15 +138,15 @@ export class MuxStream extends Duplex {
   }
 
   remoteReset(): void {
-    if (!this.destroyed) this.destroy(new Error("stream reset"));
+    if (!this.destroyed) this.destroy(new Error('stream reset'));
   }
 
   flush(): void {
     const mux = this.#session.mux;
     while (this.#pending && this.#pending.length > 0) {
-      if (!mux || !mux.has(this.streamId)) return void this.destroy(new Error("stream reset"));
+      if (!mux || !mux.has(this.streamId)) return void this.destroy(new Error('stream reset'));
       if (this.#session.congested) return this.#session.whenDrained(() => this.flush());
-      
+
       const taken = mux.write(this.streamId, this.#pending);
       if (taken === 0) return;
       this.#pending = this.#pending.subarray(taken);
@@ -144,14 +158,14 @@ export class MuxStream extends Duplex {
   }
 }
 
-type State = "handshake" | "open" | "closed";
+type State = 'handshake' | 'open' | 'closed';
 
 export class E2ESession<Id> {
   readonly role: Role;
   readonly #transport: RecordTransport;
   readonly #streams = new Map<number, MuxStream>();
   readonly #timers: Required<Timers>;
-  #state: State = "handshake";
+  #state: State = 'handshake';
   #keys: SessionKeys | null = null;
   #mux: Mux | null = null;
   #accept: ((message: Buffer) => void) | null = null;
@@ -191,10 +205,17 @@ export class E2ESession<Id> {
 
   /** Waits for message 1. Anything wrong with it closes 4001 and nothing else is sent. */
   static computer<Id>(options: ComputerSessionOptions<Id>): E2ESession<Id> {
-    const session = new E2ESession<Id>("computer", options.transport, options);
+    const session = new E2ESession<Id>('computer', options.transport, options);
     session.#connectOrigin = options.connectOrigin;
     session.#accept = (message) => {
-      const accepted = computerAccept({ staticKey: options.staticKey, transport: options.transportByte, candidates: options.candidates() }, message);
+      const accepted = computerAccept(
+        {
+          staticKey: options.staticKey,
+          transport: options.transportByte,
+          candidates: options.candidates(),
+        },
+        message,
+      );
       if (!accepted) return session.close(CLOSE.rejected);
       options.transport.send(accepted.message2);
       session.peer = accepted.id;
@@ -206,10 +227,15 @@ export class E2ESession<Id> {
 
   /** Sends message 1 now. `ready` rejects with a NoiseError when the computer can't be verified: a hard stop. */
   static phone(options: PhoneSessionOptions): E2ESession<never> {
-    const session = new E2ESession<never>("phone", options.transport, options);
+    const session = new E2ESession<never>('phone', options.transport, options);
     const conn = newConn();
     const hello: PhoneHello = phoneHello(
-      { remoteStatic: options.remoteStatic, psk: options.psk, transport: options.transportByte, ephemeral: options.ephemeral },
+      {
+        remoteStatic: options.remoteStatic,
+        psk: options.psk,
+        transport: options.transportByte,
+        ephemeral: options.ephemeral,
+      },
       encodePayload1(conn, options.app),
       b64u(conn),
     );
@@ -270,11 +296,12 @@ export class E2ESession<Id> {
 
   /** Every message the transport receives, in order. */
   receive(message: Uint8Array, binary: boolean): void {
-    if (this.#state === "closed") return;
-    if (this.#state === "handshake") {
+    if (this.#state === 'closed') return;
+    if (this.#state === 'handshake') {
       const accept = this.#accept;
       this.#accept = null;
-      if (!binary || !accept) return this.close(this.role === "computer" ? CLOSE.rejected : CLOSE.protocol);
+      if (!binary || !accept)
+        return this.close(this.role === 'computer' ? CLOSE.rejected : CLOSE.protocol);
       return accept(Buffer.from(message));
     }
     if (!binary) return this.close(CLOSE.protocol);
@@ -295,7 +322,7 @@ export class E2ESession<Id> {
 
   /** The phone side. */
   openStream(): MuxStream {
-    if (this.#state !== "open" || !this.#mux) throw new SessionClosed(CLOSE.normal);
+    if (this.#state !== 'open' || !this.#mux) throw new SessionClosed(CLOSE.normal);
     const streamId = this.#mux.open();
     const stream = new MuxStream(this as E2ESession<unknown>, streamId);
     this.#streams.set(streamId, stream);
@@ -304,18 +331,18 @@ export class E2ESession<Id> {
 
   /** The computer side: the device was removed. The phone hears it authenticated, then the 4001 close. */
   remove(): void {
-    if (this.#state === "open") this.#mux?.goAway(GO_AWAY.removed);
+    if (this.#state === 'open') this.#mux?.goAway(GO_AWAY.removed);
     this.close(CLOSE.rejected);
   }
 
   /** A planned close (quit, sleep, restart): GoAway first, so the peer knows it isn't an error. */
   shutdown(): void {
-    if (this.#state === "open") this.#mux?.goAway(GO_AWAY.normal);
+    if (this.#state === 'open') this.#mux?.goAway(GO_AWAY.normal);
     this.close(CLOSE.normal);
   }
 
   close(code: number, reason?: string): void {
-    if (this.#state === "closed") return;
+    if (this.#state === 'closed') return;
     this.#transport.close(code, reason);
     this.#end(code);
   }
@@ -326,9 +353,9 @@ export class E2ESession<Id> {
   }
 
   #end(code: number): void {
-    if (this.#state === "closed") return;
-    const wasHandshake = this.#state === "handshake";
-    this.#state = "closed";
+    if (this.#state === 'closed') return;
+    const wasHandshake = this.#state === 'handshake';
+    this.#state = 'closed';
     for (const timer of [this.#deadline, this.#pongTimer]) if (timer) clearTimeout(timer);
     if (this.#pingTimer) clearInterval(this.#pingTimer);
     this.#mux?.closeAll();
@@ -344,11 +371,14 @@ export class E2ESession<Id> {
   #start(keys: SessionKeys): void {
     if (this.#deadline) clearTimeout(this.#deadline);
     this.#keys = keys;
-    this.#state = "open";
+    this.#state = 'open';
     this.#mux = new Mux(this.role, {
       send: (frame) => this.#send(frame),
       opened: (streamId) => this.#openOrigin(streamId),
-      data: (streamId, data) => this.#streams.get(streamId)?.deliver(Buffer.from(data.buffer, data.byteOffset, data.byteLength)),
+      data: (streamId, data) =>
+        this.#streams
+          .get(streamId)
+          ?.deliver(Buffer.from(data.buffer, data.byteOffset, data.byteLength)),
       ended: (streamId) => this.#streams.get(streamId)?.remoteEnded(),
       reset: (streamId) => {
         const stream = this.#streams.get(streamId);
@@ -357,7 +387,7 @@ export class E2ESession<Id> {
       },
       writable: (streamId) => this.#streams.get(streamId)?.flush(),
       goAway: (code) => {
-        if (code === GO_AWAY.removed && this.role === "phone") this.#removed = true;
+        if (code === GO_AWAY.removed && this.role === 'phone') this.#removed = true;
         else if (code !== GO_AWAY.normal) this.close(CLOSE.protocol);
       },
       pong: (value) => {
@@ -381,7 +411,7 @@ export class E2ESession<Id> {
   }
 
   #send(frame: Frame): void {
-    if (this.#state !== "open" || !this.#keys) return;
+    if (this.#state !== 'open' || !this.#keys) return;
     let record: Buffer;
     try {
       record = this.#keys.send.seal(encodeFrame(frame));
@@ -401,13 +431,13 @@ export class E2ESession<Id> {
     if (!connect) return void stream.destroy();
     connect().then(
       (socket) => {
-        if (stream.destroyed || this.#state !== "open") return void socket.destroy();
+        if (stream.destroyed || this.#state !== 'open') return void socket.destroy();
         this.#mux?.accept(streamId);
-        socket.on("error", () => stream.destroy());
-        socket.on("close", () => {
+        socket.on('error', () => stream.destroy());
+        socket.on('close', () => {
           if (!socket.readableEnded) stream.destroy();
         });
-        stream.on("close", () => socket.destroy());
+        stream.on('close', () => socket.destroy());
         stream.pipe(socket);
         socket.pipe(stream);
       },

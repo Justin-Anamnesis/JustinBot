@@ -1,11 +1,16 @@
 // The reference phone: dials a route with Node's built-in WebSocket client and returns an open session. Used by the
 // interop and integration tests, and by a desktop reaching another desktop.
-import { b64u } from "./credentials.ts";
-import { E2ESession, SEND_BUFFER_HIGH, SessionClosed, type RecordTransport } from "./session.ts";
-import { HANDSHAKE_DEADLINE_MS, TRANSPORT_RELAY, type KeyPair, type TransportByte } from "./noise.ts";
+import { b64u } from './credentials.ts';
+import { E2ESession, SEND_BUFFER_HIGH, SessionClosed, type RecordTransport } from './session.ts';
+import {
+  HANDSHAKE_DEADLINE_MS,
+  TRANSPORT_RELAY,
+  type KeyPair,
+  type TransportByte,
+} from './noise.ts';
 
-export const DIRECT_PROTOCOL = "omb-e2e.v1";
-export const RELAY_PROTOCOL = "omb-relay.v1";
+export const DIRECT_PROTOCOL = 'omb-e2e.v1';
+export const RELAY_PROTOCOL = 'omb-relay.v1';
 const DRAIN_POLL_MS = 5;
 
 export interface DialOptions {
@@ -38,7 +43,8 @@ export function webSocketTransport(socket: WebSocket): RecordTransport {
     // The built-in client has no drain event.
     onceDrained(listener) {
       const check = () => {
-        if (socket.readyState !== WebSocket.OPEN || socket.bufferedAmount <= SEND_BUFFER_HIGH / 4) listener();
+        if (socket.readyState !== WebSocket.OPEN || socket.bufferedAmount <= SEND_BUFFER_HIGH / 4)
+          listener();
         else setTimeout(check, DRAIN_POLL_MS);
       };
       check();
@@ -49,16 +55,20 @@ export function webSocketTransport(socket: WebSocket): RecordTransport {
 /** Rejects with SessionClosed (the close code, e.g. 4001 or a relay 4404) or a NoiseError (a hard stop). */
 export function dial(options: DialOptions): Promise<E2ESession<never>> {
   const relayed = Boolean(options.relay);
-  if (relayed && options.transportByte !== TRANSPORT_RELAY) throw new Error("the relay route uses the relay prologue");
+  if (relayed && options.transportByte !== TRANSPORT_RELAY)
+    throw new Error('the relay route uses the relay prologue');
   const socket = new WebSocket(options.url, [relayed ? RELAY_PROTOCOL : DIRECT_PROTOCOL]);
-  socket.binaryType = "arraybuffer";
+  socket.binaryType = 'arraybuffer';
   const transport = webSocketTransport(socket);
   return new Promise((resolve, reject) => {
     let session: E2ESession<never> | null = null;
-    const timer = setTimeout(() => {
-      reject(new SessionClosed(4002));
-      socket.close();
-    }, (options.timeoutMs ?? HANDSHAKE_DEADLINE_MS) + (relayed ? 10_000 : 0));
+    const timer = setTimeout(
+      () => {
+        reject(new SessionClosed(4002));
+        socket.close();
+      },
+      (options.timeoutMs ?? HANDSHAKE_DEADLINE_MS) + (relayed ? 10_000 : 0),
+    );
     const start = () => {
       session = E2ESession.phone({ ...options, transport });
       session.ready.then(
@@ -74,16 +84,25 @@ export function dial(options: DialOptions): Promise<E2ESession<never>> {
     };
     socket.onopen = () => {
       if (!options.relay) return start();
-      socket.send(JSON.stringify({ t: "phone", v: 1, hid: b64u(options.relay.hostId), adm: b64u(options.relay.adm) }));
+      socket.send(
+        JSON.stringify({
+          t: 'phone',
+          v: 1,
+          hid: b64u(options.relay.hostId),
+          adm: b64u(options.relay.adm),
+        }),
+      );
     };
     socket.onmessage = (event: MessageEvent) => {
-      const binary = typeof event.data !== "string";
-      const data = binary ? new Uint8Array(event.data as ArrayBuffer) : Buffer.from(event.data as string, "utf8");
+      const binary = typeof event.data !== 'string';
+      const data = binary
+        ? new Uint8Array(event.data as ArrayBuffer)
+        : Buffer.from(event.data as string, 'utf8');
       if (session) return session.receive(data, binary);
       // Before the session: only the relay's ready.
       let ready = false;
       try {
-        ready = !binary && (JSON.parse(String(event.data)) as { t?: unknown }).t === "ready";
+        ready = !binary && (JSON.parse(String(event.data)) as { t?: unknown }).t === 'ready';
       } catch {
         ready = false;
       }

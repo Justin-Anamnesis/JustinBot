@@ -2,13 +2,22 @@
 // move into the home of the conversation they belong to, found by the session id the server keeps for it (or, for
 // Claude, by the conversation's own folder). What matches nothing goes to the held folder, where no route and no box
 // reaches it, and is deleted after HELD_DAYS.
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative } from "node:path";
+import {
+  cpSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readdirSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { basename, dirname, isAbsolute, join, relative } from 'node:path';
 
-import type { Audience } from "../audience.ts";
-import { HELD_DAYS, HELD_DIR, audienceHome, engineHomesRoot, homedSpawn } from "./layout.ts";
+import type { Audience } from '../audience.ts';
+import { HELD_DAYS, HELD_DIR, audienceHome, engineHomesRoot, homedSpawn } from './layout.ts';
 
-const MARKER = ".migrated";
+const MARKER = '.migrated';
 const DAY_MS = 86_400_000;
 const SESSION_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
@@ -39,15 +48,29 @@ export interface MigrationResult {
 
 /** Claude Code names a project's folder by its working folder, every character but a letter or digit made `-` (2.1). */
 export function claudeProjectSlug(cwd: string): string {
-  return cwd.replace(/[^a-zA-Z0-9]/g, "-");
+  return cwd.replace(/[^a-zA-Z0-9]/g, '-');
 }
 
 /** Each engine's session files, by folder variable: `sessions` are matched to a conversation; `private` move to the held
  * folder whole. Names as Claude Code 2.1 and Codex 0.16 keep them. */
-const ENGINE_STATE: ReadonlyArray<{ variable: string; home: string; sessions: readonly string[]; private: readonly string[] }> = [
-  { variable: "CLAUDE_CONFIG_DIR", home: ".claude", sessions: ["projects", "file-history", "session-env", "todos", "debug"],
-    private: ["history.jsonl", "shell-snapshots", "plans", "paste-cache"] },
-  { variable: "CODEX_HOME", home: ".codex", sessions: ["sessions", "archived_sessions"], private: ["history.jsonl", "log", "shell_snapshots"] },
+const ENGINE_STATE: ReadonlyArray<{
+  variable: string;
+  home: string;
+  sessions: readonly string[];
+  private: readonly string[];
+}> = [
+  {
+    variable: 'CLAUDE_CONFIG_DIR',
+    home: '.claude',
+    sessions: ['projects', 'file-history', 'session-env', 'todos', 'debug'],
+    private: ['history.jsonl', 'shell-snapshots', 'plans', 'paste-cache'],
+  },
+  {
+    variable: 'CODEX_HOME',
+    home: '.codex',
+    sessions: ['sessions', 'archived_sessions'],
+    private: ['history.jsonl', 'log', 'shell_snapshots'],
+  },
 ];
 
 function moveEntry(from: string, to: string): void {
@@ -55,14 +78,18 @@ function moveEntry(from: string, to: string): void {
   try {
     renameSync(from, to);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "EXDEV") throw error;
+    if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
     cpSync(from, to, { recursive: true, preserveTimestamps: true });
     rmSync(from, { recursive: true, force: true });
   }
 }
 
 function entries(dir: string): string[] {
-  try { return readdirSync(dir); } catch { return []; }
+  try {
+    return readdirSync(dir);
+  } catch {
+    return [];
+  }
 }
 
 /** Every file under `dir` (a folder that holds sessions in dated subfolders), deepest last. */
@@ -72,7 +99,11 @@ function walk(dir: string, depth = 0): string[] {
   for (const name of entries(dir)) {
     const path = join(dir, name);
     let stats;
-    try { stats = lstatSync(path); } catch { continue; }
+    try {
+      stats = lstatSync(path);
+    } catch {
+      continue;
+    }
     if (stats.isDirectory()) found.push(...walk(path, depth + 1));
     else found.push(path);
   }
@@ -100,14 +131,20 @@ export function migrateEngineHomes(input: MigrationInput): MigrationResult {
   const bySession = new Map<string, string>();
   const bySlug = new Map<string, string | null>();
   for (const thread of input.threads()) {
-    for (const cursor of thread.cursors) if (typeof cursor === "string" && cursor) bySession.set(cursor.toLowerCase(), thread.threadId);
+    for (const cursor of thread.cursors)
+      if (typeof cursor === 'string' && cursor)
+        bySession.set(cursor.toLowerCase(), thread.threadId);
     if (thread.cwd) {
       const slug = claudeProjectSlug(thread.cwd);
-      bySlug.set(slug, bySlug.has(slug) && bySlug.get(slug) !== thread.threadId ? null : thread.threadId);
+      bySlug.set(
+        slug,
+        bySlug.has(slug) && bySlug.get(slug) !== thread.threadId ? null : thread.threadId,
+      );
     }
   }
   const heldRoot = join(root, HELD_DIR, String(now));
-  let moved = 0, held = 0;
+  let moved = 0,
+    held = 0;
   const hold = (from: string, serverFolder: string, home: string) => {
     moveEntry(from, join(heldRoot, home, relative(serverFolder, from)));
     held++;
@@ -117,7 +154,11 @@ export function migrateEngineHomes(input: MigrationInput): MigrationResult {
     const serverFolder = named && isAbsolute(named) ? named : join(input.serverHome, engine.home);
     const folderIn = (audience: Audience) => {
       const home = audienceHome(input.dataDir, audience);
-      return homedSpawn(input.env, { dataDir: input.dataDir, serverHome: input.serverHome, home }).env[engine.variable] ?? join(home, engine.home);
+      return (
+        homedSpawn(input.env, { dataDir: input.dataDir, serverHome: input.serverHome, home }).env[
+          engine.variable
+        ] ?? join(home, engine.home)
+      );
     };
     const place = (from: string, threadId: string | undefined) => {
       if (!threadId) return hold(from, serverFolder, engine.home);
@@ -128,7 +169,7 @@ export function migrateEngineHomes(input: MigrationInput): MigrationResult {
     };
     for (const sessions of engine.sessions) {
       const dir = join(serverFolder, sessions);
-      if (sessions === "projects") {
+      if (sessions === 'projects') {
         for (const slug of entries(dir)) {
           const project = join(dir, slug);
           for (const name of entries(project)) {
@@ -137,7 +178,7 @@ export function migrateEngineHomes(input: MigrationInput): MigrationResult {
           }
           if (!entries(project).length) rmSync(project, { recursive: true, force: true });
         }
-      } else if (engine.variable === "CODEX_HOME") {
+      } else if (engine.variable === 'CODEX_HOME') {
         for (const file of walk(dir)) {
           const id = SESSION_ID.exec(basename(file))?.[0]?.toLowerCase();
           place(file, id ? bySession.get(id) : undefined);
@@ -154,22 +195,34 @@ export function migrateEngineHomes(input: MigrationInput): MigrationResult {
       if (existsSync(path)) hold(path, serverFolder, engine.home);
     }
   }
-  writeFileSync(join(root, MARKER), `${JSON.stringify({ at: now, moved, held })}\n`, { mode: 0o600 });
+  writeFileSync(join(root, MARKER), `${JSON.stringify({ at: now, moved, held })}\n`, {
+    mode: 0o600,
+  });
   return { ran: true, moved, held, swept };
 }
 
 export type StoreBotThreads = ReadonlyArray<{
   threadId?: string;
   resumeCursors?: Record<string, unknown>;
-  tasks?: ReadonlyArray<{ threadId: string; resumeCursors?: Record<string, unknown>; cwd?: string | null }>;
+  tasks?: ReadonlyArray<{
+    threadId: string;
+    resumeCursors?: Record<string, unknown>;
+    cwd?: string | null;
+  }>;
 }>;
 
 /** The store's conversations with the engine sessions they resume and the folders they run in. */
 export function storeThreads(bots: StoreBotThreads): MigrationThread[] {
   const threads: MigrationThread[] = [];
   for (const bot of bots) {
-    if (bot.threadId && bot.resumeCursors) threads.push({ threadId: bot.threadId, cursors: Object.values(bot.resumeCursors) });
-    for (const task of bot.tasks ?? []) threads.push({ threadId: task.threadId, cursors: Object.values(task.resumeCursors ?? {}), cwd: task.cwd ?? null });
+    if (bot.threadId && bot.resumeCursors)
+      threads.push({ threadId: bot.threadId, cursors: Object.values(bot.resumeCursors) });
+    for (const task of bot.tasks ?? [])
+      threads.push({
+        threadId: task.threadId,
+        cursors: Object.values(task.resumeCursors ?? {}),
+        cwd: task.cwd ?? null,
+      });
   }
   return threads;
 }

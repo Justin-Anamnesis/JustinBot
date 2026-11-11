@@ -15,27 +15,27 @@ export interface GitHubSkillOrigin {
 /** Why one entry of a skill's folder did not come in. */
 export type SkippedSkillFileReason =
   /** A symbolic link. */
-  | "link"
+  | 'link'
   /** Another repository nested inside (a git submodule). */
-  | "submodule"
+  | 'submodule'
   /** A dot file or dot folder. */
-  | "hidden"
+  | 'hidden'
   /** A cache a run leaves behind, such as __pycache__ or node_modules. */
-  | "generated"
+  | 'generated'
   /** A name some disks cannot hold. */
-  | "name"
+  | 'name'
   /** Differs only in letter case from another entry. */
-  | "duplicate"
+  | 'duplicate'
   /** Deeper than the folder depth limit. */
-  | "deep"
+  | 'deep'
   /** Over the size limit for one file. */
-  | "large"
+  | 'large'
   /** Past the folder's file-count or size limit. */
-  | "full"
+  | 'full'
   /** A Git LFS pointer, whose real file GitHub keeps elsewhere. */
-  | "lfs"
+  | 'lfs'
   /** GitHub would not list the folder, so only SKILL.md came in. */
-  | "unlisted";
+  | 'unlisted';
 
 export interface SkippedSkillFile {
   /** Inside the skill's folder; a folder ends in "/" and stands for everything below it. */

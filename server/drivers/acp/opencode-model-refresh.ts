@@ -1,11 +1,11 @@
-import { mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
-import { openCodeModelId } from "../../../shared/opencode-model-id.ts";
-import { writeFileAtomic } from "../../atomic.ts";
-import { DATA_DIR } from "../../config.ts";
-import type { ProviderInstance } from "../../contracts.ts";
-import { declareOpenCodeModels } from "./opencode-typed-model.ts";
+import { openCodeModelId } from '../../../shared/opencode-model-id.ts';
+import { writeFileAtomic } from '../../atomic.ts';
+import { DATA_DIR } from '../../config.ts';
+import type { ProviderInstance } from '../../contracts.ts';
+import { declareOpenCodeModels } from './opencode-typed-model.ts';
 
 export interface LiveModelList {
   /** OpenCode's id for the provider. */
@@ -18,14 +18,16 @@ export interface LiveModelList {
 }
 
 const record = (value: unknown): Record<string, unknown> =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 
 /** Providers whose own listing holds only models OpenCode can chat with, so it can be offered as it is. */
 export const OPENCODE_LIVE_MODEL_LISTS: readonly LiveModelList[] = [
   {
-    provider: "venice",
-    env: "VENICE_API_KEY",
-    url: "https://api.venice.ai/api/v1/models?type=text",
+    provider: 'venice',
+    env: 'VENICE_API_KEY',
+    url: 'https://api.venice.ai/api/v1/models?type=text',
     // Venice serves its end-to-end encrypted models only to a client that encrypts the prompt itself; models.dev
     // (2026-11-07) lists none of them for OpenCode.
     keep: (entry) => record(record(entry.model_spec).capabilities).supportsE2EE !== true,
@@ -47,20 +49,23 @@ interface Stored {
 
 let memo: Stored | null = null;
 
-const storePath = () => join(DATA_DIR, "providers", "opencode", "live-models.json");
+const storePath = () => join(DATA_DIR, 'providers', 'opencode', 'live-models.json');
 
 function load(): Stored {
   if (memo) return memo;
   memo = { providers: {}, refreshedAt: {} };
   try {
-    const raw = record(JSON.parse(readFileSync(storePath(), "utf8")));
+    const raw = record(JSON.parse(readFileSync(storePath(), 'utf8')));
     for (const [provider, value] of Object.entries(record(raw.providers))) {
       const entry = record(value);
-      const models = Array.isArray(entry.models) ? entry.models.filter((id): id is string => typeof id === "string") : [];
-      if (typeof entry.checkedAt === "number" && models.length) memo.providers[provider] = { checkedAt: entry.checkedAt, models };
+      const models = Array.isArray(entry.models)
+        ? entry.models.filter((id): id is string => typeof id === 'string')
+        : [];
+      if (typeof entry.checkedAt === 'number' && models.length)
+        memo.providers[provider] = { checkedAt: entry.checkedAt, models };
     }
     for (const [instanceId, at] of Object.entries(record(raw.refreshedAt))) {
-      if (typeof at === "number" && Number.isFinite(at)) memo.refreshedAt[instanceId] = at;
+      if (typeof at === 'number' && Number.isFinite(at)) memo.refreshedAt[instanceId] = at;
     }
   } catch {}
   return memo;
@@ -82,29 +87,38 @@ export function markOpenCodeCatalogRefreshed(instanceId: string, at: number): vo
   save();
 }
 
-async function readListing(list: LiveModelList, key: string, fetcher: typeof fetch): Promise<string[]> {
+async function readListing(
+  list: LiveModelList,
+  key: string,
+  fetcher: typeof fetch,
+): Promise<string[]> {
   const response = await fetcher(list.url, {
-    headers: { accept: "application/json", authorization: `Bearer ${key}`, "user-agent": "OpenMausBot" },
-    redirect: "error",
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${key}`,
+      'user-agent': 'OpenMausBot',
+    },
+    redirect: 'error',
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   if (!response.ok) {
     void response.body?.cancel().catch(() => {});
     throw new Error(`HTTP ${response.status}`);
   }
-  if (Number(response.headers.get("content-length")) > MAX_BYTES) {
+  if (Number(response.headers.get('content-length')) > MAX_BYTES) {
     void response.body?.cancel().catch(() => {});
-    throw new Error("the listing is too large");
+    throw new Error('the listing is too large');
   }
   const text = await response.text();
-  if (text.length > MAX_BYTES) throw new Error("the listing is too large");
+  if (text.length > MAX_BYTES) throw new Error('the listing is too large');
   const data = record(JSON.parse(text)).data;
-  if (!Array.isArray(data)) throw new Error("the listing has no data");
+  if (!Array.isArray(data)) throw new Error('the listing has no data');
   const ids = new Set<string>();
   for (const value of data) {
     const entry = record(value);
-    if (typeof entry.id !== "string" || (list.keep && !list.keep(entry))) continue;
-    if (openCodeModelId(`${list.provider}/${entry.id}`) === `${list.provider}/${entry.id}`) ids.add(entry.id);
+    if (typeof entry.id !== 'string' || (list.keep && !list.keep(entry))) continue;
+    if (openCodeModelId(`${list.provider}/${entry.id}`) === `${list.provider}/${entry.id}`)
+      ids.add(entry.id);
     if (ids.size >= MAX_MODELS) break;
   }
   return [...ids].sort();
@@ -117,18 +131,22 @@ export async function refreshLiveModelLists(
 ): Promise<void> {
   const store = load();
   let changed = false;
-  await Promise.all((options.lists ?? OPENCODE_LIVE_MODEL_LISTS).map(async (list) => {
-    const key = env[list.env]?.trim();
-    if (!key) return;
-    try {
-      const models = await readListing(list, key, options.fetch ?? fetch);
-      if (!models.length) throw new Error("the listing names no model");
-      store.providers[list.provider] = { checkedAt: (options.now ?? Date.now)(), models };
-      changed = true;
-    } catch (error) {
-      console.warn(`[opencode] could not read ${list.provider}'s model list (${error instanceof Error ? error.message : String(error)}); keeping the last one`);
-    }
-  }));
+  await Promise.all(
+    (options.lists ?? OPENCODE_LIVE_MODEL_LISTS).map(async (list) => {
+      const key = env[list.env]?.trim();
+      if (!key) return;
+      try {
+        const models = await readListing(list, key, options.fetch ?? fetch);
+        if (!models.length) throw new Error('the listing names no model');
+        store.providers[list.provider] = { checkedAt: (options.now ?? Date.now)(), models };
+        changed = true;
+      } catch (error) {
+        console.warn(
+          `[opencode] could not read ${list.provider}'s model list (${error instanceof Error ? error.message : String(error)}); keeping the last one`,
+        );
+      }
+    }),
+  );
   if (changed) save();
 }
 
@@ -138,10 +156,15 @@ export function declareLiveOpenCodeModels(
   lists: readonly LiveModelList[] = OPENCODE_LIVE_MODEL_LISTS,
 ): void {
   const store = load();
-  declareOpenCodeModels(env, Object.fromEntries(lists.flatMap((list) => {
-    const models = store.providers[list.provider]?.models;
-    return env[list.env]?.trim() && models?.length ? [[list.provider, models]] : [];
-  })));
+  declareOpenCodeModels(
+    env,
+    Object.fromEntries(
+      lists.flatMap((list) => {
+        const models = store.providers[list.provider]?.models;
+        return env[list.env]?.trim() && models?.length ? [[list.provider, models]] : [];
+      }),
+    ),
+  );
 }
 
 export function resetLiveModelLists(): void {
@@ -161,11 +184,19 @@ export interface OpenCodeRefreshSchedule extends OpenCodeModelSources {
 
 /** Reads the instance's models again past every cache once they are `everyMs` old: checked once its start-up read is
  * done and every `checkMs` after, on the wall clock, which keeps counting while a Cloud is suspended. */
-export function keepOpenCodeModelsFresh(instance: ProviderInstance, instanceId: string, schedule: OpenCodeRefreshSchedule = {}): void {
+export function keepOpenCodeModelsFresh(
+  instance: ProviderInstance,
+  instanceId: string,
+  schedule: OpenCodeRefreshSchedule = {},
+): void {
   const now = schedule.now ?? Date.now;
   let disposed = false;
   const refreshWhenDue = () => {
-    if (!disposed && now() - openCodeCatalogRefreshedAt(instanceId) >= (schedule.everyMs ?? OPENCODE_MODEL_REFRESH_MS)) {
+    if (
+      !disposed &&
+      now() - openCodeCatalogRefreshedAt(instanceId) >=
+        (schedule.everyMs ?? OPENCODE_MODEL_REFRESH_MS)
+    ) {
       void instance.refreshModels?.().catch(() => {});
     }
   };

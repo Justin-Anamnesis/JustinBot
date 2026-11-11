@@ -1,9 +1,9 @@
-import { closeSync, fstatSync, openSync, readSync, type Stats } from "node:fs";
-import { join, resolve } from "node:path";
-import type { RuntimeEvent } from "./contracts.ts";
-import type { InspectorEntry, InspectorPage, NativeRecord } from "../shared/inspector.ts";
+import { closeSync, fstatSync, openSync, readSync, type Stats } from 'node:fs';
+import { join, resolve } from 'node:path';
+import type { RuntimeEvent } from './contracts.ts';
+import type { InspectorEntry, InspectorPage, NativeRecord } from '../shared/inspector.ts';
 
-export type { InspectorEntry, InspectorPage, NativeRecord } from "../shared/inspector.ts";
+export type { InspectorEntry, InspectorPage, NativeRecord } from '../shared/inspector.ts';
 
 const DEFAULT_LIMIT = 300;
 const MAX_LIMIT = 2000;
@@ -18,14 +18,14 @@ interface LineCount {
   complete: number;
   trailing: boolean;
 }
-type FileStat = Pick<Stats, "dev" | "ino" | "size" | "mtimeMs">;
+type FileStat = Pick<Stats, 'dev' | 'ino' | 'size' | 'mtimeMs'>;
 
 const lineCounts = new Map<string, LineCount>();
 const LINE_COUNT_CACHE_MAX = 256;
 
 /** Only harness-minted uuids: anything else is not a file to read. */
 function assertThreadId(threadId: string) {
-  if (!/^[\w-]+$/.test(threadId)) throw new Error("invalid thread id");
+  if (!/^[\w-]+$/.test(threadId)) throw new Error('invalid thread id');
 }
 
 function countLines(fd: number, file: string, stat: FileStat): number {
@@ -56,7 +56,14 @@ function countLines(fd: number, file: string, stat: FileStat): number {
     }
     offset += read;
   }
-  const next = { dev: stat.dev, ino: stat.ino, size: stat.size, mtimeMs: stat.mtimeMs, complete, trailing };
+  const next = {
+    dev: stat.dev,
+    ino: stat.ino,
+    size: stat.size,
+    mtimeMs: stat.mtimeMs,
+    complete,
+    trailing,
+  };
   lineCounts.delete(file);
   lineCounts.set(file, next);
   while (lineCounts.size > LINE_COUNT_CACHE_MAX) lineCounts.delete(lineCounts.keys().next().value!);
@@ -65,8 +72,13 @@ function countLines(fd: number, file: string, stat: FileStat): number {
 
 type RecordGuard<T> = (value: unknown) => value is T;
 
-function parseRecent<T>(text: string, includeFirst: boolean, limit: number, valid: RecordGuard<T>): T[] {
-  const lines = text.split("\n");
+function parseRecent<T>(
+  text: string,
+  includeFirst: boolean,
+  limit: number,
+  valid: RecordGuard<T>,
+): T[] {
+  const lines = text.split('\n');
   if (!includeFirst) lines.shift();
   const out: T[] = [];
   for (const raw of lines) {
@@ -74,16 +86,19 @@ function parseRecent<T>(text: string, includeFirst: boolean, limit: number, vali
     try {
       const value: unknown = JSON.parse(raw);
       if (valid(value)) out.push(value);
-    } catch {
-    }
+    } catch {}
   }
   return out.slice(-limit);
 }
 
-export function readRecentLines<T>(file: string, limit: number, valid: RecordGuard<T>): { lines: T[]; total: number } {
+export function readRecentLines<T>(
+  file: string,
+  limit: number,
+  valid: RecordGuard<T>,
+): { lines: T[]; total: number } {
   let fd: number;
   try {
-    fd = openSync(file, "r");
+    fd = openSync(file, 'r');
   } catch {
     return { lines: [], total: 0 };
   }
@@ -102,14 +117,14 @@ export function readRecentLines<T>(file: string, limit: number, valid: RecordGua
       if (read <= 0) break;
       bytes = Buffer.concat([chunk.subarray(0, read), bytes]);
       position = start;
-      const text = bytes.toString("utf8");
-      if (position === 0 || text.split("\n").length - 1 >= limit) {
+      const text = bytes.toString('utf8');
+      if (position === 0 || text.split('\n').length - 1 >= limit) {
         lines = parseRecent(text, position === 0, limit, valid);
         if (lines.length >= limit || position === 0) break;
       }
     }
     if (lines.length === 0 && bytes.length > 0) {
-      lines = parseRecent(bytes.toString("utf8"), position === 0, limit, valid);
+      lines = parseRecent(bytes.toString('utf8'), position === 0, limit, valid);
     }
     return { lines, total };
   } finally {
@@ -117,115 +132,145 @@ export function readRecentLines<T>(file: string, limit: number, valid: RecordGua
   }
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-const stringOrMissing = (value: unknown) => value === undefined || typeof value === "string";
-const stringOrNullOrMissing = (value: unknown) => value === undefined || value === null || typeof value === "string";
-const numberOrNullOrMissing = (value: unknown) => value === undefined || value === null || typeof value === "number";
-const stringsOrMissing = (value: unknown) => value === undefined || (Array.isArray(value) && value.every((item) => typeof item === "string"));
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+const stringOrMissing = (value: unknown) => value === undefined || typeof value === 'string';
+const stringOrNullOrMissing = (value: unknown) =>
+  value === undefined || value === null || typeof value === 'string';
+const numberOrNullOrMissing = (value: unknown) =>
+  value === undefined || value === null || typeof value === 'number';
+const stringsOrMissing = (value: unknown) =>
+  value === undefined || (Array.isArray(value) && value.every((item) => typeof item === 'string'));
 const computerHolderOrMissing = (value: unknown) =>
   value === undefined ||
-  (isRecord(value) && typeof value.name === "string" && stringOrMissing(value.task));
+  (isRecord(value) && typeof value.name === 'string' && stringOrMissing(value.task));
 const askQuestionsOrMissing = (value: unknown) =>
   value === undefined ||
   (Array.isArray(value) &&
     value.every(
       (question) =>
         isRecord(question) &&
-        typeof question.question === "string" &&
+        typeof question.question === 'string' &&
         Array.isArray(question.options) &&
-        question.options.every((option) => isRecord(option) && typeof option.label === "string"),
+        question.options.every((option) => isRecord(option) && typeof option.label === 'string'),
     ));
 
 /** Validate persisted records, including legacy relative handoff paths normalized during replay. */
 export function isRuntimeEvent(value: unknown): value is RuntimeEvent {
   if (
     !isRecord(value) ||
-    typeof value.eventId !== "string" ||
-    typeof value.provider !== "string" ||
-    typeof value.threadId !== "string" ||
-    typeof value.createdAt !== "string" ||
-    typeof value.type !== "string" ||
+    typeof value.eventId !== 'string' ||
+    typeof value.provider !== 'string' ||
+    typeof value.threadId !== 'string' ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.type !== 'string' ||
     !stringOrMissing(value.providerInstanceId) ||
     !stringOrMissing(value.turnId) ||
     !stringOrMissing(value.itemId) ||
     !stringOrMissing(value.requestId)
-  ) return false;
+  )
+    return false;
   switch (value.type) {
-    case "session.started":
-      return (value.sessionId === null || typeof value.sessionId === "string") && stringOrNullOrMissing(value.model);
-    case "session.exited":
-      return stringOrMissing(value.reason);
-    case "turn.started":
-      return true;
-    case "turn.retrying":
+    case 'session.started':
       return (
-        typeof value.attempt === "number" &&
+        (value.sessionId === null || typeof value.sessionId === 'string') &&
+        stringOrNullOrMissing(value.model)
+      );
+    case 'session.exited':
+      return stringOrMissing(value.reason);
+    case 'turn.started':
+      return true;
+    case 'turn.retrying':
+      return (
+        typeof value.attempt === 'number' &&
         Number.isInteger(value.attempt) &&
         value.attempt >= 1 &&
-        typeof value.delayMs === "number" &&
+        typeof value.delayMs === 'number' &&
         Number.isFinite(value.delayMs) &&
         value.delayMs >= 0 &&
-        typeof value.reason === "string"
+        typeof value.reason === 'string'
       );
-    case "turn.completed":
+    case 'turn.completed':
       return (
-        typeof value.ok === "boolean" &&
+        typeof value.ok === 'boolean' &&
         stringOrNullOrMissing(value.stopReason) &&
         numberOrNullOrMissing(value.cost) &&
         stringsOrMissing(value.denials) &&
         (value.usage === undefined ||
-          (isRecord(value.usage) && typeof value.usage.input === "number" && typeof value.usage.output === "number"))
+          (isRecord(value.usage) &&
+            typeof value.usage.input === 'number' &&
+            typeof value.usage.output === 'number'))
       );
-    case "turn.wait_started":
-      return typeof value.resource === "string" && computerHolderOrMissing(value.holder);
-    case "cap.exhausted":
-      return typeof value.handoffPath === "string" && value.handoffPath.trim().length > 0 && value.reason === "cap";
-    case "turn.wait_ended":
+    case 'turn.wait_started':
+      return typeof value.resource === 'string' && computerHolderOrMissing(value.holder);
+    case 'cap.exhausted':
       return (
-        typeof value.resource === "string" &&
+        typeof value.handoffPath === 'string' &&
+        value.handoffPath.trim().length > 0 &&
+        value.reason === 'cap'
+      );
+    case 'turn.wait_ended':
+      return (
+        typeof value.resource === 'string' &&
         computerHolderOrMissing(value.holder) &&
-        typeof value.waitedMs === "number" &&
+        typeof value.waitedMs === 'number' &&
         Number.isFinite(value.waitedMs) &&
         value.waitedMs >= 0 &&
-        (value.outcome === "acquired" || value.outcome === "gave_up" || value.outcome === "parked" || value.outcome === "stopped")
+        (value.outcome === 'acquired' ||
+          value.outcome === 'gave_up' ||
+          value.outcome === 'parked' ||
+          value.outcome === 'stopped')
       );
-    case "item.started":
-      return (value.itemType === "tool" || value.itemType === "reasoning") && stringOrMissing(value.title);
-    case "item.updated":
-      return (value.itemType === "tool" || value.itemType === "reasoning") && numberOrNullOrMissing(value.tokens);
-    case "item.completed":
-      return value.itemType === "assistant_text" ? typeof value.text === "string" : value.itemType === "tool" && typeof value.ok === "boolean";
-    case "content.delta":
-      return (value.streamKind === "assistant_text" || value.streamKind === "reasoning_text") && typeof value.delta === "string";
-    case "request.opened":
+    case 'item.started':
       return (
-        (value.requestType === "permission" || value.requestType === "question") &&
-        typeof value.tool === "string" &&
-        typeof value.summary === "string" &&
+        (value.itemType === 'tool' || value.itemType === 'reasoning') &&
+        stringOrMissing(value.title)
+      );
+    case 'item.updated':
+      return (
+        (value.itemType === 'tool' || value.itemType === 'reasoning') &&
+        numberOrNullOrMissing(value.tokens)
+      );
+    case 'item.completed':
+      return value.itemType === 'assistant_text'
+        ? typeof value.text === 'string'
+        : value.itemType === 'tool' && typeof value.ok === 'boolean';
+    case 'content.delta':
+      return (
+        (value.streamKind === 'assistant_text' || value.streamKind === 'reasoning_text') &&
+        typeof value.delta === 'string'
+      );
+    case 'request.opened':
+      return (
+        (value.requestType === 'permission' || value.requestType === 'question') &&
+        typeof value.tool === 'string' &&
+        typeof value.summary === 'string' &&
         stringsOrMissing(value.choices) &&
         askQuestionsOrMissing(value.questions) &&
-        (value.origin === undefined || value.origin === "tool" || value.origin === "output")
+        (value.origin === undefined || value.origin === 'tool' || value.origin === 'output')
       );
-    case "request.resolved":
+    case 'request.resolved':
       return (
-        (value.behavior === "allow" || value.behavior === "deny" || value.behavior === "answer") &&
-        (value.source === "user" ||
-          value.source === "auto" ||
-          value.source === "timeout" ||
-          value.source === "system" ||
-          value.source === "unavailable" ||
-          value.source === "peer")
+        (value.behavior === 'allow' || value.behavior === 'deny' || value.behavior === 'answer') &&
+        (value.source === 'user' ||
+          value.source === 'auto' ||
+          value.source === 'timeout' ||
+          value.source === 'system' ||
+          value.source === 'unavailable' ||
+          value.source === 'peer')
       );
-    case "thread.token-usage.updated":
-      return typeof value.input === "number" && typeof value.output === "number";
-    case "runtime.notice":
-      return typeof value.message === "string";
-    case "context.compacted":
+    case 'thread.token-usage.updated':
+      return typeof value.input === 'number' && typeof value.output === 'number';
+    case 'runtime.notice':
+      return typeof value.message === 'string';
+    case 'context.compacted':
       return true;
-    case "runtime.error":
-      return typeof value.message === "string" &&
-        (value.setup === undefined || typeof value.setup === "boolean") &&
-        (value.claudeUpdate === undefined || typeof value.claudeUpdate === "boolean");
+    case 'runtime.error':
+      return (
+        typeof value.message === 'string' &&
+        (value.setup === undefined || typeof value.setup === 'boolean') &&
+        (value.claudeUpdate === undefined || typeof value.claudeUpdate === 'boolean')
+      );
     default:
       return false;
   }
@@ -234,10 +279,10 @@ export function isRuntimeEvent(value: unknown): value is RuntimeEvent {
 function isNativeRecord(value: unknown): value is NativeRecord {
   return (
     isRecord(value) &&
-    typeof value.at === "string" &&
-    (value.dir === "in" || value.dir === "out") &&
-    typeof value.source === "string" &&
-    Object.hasOwn(value, "msg")
+    typeof value.at === 'string' &&
+    (value.dir === 'in' || value.dir === 'out') &&
+    typeof value.source === 'string' &&
+    Object.hasOwn(value, 'msg')
   );
 }
 
@@ -250,18 +295,21 @@ export function readThreadEvents(input: {
   const { eventsDir, nativeDir, threadId } = input;
   assertThreadId(threadId);
   const requested = input.limit ?? DEFAULT_LIMIT;
-  const limit = Number.isFinite(requested) ? Math.max(1, Math.min(Math.trunc(requested), MAX_LIMIT)) : DEFAULT_LIMIT;
+  const limit = Number.isFinite(requested)
+    ? Math.max(1, Math.min(Math.trunc(requested), MAX_LIMIT))
+    : DEFAULT_LIMIT;
 
   const runtime = readRecentLines(join(eventsDir, `${threadId}.ndjson`), limit, isRuntimeEvent);
   const native = readRecentLines(join(nativeDir, `${threadId}.ndjson`), limit, isNativeRecord);
 
   const merged: InspectorEntry[] = [
     ...runtime.lines.map((data): InspectorEntry => ({
-      kind: "runtime",
+      kind: 'runtime',
       at: data.createdAt,
-      data: data.type === "cap.exhausted" ? { ...data, handoffPath: resolve(data.handoffPath) } : data,
+      data:
+        data.type === 'cap.exhausted' ? { ...data, handoffPath: resolve(data.handoffPath) } : data,
     })),
-    ...native.lines.map((data): InspectorEntry => ({ kind: "native", at: data.at, data })),
+    ...native.lines.map((data): InspectorEntry => ({ kind: 'native', at: data.at, data })),
   ];
   merged.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
 

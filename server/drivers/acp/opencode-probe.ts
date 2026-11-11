@@ -1,14 +1,14 @@
 // OpenCode's model discovery probe: an `opencode acp` in its own folder, opened just long enough to list the models.
-import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { execFile } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { writeFileAtomic } from "../../atomic.ts";
-import { DATA_DIR } from "../../config.ts";
-import { titleCaseModelId, type ModelCatalog, type ModelVariantOption } from "../../contracts.ts";
-import { killCliTree, spawnCli } from "../../procs.ts";
-import { offeredModels, surveyModelVariants } from "./config-options.ts";
-import { deleteAcpSessions, deletesAcpSessions } from "./session-delete.ts";
+import { writeFileAtomic } from '../../atomic.ts';
+import { DATA_DIR } from '../../config.ts';
+import { titleCaseModelId, type ModelCatalog, type ModelVariantOption } from '../../contracts.ts';
+import { killCliTree, spawnCli } from '../../procs.ts';
+import { offeredModels, surveyModelVariants } from './config-options.ts';
+import { deleteAcpSessions, deletesAcpSessions } from './session-delete.ts';
 
 export const DISCOVERY_TIMEOUT_MS = 20_000;
 const EFFORT_SURVEY_MS = 8_000;
@@ -18,60 +18,94 @@ export function labelForModel(id: string): string {
 }
 
 export function providerLabel(id: string): string {
-  if (id === "opencode") return "Zen";
-  if (id === "opencode-go") return "Go";
-  if (id === "openrouter") return "OpenRouter";
+  if (id === 'opencode') return 'Zen';
+  if (id === 'opencode-go') return 'Go';
+  if (id === 'openrouter') return 'OpenRouter';
   return labelForModel(id);
 }
 
 export function validModelSlug(value: string): boolean {
-  const separator = value.indexOf("/");
+  const separator = value.indexOf('/');
   if (separator <= 0 || separator >= value.length - 1 || /\s/u.test(value)) return false;
   return [...value].every((character) => (character.codePointAt(0) ?? 0) > 0x1f);
 }
 
 /** The `model` select in session/new's configOptions: exactly what set_config_option accepts, and the only reliable list on V2. */
-export function catalogFromOpenCodeSession(result: unknown): { options: ModelCatalog["options"]; current: string | null } | null {
+export function catalogFromOpenCodeSession(
+  result: unknown,
+): { options: ModelCatalog['options']; current: string | null } | null {
   const configOptions = (result as { configOptions?: unknown } | null)?.configOptions;
   const model = Array.isArray(configOptions)
-    ? configOptions.find((option: any) => option?.id === "model" && option?.type === "select")
+    ? configOptions.find((option: any) => option?.id === 'model' && option?.type === 'select')
     : null;
-  const ids = offeredModels(result, "model");
+  const ids = offeredModels(result, 'model');
   if (!model || !ids.length) return null;
   const names = new Map<string, string>();
   const visit = (entries: unknown) => {
     if (!Array.isArray(entries)) return;
     for (const entry of entries) {
-      if (typeof entry?.value === "string" && typeof entry.name === "string") names.set(entry.value, entry.name);
+      if (typeof entry?.value === 'string' && typeof entry.name === 'string')
+        names.set(entry.value, entry.name);
       else if (Array.isArray(entry?.options)) visit(entry.options);
     }
   };
   visit(model.options);
   const options = [...new Set(ids)].filter(validModelSlug).map((id) => {
-    const separator = id.indexOf("/");
+    const separator = id.indexOf('/');
     // V1 names "OpenCode Zen/Big Pickle", V2 "opencode/Big Pickle": the provider comes from the id.
-    const raw = names.get(id)?.trim() ?? "";
-    const name = (raw.includes("/") ? raw.slice(raw.indexOf("/") + 1) : raw).trim() || labelForModel(id.slice(separator + 1));
+    const raw = names.get(id)?.trim() ?? '';
+    const name =
+      (raw.includes('/') ? raw.slice(raw.indexOf('/') + 1) : raw).trim() ||
+      labelForModel(id.slice(separator + 1));
     return { id, label: `${providerLabel(id.slice(0, separator))} · ${name}` };
   });
   return options.length
-    ? { options, current: typeof (model as any).currentValue === "string" ? (model as any).currentValue : null }
+    ? {
+        options,
+        current:
+          typeof (model as any).currentValue === 'string' ? (model as any).currentValue : null,
+      }
     : null;
 }
 
 /** Security: the folder is the boxed probe's to write, and HOME may be a boxed bot's, so git reads no config but the
  * fresh repository's own, and none that runs a program. */
 function runGit(directory: string, args: string[]): Promise<void> {
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')),
+  );
   return new Promise((resolveRun, rejectRun) => {
-    execFile("git", [
-      "-c", "user.name=OpenMaus", "-c", "user.email=model-discovery@openmaus.invalid",
-      "-c", "commit.gpgsign=false", "-c", `core.hooksPath=${join(directory, ".git", "no-hooks")}`, "-c", "core.fsmonitor=false",
-      ...args,
-    ], { cwd: directory, env: { ...env, GIT_TERMINAL_PROMPT: "0", GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1" }, timeout: 10_000, windowsHide: true }, (error) => {
-      if (error) rejectRun(error);
-      else resolveRun();
-    });
+    execFile(
+      'git',
+      [
+        '-c',
+        'user.name=OpenMaus',
+        '-c',
+        'user.email=model-discovery@openmaus.invalid',
+        '-c',
+        'commit.gpgsign=false',
+        '-c',
+        `core.hooksPath=${join(directory, '.git', 'no-hooks')}`,
+        '-c',
+        'core.fsmonitor=false',
+        ...args,
+      ],
+      {
+        cwd: directory,
+        env: {
+          ...env,
+          GIT_TERMINAL_PROMPT: '0',
+          GIT_CONFIG_GLOBAL: '/dev/null',
+          GIT_CONFIG_NOSYSTEM: '1',
+        },
+        timeout: 10_000,
+        windowsHide: true,
+      },
+      (error) => {
+        if (error) rejectRun(error);
+        else resolveRun();
+      },
+    );
   });
 }
 
@@ -85,15 +119,22 @@ export function forgetDiscoveryDirectory(): void {
  * global project, so `opencode run --continue` there would resume the probe's empty session. */
 export function discoveryDirectory(): Promise<string> {
   discoveryFolder ??= (async () => {
-    const directory = join(DATA_DIR, "providers", "opencode", "discovery");
+    const directory = join(DATA_DIR, 'providers', 'opencode', 'discovery');
     mkdirSync(directory, { recursive: true });
-    const marker = join(directory, ".openmaus-project");
+    const marker = join(directory, '.openmaus-project');
     if (!existsSync(marker)) {
       try {
         rmSync(directory, { recursive: true, force: true });
         mkdirSync(directory, { recursive: true });
-        await runGit(directory, ["init", "-q"]);
-        await runGit(directory, ["commit", "-q", "--allow-empty", "--no-verify", "-m", "OpenMaus model discovery"]);
+        await runGit(directory, ['init', '-q']);
+        await runGit(directory, [
+          'commit',
+          '-q',
+          '--allow-empty',
+          '--no-verify',
+          '-m',
+          'OpenMaus model discovery',
+        ]);
         writeFileSync(marker, "OpenCode files this folder's sessions under its own project.\n");
       } catch {}
     }
@@ -122,12 +163,14 @@ export function surveyOpenCodeEfforts(
  * discovery folder survive; a probe cut off by its timeout leaves its ids for the next probe to delete. */
 type ProbeSessionLedger = Record<string, number>;
 
-const probeLedgerPath = (cwd: string) => join(cwd, ".openmaus-probe-sessions.json");
+const probeLedgerPath = (cwd: string) => join(cwd, '.openmaus-probe-sessions.json');
 
 function readProbeLedger(cwd: string): ProbeSessionLedger {
   try {
-    const ledger: unknown = JSON.parse(readFileSync(probeLedgerPath(cwd), "utf8"));
-    return ledger && typeof ledger === "object" && !Array.isArray(ledger) ? ledger as ProbeSessionLedger : {};
+    const ledger: unknown = JSON.parse(readFileSync(probeLedgerPath(cwd), 'utf8'));
+    return ledger && typeof ledger === 'object' && !Array.isArray(ledger)
+      ? (ledger as ProbeSessionLedger)
+      : {};
   } catch {
     return {};
   }
@@ -154,7 +197,10 @@ async function deleteProbeSessions(
     .filter(([, openedAt]) => openedAt < abandonedBefore)
     .map(([sessionId]) => sessionId);
   const deleted = await deleteAcpSessions(request, [...opened, ...abandoned]);
-  if (deleted.length) changeProbeLedger(cwd, (ledger) => { for (const sessionId of deleted) delete ledger[sessionId]; });
+  if (deleted.length)
+    changeProbeLedger(cwd, (ledger) => {
+      for (const sessionId of deleted) delete ledger[sessionId];
+    });
 }
 
 /** `settleMs` keeps the process open that long after it starts, then lists again: OpenCode 2's own catalog refresh
@@ -173,16 +219,24 @@ export async function probeOpenCodeSession(
   return new Promise((resolve, reject) => {
     let child: ReturnType<typeof spawnCli>;
     try {
-      child = spawnCli(cli, ["acp"], { cwd, env: environment, stdio: ["pipe", "pipe", "pipe"], box: { allowEnv } });
+      child = spawnCli(cli, ['acp'], {
+        cwd,
+        env: environment,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        box: { allowEnv },
+      });
     } catch (error) {
       reject(error);
       return;
     }
     let settled = false;
     let listed: OpenCodeSessionProbe | undefined;
-    let buffer = "";
+    let buffer = '';
     let nextId = 0;
-    const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+    const pending = new Map<
+      number,
+      { resolve: (value: unknown) => void; reject: (error: Error) => void }
+    >();
     const write = (message: unknown) => {
       try {
         child.stdin.write(`${JSON.stringify(message)}\n`);
@@ -196,25 +250,30 @@ export async function probeOpenCodeSession(
         child.stdin.end();
       } catch {}
       void killCliTree(child);
-      for (const waiter of pending.values()) waiter.reject(new Error("OpenCode closed"));
+      for (const waiter of pending.values()) waiter.reject(new Error('OpenCode closed'));
       pending.clear();
       const result = value ?? listed;
       if (result) resolve(result);
-      else reject(error ?? new Error("OpenCode did not list its models"));
+      else reject(error ?? new Error('OpenCode did not list its models'));
     };
     const timer = setTimeout(
-      () => finish(Object.assign(new Error("OpenCode did not list its models in time"), { timedOut: true })),
+      () =>
+        finish(
+          Object.assign(new Error('OpenCode did not list its models in time'), { timedOut: true }),
+        ),
       timeoutMs,
     );
     timer.unref?.();
-    child.on("error", (error) => finish(error));
-    child.on("close", (code) => finish(new Error(`OpenCode exited ${code} while listing its models`)));
+    child.on('error', (error) => finish(error));
+    child.on('close', (code) =>
+      finish(new Error(`OpenCode exited ${code} while listing its models`)),
+    );
     child.stderr.resume();
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
       buffer += chunk;
       let newline: number;
-      while ((newline = buffer.indexOf("\n")) !== -1) {
+      while ((newline = buffer.indexOf('\n')) !== -1) {
         const line = buffer.slice(0, newline);
         buffer = buffer.slice(newline + 1);
         let message: any;
@@ -223,46 +282,56 @@ export async function probeOpenCodeSession(
         } catch {
           continue;
         }
-        if (message?.id !== undefined && typeof message.method === "string") {
-          write({ jsonrpc: "2.0", id: message.id, error: { code: -32601, message: "method not found" } });
+        if (message?.id !== undefined && typeof message.method === 'string') {
+          write({
+            jsonrpc: '2.0',
+            id: message.id,
+            error: { code: -32601, message: 'method not found' },
+          });
           continue;
         }
-        const waiter = typeof message?.id === "number" ? pending.get(message.id) : undefined;
+        const waiter = typeof message?.id === 'number' ? pending.get(message.id) : undefined;
         if (!waiter) continue;
         pending.delete(message.id);
         if (message.error) {
-          waiter.reject(Object.assign(new Error(String(message.error.message ?? "ACP request failed")), {
-            code: message.error.code,
-            data: message.error.data,
-          }));
+          waiter.reject(
+            Object.assign(new Error(String(message.error.message ?? 'ACP request failed')), {
+              code: message.error.code,
+              data: message.error.data,
+            }),
+          );
         } else waiter.resolve(message.result);
       }
     });
-    const request = (method: string, params: unknown) => new Promise<unknown>((resolveRequest, rejectRequest) => {
-      if (settled) {
-        rejectRequest(new Error("OpenCode closed"));
-        return;
-      }
-      const id = ++nextId;
-      pending.set(id, { resolve: resolveRequest, reject: rejectRequest });
-      write({ jsonrpc: "2.0", id, method, params });
-    });
+    const request = (method: string, params: unknown) =>
+      new Promise<unknown>((resolveRequest, rejectRequest) => {
+        if (settled) {
+          rejectRequest(new Error('OpenCode closed'));
+          return;
+        }
+        const id = ++nextId;
+        pending.set(id, { resolve: resolveRequest, reject: rejectRequest });
+        write({ jsonrpc: '2.0', id, method, params });
+      });
     let deletesSessions = false;
     const opened: string[] = [];
     const openSession = async () => {
-      const session = await request("session/new", { cwd, mcpServers: [] });
+      const session = await request('session/new', { cwd, mcpServers: [] });
       const sessionId = (session as { sessionId?: unknown } | null)?.sessionId;
-      if (deletesSessions && typeof sessionId === "string") {
+      if (deletesSessions && typeof sessionId === 'string') {
         opened.push(sessionId);
-        changeProbeLedger(cwd, (ledger) => { ledger[sessionId] = Date.now(); });
+        changeProbeLedger(cwd, (ledger) => {
+          ledger[sessionId] = Date.now();
+        });
       }
       return session;
     };
-    const cleanUp = () => deletesSessions ? deleteProbeSessions(request, cwd, opened, timeoutMs) : Promise.resolve();
+    const cleanUp = () =>
+      deletesSessions ? deleteProbeSessions(request, cwd, opened, timeoutMs) : Promise.resolve();
     void (async () => {
-      const initialized = await request("initialize", {
+      const initialized = await request('initialize', {
         protocolVersion: 1,
-        clientInfo: { name: "openmausbot", version: "0.0.0" },
+        clientInfo: { name: 'openmausbot', version: '0.0.0' },
         clientCapabilities: { fs: { readTextFile: false, writeTextFile: false }, terminal: false },
       });
       deletesSessions = deletesAcpSessions(initialized);

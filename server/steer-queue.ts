@@ -1,18 +1,18 @@
 // Mid-turn sends wait here off the transcript (else they become the active leaf mid-turn) and survive Stop: stop-then-steer is the feature.
 
-import { newId } from "./contracts.ts";
-import { chatFollowups, saveChatFollowup, settleChatFollowups } from "./message-db.ts";
-import { drainCoalesceHead } from "./admission.ts";
-import { spokenLineFields } from "./live-call-record.ts";
-import { workOriginSchema, type WorkOrigin } from "./peer-provenance.ts";
-import type { BotQueuedMessages, ResolvedSender, SteerQueueReason } from "../shared/wire.ts";
-import type { BotRecord, Message } from "./store.ts";
-import type { UsageTrigger } from "./usage-ledger.ts";
+import { newId } from './contracts.ts';
+import { chatFollowups, saveChatFollowup, settleChatFollowups } from './message-db.ts';
+import { drainCoalesceHead } from './admission.ts';
+import { spokenLineFields } from './live-call-record.ts';
+import { workOriginSchema, type WorkOrigin } from './peer-provenance.ts';
+import type { BotQueuedMessages, ResolvedSender, SteerQueueReason } from '../shared/wire.ts';
+import type { BotRecord, Message } from './store.ts';
+import type { UsageTrigger } from './usage-ledger.ts';
 
 export interface SteerStore {
   bot(id: string): BotRecord | null;
   projectBotForTask?(botId: string, threadId: string): BotRecord | null;
-  appendMessage(threadId: string, message: Omit<Message, "id" | "at">): Message;
+  appendMessage(threadId: string, message: Omit<Message, 'id' | 'at'>): Message;
   patchMessage(threadId: string, messageId: string, patch: Partial<Message>): Message | null;
   messagesFor?(threadId: string): Message[];
 }
@@ -25,20 +25,20 @@ interface QueueEntry {
     prompt: string;
     replyToId?: string;
     sendId?: string;
-    dataContext?: Message["dataContext"];
+    dataContext?: Message['dataContext'];
     reason?: SteerQueueReason;
     /** Queued by a bot running unattended: the drained turn inherits it (a queue is a delay, not a person at the keyboard). */
     unattended?: boolean;
-    peerAsk?: Message["peerAsk"];
+    peerAsk?: Message['peerAsk'];
     origin?: WorkOrigin;
     sender?: ResolvedSender;
     trigger?: UsageTrigger;
     queuedAt: number;
-    via?: "call";
+    via?: 'call';
     callId?: string;
-    fromApp?: Message["fromApp"];
+    fromApp?: Message['fromApp'];
     reaction?: string;
-    relay?: Message["relay"];
+    relay?: Message['relay'];
     /** The person's row already in the transcript, steered into a turn that was stopped before it read it: it runs as
      * it is, never as a second copy. */
     rowId?: string;
@@ -47,22 +47,25 @@ interface QueueEntry {
   }>;
 }
 
-export type SteerQueueHead = Pick<QueueEntry["items"][number], "trigger" | "sender" | "peerAsk" | "origin" | "mentions">;
+export type SteerQueueHead = Pick<
+  QueueEntry['items'][number],
+  'trigger' | 'sender' | 'peerAsk' | 'origin' | 'mentions'
+>;
 
 const queues = new Map<string, QueueEntry>();
 
 export interface HeldSteerQueue {
   botId: string;
   threadId: string;
-  items: QueueEntry["items"];
+  items: QueueEntry['items'];
 }
 
 export function restoreSteeredMessages(): void {
   queues.clear();
-  for (const row of chatFollowups("bot")) {
-    if (row.status !== "pending") continue;
+  for (const row of chatFollowups('bot')) {
+    if (row.status !== 'pending') continue;
     const entry = queues.get(row.threadId) ?? { botId: row.ownerId, items: [] };
-    if (entry.botId !== row.ownerId) throw new Error("queued task belongs to another bot");
+    if (entry.botId !== row.ownerId) throw new Error('queued task belongs to another bot');
     const { via, callId, origin: storedOrigin, ...payload } = row.payload;
     const origin = workOriginSchema.safeParse(storedOrigin);
     entry.items.push({
@@ -79,26 +82,47 @@ export function restoreSteeredMessages(): void {
 const listeners = new Set<() => void>();
 const changed = () => {
   for (const listener of listeners) {
-    try { listener(); }
-    catch { console.warn("steer-queue: change listener failed"); }
+    try {
+      listener();
+    } catch {
+      console.warn('steer-queue: change listener failed');
+    }
   }
 };
 
 /** Public pending chips only: never expose provider prompts or reply context. `shownSender`: where several people write,
  * whose each chip is. */
-export function queuedSteerSnapshot(ownsThread: (botId: string, threadId: string) => boolean, whyHeld: (threadId: string, reason: SteerQueueReason | undefined) => string | undefined = () => undefined,
-  shownSender: (threadId: string, sender: ResolvedSender) => ResolvedSender | undefined = () => undefined): BotQueuedMessages {
-  return Object.fromEntries([...queues]
-    .filter(([threadId, entry]) => ownsThread(entry.botId, threadId))
-    .map(([threadId, entry]) => [threadId, entry.items.filter((item) => !item.rowId).map((item) => ({
-      queueId: item.messageId, text: item.text, ...(item.reason ? { reason: item.reason, why: whyHeld(threadId, item.reason) } : {}),
-      ...(item.sender && shownSender(threadId, item.sender) ? { sender: shownSender(threadId, item.sender) } : {}),
-    }))]));
+export function queuedSteerSnapshot(
+  ownsThread: (botId: string, threadId: string) => boolean,
+  whyHeld: (threadId: string, reason: SteerQueueReason | undefined) => string | undefined = () =>
+    undefined,
+  shownSender: (threadId: string, sender: ResolvedSender) => ResolvedSender | undefined = () =>
+    undefined,
+): BotQueuedMessages {
+  return Object.fromEntries(
+    [...queues]
+      .filter(([threadId, entry]) => ownsThread(entry.botId, threadId))
+      .map(([threadId, entry]) => [
+        threadId,
+        entry.items
+          .filter((item) => !item.rowId)
+          .map((item) => ({
+            queueId: item.messageId,
+            text: item.text,
+            ...(item.reason ? { reason: item.reason, why: whyHeld(threadId, item.reason) } : {}),
+            ...(item.sender && shownSender(threadId, item.sender)
+              ? { sender: shownSender(threadId, item.sender) }
+              : {}),
+          })),
+      ]),
+  );
 }
 
 export function onSteeredQueueChange(listener: () => void): () => void {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 export interface QueuedSteer {
@@ -109,11 +133,32 @@ export function queueSteeredMessage(
   botId: string,
   threadId: string,
   text: string,
-  options: { prompt?: string; replyToId?: string; sendId?: string; dataContext?: Message["dataContext"]; reason?: SteerQueueReason; unattended?: boolean; peerAsk?: Message["peerAsk"]; origin?: WorkOrigin; sender?: ResolvedSender; trigger?: UsageTrigger; callId?: string; via?: "call"; reaction?: string; fromApp?: Message["fromApp"]; relay?: Message["relay"]; rowId?: string; first?: boolean; queuedAt?: number; mentions?: string[]; aheadOfOthers?: string } = {},
+  options: {
+    prompt?: string;
+    replyToId?: string;
+    sendId?: string;
+    dataContext?: Message['dataContext'];
+    reason?: SteerQueueReason;
+    unattended?: boolean;
+    peerAsk?: Message['peerAsk'];
+    origin?: WorkOrigin;
+    sender?: ResolvedSender;
+    trigger?: UsageTrigger;
+    callId?: string;
+    via?: 'call';
+    reaction?: string;
+    fromApp?: Message['fromApp'];
+    relay?: Message['relay'];
+    rowId?: string;
+    first?: boolean;
+    queuedAt?: number;
+    mentions?: string[];
+    aheadOfOthers?: string;
+  } = {},
 ): QueuedSteer {
   const id = newId();
   const entry = queues.get(threadId) ?? { botId, items: [] };
-  if (entry.botId !== botId) throw new Error("queued task belongs to another bot");
+  if (entry.botId !== botId) throw new Error('queued task belongs to another bot');
   const item = {
     messageId: id,
     text,
@@ -135,11 +180,18 @@ export function queueSteeredMessage(
     ...(options.rowId ? { rowId: options.rowId } : {}),
     ...(options.mentions?.length ? { mentions: options.mentions } : {}),
   };
-  saveChatFollowup({ id, kind: "bot", ownerId: botId, threadId, payload: item });
+  saveChatFollowup({ id, kind: 'bot', ownerId: botId, threadId, payload: item });
   // `first`: ahead of everything queued but the person's own messages sent before it; with `aheadOfOthers` (the person
   // whose request runs, where several people write), ahead of everyone else's too.
-  const ahead = options.first ? entry.items.findIndex((other) => other.peerAsk !== undefined || other.unattended === true || other.queuedAt > item.queuedAt
-    || (options.aheadOfOthers !== undefined && other.sender?.id !== options.aheadOfOthers)) : -1;
+  const ahead = options.first
+    ? entry.items.findIndex(
+        (other) =>
+          other.peerAsk !== undefined ||
+          other.unattended === true ||
+          other.queuedAt > item.queuedAt ||
+          (options.aheadOfOthers !== undefined && other.sender?.id !== options.aheadOfOthers),
+      )
+    : -1;
   if (ahead < 0) entry.items.push(item);
   else entry.items.splice(ahead, 0, item);
   queues.set(threadId, entry);
@@ -150,7 +202,11 @@ export function queueSteeredMessage(
 export function queuedThreadPosition(botId: string, threadId: string): number | null {
   let position = 0;
   for (const [candidate, entry] of queues) {
-    if (entry.botId !== botId || !entry.items.some((item) => item.reason === "capacity" || item.reason === "group-turn")) continue;
+    if (
+      entry.botId !== botId ||
+      !entry.items.some((item) => item.reason === 'capacity' || item.reason === 'group-turn')
+    )
+      continue;
     position += 1;
     if (candidate === threadId) return position;
   }
@@ -165,7 +221,10 @@ export function hasQueuedSteeredMessages(botId: string, threadId: string): boole
 /** A message the person typed waits to run next, not a teammate's ask, an incident report, a relay or unattended work. */
 export function hasQueuedPersonMessage(botId: string, threadId: string): boolean {
   const entry = queues.get(threadId);
-  return entry?.botId === botId && entry.items.some((item) => !item.peerAsk && !item.unattended && !item.relay && !item.fromApp);
+  return (
+    entry?.botId === botId &&
+    entry.items.some((item) => !item.peerAsk && !item.unattended && !item.relay && !item.fromApp)
+  );
 }
 
 export function isSteeredMessageQueued(botId: string, threadId: string, queueId: string): boolean {
@@ -193,7 +252,10 @@ export function drainSteeredMessages(
       ? store.projectBotForTask(entry.botId, threadId)
       : store.bot(entry.botId);
     if (!bot) {
-      settleChatFollowups(entry.items.map((item) => item.messageId), "cancelled");
+      settleChatFollowups(
+        entry.items.map((item) => item.messageId),
+        'cancelled',
+      );
       queues.delete(threadId);
       changed();
       continue;
@@ -203,36 +265,39 @@ export function drainSteeredMessages(
     if (queues.get(threadId) !== entry) continue;
     const group = drainCoalesceHead(entry.items, coalesceIdentity, (item) => item.queuedAt);
     const ids = group.map((item) => item.messageId);
-    settleChatFollowups(ids, "dispatching");
+    settleChatFollowups(ids, 'dispatching');
     const rest = entry.items.slice(group.length);
     if (rest.length > 0) queues.set(threadId, { botId: entry.botId, items: rest });
     else queues.delete(threadId);
     changed();
     const appended: Message[] = [];
     for (const item of group) {
-      const recorded = item.rowId ? store.messagesFor?.(threadId).find((message) => message.id === item.rowId) : undefined;
+      const recorded = item.rowId
+        ? store.messagesFor?.(threadId).find((message) => message.id === item.rowId)
+        : undefined;
       appended.push(
-        recorded ?? store.appendMessage(threadId, {
-          role: "user",
-          kind: "text",
-          text: item.text,
-          replyToId: item.replyToId,
-          sendId: item.sendId,
-          ...(item.dataContext ? { dataContext: item.dataContext } : {}),
-          queueId: item.messageId,
-          peerAsk: item.peerAsk,
-          sender: item.sender,
-          ...spokenLineFields(item.via, item.callId),
-          ...(item.fromApp ? { fromApp: item.fromApp } : {}),
-          ...(item.relay ? { relay: item.relay } : {}),
-          ...(item.reaction ? { reaction: item.reaction } : {}),
-        }),
+        recorded ??
+          store.appendMessage(threadId, {
+            role: 'user',
+            kind: 'text',
+            text: item.text,
+            replyToId: item.replyToId,
+            sendId: item.sendId,
+            ...(item.dataContext ? { dataContext: item.dataContext } : {}),
+            queueId: item.messageId,
+            peerAsk: item.peerAsk,
+            sender: item.sender,
+            ...spokenLineFields(item.via, item.callId),
+            ...(item.fromApp ? { fromApp: item.fromApp } : {}),
+            ...(item.relay ? { relay: item.relay } : {}),
+            ...(item.reaction ? { reaction: item.reaction } : {}),
+          }),
       );
     }
     const last = appended.at(-1);
     if (!last) continue;
     // A blank line keeps each message its own Markdown block; otherwise a trailing attachment tag merges into the next and stops being an image.
-    const prompt = group.map((item) => item.prompt).join("\n\n");
+    const prompt = group.map((item) => item.prompt).join('\n\n');
     const mentions = group.flatMap((item) => item.mentions ?? []);
     let running: void | Promise<void>;
     try {
@@ -244,23 +309,35 @@ export function drainSteeredMessages(
         appended.map((message) => message.id),
         // One unattended line makes the turn unattended: a person's words in the group cannot re-attend a bot's own.
         group.some((item) => item.unattended === true),
-        { trigger: group[0].trigger, sender: group[0].sender, peerAsk: group[0].peerAsk, origin: group[0].origin, ...(mentions.length ? { mentions } : {}) },
+        {
+          trigger: group[0].trigger,
+          sender: group[0].sender,
+          peerAsk: group[0].peerAsk,
+          origin: group[0].origin,
+          ...(mentions.length ? { mentions } : {}),
+        },
       );
-    } catch (error) { console.warn("steer-queue: queued dispatch threw", error); running = Promise.reject(error); }
-    void Promise.resolve(running).then(
-      () => settleChatFollowups(ids, null),
-      () => settleChatFollowups(ids, "interrupted"),
-    ).catch((error) => console.warn("steer-queue: could not settle durable follow-up", error));
+    } catch (error) {
+      console.warn('steer-queue: queued dispatch threw', error);
+      running = Promise.reject(error);
+    }
+    void Promise.resolve(running)
+      .then(
+        () => settleChatFollowups(ids, null),
+        () => settleChatFollowups(ids, 'interrupted'),
+      )
+      .catch((error) => console.warn('steer-queue: could not settle durable follow-up', error));
   }
 }
 
 /** Who sent it, provenance included: a bot's own work never merges with a person's texts, nor a spoken line with a typed one. */
-function coalesceIdentity(item: QueueEntry["items"][number]): string {
-  if (item.peerAsk?.incident) return "incident";
-  if (item.peerAsk) return `peer:${item.peerAsk.botId}:${item.unattended === true ? "unattended" : "attended"}:${JSON.stringify(item.origin ?? null)}`;
-  if (item.unattended === true) return "unattended";
-  const person = item.sender ? `person:${item.sender.id ?? item.sender.name}` : "person:local";
-  return item.via === "call" ? `call:${item.callId ?? ""}|${person}` : person;
+function coalesceIdentity(item: QueueEntry['items'][number]): string {
+  if (item.peerAsk?.incident) return 'incident';
+  if (item.peerAsk)
+    return `peer:${item.peerAsk.botId}:${item.unattended === true ? 'unattended' : 'attended'}:${JSON.stringify(item.origin ?? null)}`;
+  if (item.unattended === true) return 'unattended';
+  const person = item.sender ? `person:${item.sender.id ?? item.sender.name}` : 'person:local';
+  return item.via === 'call' ? `call:${item.callId ?? ''}|${person}` : person;
 }
 
 export function queuedSteeredMessage(
@@ -271,22 +348,41 @@ export function queuedSteeredMessage(
   const entry = queues.get(threadId);
   if (!entry || entry.botId !== botId) return null;
   const item = entry.items.find((candidate) => candidate.sendId === sendId);
-  return item ? { id: item.messageId, text: item.text, replyToId: item.replyToId, ...(item.reason ? { reason: item.reason } : {}) } : null;
+  return item
+    ? {
+        id: item.messageId,
+        text: item.text,
+        replyToId: item.replyToId,
+        ...(item.reason ? { reason: item.reason } : {}),
+      }
+    : null;
 }
 
 /** Whose waiting line this is, or null when nothing waits under that id. */
-export function queuedSteerSender(botId: string, threadId: string, queueId: string): { sender?: ResolvedSender } | null {
-  const item = queues.get(threadId)?.botId === botId ? queues.get(threadId)!.items.find((candidate) => candidate.messageId === queueId) : undefined;
+export function queuedSteerSender(
+  botId: string,
+  threadId: string,
+  queueId: string,
+): { sender?: ResolvedSender } | null {
+  const item =
+    queues.get(threadId)?.botId === botId
+      ? queues.get(threadId)!.items.find((candidate) => candidate.messageId === queueId)
+      : undefined;
   if (!item) return null;
   return item.sender ? { sender: item.sender } : {};
 }
 
-export function cancelSteeredMessage(botId: string, messageId: string, expectedThreadId?: string): boolean {
+export function cancelSteeredMessage(
+  botId: string,
+  messageId: string,
+  expectedThreadId?: string,
+): boolean {
   for (const [threadId, entry] of queues) {
-    if (entry.botId !== botId || (expectedThreadId !== undefined && threadId !== expectedThreadId)) continue;
+    if (entry.botId !== botId || (expectedThreadId !== undefined && threadId !== expectedThreadId))
+      continue;
     const items = entry.items.filter((item) => item.messageId !== messageId);
     if (items.length === entry.items.length) continue;
-    settleChatFollowups([messageId], "cancelled");
+    settleChatFollowups([messageId], 'cancelled');
     if (items.length === 0) queues.delete(threadId);
     else queues.set(threadId, { botId: entry.botId, items });
     changed();
@@ -296,9 +392,14 @@ export function cancelSteeredMessage(botId: string, messageId: string, expectedT
 }
 
 /** The entry leaves first, so a racing settle cannot also dispatch these words; the caller must restore or settle it. */
-export function holdSteeredQueue(botId: string, threadId: string, queueId: string): HeldSteerQueue | null {
+export function holdSteeredQueue(
+  botId: string,
+  threadId: string,
+  queueId: string,
+): HeldSteerQueue | null {
   const entry = queues.get(threadId);
-  if (!entry || entry.botId !== botId || !entry.items.some((item) => item.messageId === queueId)) return null;
+  if (!entry || entry.botId !== botId || !entry.items.some((item) => item.messageId === queueId))
+    return null;
   queues.delete(threadId);
   changed();
   return { botId, threadId, items: entry.items };
@@ -306,7 +407,8 @@ export function holdSteeredQueue(botId: string, threadId: string, queueId: strin
 
 export function restoreHeldSteeredQueue(held: HeldSteerQueue): void {
   const existing = queues.get(held.threadId);
-  if (existing && existing.botId !== held.botId) throw new Error("queued task belongs to another bot");
+  if (existing && existing.botId !== held.botId)
+    throw new Error('queued task belongs to another bot');
   queues.set(held.threadId, {
     botId: held.botId,
     items: existing ? [...held.items, ...existing.items] : held.items,
@@ -315,7 +417,10 @@ export function restoreHeldSteeredQueue(held: HeldSteerQueue): void {
 }
 
 export function settleHeldSteeredQueue(held: HeldSteerQueue): void {
-  settleChatFollowups(held.items.map((item) => item.messageId), null);
+  settleChatFollowups(
+    held.items.map((item) => item.messageId),
+    null,
+  );
 }
 
 export function _queuedCount(threadId: string): number {

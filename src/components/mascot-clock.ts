@@ -1,6 +1,6 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import { FRAME_SLACK_MS, FULL_FRAME_MS } from "./mascot-motion";
+import { FRAME_SLACK_MS, FULL_FRAME_MS } from './mascot-motion';
 
 export type MascotFrame = (now: number) => number;
 
@@ -20,7 +20,9 @@ export interface ClockEnvironment {
   cancelFrame(handle: number): void;
   setTimer(callback: () => void, ms: number): unknown;
   clearTimer(handle: unknown): void;
-  watchVisibility(onChange: (changes: Array<{ target: Element; isIntersecting: boolean }>) => void): VisibilityWatch | null;
+  watchVisibility(
+    onChange: (changes: Array<{ target: Element; isIntersecting: boolean }>) => void,
+  ): VisibilityWatch | null;
   documentHidden(): boolean;
   onDocumentVisibility(listener: () => void): void;
 }
@@ -78,7 +80,8 @@ export function createMascotClock(env: ClockEnvironment): MascotClock {
   const run = (now: number) => {
     frameHandle = null;
     try {
-      for (const entry of entries) if (entry.onScreen && entry.due <= now + FRAME_SLACK_MS) draw(entry, now);
+      for (const entry of entries)
+        if (entry.onScreen && entry.due <= now + FRAME_SLACK_MS) draw(entry, now);
     } finally {
       schedule();
     }
@@ -143,11 +146,12 @@ function browserEnvironment(): ClockEnvironment {
     cancelFrame: (handle) => cancelAnimationFrame(handle),
     setTimer: (callback, ms) => setTimeout(callback, ms),
     clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
-    watchVisibility: (onChange) => typeof IntersectionObserver === "function"
-      ? new IntersectionObserver(onChange, { rootMargin: "64px" })
-      : null,
-    documentHidden: () => document.visibilityState === "hidden",
-    onDocumentVisibility: (listener) => document.addEventListener("visibilitychange", listener),
+    watchVisibility: (onChange) =>
+      typeof IntersectionObserver === 'function'
+        ? new IntersectionObserver(onChange, { rootMargin: '64px' })
+        : null,
+    documentHidden: () => document.visibilityState === 'hidden',
+    onDocumentVisibility: (listener) => document.addEventListener('visibilitychange', listener),
   };
 }
 
@@ -158,12 +162,12 @@ export function mascotClock(): MascotClock {
   return shared;
 }
 
-const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
 function subscribeReducedMotion(onChange: () => void): () => void {
   const query = globalThis.window?.matchMedia?.(REDUCED_MOTION);
-  query?.addEventListener("change", onChange);
-  return () => query?.removeEventListener("change", onChange);
+  query?.addEventListener('change', onChange);
+  return () => query?.removeEventListener('change', onChange);
 }
 
 const readReducedMotion = () => globalThis.window?.matchMedia?.(REDUCED_MOTION).matches ?? false;

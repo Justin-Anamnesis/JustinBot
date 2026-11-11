@@ -1,4 +1,4 @@
-import type { ConnectorStatus } from "@/lib/connector-status";
+import type { ConnectorStatus } from '@/lib/connector-status';
 
 export function mergeCurrentConnectorStatus(
   current: Record<string, ConnectorStatus>,
@@ -22,12 +22,13 @@ export function mergeCompleteConnectorStatus(
   authoritative = true,
 ) {
   const next = { ...current };
-  if (!authoritative) return mergeCurrentConnectorStatus(next, incoming, latestGenerations, requestGenerations);
+  if (!authoritative)
+    return mergeCurrentConnectorStatus(next, incoming, latestGenerations, requestGenerations);
   for (const [slug, state] of Object.entries(current)) {
     if (incoming[slug]) continue;
     if (!state.connected && !state.accounts?.length) continue;
     if ((latestGenerations.get(slug) ?? 0) !== (requestGenerations.get(slug) ?? 0)) continue;
-    next[slug] = { connected: false, pending: false, status: "not_connected", accounts: [] };
+    next[slug] = { connected: false, pending: false, status: 'not_connected', accounts: [] };
   }
   return mergeCurrentConnectorStatus(next, incoming, latestGenerations, requestGenerations);
 }

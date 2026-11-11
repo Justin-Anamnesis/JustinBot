@@ -1,52 +1,100 @@
 // The engines' own prompts stay the only gates: nothing here answers, holds or grants anything.
-import type { PersonWaitKind } from "../shared/person-wait.ts";
-import type { RuntimeEvent } from "./contracts.ts";
-import { redactSecretsInText } from "./redact.ts";
-import { serverLine } from "./server-lines.ts";
+import type { PersonWaitKind } from '../shared/person-wait.ts';
+import type { RuntimeEvent } from './contracts.ts';
+import { redactSecretsInText } from './redact.ts';
+import { serverLine } from './server-lines.ts';
 
-type Resolved = Extract<RuntimeEvent, { type: "request.resolved" }>;
+type Resolved = Extract<RuntimeEvent, { type: 'request.resolved' }>;
 
 /** `language`: the conversation's where the row is shown. */
-export function settledWaitingChip(name: string, kind: string, behavior: Resolved["behavior"], source: Resolved["source"], language?: string): { name: string; ok: boolean } {
+export function settledWaitingChip(
+  name: string,
+  kind: string,
+  behavior: Resolved['behavior'],
+  source: Resolved['source'],
+  language?: string,
+): { name: string; ok: boolean } {
   const who = `@${name}`;
-  const question = kind === "answer";
+  const question = kind === 'answer';
   const line = (key: Parameters<typeof serverLine>[1]) => serverLine(language, key, { who });
   // A timeout or closed turn says so even when the engine filed it as an answer (Claude's note for an unanswered question).
-  if (source === "timeout") return question
-    ? { name: line("server.teammates.noAnswerInTime"), ok: false }
-    : { name: line("server.teammates.noApprovalInTime"), ok: false };
-  if (source === "system" || source === "unavailable") return question
-    ? { name: line("server.teammates.turnEndedBeforeAnswer"), ok: false }
-    : { name: line("server.teammates.approvalClosed"), ok: false };
-  if (behavior === "deny") return { name: line(question ? "server.teammates.questionDismissed" : "server.teammates.requestDenied"), ok: false };
-  return source === "user"
-    ? { name: line(question ? "server.teammates.gotYourAnswer" : "server.teammates.gotYourApproval"), ok: true }
-    : { name: line(question ? "server.teammates.questionAnswered" : "server.teammates.requestApproved"), ok: true };
+  if (source === 'timeout')
+    return question
+      ? { name: line('server.teammates.noAnswerInTime'), ok: false }
+      : { name: line('server.teammates.noApprovalInTime'), ok: false };
+  if (source === 'system' || source === 'unavailable')
+    return question
+      ? { name: line('server.teammates.turnEndedBeforeAnswer'), ok: false }
+      : { name: line('server.teammates.approvalClosed'), ok: false };
+  if (behavior === 'deny')
+    return {
+      name: line(
+        question ? 'server.teammates.questionDismissed' : 'server.teammates.requestDenied',
+      ),
+      ok: false,
+    };
+  return source === 'user'
+    ? {
+        name: line(
+          question ? 'server.teammates.gotYourAnswer' : 'server.teammates.gotYourApproval',
+        ),
+        ok: true,
+      }
+    : {
+        name: line(
+          question ? 'server.teammates.questionAnswered' : 'server.teammates.requestApproved',
+        ),
+        ok: true,
+      };
 }
 
 /** A running turn waited on the person; once they answer it works again. A conversation resting on a card runs no turn
  * and keeps waiting. */
-export const turnWaitedOnPerson = <T extends { activity?: string; busy?: boolean }>(waiting: T | null | undefined): waiting is T =>
-  waiting?.activity === "waiting-on-you" && waiting.busy === true;
+export const turnWaitedOnPerson = <T extends { activity?: string; busy?: boolean }>(
+  waiting: T | null | undefined,
+): waiting is T => waiting?.activity === 'waiting-on-you' && waiting.busy === true;
 
-export function queuedBehindPersonText(name: string, kind: PersonWaitKind, title: string, language?: string): string {
-  return serverLine(language, kind === "question" ? "server.teammates.queuedBehind.answer" : kind === "approval" ? "server.teammates.queuedBehind.approval"
-    : "server.teammates.queuedBehind.review", { bot: name, title });
+export function queuedBehindPersonText(
+  name: string,
+  kind: PersonWaitKind,
+  title: string,
+  language?: string,
+): string {
+  return serverLine(
+    language,
+    kind === 'question'
+      ? 'server.teammates.queuedBehind.answer'
+      : kind === 'approval'
+        ? 'server.teammates.queuedBehind.approval'
+        : 'server.teammates.queuedBehind.review',
+    { bot: name, title },
+  );
 }
 
 const MAX_ACTIONS = 10;
 const MAX_THREADS = 256;
 
 function actionLine(tool: string | undefined, summary: string | undefined): string {
-  return redactSecretsInText(tool && summary && !summary.includes(tool) ? `${tool}: ${summary}` : summary || tool || "an action")
-    .replace(/\s+/g, " ").trim().slice(0, 160);
+  return redactSecretsInText(
+    tool && summary && !summary.includes(tool)
+      ? `${tool}: ${summary}`
+      : summary || tool || 'an action',
+  )
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
 }
 
 /** Every engine denies an unanswered approval on its own timer and the turn carries on, so its result can read as done while those actions never ran. */
 export class UnansweredApprovals {
   private readonly byThread = new Map<string, { turnId: string; actions: string[] }>();
 
-  record(threadId: string, turnId: string | undefined, tool: string | undefined, summary: string | undefined): void {
+  record(
+    threadId: string,
+    turnId: string | undefined,
+    tool: string | undefined,
+    summary: string | undefined,
+  ): void {
     if (!turnId) return;
     const noted = this.byThread.get(threadId);
     const actions = noted?.turnId === turnId ? noted.actions : [];
@@ -57,11 +105,16 @@ export class UnansweredApprovals {
     if (this.byThread.size > MAX_THREADS) this.byThread.delete(this.byThread.keys().next().value!);
   }
 
-  answered(threadId: string, turnId: string | undefined, tool: string | undefined, summary: string | undefined): void {
+  answered(
+    threadId: string,
+    turnId: string | undefined,
+    tool: string | undefined,
+    summary: string | undefined,
+  ): void {
     const noted = this.byThread.get(threadId);
     if (!turnId || noted?.turnId !== turnId) return;
     const action = actionLine(tool, summary);
-    noted.actions = noted.actions.filter(candidate => candidate !== action);
+    noted.actions = noted.actions.filter((candidate) => candidate !== action);
     if (!noted.actions.length) this.byThread.delete(threadId);
   }
 
@@ -69,7 +122,7 @@ export class UnansweredApprovals {
     const noted = this.byThread.get(threadId);
     if (!noted || noted.turnId !== turnId) return text;
     const one = noted.actions.length === 1;
-    const note = `[OpenMausBot: nobody answered the ${one ? "approval" : "approvals"} for ${noted.actions.map(action => `“${action}”`).join(", ")} in time, so ${one ? "it" : "they"} did not run. Do not report ${one ? "it" : "them"} as done; ${one ? "it needs" : "they need"} the person's approval.]`;
+    const note = `[OpenMausBot: nobody answered the ${one ? 'approval' : 'approvals'} for ${noted.actions.map((action) => `“${action}”`).join(', ')} in time, so ${one ? 'it' : 'they'} did not run. Do not report ${one ? 'it' : 'them'} as done; ${one ? 'it needs' : 'they need'} the person's approval.]`;
     if (!text) return note;
     return ok ? `${note}\n\n${text}` : `${text}\n\n${note}`;
   }

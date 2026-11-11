@@ -2,7 +2,7 @@
 
 /** Null for a bare tool name: Claude's item.started carries only the name, and five "Bash" calls may be five commands. */
 export function callKey(tool: string, args: string | undefined): string | null {
-  const a = (args ?? "").replace(/\s+/g, " ").trim();
+  const a = (args ?? '').replace(/\s+/g, ' ').trim();
   if (!a || a === tool) return null;
   return `${tool}:${a}`;
 }
@@ -12,10 +12,10 @@ const NAMELESS_TITLE = /^MCP:\s*tool$/i;
 
 /** Antigravity's ACP adapter titles every call alike ("Running list_directory") and carries what differs only in the input. */
 export function toolItemKey(title: string | undefined, input: string | undefined): string | null {
-  const t = (title ?? "").trim();
+  const t = (title ?? '').trim();
   if (!/\s|\//.test(t)) return null;
   if (!input && NAMELESS_TITLE.test(t)) return null;
-  return input ? `tool:${JSON.stringify([t, input])}` : callKey("tool", t);
+  return input ? `tool:${JSON.stringify([t, input])}` : callKey('tool', t);
 }
 
 export class RepeatDetector {
@@ -27,7 +27,7 @@ export class RepeatDetector {
     this.thresholds = [...opts.thresholds].sort((a, b) => a - b);
     this.maxKeysPerThread = opts.maxKeysPerThread ?? 256;
     if (!Number.isInteger(this.maxKeysPerThread) || this.maxKeysPerThread < 1) {
-      throw new Error("maxKeysPerThread must be a positive integer");
+      throw new Error('maxKeysPerThread must be a positive integer');
     }
   }
 

@@ -1,53 +1,53 @@
-import type { Bot, BotAnnouncement } from "./store";
+import type { Bot, BotAnnouncement } from './store';
 
 export type BotUpdatePatch = Partial<
   Pick<
     Bot,
-    | "name"
-    | "title"
-    | "description"
-    | "soul"
-    | "notifications"
-    | "cloudBackend"
-    | "autoStartVps"
-    | "color"
-    | "mascotExpression"
-    | "mascotFaceColor"
-    | "avatarUrl"
-    | "avatarCrop"
-    | "avatarZoom"
-    | "avatarFocusX"
-    | "avatarFocusY"
-    | "autoApprove"
-    | "approvalMode"
-    | "outbound"
-    | "fallback"
-    | "speakReplies"
-    | "replyStyle"
-    | "voice"
-    | "voiceNotes"
-    | "voiceNoteEveryReply"
-    | "xResearch"
-    | "pinned"
-    | "hidden"
-    | "sidebarHidden"
-    | "welcomed"
-    | "section"
-    | "pinnedMessageId"
-    | "chiefOfStaff"
-    | "composio"
-    | "browser"
-    | "browserProfile"
-    | "memoryUpkeep"
-    | "cacheKeepWarm"
-    | "mcpServers"
-    | "modelSelection"
+    | 'name'
+    | 'title'
+    | 'description'
+    | 'soul'
+    | 'notifications'
+    | 'cloudBackend'
+    | 'autoStartVps'
+    | 'color'
+    | 'mascotExpression'
+    | 'mascotFaceColor'
+    | 'avatarUrl'
+    | 'avatarCrop'
+    | 'avatarZoom'
+    | 'avatarFocusX'
+    | 'avatarFocusY'
+    | 'autoApprove'
+    | 'approvalMode'
+    | 'outbound'
+    | 'fallback'
+    | 'speakReplies'
+    | 'replyStyle'
+    | 'voice'
+    | 'voiceNotes'
+    | 'voiceNoteEveryReply'
+    | 'xResearch'
+    | 'pinned'
+    | 'hidden'
+    | 'sidebarHidden'
+    | 'welcomed'
+    | 'section'
+    | 'pinnedMessageId'
+    | 'chiefOfStaff'
+    | 'composio'
+    | 'browser'
+    | 'browserProfile'
+    | 'memoryUpkeep'
+    | 'cacheKeepWarm'
+    | 'mcpServers'
+    | 'modelSelection'
   >
 > & {
-  computer?: Bot["computer"] | null;
-  connectorTools?: Bot["connectorTools"] | null;
-  connectorScopes?: Bot["connectorScopes"] | null;
-  phoneApps?: Bot["phoneApps"] | null;
+  computer?: Bot['computer'] | null;
+  connectorTools?: Bot['connectorTools'] | null;
+  connectorScopes?: Bot['connectorScopes'] | null;
+  phoneApps?: Bot['phoneApps'] | null;
   /** The server's proof the local-auto warning was shown: wire-only, never folded into bot state. */
   acknowledgeLocalAuto?: boolean;
   applyToAllThreads?: boolean;
@@ -60,13 +60,21 @@ export type BotUpdatePatch = Partial<
 
 export type BotStatePatch = Omit<
   BotUpdatePatch,
-  "computer" | "connectorTools" | "connectorScopes" | "phoneApps" | "acknowledgeLocalAuto" | "applyToAllThreads" | "keepThreadModels" | "threadId" | "mainThreadChoice"
+  | 'computer'
+  | 'connectorTools'
+  | 'connectorScopes'
+  | 'phoneApps'
+  | 'acknowledgeLocalAuto'
+  | 'applyToAllThreads'
+  | 'keepThreadModels'
+  | 'threadId'
+  | 'mainThreadChoice'
 > & {
   mainThreadId?: string;
-  computer?: Bot["computer"];
-  connectorTools?: Bot["connectorTools"];
-  connectorScopes?: Bot["connectorScopes"];
-  phoneApps?: Bot["phoneApps"];
+  computer?: Bot['computer'];
+  connectorTools?: Bot['connectorTools'];
+  connectorScopes?: Bot['connectorScopes'];
+  phoneApps?: Bot['phoneApps'];
 };
 
 interface BotPatchQueueEntry {
@@ -112,7 +120,9 @@ const hasOwn = (value: object, key: PropertyKey): boolean =>
   Object.prototype.hasOwnProperty.call(value, key);
 
 const isAbortError = (error: unknown): boolean =>
-  Boolean(error && typeof error === "object" && (error as { name?: unknown }).name === "AbortError");
+  Boolean(
+    error && typeof error === 'object' && (error as { name?: unknown }).name === 'AbortError',
+  );
 
 const stateOverlay = (patch: BotUpdatePatch): BotStatePatch => {
   const {
@@ -137,7 +147,7 @@ const stateOverlay = (patch: BotUpdatePatch): BotStatePatch => {
   if (phoneApps === null) normalized.phoneApps = undefined;
   else if (phoneApps !== undefined) normalized.phoneApps = phoneApps;
   // A pending choice shows as the bot's main thread, so a broadcast during the save does not revert it.
-  if (typeof mainThreadChoice === "string") normalized.mainThreadId = mainThreadChoice;
+  if (typeof mainThreadChoice === 'string') normalized.mainThreadId = mainThreadChoice;
   return normalized;
 };
 
@@ -162,14 +172,21 @@ export function createBotPatchQueue(options: BotPatchQueueOptions): BotPatchQueu
     entry.controller = controller;
 
     try {
-      const bot = await options.send(entry.botId, patch, controller.signal, entry.fallback, leaving);
+      const bot = await options.send(
+        entry.botId,
+        patch,
+        controller.signal,
+        entry.fallback,
+        leaving,
+      );
       if (disposed || entry.cancelled) return;
       entry.fallback = bot;
       options.onAuthoritative(bot, stateOverlay(entry.pending));
     } catch (caught) {
       if (!disposed && !entry.cancelled) {
-        const supersededApproval = controller.signal.aborted &&
-          hasOwn(entry.pending, "approvalMode") &&
+        const supersededApproval =
+          controller.signal.aborted &&
+          hasOwn(entry.pending, 'approvalMode') &&
           isAbortError(caught);
         if (supersededApproval) return;
         // A lost HTTP response may still have committed and broadcast: re-read before rolling back.
@@ -178,8 +195,7 @@ export function createBotPatchQueue(options: BotPatchQueueOptions): BotPatchQueu
         try {
           bot = await options.reconcile(entry.botId, controller.signal);
           if (bot) entry.fallback = bot;
-        } catch {
-        }
+        } catch {}
         // Deletion may cancel this lane mid-read; folding the result back would resurrect the bot.
         if (disposed || entry.cancelled) return;
         if (bot) options.onAuthoritative(bot, stateOverlay(entry.pending));
@@ -220,21 +236,23 @@ export function createBotPatchQueue(options: BotPatchQueueOptions): BotPatchQueu
       };
       entries.set(botId, entry);
       entry.pending = { ...entry.pending, ...patch };
-      if (hasOwn(patch, "approvalMode") && !hasOwn(patch, "applyToAllThreads")) delete entry.pending.applyToAllThreads;
+      if (hasOwn(patch, 'approvalMode') && !hasOwn(patch, 'applyToAllThreads'))
+        delete entry.pending.applyToAllThreads;
       // A private Full/Custom grant cannot be cancelled once it crosses the Electron bridge.
       const inFlightMode = entry.inFlight.approvalMode;
       if (
         entry.running &&
-        (inFlightMode === "full" || inFlightMode === "custom") &&
-        hasOwn(patch, "approvalMode") &&
+        (inFlightMode === 'full' || inFlightMode === 'custom') &&
+        hasOwn(patch, 'approvalMode') &&
         patch.approvalMode !== inFlightMode
       ) {
         entry.controller?.abort();
       }
       // Execution-boundary edits skip the debounce: work must never start under stale permissions or revoked tools.
-      const immediate = Object.prototype.hasOwnProperty.call(patch, "approvalMode") ||
-        Object.prototype.hasOwnProperty.call(patch, "modelSelection") ||
-        Object.prototype.hasOwnProperty.call(patch, "connectorTools");
+      const immediate =
+        Object.prototype.hasOwnProperty.call(patch, 'approvalMode') ||
+        Object.prototype.hasOwnProperty.call(patch, 'modelSelection') ||
+        Object.prototype.hasOwnProperty.call(patch, 'connectorTools');
       if (immediate) {
         if (entry.timer !== null) clearTimeout(entry.timer);
         entry.timer = null;
@@ -251,7 +269,9 @@ export function createBotPatchQueue(options: BotPatchQueueOptions): BotPatchQueu
         clearTimeout(entry.timer);
         entry.timer = null;
       }
-      const idle = new Promise<BotAnnouncement | null>((resolve) => entry.idleWaiters.push(resolve));
+      const idle = new Promise<BotAnnouncement | null>((resolve) =>
+        entry.idleWaiters.push(resolve),
+      );
       void drain(entry);
       settleIfIdle(entry);
       return idle;
@@ -302,12 +322,15 @@ export function createBotPatchQueue(options: BotPatchQueueOptions): BotPatchQueu
 export const keepaliveFits = (body: string) => new TextEncoder().encode(body).length < 60_000;
 
 /** Saves every edit still waiting at once (`flushAll`) when the page is left; returns the listeners' removal. */
-export function flushWhenLeaving(queue: Pick<BotPatchQueue, "flushAll">, target: Pick<Window, "addEventListener" | "removeEventListener">): () => void {
+export function flushWhenLeaving(
+  queue: Pick<BotPatchQueue, 'flushAll'>,
+  target: Pick<Window, 'addEventListener' | 'removeEventListener'>,
+): () => void {
   const leaving = () => queue.flushAll();
-  target.addEventListener("pagehide", leaving);
-  target.addEventListener("beforeunload", leaving);
+  target.addEventListener('pagehide', leaving);
+  target.addEventListener('beforeunload', leaving);
   return () => {
-    target.removeEventListener("pagehide", leaving);
-    target.removeEventListener("beforeunload", leaving);
+    target.removeEventListener('pagehide', leaving);
+    target.removeEventListener('beforeunload', leaving);
   };
 }

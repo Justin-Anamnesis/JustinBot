@@ -1,10 +1,10 @@
 // The computer's side of MausBot Relay: one outbound control socket, and one data socket per phone session. The relay
 // splices sealed bytes and can't open them; everything here is outside the encryption. Wire spec: README section 9.
-import { webSocketTransport } from "./phone.ts";
-import type { RecordTransport } from "./session.ts";
+import { webSocketTransport } from './phone.ts';
+import type { RecordTransport } from './session.ts';
 
-export const RELAY_PROTOCOL = "omb-relay.v1";
-export type RelayStatus = "connected" | "connecting" | "off";
+export const RELAY_PROTOCOL = 'omb-relay.v1';
+export type RelayStatus = 'connected' | 'connecting' | 'off';
 
 const BACKOFF_MS = [0, 1_000, 2_000, 4_000, 8_000, 16_000, 32_000, 60_000];
 const DEFAULT_TIMING = {
@@ -56,11 +56,11 @@ export class RelayClient {
   #control: WebSocket | null = null;
   #controlNode = 0;
   #probe: WebSocket | null = null;
-  #status: RelayStatus = "off";
+  #status: RelayStatus = 'off';
   #attempt = 0;
   #stopped = true;
   #awaitingToken = false;
-  #lastAdmit = "";
+  #lastAdmit = '';
   #retryTimer: ReturnType<typeof setTimeout> | null = null;
   #firstNodeTimer: ReturnType<typeof setTimeout> | null = null;
   #intervals: Array<ReturnType<typeof setInterval>> = [];
@@ -78,13 +78,13 @@ export class RelayClient {
   }
 
   get node(): string | null {
-    return this.#status === "connected" ? this.#nodes[this.#controlNode] ?? null : null;
+    return this.#status === 'connected' ? (this.#nodes[this.#controlNode] ?? null) : null;
   }
 
   start(): void {
     if (!this.#stopped) return;
     this.#stopped = false;
-    this.#setStatus("connecting");
+    this.#setStatus('connecting');
     this.#connect(0);
     let wall = Date.now();
     let mono = performance.now();
@@ -112,13 +112,13 @@ export class RelayClient {
     for (const socket of [this.#control, this.#probe]) socket?.close(1000);
     this.#control = null;
     this.#probe = null;
-    this.#setStatus("off");
+    this.#setStatus('off');
   }
 
   /** A refreshed token goes to the relay on the same socket; a refused one reconnects. */
   setToken(token: string, nodes?: string[]): void {
     this.#token = token;
-    if (nodes && nodes.join(",") !== this.#nodes.join(",")) {
+    if (nodes && nodes.join(',') !== this.#nodes.join(',')) {
       this.#nodes = [...nodes];
       return this.redial();
     }
@@ -126,7 +126,8 @@ export class RelayClient {
       this.#awaitingToken = false;
       return this.#connect(this.#controlNode);
     }
-    if (this.#status === "connected") this.#control?.send(JSON.stringify({ t: "auth", v: 1, token }));
+    if (this.#status === 'connected')
+      this.#control?.send(JSON.stringify({ t: 'auth', v: 1, token }));
   }
 
   /** After sleep, a network change or a resume: drop the control socket and dial the first node now. */
@@ -137,18 +138,18 @@ export class RelayClient {
     this.#control = null;
     old?.close(1000);
     this.#attempt = 0;
-    this.#setStatus("connecting");
+    this.#setStatus('connecting');
     this.#connect(0);
   }
 
   /** Sends the full set whenever it differs from the last one sent. */
   refreshAdmission(force = false): void {
-    if (this.#status !== "connected" || !this.#control) return;
+    if (this.#status !== 'connected' || !this.#control) return;
     const set = this.#options.admissionSet();
     const text = JSON.stringify(set);
     if (!force && text === this.#lastAdmit) return;
     this.#lastAdmit = text;
-    this.#control.send(JSON.stringify({ t: "admit", set }));
+    this.#control.send(JSON.stringify({ t: 'admit', set }));
   }
 
   #url(node: string, path: string): string {
@@ -156,7 +157,7 @@ export class RelayClient {
   }
 
   #setStatus(status: RelayStatus): void {
-    if (status === this.#status && status !== "connected") return;
+    if (status === this.#status && status !== 'connected') return;
     this.#status = status;
     this.#options.statusChanged?.(status, this.node);
   }
@@ -170,12 +171,12 @@ export class RelayClient {
   #connect(index: number, probe = false): void {
     if (this.#stopped || this.#nodes.length === 0) return;
     const nodeIndex = index % this.#nodes.length;
-    const socket = new WebSocket(this.#url(this.#nodes[nodeIndex], "/v1/host"), [RELAY_PROTOCOL]);
+    const socket = new WebSocket(this.#url(this.#nodes[nodeIndex], '/v1/host'), [RELAY_PROTOCOL]);
     if (probe) this.#probe = socket;
     else this.#control = socket;
-    socket.onopen = () => socket.send(JSON.stringify({ t: "auth", v: 1, token: this.#token }));
+    socket.onopen = () => socket.send(JSON.stringify({ t: 'auth', v: 1, token: this.#token }));
     socket.onmessage = (event: MessageEvent) => {
-      if (typeof event.data !== "string") return;
+      if (typeof event.data !== 'string') return;
       let message: ControlMessage;
       try {
         message = JSON.parse(event.data) as ControlMessage;
@@ -184,12 +185,13 @@ export class RelayClient {
       }
       this.#onControlMessage(socket, nodeIndex, message);
     };
-    socket.onclose = (event: CloseEvent) => this.#onControlClose(socket, nodeIndex, event.code, event.reason);
+    socket.onclose = (event: CloseEvent) =>
+      this.#onControlClose(socket, nodeIndex, event.code, event.reason);
     socket.onerror = () => {};
   }
 
   #onControlMessage(socket: WebSocket, nodeIndex: number, message: ControlMessage): void {
-    if (message.t === "hello") {
+    if (message.t === 'hello') {
       if (socket === this.#probe) {
         // Back on the first node: the new socket first, then the old one goes.
         this.#probe = null;
@@ -200,18 +202,24 @@ export class RelayClient {
       if (socket !== this.#control) return;
       this.#controlNode = nodeIndex;
       this.#attempt = 0;
-      this.#lastAdmit = "";
-      this.#setStatus("connected");
+      this.#lastAdmit = '';
+      this.#setStatus('connected');
       this.refreshAdmission(true);
       this.#scheduleFirstNode();
       return;
     }
     if (socket !== this.#control) return;
-    if (message.t === "open" && typeof message.sid === "string" && /^[A-Za-z0-9_-]{22}$/.test(message.sid)) {
+    if (
+      message.t === 'open' &&
+      typeof message.sid === 'string' &&
+      /^[A-Za-z0-9_-]{22}$/.test(message.sid)
+    ) {
       return this.#openData(nodeIndex, message.sid);
     }
-    if (message.t === "restarting") {
-      const wait = (Number(message.reconnectInMs) || 0) + this.#random() * (Number(message.tryForMs) || 15_000);
+    if (message.t === 'restarting') {
+      const wait =
+        (Number(message.reconnectInMs) || 0) +
+        this.#random() * (Number(message.tryForMs) || 15_000);
       this.#control = null;
       socket.close(1000);
       this.#retry(nodeIndex + 1, Math.min(wait, 60_000));
@@ -226,8 +234,8 @@ export class RelayClient {
     if (socket !== this.#control || this.#stopped) return;
     this.#control = null;
     if (code === 4409) return this.stop();
-    const wasConnected = this.#status === "connected";
-    this.#setStatus("connecting");
+    const wasConnected = this.#status === 'connected';
+    this.#setStatus('connecting');
     if (code === 4401) {
       this.#awaitingToken = true;
       this.#controlNode = nodeIndex;
@@ -261,24 +269,34 @@ export class RelayClient {
     if (this.#firstNodeTimer) clearTimeout(this.#firstNodeTimer);
     this.#firstNodeTimer = null;
     if (this.#controlNode === 0 || this.#stopped) return;
-    this.#firstNodeTimer = setTimeout(() => {
-      this.#firstNodeTimer = null;
-      if (!this.#probe && this.#controlNode !== 0) this.#connect(0, true);
-    }, jitter(this.#timing.firstNodeRetryMs, this.#random));
+    this.#firstNodeTimer = setTimeout(
+      () => {
+        this.#firstNodeTimer = null;
+        if (!this.#probe && this.#controlNode !== 0) this.#connect(0, true);
+      },
+      jitter(this.#timing.firstNodeRetryMs, this.#random),
+    );
     this.#firstNodeTimer.unref?.();
   }
 
   #openData(nodeIndex: number, sid: string): void {
-    const socket = new WebSocket(this.#url(this.#nodes[nodeIndex], "/v1/host/data"), [RELAY_PROTOCOL]);
-    socket.binaryType = "arraybuffer";
+    const socket = new WebSocket(this.#url(this.#nodes[nodeIndex], '/v1/host/data'), [
+      RELAY_PROTOCOL,
+    ]);
+    socket.binaryType = 'arraybuffer';
     let sink: SessionSink | null = null;
     socket.onopen = () => {
-      socket.send(JSON.stringify({ t: "data", v: 1, sid, token: this.#token }));
+      socket.send(JSON.stringify({ t: 'data', v: 1, sid, token: this.#token }));
       sink = this.#options.accept(webSocketTransport(socket));
     };
     socket.onmessage = (event: MessageEvent) => {
-      const binary = typeof event.data !== "string";
-      sink?.receive(binary ? new Uint8Array(event.data as ArrayBuffer) : Buffer.from(event.data as string, "utf8"), binary);
+      const binary = typeof event.data !== 'string';
+      sink?.receive(
+        binary
+          ? new Uint8Array(event.data as ArrayBuffer)
+          : Buffer.from(event.data as string, 'utf8'),
+        binary,
+      );
     };
     socket.onclose = (event: CloseEvent) => sink?.transportClosed(event.code);
     socket.onerror = () => {};

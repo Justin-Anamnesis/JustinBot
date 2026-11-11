@@ -1,6 +1,6 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from 'react';
 
-import type { AppState, Group } from "@/state/store";
+import type { AppState, Group } from '@/state/store';
 
 const watchers = new Set<() => void>();
 let openGroupId: string | null = null;
@@ -33,13 +33,21 @@ function subscribe(watch: () => void) {
 }
 
 export function useRoomPanel(): string | null {
-  return useSyncExternalStore(subscribe, () => openGroupId, () => null);
+  return useSyncExternalStore(
+    subscribe,
+    () => openGroupId,
+    () => null,
+  );
 }
 
 /** Whether the shell draws the open room's panel. Another room, another view, a bot panel or a mode change closes it. */
-export function useRoomPanelShown({ group, state, simple }: {
-  group: Pick<Group, "id"> | undefined;
-  state: Pick<AppState, "selectedId" | "activeView" | "settingsOpen">;
+export function useRoomPanelShown({
+  group,
+  state,
+  simple,
+}: {
+  group: Pick<Group, 'id'> | undefined;
+  state: Pick<AppState, 'selectedId' | 'activeView' | 'settingsOpen'>;
   simple: boolean;
 }): boolean {
   const open = useRoomPanel();
@@ -47,14 +55,19 @@ export function useRoomPanelShown({ group, state, simple }: {
   useEffect(() => {
     if (state.settingsOpen) closeRoomPanel();
   }, [state.settingsOpen]);
-  return simple && state.activeView === "chat" && group !== undefined && open === group.id;
+  return simple && state.activeView === 'chat' && group !== undefined && open === group.id;
 }
 
 // A remote client cannot open desktop panels, so it keeps every control in the header.
-export function simpleRoomHeader({ advanced, remoteClient, group, setupPending }: {
+export function simpleRoomHeader({
+  advanced,
+  remoteClient,
+  group,
+  setupPending,
+}: {
   advanced: boolean;
   remoteClient: boolean;
-  group: Pick<Group, "dm">;
+  group: Pick<Group, 'dm'>;
   setupPending: boolean;
 }): boolean {
   return !advanced && !remoteClient && !group.dm && !setupPending;

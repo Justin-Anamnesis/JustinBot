@@ -1,5 +1,5 @@
 // A tiny ZIP writer for tests: local headers, a central directory and its end record, nothing else.
-import { crc32, deflateRawSync } from "node:zlib";
+import { crc32, deflateRawSync } from 'node:zlib';
 
 export interface ZipFixtureMember {
   name: string;
@@ -16,8 +16,10 @@ export function buildZip(members: ZipFixtureMember[]): Buffer {
   const centrals: Buffer[] = [];
   let offset = 0;
   for (const member of members) {
-    const name = Buffer.from(member.name, "utf8");
-    const data = Buffer.isBuffer(member.data) ? member.data : Buffer.from(member.data ?? "", "utf8");
+    const name = Buffer.from(member.name, 'utf8');
+    const data = Buffer.isBuffer(member.data)
+      ? member.data
+      : Buffer.from(member.data ?? '', 'utf8');
     const method = member.method ?? 8;
     const stored = method === 8 ? deflateRawSync(data) : data;
     const crc = crc32(data);

@@ -1,17 +1,17 @@
-const { createHash } = require("node:crypto");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
+const { createHash } = require('node:crypto');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
-const STAGE_PREFIX = "openmausbot-cua-linux-x64-";
+const STAGE_PREFIX = 'openmausbot-cua-linux-x64-';
 const LEGACY_STAGE_GRACE_MS = 10 * 60 * 1000;
 const FILES = Object.freeze({
-  "cua-driver": "83030028e7c9e3f4d753b3b27025135d44eb8d52f562cce0aaaf95777bc1b41f",
-  "cua-cursor-theme": "d39efb960d207e7328d7a9dd48e3b6565f74be073f9c2ca8dcba86a4d0f28312",
+  'cua-driver': '83030028e7c9e3f4d753b3b27025135d44eb8d52f562cce0aaaf95777bc1b41f',
+  'cua-cursor-theme': 'd39efb960d207e7328d7a9dd48e3b6565f74be073f9c2ca8dcba86a4d0f28312',
 });
 
 function sha256(file, fileSystem = fs) {
-  return createHash("sha256").update(fileSystem.readFileSync(file)).digest("hex");
+  return createHash('sha256').update(fileSystem.readFileSync(file)).digest('hex');
 }
 
 function processIsAlive(processId) {
@@ -19,14 +19,11 @@ function processIsAlive(processId) {
     process.kill(processId, 0);
     return true;
   } catch (error) {
-    return error?.code === "EPERM";
+    return error?.code === 'EPERM';
   }
 }
 
-function processReferencesDirectory(directory, {
-  fileSystem = fs,
-  procRoot = "/proc",
-} = {}) {
+function processReferencesDirectory(directory, { fileSystem = fs, procRoot = '/proc' } = {}) {
   let processes;
   try {
     processes = fileSystem.readdirSync(procRoot);
@@ -36,25 +33,24 @@ function processReferencesDirectory(directory, {
   }
   for (const processName of processes) {
     if (!/^\d+$/.test(processName)) continue;
-    for (const linkName of ["exe", "cwd"]) {
+    for (const linkName of ['exe', 'cwd']) {
       let target;
       try {
         target = fileSystem.readlinkSync(path.join(procRoot, processName, linkName));
       } catch {
         continue;
       }
-      const liveTarget = target.endsWith(" (deleted)") ? target.slice(0, -10) : target;
+      const liveTarget = target.endsWith(' (deleted)') ? target.slice(0, -10) : target;
       if (liveTarget === directory || liveTarget.startsWith(`${directory}${path.sep}`)) return true;
     }
   }
   return false;
 }
 
-function safeStageContents(directory, {
-  currentUid = process.getuid?.(),
-  fileSystem = fs,
-  files = FILES,
-} = {}) {
+function safeStageContents(
+  directory,
+  { currentUid = process.getuid?.(), fileSystem = fs, files = FILES } = {},
+) {
   let entries;
   try {
     entries = fileSystem.readdirSync(directory);
@@ -102,7 +98,7 @@ function reapStaleAppImageCuaBundles({
     return [];
   }
   const removed = [];
-  const escapedPrefix = STAGE_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const escapedPrefix = STAGE_PREFIX.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const candidatePattern = new RegExp(`^${escapedPrefix}(?:(\\d+)-)?[A-Za-z0-9]{6}$`);
   for (const name of names) {
     const match = candidatePattern.exec(name);
@@ -130,8 +126,7 @@ function reapStaleAppImageCuaBundles({
     try {
       fileSystem.rmSync(directory, { recursive: true, force: false });
       removed.push(directory);
-    } catch {
-    }
+    } catch {}
   }
   return removed;
 }
@@ -149,9 +144,9 @@ function stageAppImageCuaBundle({
     !Number.isSafeInteger(processId) ||
     processId <= 0
   ) {
-    throw new Error("AppImage CUA staging paths must be absolute");
+    throw new Error('AppImage CUA staging paths must be absolute');
   }
-  const sourceRoot = path.join(resourcesPath, "cua-linux-x64");
+  const sourceRoot = path.join(resourcesPath, 'cua-linux-x64');
   const stageDirectory = fileSystem.mkdtempSync(
     path.join(temporaryRoot, `${STAGE_PREFIX}${processId}-`),
   );
@@ -178,7 +173,7 @@ function stageAppImageCuaBundle({
     }
     return Object.freeze({
       directory: stageDirectory,
-      driverPath: path.join(stageDirectory, "cua-driver"),
+      driverPath: path.join(stageDirectory, 'cua-driver'),
     });
   } catch (error) {
     fileSystem.rmSync(stageDirectory, { recursive: true, force: true });
@@ -186,22 +181,19 @@ function stageAppImageCuaBundle({
   }
 }
 
-function cleanupAppImageCuaBundle(stage, {
-  temporaryRoot = os.tmpdir(),
-  fileSystem = fs,
-} = {}) {
+function cleanupAppImageCuaBundle(stage, { temporaryRoot = os.tmpdir(), fileSystem = fs } = {}) {
   const directory = stage?.directory;
   if (
-    !path.isAbsolute(directory ?? "") ||
+    !path.isAbsolute(directory ?? '') ||
     path.dirname(directory) !== path.resolve(temporaryRoot) ||
     !path.basename(directory).startsWith(STAGE_PREFIX)
   ) {
-    throw new Error("refusing to clean an unexpected AppImage CUA stage");
+    throw new Error('refusing to clean an unexpected AppImage CUA stage');
   }
   const details = fileSystem.lstatSync(directory, { throwIfNoEntry: false });
   if (!details) return;
   if (!details.isDirectory() || details.isSymbolicLink()) {
-    throw new Error("refusing to clean a replaced AppImage CUA stage");
+    throw new Error('refusing to clean a replaced AppImage CUA stage');
   }
   fileSystem.rmSync(directory, { recursive: true, force: false });
 }

@@ -1,37 +1,41 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createHandoffTicks, HANDOFF_TICK_MS, type HandoffPace } from "./handoff-ticks.ts";
+import { createHandoffTicks, HANDOFF_TICK_MS, type HandoffPace } from './handoff-ticks.ts';
 
-describe("hand-off ticks", () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+describe('hand-off ticks', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-  it("ticks every 250 ms only while work is moving, rarely while it is parked, and hourly with none", async () => {
-    let pace: HandoffPace = "busy";
+  it('ticks every 250 ms only while work is moving, rarely while it is parked, and hourly with none', async () => {
+    let pace: HandoffPace = 'busy';
     const tick = vi.fn();
     const ticks = createHandoffTicks();
     ticks.start({ tick, pace: () => pace });
     await vi.advanceTimersByTimeAsync(1_000);
     expect(tick).toHaveBeenCalledTimes(4);
-    pace = "parked";
+    pace = 'parked';
     await vi.advanceTimersByTimeAsync(250 + 60_000);
     expect(tick).toHaveBeenCalledTimes(5 + 6);
-    pace = "idle";
+    pace = 'idle';
     tick.mockClear();
     await vi.advanceTimersByTimeAsync(HANDOFF_TICK_MS.parked + 3 * 60 * 60_000);
     expect(tick).toHaveBeenCalledTimes(1 + 3);
     ticks.stop();
   });
 
-  it("ticks at once when a write lands while idle, and a kick during busy ticks keeps the 250 ms pace", async () => {
-    let pace: HandoffPace = "idle";
+  it('ticks at once when a write lands while idle, and a kick during busy ticks keeps the 250 ms pace', async () => {
+    let pace: HandoffPace = 'idle';
     const tick = vi.fn();
     const ticks = createHandoffTicks();
     ticks.kick();
     ticks.start({ tick, pace: () => pace });
     await vi.advanceTimersByTimeAsync(250);
     expect(tick).toHaveBeenCalledTimes(1);
-    pace = "busy";
+    pace = 'busy';
     ticks.kick();
     ticks.kick();
     await vi.advanceTimersByTimeAsync(0);
@@ -47,10 +51,10 @@ describe("hand-off ticks", () => {
     expect(tick).toHaveBeenCalledTimes(3);
   });
 
-  it("ticks at once on a write after a wake, though the clock has passed the timer the sleep left behind", async () => {
+  it('ticks at once on a write after a wake, though the clock has passed the timer the sleep left behind', async () => {
     const tick = vi.fn();
     const ticks = createHandoffTicks();
-    ticks.start({ tick, pace: () => "idle" });
+    ticks.start({ tick, pace: () => 'idle' });
     await vi.advanceTimersByTimeAsync(HANDOFF_TICK_MS.busy);
     expect(tick).toHaveBeenCalledTimes(1);
     // A suspended machine's clock jumps when it wakes, and its timers carry on from where they stopped: this one still has an hour to go.
@@ -61,11 +65,13 @@ describe("hand-off ticks", () => {
     ticks.stop();
   });
 
-  it("keeps ticking after a tick throws", async () => {
-    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
-    const tick = vi.fn(() => { throw new Error("boom"); });
+  it('keeps ticking after a tick throws', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const tick = vi.fn(() => {
+      throw new Error('boom');
+    });
     const ticks = createHandoffTicks();
-    ticks.start({ tick, pace: () => "idle" });
+    ticks.start({ tick, pace: () => 'idle' });
     await vi.advanceTimersByTimeAsync(750);
     expect(tick).toHaveBeenCalledTimes(3);
     expect(errors).toHaveBeenCalled();

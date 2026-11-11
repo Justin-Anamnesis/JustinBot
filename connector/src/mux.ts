@@ -1,9 +1,17 @@
 // yamux streams over the box channel's binary WebSocket messages, one frame per message, each stream a Node Duplex.
 // The Admin opens every stream (yamux.ts calls that side the "phone"); the connector accepts each one (the "computer")
 // and pipes it to the home. The Admin copies this file as it is.
-import { Duplex } from "node:stream";
+import { Duplex } from 'node:stream';
 
-import { decodeFrame, encodeFrame, GO_AWAY, Mux, YamuxError, type Frame, type Role } from "./yamux.ts";
+import {
+  decodeFrame,
+  encodeFrame,
+  GO_AWAY,
+  Mux,
+  YamuxError,
+  type Frame,
+  type Role,
+} from './yamux.ts';
 
 /** A sender stops writing frames while the socket holds more than this. */
 export const SEND_BUFFER_HIGH = 1024 * 1024;
@@ -36,10 +44,14 @@ export class MuxStream extends Duplex {
     this.#session = session;
     this.streamId = streamId;
     // A reset reaches whoever listens; without a listener it must not take the process down.
-    this.on("error", noop);
+    this.on('error', noop);
   }
 
-  override _write(chunk: Buffer, _encoding: BufferEncoding, done: (error?: Error | null) => void): void {
+  override _write(
+    chunk: Buffer,
+    _encoding: BufferEncoding,
+    done: (error?: Error | null) => void,
+  ): void {
     this.#pending = chunk;
     this.#pendingDone = done;
     this.flush();
@@ -64,7 +76,7 @@ export class MuxStream extends Duplex {
     const pendingDone = this.#pendingDone;
     this.#pending = null;
     this.#pendingDone = null;
-    pendingDone?.(error ?? new Error("stream reset"));
+    pendingDone?.(error ?? new Error('stream reset'));
     done(error);
   }
 
@@ -100,13 +112,14 @@ export class MuxStream extends Duplex {
   }
 
   remoteReset(): void {
-    if (!this.destroyed) this.destroy(new Error("stream reset"));
+    if (!this.destroyed) this.destroy(new Error('stream reset'));
   }
 
   flush(): void {
     const mux = this.#session.mux;
     while (this.#pending && this.#pending.length > 0) {
-      if (!mux.has(this.streamId) || this.#session.closed) return void this.destroy(new Error("stream reset"));
+      if (!mux.has(this.streamId) || this.#session.closed)
+        return void this.destroy(new Error('stream reset'));
       if (this.#session.congested) return this.#session.whenDrained(() => this.flush());
       const taken = mux.write(this.streamId, this.#pending);
       if (taken === 0) return;
@@ -133,7 +146,10 @@ export class MuxSession {
     this.mux = new Mux(role, {
       send: (frame) => this.#send(frame),
       opened: (streamId) => this.#incoming(streamId),
-      data: (streamId, data) => this.#streams.get(streamId)?.deliver(Buffer.from(data.buffer, data.byteOffset, data.byteLength)),
+      data: (streamId, data) =>
+        this.#streams
+          .get(streamId)
+          ?.deliver(Buffer.from(data.buffer, data.byteOffset, data.byteLength)),
       ended: (streamId) => this.#streams.get(streamId)?.remoteEnded(),
       reset: (streamId) => {
         const stream = this.#streams.get(streamId);
@@ -188,7 +204,7 @@ export class MuxSession {
 
   /** The opening side. */
   openStream(): MuxStream {
-    if (this.#closed) throw new YamuxError("closed");
+    if (this.#closed) throw new YamuxError('closed');
     const streamId = this.mux.open();
     const stream = new MuxStream(this, streamId);
     this.#streams.set(streamId, stream);

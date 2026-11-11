@@ -1,9 +1,8 @@
 /** Joining the room never starts audio automatically. */
 export type CalendarCallSchedule =
-  | { type: "once"; at: number }
-  | { type: "daily"; time: string; weekdays: number[] };
+  { type: 'once'; at: number } | { type: 'daily'; time: string; weekdays: number[] };
 
-export type CalendarCallAttachmentKind = "file" | "image";
+export type CalendarCallAttachmentKind = 'file' | 'image';
 
 export interface CalendarCallAttachment {
   id: string;

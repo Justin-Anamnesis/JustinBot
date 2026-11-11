@@ -1,5 +1,9 @@
 /** The Admin's word on a Cloud whose plan sleeps when idle (the session's `cloud.power`). */
-export interface CloudPower { state: "awake" | "asleep" | "waking"; since: number; sleeps: true }
+export interface CloudPower {
+  state: 'awake' | 'asleep' | 'waking';
+  since: number;
+  sleeps: true;
+}
 export declare const CLOUD_POWER_HEADER: string;
 export declare const BACKGROUND_HEADERS: Readonly<Record<string, string>>;
 export declare const ASLEEP_HOLD_MS: number;
@@ -7,7 +11,9 @@ export declare const SIGNED_IN_MS: number;
 export declare const WAKING_SIGNED_IN_MS: number;
 export declare const WAKING_SHOWN_AFTER_MS: number;
 export declare class CloudAsleepError extends Error {}
-export declare function asleepAnswer(response: { status: number; headers?: { get(name: string): string | null } } | null | undefined): boolean;
+export declare function asleepAnswer(
+  response: { status: number; headers?: { get(name: string): string | null } } | null | undefined,
+): boolean;
 export interface CloudPowerGate {
   /** Background work must not call My Cloud now. */
   asleep(): boolean;

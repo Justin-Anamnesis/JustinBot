@@ -3,14 +3,21 @@
 // Anywhere else (the bot's shared chats, a group chat, a routine the team made) it is the bot's owner's, or the Admins'
 // when nobody owns it. Everyone who sees the conversation still sees the card there; this decides only whose Needs you,
 // brief and notifications it reaches. Off a team nothing is routed.
-import { botOwner, type OwnedBot } from "../shared/bot-owner.ts";
-import type { NotifyKind } from "../shared/notification.ts";
-import { audienceMember, type Audience } from "./audience.ts";
+import { botOwner, type OwnedBot } from '../shared/bot-owner.ts';
+import type { NotifyKind } from '../shared/notification.ts';
+import { audienceMember, type Audience } from './audience.ts';
 
 /** The notifications that are a bot asking a person for something; "done", "mention" and the rest reach whoever sees
  * the conversation, unless one names its person (`forPerson`). */
 export const ASK_NOTIFICATIONS: ReadonlySet<NotifyKind> = new Set([
-  "approval", "question", "sign-in", "secret", "routine-failed", "routine-deferred", "turn-failed", "incident",
+  'approval',
+  'question',
+  'sign-in',
+  'secret',
+  'routine-failed',
+  'routine-deferred',
+  'turn-failed',
+  'incident',
 ]);
 
 export interface AskViewer {
@@ -47,10 +54,23 @@ export function createAskRouting(deps: AskRoutingDeps) {
 
   /** Whether a notification reaches this viewer: one for a person only them, an ask only its person, anything else
    * whoever sees it. */
-  function notificationReaches(viewer: AskViewer, notification: { kind?: unknown; botId?: unknown; threadId?: unknown; forPerson?: unknown }): boolean {
-    if (deps.team && typeof notification.forPerson === "string") return notification.forPerson === viewer.person;
-    if (!deps.team || typeof notification.threadId !== "string" || !ASK_NOTIFICATIONS.has(notification.kind as NotifyKind)) return true;
-    return asks(viewer, typeof notification.botId === "string" ? notification.botId : undefined, notification.threadId);
+  function notificationReaches(
+    viewer: AskViewer,
+    notification: { kind?: unknown; botId?: unknown; threadId?: unknown; forPerson?: unknown },
+  ): boolean {
+    if (deps.team && typeof notification.forPerson === 'string')
+      return notification.forPerson === viewer.person;
+    if (
+      !deps.team ||
+      typeof notification.threadId !== 'string' ||
+      !ASK_NOTIFICATIONS.has(notification.kind as NotifyKind)
+    )
+      return true;
+    return asks(
+      viewer,
+      typeof notification.botId === 'string' ? notification.botId : undefined,
+      notification.threadId,
+    );
   }
 
   return { team: deps.team, askedPerson, asks, notificationReaches };

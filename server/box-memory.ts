@@ -1,4 +1,4 @@
-import { freemem, totalmem } from "node:os";
+import { freemem, totalmem } from 'node:os';
 
 const MB = 1024 * 1024;
 
@@ -28,12 +28,19 @@ export function availableMemory(): number {
 }
 
 const HEAP_SHARE = 0.6;
-const HEAP_MIN_MB = 128, HEAP_MAX_MB = 4096;
+const HEAP_MIN_MB = 128,
+  HEAP_MAX_MB = 4096;
 
 /** Node sizes its old space to a quarter of a cgroup limit; a server on a small box runs out of heap long before the box
  * runs out of memory. No flag without a cgroup limit, or when NODE_OPTIONS already sizes the heap. */
-export function heapSizeArgs(cgroupLimit: number | null, nodeOptions: string | undefined): string[] {
-  if (cgroupLimit === null || /--max[-_]old[-_]space[-_]size/.test(nodeOptions ?? "")) return [];
-  const mb = Math.min(HEAP_MAX_MB, Math.max(HEAP_MIN_MB, Math.floor((cgroupLimit * HEAP_SHARE) / MB)));
+export function heapSizeArgs(
+  cgroupLimit: number | null,
+  nodeOptions: string | undefined,
+): string[] {
+  if (cgroupLimit === null || /--max[-_]old[-_]space[-_]size/.test(nodeOptions ?? '')) return [];
+  const mb = Math.min(
+    HEAP_MAX_MB,
+    Math.max(HEAP_MIN_MB, Math.floor((cgroupLimit * HEAP_SHARE) / MB)),
+  );
   return [`--max-old-space-size=${mb}`];
 }

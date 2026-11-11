@@ -1,4 +1,4 @@
-import { userError, userErrorFields } from "./user-errors.ts";
+import { userError, userErrorFields } from './user-errors.ts';
 // An AI's own standalone build, installed without Node.js or npm. The release is pinned in code (URLs, archive and
 // program SHA-256, size, hosts, macOS signer), downloaded over HTTPS from those hosts only, and checked before anything
 // is unpacked. The new build must start before it replaces anything, the old folder is moved aside rather than deleted
@@ -10,35 +10,62 @@ import { userError, userErrorFields } from "./user-errors.ts";
 //                   (a program that runs the rest of its folder) a link to it inside that folder
 //   current.json    which version bin/ holds
 // bin/ goes on PATH after the person's own PATH and the vendors' default folders, so their own copy always wins.
-import { execFile } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
+import { execFile } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
 import {
-  closeSync, createReadStream, existsSync, lstatSync, openSync, readdirSync, readFileSync, readlinkSync, readSync, realpathSync, renameSync, rmSync, unlinkSync,
-} from "node:fs";
-import { chmod, copyFile, link, lstat, mkdir, open, readdir, rename, rm, stat, symlink, unlink, writeFile, type FileHandle } from "node:fs/promises";
-import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { stripVTControlCharacters } from "node:util";
+  closeSync,
+  createReadStream,
+  existsSync,
+  lstatSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  readSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  unlinkSync,
+} from 'node:fs';
+import {
+  chmod,
+  copyFile,
+  link,
+  lstat,
+  mkdir,
+  open,
+  readdir,
+  rename,
+  rm,
+  stat,
+  symlink,
+  unlink,
+  writeFile,
+  type FileHandle,
+} from 'node:fs/promises';
+import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 
-import { writeFileAtomic } from "./atomic.ts";
-import { cliProbeEnvironment } from "./cli-probe.ts";
-import { DATA_DIR, stripControlPlaneEnv } from "./config.ts";
-import { standaloneEnginesRoot } from "./engine-roots.ts";
-import type { StandaloneAsset, StandaloneRelease } from "./contracts.ts";
-import { findCliCandidates, registerFallbackPathDir, resetPathCache } from "./env-path.ts";
-import { extractZip, safeArchivePath } from "./zip-archive.ts";
+import { writeFileAtomic } from './atomic.ts';
+import { cliProbeEnvironment } from './cli-probe.ts';
+import { DATA_DIR, stripControlPlaneEnv } from './config.ts';
+import { standaloneEnginesRoot } from './engine-roots.ts';
+import type { StandaloneAsset, StandaloneRelease } from './contracts.ts';
+import { findCliCandidates, registerFallbackPathDir, resetPathCache } from './env-path.ts';
+import { extractZip, safeArchivePath } from './zip-archive.ts';
 
 export const STANDALONE_DOWNLOAD_TIMEOUT_MS = 20 * 60_000;
 const STALL_TIMEOUT_MS = 60_000;
 const PROBE_TIMEOUT_MS = 30_000;
 const MAX_REDIRECTS = 5;
 const MAX_ZIP_MEMBERS = 10_000;
-const RECORD = ".standalone-install.json";
-const CURRENT = "current.json";
-const BIN = "bin";
-const DOWNLOAD_PREFIX = ".download-";
-const STAGING_PREFIX = ".staging-";
-const OLD_PREFIX = ".old-";
-const NEW_PREFIX = ".new-";
+const RECORD = '.standalone-install.json';
+const CURRENT = 'current.json';
+const BIN = 'bin';
+const DOWNLOAD_PREFIX = '.download-';
+const STAGING_PREFIX = '.staging-';
+const OLD_PREFIX = '.old-';
+const NEW_PREFIX = '.new-';
 const POINTER_TEMP = /^current\.json\..+\.tmp$/u;
 
 const ENGINE_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/u;
@@ -97,10 +124,12 @@ let muslHost: boolean | undefined;
 
 /** Node's own report names the glibc it runs on; a Linux without one is musl (Alpine and friends). */
 function linuxWithoutGlibc(): boolean {
-  if (process.platform !== "linux") return false;
+  if (process.platform !== 'linux') return false;
   if (muslHost === undefined) {
     try {
-      const header = (process.report?.getReport() as { header?: { glibcVersionRuntime?: string } } | undefined)?.header;
+      const header = (
+        process.report?.getReport() as { header?: { glibcVersionRuntime?: string } } | undefined
+      )?.header;
       muslHost = !header?.glibcVersionRuntime;
     } catch {
       muslHost = false;
@@ -114,13 +143,16 @@ export function standalonePlatformKey(
   arch: string = process.arch,
   musl: boolean = linuxWithoutGlibc(),
 ): string {
-  return `${platform}-${arch}${platform === "linux" && musl ? "-musl" : ""}`;
+  return `${platform}-${arch}${platform === 'linux' && musl ? '-musl' : ''}`;
 }
 
 /** Only the build made for exactly this platform: a glibc build does not start on musl, nor the reverse. */
-export function standaloneAssetFor(release: StandaloneRelease | undefined, key: string = standalonePlatformKey()): StandaloneAsset | null {
+export function standaloneAssetFor(
+  release: StandaloneRelease | undefined,
+  key: string = standalonePlatformKey(),
+): StandaloneAsset | null {
   const assets = release?.assets as Record<string, StandaloneAsset | undefined> | undefined;
-  return assets && Object.hasOwn(assets, key) ? assets[key] ?? null : null;
+  return assets && Object.hasOwn(assets, key) ? (assets[key] ?? null) : null;
 }
 
 export function standaloneRoot(baseDir = DATA_DIR): string {
@@ -137,7 +169,7 @@ const running = new Map<string, Promise<StandaloneInstalled>>();
 
 function inside(parent: string, child: string): boolean {
   const path = relative(parent, child);
-  return path !== "" && !path.startsWith("..") && !isAbsolute(path);
+  return path !== '' && !path.startsWith('..') && !isAbsolute(path);
 }
 
 /** The same folder however it is spelled: /var and /private/var on macOS, a data folder reached through a link. */
@@ -150,11 +182,11 @@ function realOrResolved(path: string): string {
 }
 
 function executableIn(versionDir: string, executable: string): string {
-  return join(versionDir, ...executable.split("/"));
+  return join(versionDir, ...executable.split('/'));
 }
 
 function programName(executable: string): string {
-  return executable.split("/").at(-1)!;
+  return executable.split('/').at(-1)!;
 }
 
 function realFile(path: string): boolean {
@@ -177,7 +209,7 @@ function realDirectory(path: string): boolean {
 function readJsonFile(path: string): unknown {
   if (!realFile(path)) return null;
   try {
-    return JSON.parse(readFileSync(path, "utf8"));
+    return JSON.parse(readFileSync(path, 'utf8'));
   } catch {
     return null;
   }
@@ -186,31 +218,42 @@ function readJsonFile(path: string): unknown {
 function readRecord(versionDir: string): InstallRecord | null {
   const record = readJsonFile(join(versionDir, RECORD)) as Partial<InstallRecord> | null;
   if (
-    !record || typeof record.engine !== "string" || typeof record.version !== "string" || !usableVersionName(record.version)
-    || typeof record.sha256 !== "string" || typeof record.executable !== "string" || !safeArchivePath(record.executable)
-    || typeof record.executableSha256 !== "string" || !SHA256.test(record.executableSha256)
-  ) return null;
+    !record ||
+    typeof record.engine !== 'string' ||
+    typeof record.version !== 'string' ||
+    !usableVersionName(record.version) ||
+    typeof record.sha256 !== 'string' ||
+    typeof record.executable !== 'string' ||
+    !safeArchivePath(record.executable) ||
+    typeof record.executableSha256 !== 'string' ||
+    !SHA256.test(record.executableSha256)
+  )
+    return null;
   return record as InstallRecord;
 }
 
 async function hashFile(path: string): Promise<string> {
-  const hash = createHash("sha256");
+  const hash = createHash('sha256');
   for await (const chunk of createReadStream(path)) hash.update(chunk as Buffer);
-  return hash.digest("hex");
+  return hash.digest('hex');
 }
 
 function hashFileSync(path: string): string {
-  const hash = createHash("sha256");
-  const fd = openSync(path, "r");
+  const hash = createHash('sha256');
+  const fd = openSync(path, 'r');
   try {
     const buffer = Buffer.allocUnsafe(1 << 20);
-    for (let read = readSync(fd, buffer, 0, buffer.length, null); read > 0; read = readSync(fd, buffer, 0, buffer.length, null)) {
+    for (
+      let read = readSync(fd, buffer, 0, buffer.length, null);
+      read > 0;
+      read = readSync(fd, buffer, 0, buffer.length, null)
+    ) {
       hash.update(buffer.subarray(0, read));
     }
   } finally {
     closeSync(fd);
   }
-  return hash.digest("hex");
+  return hash.digest('hex');
 }
 
 /** Removes one leftover without ever following a link: a link or file is unlinked, only a real folder is emptied. */
@@ -237,7 +280,11 @@ function sweepLeftovers(engineDir: string): void {
           renameSync(path, join(engineDir, version));
           continue;
         }
-      } else if (!name.startsWith(DOWNLOAD_PREFIX) && !name.startsWith(STAGING_PREFIX) && !POINTER_TEMP.test(name)) {
+      } else if (
+        !name.startsWith(DOWNLOAD_PREFIX) &&
+        !name.startsWith(STAGING_PREFIX) &&
+        !POINTER_TEMP.test(name)
+      ) {
         continue;
       }
       removeLeftover(path);
@@ -248,7 +295,10 @@ function sweepLeftovers(engineDir: string): void {
   const bin = join(engineDir, BIN);
   if (!realDirectory(bin)) return;
   for (const entry of readdirSync(bin, { withFileTypes: true })) {
-    if ((entry.name.startsWith(NEW_PREFIX) || entry.name.startsWith(OLD_PREFIX)) && (entry.isFile() || entry.isSymbolicLink())) {
+    if (
+      (entry.name.startsWith(NEW_PREFIX) || entry.name.startsWith(OLD_PREFIX)) &&
+      (entry.isFile() || entry.isSymbolicLink())
+    ) {
       try {
         unlinkSync(join(bin, entry.name));
       } catch {}
@@ -258,28 +308,48 @@ function sweepLeftovers(engineDir: string): void {
 
 /** The current version when its record, pointer and bin/ program agree with the code: the program the pin names, hashing
  * to the pinned value, or for an earlier version to one the code lists. The data folder never vouches for itself. */
-function verifiedCurrent(engineDir: string, release: StandaloneRelease): StandaloneInstalled | null {
+function verifiedCurrent(
+  engineDir: string,
+  release: StandaloneRelease,
+): StandaloneInstalled | null {
   const key = standalonePlatformKey();
   const asset = standaloneAssetFor(release, key);
   if (!asset) return null;
   const pointer = readJsonFile(join(engineDir, CURRENT)) as Partial<CurrentPointer> | null;
-  if (!pointer || typeof pointer.version !== "string" || !usableVersionName(pointer.version)) return null;
+  if (!pointer || typeof pointer.version !== 'string' || !usableVersionName(pointer.version))
+    return null;
   const record = readRecord(join(engineDir, pointer.version));
   if (
-    !record || record.engine !== release.engine || record.version !== pointer.version || record.sha256 !== pointer.sha256
-    || record.executable !== asset.executable || pointer.executable !== asset.executable
-    || record.executableSha256 !== pointer.executableSha256
-  ) return null;
-  const earlier = (release.previousPrograms as Record<string, readonly string[] | undefined> | undefined)?.[key] ?? [];
-  const expected = pointer.version === release.version ? asset.executableSha256 : earlier.includes(record.executableSha256) ? record.executableSha256 : null;
+    !record ||
+    record.engine !== release.engine ||
+    record.version !== pointer.version ||
+    record.sha256 !== pointer.sha256 ||
+    record.executable !== asset.executable ||
+    pointer.executable !== asset.executable ||
+    record.executableSha256 !== pointer.executableSha256
+  )
+    return null;
+  const earlier =
+    (release.previousPrograms as Record<string, readonly string[] | undefined> | undefined)?.[
+      key
+    ] ?? [];
+  const expected =
+    pointer.version === release.version
+      ? asset.executableSha256
+      : earlier.includes(record.executableSha256)
+        ? record.executableSha256
+        : null;
   if (!expected || record.executableSha256 !== expected) return null;
   const binDir = join(engineDir, BIN);
   const name = programName(asset.executable);
   if (!realDirectory(binDir)) return null;
   // Nothing but the program goes on PATH; a rename Windows could not finish (.old-) is never a command anyone types.
-  if (readdirSync(binDir).some((entry) => entry !== name && !entry.startsWith(OLD_PREFIX))) return null;
+  if (readdirSync(binDir).some((entry) => entry !== name && !entry.startsWith(OLD_PREFIX)))
+    return null;
   const executablePath = join(binDir, name);
-  const program = release.launcher ? launcherTarget(executablePath, pointer.version, asset.executable) : executablePath;
+  const program = release.launcher
+    ? launcherTarget(executablePath, pointer.version, asset.executable)
+    : executablePath;
   if (!program || !realFile(program)) return null;
   try {
     if (hashFileSync(program) !== expected) return null;
@@ -292,12 +362,16 @@ function verifiedCurrent(engineDir: string, release: StandaloneRelease): Standal
 /** bin/'s entry for a launcher is a link to exactly this version's program, written relative to bin/: anything else is
  * not the app's (a link elsewhere is never followed). */
 function launcherLink(version: string, executable: string): string {
-  return join("..", version, ...executable.split("/"));
+  return join('..', version, ...executable.split('/'));
 }
 
 function launcherTarget(entry: string, version: string, executable: string): string | null {
   try {
-    if (!lstatSync(entry).isSymbolicLink() || readlinkSync(entry) !== launcherLink(version, executable)) return null;
+    if (
+      !lstatSync(entry).isSymbolicLink() ||
+      readlinkSync(entry) !== launcherLink(version, executable)
+    )
+      return null;
   } catch {
     return null;
   }
@@ -305,7 +379,10 @@ function launcherTarget(entry: string, version: string, executable: string): str
 }
 
 /** At boot: the bin/ folder of each engine this app pins, once its program is checked, goes on PATH after everything else. */
-export function registerStandaloneBinDirs(baseDir = DATA_DIR, releases: readonly StandaloneRelease[] = []): void {
+export function registerStandaloneBinDirs(
+  baseDir = DATA_DIR,
+  releases: readonly StandaloneRelease[] = [],
+): void {
   // Never through a link: a linked folder could lead to the person's own files.
   if (!realDirectory(standaloneRoot(baseDir))) return;
   for (const release of releases) {
@@ -326,9 +403,16 @@ export function registerStandaloneBinDirs(baseDir = DATA_DIR, releases: readonly
 }
 
 /** The version the app's copy of this engine points at, checked or not; null when the app installed none. */
-export function standaloneCurrentVersion(release: StandaloneRelease, baseDir = DATA_DIR): string | null {
-  const pointer = readJsonFile(join(standaloneEngineDir(release.engine, baseDir), CURRENT)) as Partial<CurrentPointer> | null;
-  return typeof pointer?.version === "string" && usableVersionName(pointer.version) ? pointer.version : null;
+export function standaloneCurrentVersion(
+  release: StandaloneRelease,
+  baseDir = DATA_DIR,
+): string | null {
+  const pointer = readJsonFile(
+    join(standaloneEngineDir(release.engine, baseDir), CURRENT),
+  ) as Partial<CurrentPointer> | null;
+  return typeof pointer?.version === 'string' && usableVersionName(pointer.version)
+    ? pointer.version
+    : null;
 }
 
 function resolvesInside(folder: string, cli: string, path?: string): boolean {
@@ -342,49 +426,109 @@ export function isAppStandaloneCopy(cli: string, baseDir = DATA_DIR, path?: stri
 }
 
 /** The release's run settings when `cli` resolves to the app's own copy; a copy the person installed gets none. */
-export function standaloneRunEnv(release: StandaloneRelease | undefined, cli: string, baseDir = DATA_DIR, path?: string): Record<string, string> {
+export function standaloneRunEnv(
+  release: StandaloneRelease | undefined,
+  cli: string,
+  baseDir = DATA_DIR,
+  path?: string,
+): Record<string, string> {
   if (!release?.runEnv) return {};
-  return resolvesInside(standaloneEngineDir(release.engine, baseDir), cli, path) ? { ...release.runEnv } : {};
+  return resolvesInside(standaloneEngineDir(release.engine, baseDir), cli, path)
+    ? { ...release.runEnv }
+    : {};
 }
 
 function checkRelease(release: StandaloneRelease, asset: StandaloneAsset): void {
   if (
-    !ENGINE_NAME.test(release.engine) || !usableVersionName(release.version) || !SHA256.test(asset.sha256)
-    || typeof asset.executableSha256 !== "string" || !SHA256.test(asset.executableSha256)
-    || !safeArchivePath(asset.executable) || !Number.isSafeInteger(asset.approxBytes) || asset.approxBytes <= 0
-    || (release.macTeamId !== undefined && !TEAM_ID.test(release.macTeamId))
-  ) throw Object.assign(new StandaloneInstallError(`${release.name}'s install details are invalid. Nothing was downloaded.`), userErrorFields(userError("serverError.install.invalidDetails", { name: release.name })));
+    !ENGINE_NAME.test(release.engine) ||
+    !usableVersionName(release.version) ||
+    !SHA256.test(asset.sha256) ||
+    typeof asset.executableSha256 !== 'string' ||
+    !SHA256.test(asset.executableSha256) ||
+    !safeArchivePath(asset.executable) ||
+    !Number.isSafeInteger(asset.approxBytes) ||
+    asset.approxBytes <= 0 ||
+    (release.macTeamId !== undefined && !TEAM_ID.test(release.macTeamId))
+  )
+    throw Object.assign(
+      new StandaloneInstallError(
+        `${release.name}'s install details are invalid. Nothing was downloaded.`,
+      ),
+      userErrorFields(userError('serverError.install.invalidDetails', { name: release.name })),
+    );
 }
 
 function trustedUrl(url: URL, hosts: readonly string[]): boolean {
-  return url.protocol === "https:" && !url.username && !url.password && (url.port === "" || url.port === "443") && hosts.includes(url.hostname);
+  return (
+    url.protocol === 'https:' &&
+    !url.username &&
+    !url.password &&
+    (url.port === '' || url.port === '443') &&
+    hosts.includes(url.hostname)
+  );
 }
 
 async function writeAll(handle: FileHandle, chunk: Uint8Array): Promise<void> {
   let offset = 0;
   while (offset < chunk.length) {
     const { bytesWritten } = await handle.write(chunk, offset, chunk.length - offset, null);
-    if (bytesWritten <= 0) throw new Error("The download could not be written to disk.");
+    if (bytesWritten <= 0) throw new Error('The download could not be written to disk.');
     offset += bytesWritten;
   }
 }
 
 function warn(release: StandaloneRelease, detail: unknown): void {
-  console.warn(`standalone ${release.engine}: ${detail instanceof Error ? detail.message : String(detail)}`);
+  console.warn(
+    `standalone ${release.engine}: ${detail instanceof Error ? detail.message : String(detail)}`,
+  );
 }
 
 function httpRefusal(name: string, status: number): StandaloneInstallError {
-  if (status === 404 || status === 410) return Object.assign(new StandaloneInstallError(`This version of ${name} is no longer available to download. Update OpenMausBot, then try again.`), userErrorFields(userError("serverError.install.versionGone", { name: name })));
-  if (status === 403 || status === 429) return Object.assign(new StandaloneInstallError(`The download site is limiting downloads right now. Try again in a few minutes.`), userErrorFields(userError("serverError.install.downloadLimited")));
-  if (status >= 500) return Object.assign(new StandaloneInstallError(`${name}'s download site isn't answering right now. Try again later.`), userErrorFields(userError("serverError.install.siteNotAnswering", { name: name })));
-  return Object.assign(new StandaloneInstallError(`${name} couldn't be downloaded. Check the internet connection and try again.`), userErrorFields(userError("serverError.install.downloadFailed", { name: name })));
+  if (status === 404 || status === 410)
+    return Object.assign(
+      new StandaloneInstallError(
+        `This version of ${name} is no longer available to download. Update OpenMausBot, then try again.`,
+      ),
+      userErrorFields(userError('serverError.install.versionGone', { name: name })),
+    );
+  if (status === 403 || status === 429)
+    return Object.assign(
+      new StandaloneInstallError(
+        `The download site is limiting downloads right now. Try again in a few minutes.`,
+      ),
+      userErrorFields(userError('serverError.install.downloadLimited')),
+    );
+  if (status >= 500)
+    return Object.assign(
+      new StandaloneInstallError(
+        `${name}'s download site isn't answering right now. Try again later.`,
+      ),
+      userErrorFields(userError('serverError.install.siteNotAnswering', { name: name })),
+    );
+  return Object.assign(
+    new StandaloneInstallError(
+      `${name} couldn't be downloaded. Check the internet connection and try again.`,
+    ),
+    userErrorFields(userError('serverError.install.downloadFailed', { name: name })),
+  );
 }
 
 /** Streams the asset to `destination` while hashing it; every hop must be HTTPS to a release host. */
-async function download(release: StandaloneRelease, asset: StandaloneAsset, destination: string, options: StandaloneInstallOptions): Promise<void> {
+async function download(
+  release: StandaloneRelease,
+  asset: StandaloneAsset,
+  destination: string,
+  options: StandaloneInstallOptions,
+): Promise<void> {
   const name = release.name;
   const cap = asset.approxBytes * 2;
-  const tooLarge = () => Object.assign(new StandaloneInstallError(`The ${name} download was larger than expected, so it was stopped. Nothing was installed.`), userErrorFields(userError("serverError.install.downloadTooLarge", { name: name })));
+  const tooLarge = () =>
+    Object.assign(
+      new StandaloneInstallError(
+        `The ${name} download was larger than expected, so it was stopped. Nothing was installed.`,
+      ),
+      userErrorFields(userError('serverError.install.downloadTooLarge', { name: name })),
+    );
   const controller = new AbortController();
   let timedOut = false;
   let stalled = false;
@@ -407,15 +551,28 @@ async function download(release: StandaloneRelease, asset: StandaloneAsset, dest
     let response: Response;
     for (let hop = 0; ; hop += 1) {
       if (!trustedUrl(url, release.hosts)) {
-        throw Object.assign(new StandaloneInstallError(`The ${name} download did not come from its official site, so it was stopped. Nothing was installed.`), userErrorFields(userError("serverError.install.unofficialDownload", { name: name })));
+        throw Object.assign(
+          new StandaloneInstallError(
+            `The ${name} download did not come from its official site, so it was stopped. Nothing was installed.`,
+          ),
+          userErrorFields(userError('serverError.install.unofficialDownload', { name: name })),
+        );
       }
       progressed();
-      response = await (options.fetchImpl ?? fetch)(url.href, { redirect: "manual", signal: controller.signal });
+      response = await (options.fetchImpl ?? fetch)(url.href, {
+        redirect: 'manual',
+        signal: controller.signal,
+      });
       if (response.status < 300 || response.status >= 400) break;
-      const location = response.headers.get("location");
+      const location = response.headers.get('location');
       await response.body?.cancel().catch(() => {});
       if (!location || hop >= MAX_REDIRECTS) {
-        throw Object.assign(new StandaloneInstallError(`The ${name} download kept redirecting, so it was stopped. Nothing was installed.`), userErrorFields(userError("serverError.install.redirects", { name: name })));
+        throw Object.assign(
+          new StandaloneInstallError(
+            `The ${name} download kept redirecting, so it was stopped. Nothing was installed.`,
+          ),
+          userErrorFields(userError('serverError.install.redirects', { name: name })),
+        );
       }
       url = new URL(location, url);
     }
@@ -424,10 +581,10 @@ async function download(release: StandaloneRelease, asset: StandaloneAsset, dest
       await response.body?.cancel().catch(() => {});
       throw httpRefusal(name, response.status);
     }
-    const declared = Number(response.headers.get("content-length") ?? Number.NaN);
+    const declared = Number(response.headers.get('content-length') ?? Number.NaN);
     if (Number.isFinite(declared) && declared > cap) throw tooLarge();
-    const hash = createHash("sha256");
-    const handle = await open(destination, "wx", 0o600);
+    const hash = createHash('sha256');
+    const handle = await open(destination, 'wx', 0o600);
     let received = 0;
     try {
       for await (const chunk of response.body as unknown as AsyncIterable<Uint8Array>) {
@@ -440,17 +597,41 @@ async function download(release: StandaloneRelease, asset: StandaloneAsset, dest
     } finally {
       await handle.close();
     }
-    if (hash.digest("hex") !== asset.sha256) {
-      throw Object.assign(new StandaloneInstallError(`The ${name} download failed its safety check, so nothing was installed. Try again later.`), userErrorFields(userError("serverError.install.safetyCheck", { name: name })));
+    if (hash.digest('hex') !== asset.sha256) {
+      throw Object.assign(
+        new StandaloneInstallError(
+          `The ${name} download failed its safety check, so nothing was installed. Try again later.`,
+        ),
+        userErrorFields(userError('serverError.install.safetyCheck', { name: name })),
+      );
     }
   } catch (error) {
     if (error instanceof StandaloneInstallError) throw error;
-    if (timedOut) throw Object.assign(new StandaloneInstallError(`The ${name} download took too long and was stopped. Check the internet connection and try again.`), userErrorFields(userError("serverError.install.downloadTimeout", { name: name })));
-    if (stalled) throw new StandaloneInstallError(`The ${name} download stopped partway. Check the internet connection and try again.`);
+    if (timedOut)
+      throw Object.assign(
+        new StandaloneInstallError(
+          `The ${name} download took too long and was stopped. Check the internet connection and try again.`,
+        ),
+        userErrorFields(userError('serverError.install.downloadTimeout', { name: name })),
+      );
+    if (stalled)
+      throw new StandaloneInstallError(
+        `The ${name} download stopped partway. Check the internet connection and try again.`,
+      );
     // A file-system error (no space, a locked folder) is the caller's to describe; anything else is the network.
-    if (typeof (error as NodeJS.ErrnoException).code === "string") throw error;
-    warn(release, error instanceof Error && error.cause instanceof Error ? `${error.message}: ${error.cause.message}` : error);
-    throw Object.assign(new StandaloneInstallError(`${name} couldn't be downloaded. Check the internet connection and try again.`), userErrorFields(userError("serverError.install.downloadFailed", { name: name })));
+    if (typeof (error as NodeJS.ErrnoException).code === 'string') throw error;
+    warn(
+      release,
+      error instanceof Error && error.cause instanceof Error
+        ? `${error.message}: ${error.cause.message}`
+        : error,
+    );
+    throw Object.assign(
+      new StandaloneInstallError(
+        `${name} couldn't be downloaded. Check the internet connection and try again.`,
+      ),
+      userErrorFields(userError('serverError.install.downloadFailed', { name: name })),
+    );
   } finally {
     clearTimeout(timer);
     clearTimeout(stallTimer);
@@ -461,7 +642,7 @@ async function download(release: StandaloneRelease, asset: StandaloneAsset, dest
 /** Plain files and folders only, each inside the staging folder; `./` prefixes are allowed. */
 async function extractTarGz(archivePath: string, staging: string): Promise<boolean> {
   let unsafe = false;
-  const tar = await import("tar");
+  const tar = await import('tar');
   await tar.x({
     file: archivePath,
     cwd: staging,
@@ -470,10 +651,10 @@ async function extractTarGz(archivePath: string, staging: string): Promise<boole
     preserveOwner: false,
     umask: 0o022,
     filter: (path, entry) => {
-      const type = "type" in entry ? entry.type : undefined;
-      const name = path.replace(/^(?:\.\/)+/u, "").replace(/\/$/u, "");
-      if (name === "" && type === "Directory") return false;
-      if ((type !== "File" && type !== "Directory") || !safeArchivePath(name)) {
+      const type = 'type' in entry ? entry.type : undefined;
+      const name = path.replace(/^(?:\.\/)+/u, '').replace(/\/$/u, '');
+      if (name === '' && type === 'Directory') return false;
+      if ((type !== 'File' && type !== 'Directory') || !safeArchivePath(name)) {
         unsafe = true;
         return false;
       }
@@ -493,16 +674,32 @@ async function normaliseModes(directory: string): Promise<void> {
     } else if (entry.isFile()) {
       await chmod(path, ((await stat(path)).mode & 0o111) !== 0 ? 0o755 : 0o644);
     } else {
-      throw Object.assign(new StandaloneInstallError("The archive contains an unexpected or unsafe file. Nothing was installed."), userErrorFields(userError("serverError.install.unsafeArchive")));
+      throw Object.assign(
+        new StandaloneInstallError(
+          'The archive contains an unexpected or unsafe file. Nothing was installed.',
+        ),
+        userErrorFields(userError('serverError.install.unsafeArchive')),
+      );
     }
   }
 }
 
-async function unpack(release: StandaloneRelease, archivePath: string, staging: string, asset: StandaloneAsset): Promise<void> {
-  const unsafe = Object.assign(new StandaloneInstallError(`The ${release.name} download holds an unexpected or unsafe file, so nothing was installed.`), userErrorFields(userError("serverError.install.unsafeFile", { name: release.name })));
+async function unpack(
+  release: StandaloneRelease,
+  archivePath: string,
+  staging: string,
+  asset: StandaloneAsset,
+): Promise<void> {
+  const unsafe = Object.assign(
+    new StandaloneInstallError(
+      `The ${release.name} download holds an unexpected or unsafe file, so nothing was installed.`,
+    ),
+    userErrorFields(userError('serverError.install.unsafeFile', { name: release.name })),
+  );
   try {
-    if (asset.archive === "zip") await extractZip(archivePath, staging, { maxEntries: MAX_ZIP_MEMBERS });
-    else if (asset.archive === "tar.gz") {
+    if (asset.archive === 'zip')
+      await extractZip(archivePath, staging, { maxEntries: MAX_ZIP_MEMBERS });
+    else if (asset.archive === 'tar.gz') {
       if (!(await extractTarGz(archivePath, staging))) throw unsafe;
     } else {
       const target = executableIn(staging, asset.executable);
@@ -510,32 +707,51 @@ async function unpack(release: StandaloneRelease, archivePath: string, staging: 
       await rename(archivePath, target);
     }
   } catch (error) {
-    if (error instanceof StandaloneInstallError || typeof (error as NodeJS.ErrnoException).code === "string") throw error;
+    if (
+      error instanceof StandaloneInstallError ||
+      typeof (error as NodeJS.ErrnoException).code === 'string'
+    )
+      throw error;
     warn(release, error);
     throw unsafe;
   }
-  if (process.platform !== "win32") await normaliseModes(staging);
+  if (process.platform !== 'win32') await normaliseModes(staging);
 }
 
-const runCodesign: CodesignRunner = (args) => new Promise((resolveRun) => {
-  execFile("/usr/bin/codesign", args, { timeout: 120_000, maxBuffer: 256 * 1024, encoding: "utf8" }, (error, stdout, stderr) => {
-    const code = error ? (typeof (error as { code?: unknown }).code === "number" ? (error as { code: number }).code : null) : 0;
-    resolveRun({ code, output: `${stdout}${stderr}` });
+const runCodesign: CodesignRunner = (args) =>
+  new Promise((resolveRun) => {
+    execFile(
+      '/usr/bin/codesign',
+      args,
+      { timeout: 120_000, maxBuffer: 256 * 1024, encoding: 'utf8' },
+      (error, stdout, stderr) => {
+        const code = error
+          ? typeof (error as { code?: unknown }).code === 'number'
+            ? (error as { code: number }).code
+            : null
+          : 0;
+        resolveRun({ code, output: `${stdout}${stderr}` });
+      },
+    );
   });
-});
 
 /** A valid signature from a Developer ID Application certificate Apple issued to the pinned team. */
-async function macSignerOk(executable: string, release: StandaloneRelease, codesign: CodesignRunner): Promise<boolean> {
+async function macSignerOk(
+  executable: string,
+  release: StandaloneRelease,
+  codesign: CodesignRunner,
+): Promise<boolean> {
   const requirement = [
-    "=anchor apple generic",
-    "certificate 1[field.1.2.840.113635.100.6.2.6] exists",
-    "certificate leaf[field.1.2.840.113635.100.6.1.13] exists",
+    '=anchor apple generic',
+    'certificate 1[field.1.2.840.113635.100.6.2.6] exists',
+    'certificate leaf[field.1.2.840.113635.100.6.1.13] exists',
     `certificate leaf[subject.OU] = "${release.macTeamId}"`,
-  ].join(" and ");
-  return (await codesign(["--verify", "--strict", "-R", requirement, executable])).code === 0;
+  ].join(' and ');
+  return (await codesign(['--verify', '--strict', '-R', requirement, executable])).code === 0;
 }
 
-const signedHere = (key: string, release: StandaloneRelease) => key.startsWith("darwin-") && release.macTeamId !== undefined;
+const signedHere = (key: string, release: StandaloneRelease) =>
+  key.startsWith('darwin-') && release.macTeamId !== undefined;
 
 /** Null when `<executable> --version` exits cleanly and names the pinned version; otherwise what went wrong. Run with the
  * environment bots' engines get, minus every key: no provider, workspace or control-plane credential. */
@@ -543,17 +759,41 @@ function probeVersion(executable: string, release: StandaloneRelease): Promise<s
   const env: NodeJS.ProcessEnv = { ...cliProbeEnvironment(), ...release.runEnv };
   stripControlPlaneEnv(env as Record<string, string | undefined>);
   return new Promise((resolveProbe) => {
-    execFile(executable, ["--version"], { env, timeout: PROBE_TIMEOUT_MS, killSignal: "SIGKILL", maxBuffer: 64 * 1024, windowsHide: true, encoding: "utf8" }, (error, stdout, stderr) => {
-      const lines = (text: string) => stripVTControlCharacters(text).split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
-      if (error) {
-        const { code, killed } = error as { code?: unknown; killed?: boolean };
-        const said = lines(stderr)[0]
-          ?? (killed ? "it did not answer in time" : typeof code === "number" ? `it stopped with exit code ${code}` : lines(stdout)[0] ?? "it could not be run");
-        return resolveProbe(said.slice(0, 400));
-      }
-      if (!stdout.includes(release.version)) return resolveProbe(`it reported version ${(lines(stdout)[0] ?? "nothing").slice(0, 80)}, not ${release.version}`);
-      resolveProbe(null);
-    });
+    execFile(
+      executable,
+      ['--version'],
+      {
+        env,
+        timeout: PROBE_TIMEOUT_MS,
+        killSignal: 'SIGKILL',
+        maxBuffer: 64 * 1024,
+        windowsHide: true,
+        encoding: 'utf8',
+      },
+      (error, stdout, stderr) => {
+        const lines = (text: string) =>
+          stripVTControlCharacters(text)
+            .split(/\r?\n/u)
+            .map((line) => line.trim())
+            .filter(Boolean);
+        if (error) {
+          const { code, killed } = error as { code?: unknown; killed?: boolean };
+          const said =
+            lines(stderr)[0] ??
+            (killed
+              ? 'it did not answer in time'
+              : typeof code === 'number'
+                ? `it stopped with exit code ${code}`
+                : (lines(stdout)[0] ?? 'it could not be run'));
+          return resolveProbe(said.slice(0, 400));
+        }
+        if (!stdout.includes(release.version))
+          return resolveProbe(
+            `it reported version ${(lines(stdout)[0] ?? 'nothing').slice(0, 80)}, not ${release.version}`,
+          );
+        resolveProbe(null);
+      },
+    );
   });
 }
 
@@ -566,7 +806,14 @@ async function verifiedVersion(
   codesign: CodesignRunner,
 ): Promise<{ executable: string; sha256: string } | null> {
   const record = readRecord(versionDir);
-  if (!record || record.engine !== release.engine || record.version !== release.version || record.sha256 !== asset.sha256 || record.executable !== asset.executable) return null;
+  if (
+    !record ||
+    record.engine !== release.engine ||
+    record.version !== release.version ||
+    record.sha256 !== asset.sha256 ||
+    record.executable !== asset.executable
+  )
+    return null;
   const expected = asset.executableSha256;
   if (record.executableSha256 !== expected) return null;
   const executable = executableIn(versionDir, asset.executable);
@@ -582,7 +829,7 @@ async function removeDir(path: string): Promise<void> {
 
 function lockedError(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException).code;
-  return code === "EPERM" || code === "EACCES" || code === "EBUSY";
+  return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY';
 }
 
 /** Moves `from` onto `to`. Windows will not replace a program that is running but lets it be renamed, so it steps aside. */
@@ -591,7 +838,7 @@ export async function replaceFile(from: string, to: string): Promise<void> {
     await rename(from, to);
     return;
   } catch (error) {
-    if (process.platform !== "win32" || !lockedError(error)) throw error;
+    if (process.platform !== 'win32' || !lockedError(error)) throw error;
   }
   const aside = join(dirname(to), `${OLD_PREFIX}${randomUUID()}${extname(to)}`);
   await rename(to, aside);
@@ -613,7 +860,14 @@ async function realFolder(path: string, release: StandaloneRelease): Promise<voi
     return;
   }
   if (!info.isDirectory()) {
-    throw Object.assign(new StandaloneInstallError(`OpenMausBot's folder for ${release.name} is not a plain folder (${path}), so nothing was changed. Move it away, then try again.`), userErrorFields(userError("serverError.install.notPlainFolder", { name: release.name, path: path })));
+    throw Object.assign(
+      new StandaloneInstallError(
+        `OpenMausBot's folder for ${release.name} is not a plain folder (${path}), so nothing was changed. Move it away, then try again.`,
+      ),
+      userErrorFields(
+        userError('serverError.install.notPlainFolder', { name: release.name, path: path }),
+      ),
+    );
   }
 }
 
@@ -621,14 +875,31 @@ async function realFolder(path: string, release: StandaloneRelease): Promise<voi
 async function checkBinFolder(binDir: string, release: StandaloneRelease): Promise<void> {
   if (!(await lstat(binDir).catch(() => null))) return;
   await realFolder(binDir, release);
-  const folder = (await readdir(binDir, { withFileTypes: true })).find((entry) => entry.isDirectory());
+  const folder = (await readdir(binDir, { withFileTypes: true })).find((entry) =>
+    entry.isDirectory(),
+  );
   if (folder) {
-    throw Object.assign(new StandaloneInstallError(`OpenMausBot's folder for ${release.name} holds something it did not put there (${join(binDir, folder.name)}), so nothing was changed. Move it away, then try again.`), userErrorFields(userError("serverError.install.unexpectedFolder", { name: release.name, path: join(binDir, folder.name) })));
+    throw Object.assign(
+      new StandaloneInstallError(
+        `OpenMausBot's folder for ${release.name} holds something it did not put there (${join(binDir, folder.name)}), so nothing was changed. Move it away, then try again.`,
+      ),
+      userErrorFields(
+        userError('serverError.install.unexpectedFolder', {
+          name: release.name,
+          path: join(binDir, folder.name),
+        }),
+      ),
+    );
   }
 }
 
 /** Puts this version's program in bin/, points current.json at it and bin/ on PATH. */
-async function activate(engineDir: string, release: StandaloneRelease, asset: StandaloneAsset, programSha256: string): Promise<StandaloneInstalled> {
+async function activate(
+  engineDir: string,
+  release: StandaloneRelease,
+  asset: StandaloneAsset,
+  programSha256: string,
+): Promise<StandaloneInstalled> {
   const versionDir = join(engineDir, release.version);
   const binDir = join(engineDir, BIN);
   await checkBinFolder(binDir, release);
@@ -641,13 +912,14 @@ async function activate(engineDir: string, release: StandaloneRelease, asset: St
     if (release.launcher) {
       // A launcher finds the rest of its folder from where it really is, so bin/ links to it rather than holding a copy.
       await symlink(launcherLink(release.version, asset.executable), fresh);
-    } else try {
-      await link(source, fresh);
-    } catch {
-      // A file system without hard links gets a copy.
-      await copyFile(source, fresh);
-      if (process.platform !== "win32") await chmod(fresh, 0o755);
-    }
+    } else
+      try {
+        await link(source, fresh);
+      } catch {
+        // A file system without hard links gets a copy.
+        await copyFile(source, fresh);
+        if (process.platform !== 'win32') await chmod(fresh, 0o755);
+      }
     await replaceFile(fresh, target);
   } finally {
     // Renaming one hard link onto another of the same file leaves both names in place.
@@ -656,9 +928,15 @@ async function activate(engineDir: string, release: StandaloneRelease, asset: St
   // Only the program goes on PATH: any other file or link here, planted or left over, is unlinked (never followed, never
   // emptied). A program Windows still holds open under an .old- name stays for a later sweep.
   for (const entry of await readdir(binDir, { withFileTypes: true })) {
-    if (entry.name !== name && (entry.isFile() || entry.isSymbolicLink())) await unlink(join(binDir, entry.name)).catch(() => {});
+    if (entry.name !== name && (entry.isFile() || entry.isSymbolicLink()))
+      await unlink(join(binDir, entry.name)).catch(() => {});
   }
-  const pointer: CurrentPointer = { version: release.version, executable: asset.executable, sha256: asset.sha256, executableSha256: programSha256 };
+  const pointer: CurrentPointer = {
+    version: release.version,
+    executable: asset.executable,
+    sha256: asset.sha256,
+    executableSha256: programSha256,
+  };
   writeFileAtomic(join(engineDir, CURRENT), `${JSON.stringify(pointer)}\n`, { mode: 0o600 });
   activeVersions.add(versionDir);
   registerFallbackPathDir(binDir);
@@ -675,7 +953,10 @@ async function prune(engineDir: string, currentDir: string, engine: string): Pro
     if (!entry.isDirectory() || !usableVersionName(entry.name) || dir === currentDir) continue;
     const record = readRecord(dir);
     if (!record || record.engine !== engine || record.version !== entry.name) continue;
-    versions.push({ dir, installedAt: typeof record.installedAt === "number" ? record.installedAt : 0 });
+    versions.push({
+      dir,
+      installedAt: typeof record.installedAt === 'number' ? record.installedAt : 0,
+    });
   }
   versions.sort((a, b) => b.installedAt - a.installedAt);
   for (const old of versions.slice(1)) {
@@ -688,27 +969,62 @@ async function prune(engineDir: string, currentDir: string, engine: string): Pro
 /** Everything that is not already a plain sentence becomes one; the detail goes to the server log. Windows refuses to
  * move or delete a file a running program holds with EBUSY, or EPERM from rename, unlink or rmdir; EACCES and any other
  * EPERM mean the folder's permissions. */
-export function plainInstallError(release: StandaloneRelease, asset: StandaloneAsset, error: unknown): Error {
+export function plainInstallError(
+  release: StandaloneRelease,
+  asset: StandaloneAsset,
+  error: unknown,
+): Error {
   if (error instanceof StandaloneInstallError) return error;
   warn(release, error);
   const { code, syscall } = error as NodeJS.ErrnoException;
-  if (code === "ENOSPC") {
+  if (code === 'ENOSPC') {
     const megabytes = Math.ceil((asset.approxBytes * 4) / 1024 / 1024);
-    return Object.assign(new StandaloneInstallError(`There is not enough free disk space to install ${release.name}. Free up about ${megabytes} MB, then try again.`), userErrorFields(userError("serverError.install.diskSpace", { name: release.name, megabytes: megabytes })));
+    return Object.assign(
+      new StandaloneInstallError(
+        `There is not enough free disk space to install ${release.name}. Free up about ${megabytes} MB, then try again.`,
+      ),
+      userErrorFields(
+        userError('serverError.install.diskSpace', { name: release.name, megabytes: megabytes }),
+      ),
+    );
   }
-  if (code === "EBUSY" || code === "ENOTEMPTY" || (code === "EPERM" && (syscall === "rename" || syscall === "unlink" || syscall === "rmdir"))) {
-    return Object.assign(new StandaloneInstallError(`${release.name} is open in another window. Close it, then try again.`), userErrorFields(userError("serverError.install.openElsewhere", { name: release.name })));
+  if (
+    code === 'EBUSY' ||
+    code === 'ENOTEMPTY' ||
+    (code === 'EPERM' && (syscall === 'rename' || syscall === 'unlink' || syscall === 'rmdir'))
+  ) {
+    return Object.assign(
+      new StandaloneInstallError(
+        `${release.name} is open in another window. Close it, then try again.`,
+      ),
+      userErrorFields(userError('serverError.install.openElsewhere', { name: release.name })),
+    );
   }
-  if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
-    return Object.assign(new StandaloneInstallError(`OpenMausBot can't write to its folder for ${release.name}. Check the folder's permissions, then try again.`), userErrorFields(userError("serverError.install.cannotWrite", { name: release.name })));
+  if (code === 'EACCES' || code === 'EPERM' || code === 'EROFS') {
+    return Object.assign(
+      new StandaloneInstallError(
+        `OpenMausBot can't write to its folder for ${release.name}. Check the folder's permissions, then try again.`,
+      ),
+      userErrorFields(userError('serverError.install.cannotWrite', { name: release.name })),
+    );
   }
-  return Object.assign(new StandaloneInstallError(`${release.name} couldn't be installed. Try again.`), userErrorFields(userError("serverError.install.failed", { name: release.name })));
+  return Object.assign(
+    new StandaloneInstallError(`${release.name} couldn't be installed. Try again.`),
+    userErrorFields(userError('serverError.install.failed', { name: release.name })),
+  );
 }
 
-async function installOnce(release: StandaloneRelease, options: StandaloneInstallOptions): Promise<StandaloneInstalled> {
+async function installOnce(
+  release: StandaloneRelease,
+  options: StandaloneInstallOptions,
+): Promise<StandaloneInstalled> {
   const key = options.platformKey ?? standalonePlatformKey();
   const asset = standaloneAssetFor(release, key);
-  if (!asset) throw Object.assign(new StandaloneInstallError(`${release.name} has no download for this computer.`), userErrorFields(userError("serverError.install.noDownload", { name: release.name })));
+  if (!asset)
+    throw Object.assign(
+      new StandaloneInstallError(`${release.name} has no download for this computer.`),
+      userErrorFields(userError('serverError.install.noDownload', { name: release.name })),
+    );
   checkRelease(release, asset);
   const codesign = options.codesign ?? runCodesign;
   const engineDir = standaloneEngineDir(release.engine, options.baseDir);
@@ -731,7 +1047,17 @@ async function installOnce(release: StandaloneRelease, options: StandaloneInstal
       // The bytes are the pinned ones, so downloading them again would not help: say so and change nothing.
       const failure = await probeVersion(existing.executable, release);
       if (failure !== null) {
-        throw Object.assign(new StandaloneInstallError(`${release.name} is installed, but it doesn't start on this computer (${failure}). Nothing was changed.`), userErrorFields(userError("serverError.install.existingDoesNotStart", { name: release.name, failure: failure })));
+        throw Object.assign(
+          new StandaloneInstallError(
+            `${release.name} is installed, but it doesn't start on this computer (${failure}). Nothing was changed.`,
+          ),
+          userErrorFields(
+            userError('serverError.install.existingDoesNotStart', {
+              name: release.name,
+              failure: failure,
+            }),
+          ),
+        );
       }
       const installed = await activate(engineDir, release, asset, existing.sha256);
       await prune(engineDir, versionDir, release.engine).catch(() => {});
@@ -743,24 +1069,60 @@ async function installOnce(release: StandaloneRelease, options: StandaloneInstal
     await unpack(release, archivePath, staging, asset);
     const stagedProgram = executableIn(staging, asset.executable);
     if (!(await lstat(stagedProgram).catch(() => null))?.isFile()) {
-      throw Object.assign(new StandaloneInstallError(`The ${release.name} download did not contain the program it should, so nothing was installed.`), userErrorFields(userError("serverError.install.programMissing", { name: release.name })));
+      throw Object.assign(
+        new StandaloneInstallError(
+          `The ${release.name} download did not contain the program it should, so nothing was installed.`,
+        ),
+        userErrorFields(userError('serverError.install.programMissing', { name: release.name })),
+      );
     }
-    if (process.platform !== "win32") await chmod(stagedProgram, 0o755);
+    if (process.platform !== 'win32') await chmod(stagedProgram, 0o755);
     const programSha256 = await hashFile(stagedProgram);
     if (programSha256 !== asset.executableSha256) {
-      throw Object.assign(new StandaloneInstallError(`The ${release.name} download failed its safety check, so nothing was installed. Try again later.`), userErrorFields(userError("serverError.install.safetyCheck", { name: release.name })));
+      throw Object.assign(
+        new StandaloneInstallError(
+          `The ${release.name} download failed its safety check, so nothing was installed. Try again later.`,
+        ),
+        userErrorFields(userError('serverError.install.safetyCheck', { name: release.name })),
+      );
     }
     if (signedHere(key, release) && !(await macSignerOk(stagedProgram, release, codesign))) {
-      throw Object.assign(new StandaloneInstallError(`The downloaded ${release.name} is not signed by its maker, so nothing was installed.`), userErrorFields(userError("serverError.install.notSigned", { name: release.name })));
+      throw Object.assign(
+        new StandaloneInstallError(
+          `The downloaded ${release.name} is not signed by its maker, so nothing was installed.`,
+        ),
+        userErrorFields(userError('serverError.install.notSigned', { name: release.name })),
+      );
     }
-    const failure = await probeVersion(stagedProgram, release) ?? await options.beforeSwitch?.(stagedProgram) ?? null;
+    const failure =
+      (await probeVersion(stagedProgram, release)) ??
+      (await options.beforeSwitch?.(stagedProgram)) ??
+      null;
     if (failure !== null) {
-      throw Object.assign(new StandaloneInstallError(`${release.name} was downloaded, but it doesn't start on this computer (${failure}). Nothing was installed.`), userErrorFields(userError("serverError.install.downloadDoesNotStart", { name: release.name, failure: failure })));
+      throw Object.assign(
+        new StandaloneInstallError(
+          `${release.name} was downloaded, but it doesn't start on this computer (${failure}). Nothing was installed.`,
+        ),
+        userErrorFields(
+          userError('serverError.install.downloadDoesNotStart', {
+            name: release.name,
+            failure: failure,
+          }),
+        ),
+      );
     }
     const record: InstallRecord = {
-      engine: release.engine, version: release.version, sha256: asset.sha256, executable: asset.executable, executableSha256: programSha256, installedAt: Date.now(),
+      engine: release.engine,
+      version: release.version,
+      sha256: asset.sha256,
+      executable: asset.executable,
+      executableSha256: programSha256,
+      installedAt: Date.now(),
     };
-    await writeFile(join(staging, RECORD), `${JSON.stringify(record)}\n`, { flag: "wx", mode: 0o600 });
+    await writeFile(join(staging, RECORD), `${JSON.stringify(record)}\n`, {
+      flag: 'wx',
+      mode: 0o600,
+    });
 
     // Proven, so it takes the version's folder. Whatever held it (a changed or partial copy) steps aside, and comes
     // back if anything below fails.
@@ -795,7 +1157,10 @@ async function installOnce(release: StandaloneRelease, options: StandaloneInstal
 }
 
 /** Install or reuse the pinned build for this computer. Installs of one engine that overlap share a single run. */
-export function installStandaloneEngine(release: StandaloneRelease, options: StandaloneInstallOptions = {}): Promise<StandaloneInstalled> {
+export function installStandaloneEngine(
+  release: StandaloneRelease,
+  options: StandaloneInstallOptions = {},
+): Promise<StandaloneInstalled> {
   const key = standaloneEngineDir(release.engine, options.baseDir);
   const existing = running.get(key);
   if (existing) return existing;

@@ -1,10 +1,11 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 
-const srcRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
-const FRACTIONAL_SIZE = /text-\[\d+\.\d+px\]|font-size:\s*\d+\.\d+px|fontSize:\s*\d+\.\d+(?![\d.])/g;
+const srcRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+const FRACTIONAL_SIZE =
+  /text-\[\d+\.\d+px\]|font-size:\s*\d+\.\d+px|fontSize:\s*\d+\.\d+(?![\d.])/g;
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -14,10 +15,12 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-describe("type scale", () => {
-  it("sizes text in whole pixels, so neighbouring steps stay distinct", () => {
+describe('type scale', () => {
+  it('sizes text in whole pixels, so neighbouring steps stay distinct', () => {
     const offenders = sourceFiles(srcRoot).flatMap((file) =>
-      (readFileSync(file, "utf8").match(FRACTIONAL_SIZE) ?? []).map((size) => `${relative(srcRoot, file)}: ${size}`),
+      (readFileSync(file, 'utf8').match(FRACTIONAL_SIZE) ?? []).map(
+        (size) => `${relative(srcRoot, file)}: ${size}`,
+      ),
     );
     expect(offenders).toEqual([]);
   });

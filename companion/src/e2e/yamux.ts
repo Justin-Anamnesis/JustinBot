@@ -40,9 +40,10 @@ export class YamuxError extends Error {
 }
 
 export function encodeFrame(frame: Frame): Buffer {
-  const payload = frame.type === TYPE.data ? frame.data ?? new Uint8Array(0) : new Uint8Array(0);
-  if (frame.type === TYPE.data && payload.length !== frame.length) throw new YamuxError("data_length");
-  if (payload.length > MAX_DATA_PAYLOAD) throw new YamuxError("data_too_large");
+  const payload = frame.type === TYPE.data ? (frame.data ?? new Uint8Array(0)) : new Uint8Array(0);
+  if (frame.type === TYPE.data && payload.length !== frame.length)
+    throw new YamuxError('data_length');
+  if (payload.length > MAX_DATA_PAYLOAD) throw new YamuxError('data_too_large');
   const out = Buffer.alloc(HEADER_BYTES + payload.length);
   out.writeUInt8(VERSION, 0);
   out.writeUInt8(frame.type, 1);
@@ -56,43 +57,85 @@ export function encodeFrame(frame: Frame): Buffer {
 /** One record's plaintext is exactly one frame. Everything that can be checked without stream state is
  * checked here. */
 export function decodeFrame(bytes: Uint8Array): Frame {
-  if (bytes.length < HEADER_BYTES) throw new YamuxError("short_frame");
+  if (bytes.length < HEADER_BYTES) throw new YamuxError('short_frame');
   const view = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  if (view.readUInt8(0) !== VERSION) throw new YamuxError("version");
+  if (view.readUInt8(0) !== VERSION) throw new YamuxError('version');
   const type = view.readUInt8(1);
-  if (type > TYPE.goAway) throw new YamuxError("type");
+  if (type > TYPE.goAway) throw new YamuxError('type');
   const flags = view.readUInt16BE(2);
-  if ((flags & ~KNOWN_FLAGS) !== 0) throw new YamuxError("flags");
+  if ((flags & ~KNOWN_FLAGS) !== 0) throw new YamuxError('flags');
   const streamId = view.readUInt32BE(4);
   const length = view.readUInt32BE(8);
   if (type === TYPE.data) {
-    if (length > MAX_DATA_PAYLOAD) throw new YamuxError("data_too_large");
-    if (bytes.length !== HEADER_BYTES + length) throw new YamuxError("data_length");
-    if (streamId === 0) throw new YamuxError("stream_zero");
+    if (length > MAX_DATA_PAYLOAD) throw new YamuxError('data_too_large');
+    if (bytes.length !== HEADER_BYTES + length) throw new YamuxError('data_length');
+    if (streamId === 0) throw new YamuxError('stream_zero');
     return { type, flags, streamId, length, data: view.subarray(HEADER_BYTES) };
   }
-  if (bytes.length !== HEADER_BYTES) throw new YamuxError("trailing_bytes");
+  if (bytes.length !== HEADER_BYTES) throw new YamuxError('trailing_bytes');
   if (type === TYPE.windowUpdate) {
-    if (streamId === 0) throw new YamuxError("stream_zero");
+    if (streamId === 0) throw new YamuxError('stream_zero');
   } else {
-    if (streamId !== 0) throw new YamuxError("session_frame_stream");
-    if (type === TYPE.ping && flags !== FLAG.syn && flags !== FLAG.ack) throw new YamuxError("ping_flags");
-    if (type === TYPE.goAway && flags !== 0) throw new YamuxError("goaway_flags");
+    if (streamId !== 0) throw new YamuxError('session_frame_stream');
+    if (type === TYPE.ping && flags !== FLAG.syn && flags !== FLAG.ack)
+      throw new YamuxError('ping_flags');
+    if (type === TYPE.goAway && flags !== 0) throw new YamuxError('goaway_flags');
   }
   return { type: type as FrameType, flags, streamId, length };
 }
 
-export const openFrame = (streamId: number): Frame => ({ type: TYPE.windowUpdate, flags: FLAG.syn, streamId, length: OPEN_WINDOW_DELTA });
-export const acceptFrame = (streamId: number): Frame => ({ type: TYPE.windowUpdate, flags: FLAG.ack, streamId, length: OPEN_WINDOW_DELTA });
-export const resetFrame = (streamId: number): Frame => ({ type: TYPE.windowUpdate, flags: FLAG.rst, streamId, length: 0 });
-export const finFrame = (streamId: number): Frame => ({ type: TYPE.windowUpdate, flags: FLAG.fin, streamId, length: 0 });
-export const windowFrame = (streamId: number, delta: number): Frame => ({ type: TYPE.windowUpdate, flags: 0, streamId, length: delta });
-export const dataFrame = (streamId: number, data: Uint8Array, flags = 0): Frame => ({ type: TYPE.data, flags, streamId, length: data.length, data });
-export const pingFrame = (value: number, flags: number = FLAG.syn): Frame => ({ type: TYPE.ping, flags, streamId: 0, length: value >>> 0 });
-export const goAwayFrame = (code: number): Frame => ({ type: TYPE.goAway, flags: 0, streamId: 0, length: code });
+export const openFrame = (streamId: number): Frame => ({
+  type: TYPE.windowUpdate,
+  flags: FLAG.syn,
+  streamId,
+  length: OPEN_WINDOW_DELTA,
+});
+export const acceptFrame = (streamId: number): Frame => ({
+  type: TYPE.windowUpdate,
+  flags: FLAG.ack,
+  streamId,
+  length: OPEN_WINDOW_DELTA,
+});
+export const resetFrame = (streamId: number): Frame => ({
+  type: TYPE.windowUpdate,
+  flags: FLAG.rst,
+  streamId,
+  length: 0,
+});
+export const finFrame = (streamId: number): Frame => ({
+  type: TYPE.windowUpdate,
+  flags: FLAG.fin,
+  streamId,
+  length: 0,
+});
+export const windowFrame = (streamId: number, delta: number): Frame => ({
+  type: TYPE.windowUpdate,
+  flags: 0,
+  streamId,
+  length: delta,
+});
+export const dataFrame = (streamId: number, data: Uint8Array, flags = 0): Frame => ({
+  type: TYPE.data,
+  flags,
+  streamId,
+  length: data.length,
+  data,
+});
+export const pingFrame = (value: number, flags: number = FLAG.syn): Frame => ({
+  type: TYPE.ping,
+  flags,
+  streamId: 0,
+  length: value >>> 0,
+});
+export const goAwayFrame = (code: number): Frame => ({
+  type: TYPE.goAway,
+  flags: 0,
+  streamId: 0,
+  length: code,
+});
 
 /** The phone opens every stream; the computer only accepts. */
-export type Role = "phone" | "computer";
+export type Role = 'phone' | 'computer';
 
 interface StreamState {
   /** The phone side: false until the computer's ACK arrives. The computer side: false until accept(). */
@@ -159,11 +202,11 @@ export class Mux {
 
   /** The phone side. Data may follow at once, within the first 256 KiB. */
   open(): number {
-    if (this.role !== "phone") throw new YamuxError("computer_open");
-    if (this.#localGoneAway || this.#peerGoneAway) throw new YamuxError("gone_away");
-    if (this.#streams.size >= MAX_STREAMS) throw new YamuxError("too_many_streams");
+    if (this.role !== 'phone') throw new YamuxError('computer_open');
+    if (this.#localGoneAway || this.#peerGoneAway) throw new YamuxError('gone_away');
+    if (this.#streams.size >= MAX_STREAMS) throw new YamuxError('too_many_streams');
     const streamId = this.#highestId === 0 ? 1 : this.#highestId + 2;
-    if (streamId > MAX_STREAM_ID) throw new YamuxError("ids_exhausted");
+    if (streamId > MAX_STREAM_ID) throw new YamuxError('ids_exhausted');
     this.#highestId = streamId;
     this.#streams.set(streamId, {
       established: false,
@@ -180,7 +223,7 @@ export class Mux {
   /** The computer side, once the origin socket is connected. */
   accept(streamId: number): void {
     const stream = this.#streams.get(streamId);
-    if (!stream || stream.established || this.role !== "computer") return;
+    if (!stream || stream.established || this.role !== 'computer') return;
     stream.established = true;
     stream.receiveWindow += OPEN_WINDOW_DELTA;
     this.#events.send(acceptFrame(streamId));
@@ -189,7 +232,7 @@ export class Mux {
   /** Sends up to the window and the frame cap; returns the bytes taken. */
   write(streamId: number, data: Uint8Array): number {
     const stream = this.#streams.get(streamId);
-    if (!stream || stream.localFin || (this.role === "computer" && !stream.established)) return 0;
+    if (!stream || stream.localFin || (this.role === 'computer' && !stream.established)) return 0;
     const size = Math.min(data.length, stream.sendWindow, MAX_DATA_PAYLOAD);
     if (size === 0) return 0;
     stream.sendWindow -= size;
@@ -270,15 +313,16 @@ export class Mux {
 
   /** A stream that ended is ignored: an RST and the peer's last frames cross. An ID never opened is an error. */
   #known(streamId: number): StreamState | null {
-    if (streamId % 2 === 0 || streamId > this.#highestId) throw new YamuxError("unknown_stream");
+    if (streamId % 2 === 0 || streamId > this.#highestId) throw new YamuxError('unknown_stream');
     return this.#streams.get(streamId) ?? null;
   }
 
   #receiveOpen(frame: Frame): void {
-    if (this.role === "phone") throw new YamuxError("computer_opened_stream");
-    if (frame.type !== TYPE.windowUpdate || frame.flags !== FLAG.syn) throw new YamuxError("open_flags");
-    if (frame.streamId % 2 === 0) throw new YamuxError("even_stream");
-    if (frame.streamId <= this.#highestId) throw new YamuxError("stream_reused");
+    if (this.role === 'phone') throw new YamuxError('computer_opened_stream');
+    if (frame.type !== TYPE.windowUpdate || frame.flags !== FLAG.syn)
+      throw new YamuxError('open_flags');
+    if (frame.streamId % 2 === 0) throw new YamuxError('even_stream');
+    if (frame.streamId <= this.#highestId) throw new YamuxError('stream_reused');
     this.#highestId = frame.streamId;
     if (this.#localGoneAway || this.#streams.size >= MAX_STREAMS) {
       this.#events.send(resetFrame(frame.streamId));
@@ -296,11 +340,12 @@ export class Mux {
   }
 
   #receiveAck(frame: Frame): void {
-    if (this.role === "computer") throw new YamuxError("phone_ack");
-    if (frame.type !== TYPE.windowUpdate || (frame.flags & ~(FLAG.ack | FLAG.fin | FLAG.rst)) !== 0) throw new YamuxError("ack_flags");
+    if (this.role === 'computer') throw new YamuxError('phone_ack');
+    if (frame.type !== TYPE.windowUpdate || (frame.flags & ~(FLAG.ack | FLAG.fin | FLAG.rst)) !== 0)
+      throw new YamuxError('ack_flags');
     const stream = this.#known(frame.streamId);
     if (!stream) return;
-    if (stream.established) throw new YamuxError("duplicate_ack");
+    if (stream.established) throw new YamuxError('duplicate_ack');
     stream.established = true;
     this.#events.accepted?.(frame.streamId);
     this.#receiveOnStream(frame.streamId, stream, { ...frame, flags: frame.flags & ~FLAG.ack });
@@ -313,8 +358,9 @@ export class Mux {
       return;
     }
     if (frame.type === TYPE.data) {
-      if (stream.remoteFin && (frame.length > 0 || frame.flags & FLAG.fin)) throw new YamuxError("data_after_fin");
-      if (frame.length > stream.receiveWindow) throw new YamuxError("window_exceeded");
+      if (stream.remoteFin && (frame.length > 0 || frame.flags & FLAG.fin))
+        throw new YamuxError('data_after_fin');
+      if (frame.length > stream.receiveWindow) throw new YamuxError('window_exceeded');
       stream.receiveWindow -= frame.length;
       if (frame.length > 0) this.#events.data(streamId, frame.data as Uint8Array);
     } else if (frame.length > 0) {
@@ -322,7 +368,7 @@ export class Mux {
       this.#events.writable(streamId);
     }
     if (frame.flags & FLAG.fin) {
-      if (stream.remoteFin) throw new YamuxError("data_after_fin");
+      if (stream.remoteFin) throw new YamuxError('data_after_fin');
       stream.remoteFin = true;
       this.#events.ended(streamId);
       this.#closeIfDone(streamId, stream);

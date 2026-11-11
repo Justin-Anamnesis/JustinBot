@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-import { isOwnerOrAdmin, readSessionState } from "./session";
+import { isOwnerOrAdmin, readSessionState } from './session';
 
 const RETRY_MS = 10_000;
 let known: boolean | null = null;
@@ -13,14 +13,17 @@ function lookUp(): void {
   if (known !== null || looking || !listeners.size) return;
   // A paired desktop reaches the host through its companion, which does not serve the session route; the host already
   // treats that device as its owner, so owner controls such as New bot stay shown.
-  if (typeof window !== "undefined" && window.ogb?.remoteClient?.active === true) {
+  if (typeof window !== 'undefined' && window.ogb?.remoteClient?.active === true) {
     known = true;
     for (const listener of listeners) listener(true);
     return;
   }
   looking = true;
   void readSessionState()
-    .then((state) => state.kind === "unreachable" ? null : isOwnerOrAdmin(state), () => null)
+    .then(
+      (state) => (state.kind === 'unreachable' ? null : isOwnerOrAdmin(state)),
+      () => null,
+    )
     .then((allowed) => {
       looking = false;
       if (allowed !== null) known = allowed;

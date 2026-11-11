@@ -1,20 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { api } from "@/state/store";
+import { api } from '@/state/store';
 import {
   ALL_PHONE_APPS,
   PHONE_CAPABILITIES,
   type PhoneApps,
   type PhoneCapability,
   type PhoneGrant,
-} from "../../shared/phone-apps";
+} from '../../shared/phone-apps';
 
 export interface PublicPhone {
   key: string;
   registration: {
     installId: string;
     name: string;
-    platform: "ios" | "android";
+    platform: 'ios' | 'android';
     appVersion: string;
     timeZone: string;
     /** Capability → the OS grant string; present means the phone allows it. */
@@ -51,10 +51,7 @@ export function nextPhoneApps(
   return next;
 }
 
-export function phoneAppRows(
-  bot: { phoneApps?: PhoneApps },
-  phones: PublicPhone[],
-): PhoneAppRow[] {
+export function phoneAppRows(bot: { phoneApps?: PhoneApps }, phones: PublicPhone[]): PhoneAppRow[] {
   const apps = effectivePhoneApps(bot);
   return PHONE_CAPABILITIES.map((cap) => ({
     cap,
@@ -64,30 +61,37 @@ export function phoneAppRows(
 }
 
 export function phoneNames(phones: PublicPhone[]): string {
-  return phones.map((phone) => phone.registration.name).join(", ");
+  return phones.map((phone) => phone.registration.name).join(', ');
 }
 
 export function phoneAppChips(phone: PublicPhone): PhoneCapability[] {
   return PHONE_CAPABILITIES.filter((cap) => Boolean(phone.registration.capabilities[cap]));
 }
 
-export function phonePlatformLabel(platform: "ios" | "android"): string {
-  return platform === "ios" ? "iPhone" : "Android";
+export function phonePlatformLabel(platform: 'ios' | 'android'): string {
+  return platform === 'ios' ? 'iPhone' : 'Android';
 }
 
 export function phoneRemovePath(key: string): string {
   return `/api/phones/${encodeURIComponent(key)}`;
 }
 
-export function usePhones(): { phase: "loading" | "ready"; phones: PublicPhone[]; refresh(): void } {
-  const [state, setState] = useState<{ phase: "loading" | "ready"; phones: PublicPhone[] }>({ phase: "loading", phones: [] });
+export function usePhones(): {
+  phase: 'loading' | 'ready';
+  phones: PublicPhone[];
+  refresh(): void;
+} {
+  const [state, setState] = useState<{ phase: 'loading' | 'ready'; phones: PublicPhone[] }>({
+    phase: 'loading',
+    phones: [],
+  });
   const disposed = useRef(false);
 
   const refresh = useCallback(() => {
     // A poll: never someone using a Cloud home, and never sent from a hidden page (src/state/api.ts `background`).
-    void api<{ phones: PublicPhone[] }>("/api/phones", { background: true })
+    void api<{ phones: PublicPhone[] }>('/api/phones', { background: true })
       .then((response) => {
-        if (!disposed.current) setState({ phase: "ready", phones: response.phones ?? [] });
+        if (!disposed.current) setState({ phase: 'ready', phones: response.phones ?? [] });
       })
       .catch(() => {
         // Keep the last list; a failed poll must not blank the card.

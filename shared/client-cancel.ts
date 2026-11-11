@@ -3,9 +3,9 @@
 // request was cancelled by the client.") or by raising that sentence as
 // runtime.error. Both are the whole message or nothing: a real error that
 // merely mentions a cancellation stays an error.
-import { failedTurnCause } from "./failed-turn.ts";
+import { failedTurnCause } from './failed-turn.ts';
 
-const STOPPED_PREFIX = "stopped:";
+const STOPPED_PREFIX = 'stopped:';
 
 /** Activity name for a stopped turn. The word after the prefix is what a
  * phone that prints tool names shows; the desktop localizes it. */
@@ -33,7 +33,7 @@ const CLIENT_CANCEL = [
 /** The abort sentence when `text` is only a client abort, including the
  * harness wrapper around one (`provider returned a completion error: …`). */
 export function clientCancellation(text: string): string | null {
-  const body = text.trim().replace(HARNESS_PREFIX, "").trim();
+  const body = text.trim().replace(HARNESS_PREFIX, '').trim();
   return body && CLIENT_CANCEL.some((pattern) => pattern.test(body)) ? body : null;
 }
 
@@ -41,20 +41,16 @@ export function isClientCancellation(text: string): boolean {
   return clientCancellation(text) !== null;
 }
 
-export type AssistantTranscript =
-  | { kind: "text"; text: string }
-  | { kind: "stopped" };
+export type AssistantTranscript = { kind: 'text'; text: string } | { kind: 'stopped' };
 
 export function assistantTranscript(text: string): AssistantTranscript {
-  return isClientCancellation(text) ? { kind: "stopped" } : { kind: "text", text };
+  return isClientCancellation(text) ? { kind: 'stopped' } : { kind: 'text', text };
 }
 
-export type ErrorTranscript =
-  | { kind: "error"; message: string }
-  | { kind: "stopped" };
+export type ErrorTranscript = { kind: 'error'; message: string } | { kind: 'stopped' };
 
 export function errorTranscript(message: string): ErrorTranscript {
-  return isClientCancellation(message) ? { kind: "stopped" } : { kind: "error", message };
+  return isClientCancellation(message) ? { kind: 'stopped' } : { kind: 'error', message };
 }
 
 /** A stored row the chat should read as a stop: the new activity, a legacy
@@ -68,12 +64,15 @@ export function isCancelledTranscriptRow(message: {
   attachments?: readonly unknown[] | null;
   tool?: { name: string } | null;
 }): boolean {
-  if (message.role === "user") return false;
-  if (message.kind === "text") {
-    return !message.attachments?.length && isClientCancellation(message.text ?? "");
+  if (message.role === 'user') return false;
+  if (message.kind === 'text') {
+    return !message.attachments?.length && isClientCancellation(message.text ?? '');
   }
-  if (message.kind === "activity" && message.tool) {
-    return isStoppedTurnName(message.tool.name) || isClientCancellation(failedTurnCause(message.tool.name) ?? "");
+  if (message.kind === 'activity' && message.tool) {
+    return (
+      isStoppedTurnName(message.tool.name) ||
+      isClientCancellation(failedTurnCause(message.tool.name) ?? '')
+    );
   }
   return false;
 }

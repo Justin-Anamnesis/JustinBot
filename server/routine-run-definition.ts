@@ -1,16 +1,16 @@
-import { cloneAttachments } from "./routine-attachments.ts";
-import type { Routine, RoutineManagerOptions, RoutineRun } from "./routines.ts";
+import { cloneAttachments } from './routine-attachments.ts';
+import type { Routine, RoutineManagerOptions, RoutineRun } from './routines.ts';
 
 export type ResultsThreadAllocation = { botId: string; threadId: string };
 
 export function resolveRoutineResultsThread(
   routine: Routine,
-  resolve: RoutineManagerOptions["resolveResultsThread"],
+  resolve: RoutineManagerOptions['resolveResultsThread'],
   allocations: ResultsThreadAllocation[],
   now: number,
   sourceThreadId = routine.sourceThreadId,
 ): string | undefined {
-  if (routine.target !== "bot" || !resolve) return routine.resultsThreadId;
+  if (routine.target !== 'bot' || !resolve) return routine.resultsThreadId;
   const destination = resolve({ ...routine, sourceThreadId }, false);
   const own = destination?.main ? undefined : destination?.threadId;
   if (own !== routine.resultsThreadId) {
@@ -22,8 +22,22 @@ export function resolveRoutineResultsThread(
   return destination?.threadId;
 }
 
-export function routineRunDefinition(routine: Routine): Pick<RoutineRun,
-  "routineName" | "prompt" | "durationMinutes" | "timeoutMinutes" | "attachments" | "target" | "groupId" | "botId" | "runOn" | "access" | "deliver"> {
+export function routineRunDefinition(
+  routine: Routine,
+): Pick<
+  RoutineRun,
+  | 'routineName'
+  | 'prompt'
+  | 'durationMinutes'
+  | 'timeoutMinutes'
+  | 'attachments'
+  | 'target'
+  | 'groupId'
+  | 'botId'
+  | 'runOn'
+  | 'access'
+  | 'deliver'
+> {
   return {
     routineName: routine.name,
     prompt: routine.prompt,
@@ -33,7 +47,7 @@ export function routineRunDefinition(routine: Routine): Pick<RoutineRun,
     target: routine.target,
     groupId: routine.groupId,
     botId: routine.botId,
-    runOn: routine.runOn ?? "maus",
+    runOn: routine.runOn ?? 'maus',
     access: routine.access,
     deliver: routine.deliver,
   };

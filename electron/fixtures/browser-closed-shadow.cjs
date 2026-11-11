@@ -1,22 +1,23 @@
-"use strict";
+'use strict';
 
-process.stdout.write("fixture-entered\n");
-const { once } = require("node:events");
-const { join } = require("node:path");
-const { app, BrowserWindow, WebContentsView, nativeImage } = require("electron");
-const { createBrowserSurfaceManager } = require("../browser-surface.cjs");
-process.stdout.write("fixture-modules-loaded\n");
+process.stdout.write('fixture-entered\n');
+const { once } = require('node:events');
+const { join } = require('node:path');
+const { app, BrowserWindow, WebContentsView, nativeImage } = require('electron');
+const { createBrowserSurfaceManager } = require('../browser-surface.cjs');
+process.stdout.write('fixture-modules-loaded\n');
 
 // Linux CI runs under Xvfb as root; elsewhere Electron keeps its production sandbox defaults.
-if (process.platform === "linux") {
-  app.commandLine.appendSwitch("no-sandbox");
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('no-sandbox');
 }
 
 async function waitForLifecycleEvent(emitter, event, label, timeoutMs = 2_000) {
   try {
     await once(emitter, event, { signal: AbortSignal.timeout(timeoutMs) });
   } catch (error) {
-    if (error?.name === "AbortError") throw new Error(`Timed out waiting for ${label} to emit ${event}`);
+    if (error?.name === 'AbortError')
+      throw new Error(`Timed out waiting for ${label} to emit ${event}`);
     throw error;
   }
 }
@@ -25,7 +26,9 @@ async function waitForFixedViewport(browserView, label, timeoutMs = 2_000) {
   const deadline = Date.now() + timeoutMs;
   let viewport = null;
   do {
-    viewport = await browserView.webContents.executeJavaScript(`({ width: innerWidth, height: innerHeight })`);
+    viewport = await browserView.webContents.executeJavaScript(
+      `({ width: innerWidth, height: innerHeight })`,
+    );
     if (viewport.width === 1280 && viewport.height === 800) return viewport;
     await new Promise((resolve) => setTimeout(resolve, 20));
   } while (Date.now() < deadline);
@@ -48,15 +51,16 @@ async function waitForScrollTop(browserView, selector, expected, label, timeoutM
 
 async function closeFixture(manager, browserView, owner) {
   const viewContents = browserView?.webContents;
-  const viewDestroyed = viewContents && !viewContents.isDestroyed()
-    ? waitForLifecycleEvent(viewContents, "destroyed", "browser WebContents")
-    : Promise.resolve();
+  const viewDestroyed =
+    viewContents && !viewContents.isDestroyed()
+      ? waitForLifecycleEvent(viewContents, 'destroyed', 'browser WebContents')
+      : Promise.resolve();
   manager.closeAll();
   try {
     await viewDestroyed;
   } finally {
     if (!owner.isDestroyed()) {
-      const ownerClosed = waitForLifecycleEvent(owner, "closed", "owner BrowserWindow");
+      const ownerClosed = waitForLifecycleEvent(owner, 'closed', 'owner BrowserWindow');
       owner.destroy();
       await ownerClosed;
     }
@@ -69,22 +73,28 @@ async function verifySandboxedPreload() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
-      preload: join(__dirname, "..", "preload.cjs"),
+      preload: join(__dirname, '..', 'preload.cjs'),
       sandbox: true,
     },
   });
   try {
-    await probe.loadURL("data:text/html,<title>preload probe</title>");
+    await probe.loadURL('data:text/html,<title>preload probe</title>');
     const exposed = await probe.webContents.executeJavaScript(`({
       ogb: typeof window.ogb,
       platform: window.ogb?.platform,
       browser: typeof window.ogb?.browser,
     })`);
-    const expectedBrowser = process.platform === "win32" ? "undefined" : "object";
-    if (exposed.ogb !== "object" || exposed.platform !== process.platform || exposed.browser !== expectedBrowser) {
-      throw new Error(`sandboxed preload bridge was not exposed correctly: ${JSON.stringify(exposed)}`);
+    const expectedBrowser = process.platform === 'win32' ? 'undefined' : 'object';
+    if (
+      exposed.ogb !== 'object' ||
+      exposed.platform !== process.platform ||
+      exposed.browser !== expectedBrowser
+    ) {
+      throw new Error(
+        `sandboxed preload bridge was not exposed correctly: ${JSON.stringify(exposed)}`,
+      );
     }
-    process.stdout.write("sandboxed-preload-bridge-loaded\n");
+    process.stdout.write('sandboxed-preload-bridge-loaded\n');
   } finally {
     if (!probe.isDestroyed()) probe.destroy();
   }
@@ -105,8 +115,8 @@ async function run() {
     loadWaitMs: 1_000,
   });
   try {
-    manager.ensure("fixture-bot", "");
-    manager.layout("fixture-bot", { x: 20, y: 30, width: 400, height: 250 }, "", "compact");
+    manager.ensure('fixture-bot', '');
+    manager.layout('fixture-bot', { x: 20, y: 30, width: 400, height: 250 }, '', 'compact');
     const html = `<!doctype html><html><body><closed-login></closed-login><script>
       customElements.define("closed-login", class extends HTMLElement {
         constructor() {
@@ -149,77 +159,93 @@ async function run() {
         focusCredential() { this._closedRoot.querySelector("input").focus(); }
       });
     </script></body></html>`;
-    await browserView.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-    await waitForFixedViewport(browserView, "compact browser after navigation");
-    process.stdout.write("compact-viewport-stable-after-navigation\n");
+    await browserView.webContents.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
+    );
+    await waitForFixedViewport(browserView, 'compact browser after navigation');
+    process.stdout.write('compact-viewport-stable-after-navigation\n');
     const protectedValues = [
-      "sk_closed_shadow_must_not_reach_pixels",
-      "closed shadow mnemonic must stay private",
-      "sk_nested_name_source_must_stay_private",
-      "nested contributor text must stay private",
+      'sk_closed_shadow_must_not_reach_pixels',
+      'closed shadow mnemonic must stay private',
+      'sk_nested_name_source_must_stay_private',
+      'nested contributor text must stay private',
     ];
     let readRefused = false;
     try {
-      await manager.read("fixture-bot", "");
+      await manager.read('fixture-bot', '');
     } catch (error) {
       readRefused = /browser_read is unavailable/.test(String(error?.message ?? error));
     }
-    if (!readRefused) throw new Error("closed-shadow protected text was not refused by browser_read");
-    const protectedSnapshot = await manager.snapshot("fixture-bot", "");
-    if (protectedSnapshot.title !== "Protected content hidden" || protectedSnapshot.elements.length !== 0) {
-      throw new Error("protected closed-shadow snapshot was not genericized");
+    if (!readRefused)
+      throw new Error('closed-shadow protected text was not refused by browser_read');
+    const protectedSnapshot = await manager.snapshot('fixture-bot', '');
+    if (
+      protectedSnapshot.title !== 'Protected content hidden' ||
+      protectedSnapshot.elements.length !== 0
+    ) {
+      throw new Error('protected closed-shadow snapshot was not genericized');
     }
-    if (protectedValues.some(value => JSON.stringify(protectedSnapshot).includes(value))) {
-      throw new Error("closed-shadow protected value leaked through generic snapshot");
+    if (protectedValues.some((value) => JSON.stringify(protectedSnapshot).includes(value))) {
+      throw new Error('closed-shadow protected value leaked through generic snapshot');
     }
     let refused = false;
     try {
-      await manager.screenshot("fixture-bot", "");
+      await manager.screenshot('fixture-bot', '');
     } catch (error) {
       refused = /protected field contains a value/.test(String(error?.message ?? error));
     }
-    if (!refused) throw new Error("closed-shadow protected input was not refused");
-    process.stdout.write("closed-shadow-screenshot-refused\n");
+    if (!refused) throw new Error('closed-shadow protected input was not refused');
+    process.stdout.write('closed-shadow-screenshot-refused\n');
 
-    await browserView.webContents.executeJavaScript(`document.querySelector("closed-login").clearProtectedFields()`);
-    const safeClosedSnapshot = await manager.snapshot("fixture-bot", "");
-    if (!safeClosedSnapshot.elements.some(element => element.role === "button")) {
-      throw new Error("closed-shadow interactive control was omitted from the AX fallback");
+    await browserView.webContents.executeJavaScript(
+      `document.querySelector("closed-login").clearProtectedFields()`,
+    );
+    const safeClosedSnapshot = await manager.snapshot('fixture-bot', '');
+    if (!safeClosedSnapshot.elements.some((element) => element.role === 'button')) {
+      throw new Error('closed-shadow interactive control was omitted from the AX fallback');
     }
     const nestedProtectedValues = [
-      "sk_nested_name_source_must_stay_private",
-      "nested contributor text must stay private",
+      'sk_nested_name_source_must_stay_private',
+      'nested contributor text must stay private',
     ];
-    if (nestedProtectedValues.some(value => JSON.stringify(safeClosedSnapshot).includes(value))) {
-      throw new Error("nested protected accessible-name contributor leaked after values were cleared");
+    if (nestedProtectedValues.some((value) => JSON.stringify(safeClosedSnapshot).includes(value))) {
+      throw new Error(
+        'nested protected accessible-name contributor leaked after values were cleared',
+      );
     }
-    process.stdout.write("closed-shadow-nested-name-source-redacted\n");
+    process.stdout.write('closed-shadow-nested-name-source-redacted\n');
 
     // A hostile page can turn a typed password into sibling text and clear the input; human keyboard input taints the document.
-    manager.setHumanControl("fixture-bot", true, "");
-    await browserView.webContents.executeJavaScript(`document.querySelector("closed-login").focusCredential()`);
+    manager.setHumanControl('fixture-bot', true, '');
+    await browserView.webContents.executeJavaScript(
+      `document.querySelector("closed-login").focusCredential()`,
+    );
     browserView.webContents.focus();
-    browserView.webContents.sendInputEvent({ type: "keyDown", keyCode: "x" });
-    browserView.webContents.sendInputEvent({ type: "char", keyCode: "x" });
-    browserView.webContents.sendInputEvent({ type: "keyUp", keyCode: "x" });
+    browserView.webContents.sendInputEvent({ type: 'keyDown', keyCode: 'x' });
+    browserView.webContents.sendInputEvent({ type: 'char', keyCode: 'x' });
+    browserView.webContents.sendInputEvent({ type: 'keyUp', keyCode: 'x' });
     await new Promise((resolve) => setTimeout(resolve, 50));
     const transformedTitle = browserView.webContents.getTitle();
-    if (!transformedTitle || transformedTitle === "Protected content hidden") {
-      throw new Error("fixture did not transform the human-entered value into document.title");
+    if (!transformedTitle || transformedTitle === 'Protected content hidden') {
+      throw new Error('fixture did not transform the human-entered value into document.title');
     }
-    manager.setHumanControl("fixture-bot", false, "");
+    manager.setHumanControl('fixture-bot', false, '');
     let taintedReadRefused = false;
     try {
-      await manager.read("fixture-bot", "");
+      await manager.read('fixture-bot', '');
     } catch (error) {
       taintedReadRefused = /browser_read is unavailable/.test(String(error?.message ?? error));
     }
-    if (!taintedReadRefused) throw new Error("transformed-and-cleared human input was readable after hand-back");
-    const taintedSnapshot = await manager.snapshot("fixture-bot", "");
-    if (taintedSnapshot.title !== "Protected content hidden" || JSON.stringify(taintedSnapshot).includes(transformedTitle)) {
-      throw new Error("transformed human input escaped the document taint boundary");
+    if (!taintedReadRefused)
+      throw new Error('transformed-and-cleared human input was readable after hand-back');
+    const taintedSnapshot = await manager.snapshot('fixture-bot', '');
+    if (
+      taintedSnapshot.title !== 'Protected content hidden' ||
+      JSON.stringify(taintedSnapshot).includes(transformedTitle)
+    ) {
+      throw new Error('transformed human input escaped the document taint boundary');
     }
-    process.stdout.write("transformed-secret-taint\n");
+    process.stdout.write('transformed-secret-taint\n');
 
     // The closed-shadow page takes the conservative AX fallback, so only an open-DOM page exercises the rich snapshot's redaction.
     const richSnapshotHtml = `<!doctype html><html><body>
@@ -235,28 +261,35 @@ async function run() {
         nestedNameSource.textContent = ["rich nested contributor ", "text private"].join("");
       </script>
     </body></html>`;
-    await browserView.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(richSnapshotHtml)}`);
-    const richSnapshot = await manager.snapshot("fixture-bot", "");
-    if (Object.prototype.toString.call(richSnapshot.yaml) !== "[object String]" || !/\[ref=e\d+\]/.test(richSnapshot.yaml)) {
-      throw new Error("open-DOM fixture did not run the rich injected browser snapshot");
+    await browserView.webContents.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(richSnapshotHtml)}`,
+    );
+    const richSnapshot = await manager.snapshot('fixture-bot', '');
+    if (
+      Object.prototype.toString.call(richSnapshot.yaml) !== '[object String]' ||
+      !/\[ref=e\d+\]/.test(richSnapshot.yaml)
+    ) {
+      throw new Error('open-DOM fixture did not run the rich injected browser snapshot');
     }
     if (richSnapshot.elements.length !== 0 || /\[ref=b\d+\]/.test(richSnapshot.yaml)) {
-      throw new Error("open-DOM fixture unexpectedly used the conservative AX fallback");
+      throw new Error('open-DOM fixture unexpectedly used the conservative AX fallback');
     }
     if (!/button "protected field label" \[ref=e\d+\]/.test(richSnapshot.yaml)) {
-      throw new Error("rich snapshot did not retain the nested name contributor in redacted form");
+      throw new Error('rich snapshot did not retain the nested name contributor in redacted form');
     }
     if (!/button "Ordinary action" \[ref=e\d+\]/.test(richSnapshot.yaml)) {
-      throw new Error("rich snapshot did not expose an ordinary open-DOM action");
+      throw new Error('rich snapshot did not expose an ordinary open-DOM action');
     }
     const richProtectedValues = [
-      "sk_rich_nested_name_source_private",
-      "rich nested contributor text private",
+      'sk_rich_nested_name_source_private',
+      'rich nested contributor text private',
     ];
-    if (richProtectedValues.some(value => JSON.stringify(richSnapshot).includes(value))) {
-      throw new Error("nested protected accessible-name contributor leaked through the rich snapshot");
+    if (richProtectedValues.some((value) => JSON.stringify(richSnapshot).includes(value))) {
+      throw new Error(
+        'nested protected accessible-name contributor leaked through the rich snapshot',
+      );
     }
-    process.stdout.write("rich-nested-name-source-redacted\n");
+    process.stdout.write('rich-nested-name-source-redacted\n');
 
     const actionHtml = `<!doctype html><html><head><style>
       html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
@@ -275,76 +308,110 @@ async function run() {
         });
       </script>
     </body></html>`;
-    await browserView.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(actionHtml)}`);
-    const actionSnapshot = await manager.snapshot("fixture-bot", "");
-    const reviewedRef = String(actionSnapshot.yaml ?? "").match(/button[^\n]*\[ref=(e\d+)\]/)?.[1];
-    if (!reviewedRef) throw new Error("real Electron fixture did not produce a rich browser ref");
-    manager.setHumanControl("fixture-bot", false, "");
+    await browserView.webContents.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(actionHtml)}`,
+    );
+    const actionSnapshot = await manager.snapshot('fixture-bot', '');
+    const reviewedRef = String(actionSnapshot.yaml ?? '').match(/button[^\n]*\[ref=(e\d+)\]/)?.[1];
+    if (!reviewedRef) throw new Error('real Electron fixture did not produce a rich browser ref');
+    manager.setHumanControl('fixture-bot', false, '');
 
     // CDP boxes are in the fixed 1280x800 viewport while Electron's device-emulation scale expects WebContentsView positions.
-    await waitForFixedViewport(browserView, "compact action");
-    await manager.click("fixture-bot", reviewedRef, { profile: "" });
+    await waitForFixedViewport(browserView, 'compact action');
+    await manager.click('fixture-bot', reviewedRef, { profile: '' });
     let actionEvents = await browserView.webContents.executeJavaScript(`window.actionEvents`);
-    if (JSON.stringify(actionEvents) !== JSON.stringify([{ type: "click", detail: 1, x: 130, y: 70 }])) {
-      throw new Error(`compact known-coordinate click missed its target: ${JSON.stringify(actionEvents)}`);
+    if (
+      JSON.stringify(actionEvents) !== JSON.stringify([{ type: 'click', detail: 1, x: 130, y: 70 }])
+    ) {
+      throw new Error(
+        `compact known-coordinate click missed its target: ${JSON.stringify(actionEvents)}`,
+      );
     }
-    process.stdout.write("compact-known-coordinate-click\n");
+    process.stdout.write('compact-known-coordinate-click\n');
 
-    await manager.scroll("fixture-bot", "down", 600, "");
-    await waitForScrollTop(browserView, "#scroller", 600, "compact nested scroll");
-    await browserView.webContents.executeJavaScript(`document.getElementById("scroller").scrollTop = 0`);
-    process.stdout.write("compact-known-coordinate-scroll\n");
+    await manager.scroll('fixture-bot', 'down', 600, '');
+    await waitForScrollTop(browserView, '#scroller', 600, 'compact nested scroll');
+    await browserView.webContents.executeJavaScript(
+      `document.getElementById("scroller").scrollTop = 0`,
+    );
+    process.stdout.write('compact-known-coordinate-scroll\n');
 
-    const compactShot = await manager.screenshot("fixture-bot", "");
-    const compactShotSize = nativeImage.createFromBuffer(Buffer.from(compactShot.png, "base64")).getSize();
-    if (compactShot.width !== 1024 || compactShot.height !== 640
-      || compactShotSize.width !== compactShot.width || compactShotSize.height !== compactShot.height) {
-      throw new Error(`compact screenshot pixels disagree with metadata: ${JSON.stringify({ metadata: [compactShot.width, compactShot.height], encoded: compactShotSize })}`);
+    const compactShot = await manager.screenshot('fixture-bot', '');
+    const compactShotSize = nativeImage
+      .createFromBuffer(Buffer.from(compactShot.png, 'base64'))
+      .getSize();
+    if (
+      compactShot.width !== 1024 ||
+      compactShot.height !== 640 ||
+      compactShotSize.width !== compactShot.width ||
+      compactShotSize.height !== compactShot.height
+    ) {
+      throw new Error(
+        `compact screenshot pixels disagree with metadata: ${JSON.stringify({ metadata: [compactShot.width, compactShot.height], encoded: compactShotSize })}`,
+      );
     }
 
-    manager.layout("fixture-bot", { x: 10, y: 20, width: 820, height: 600 }, "", "expanded");
-    await waitForFixedViewport(browserView, "expanded action");
-    const expandedSnapshot = await manager.snapshot("fixture-bot", "");
-    const expandedRef = String(expandedSnapshot.yaml ?? "").match(/button[^\n]*\[ref=(e\d+)\]/)?.[1];
-    if (!expandedRef) throw new Error("expanded Electron fixture did not produce a rich browser ref");
-    await manager.click("fixture-bot", expandedRef, { clickCount: 2, profile: "" });
+    manager.layout('fixture-bot', { x: 10, y: 20, width: 820, height: 600 }, '', 'expanded');
+    await waitForFixedViewport(browserView, 'expanded action');
+    const expandedSnapshot = await manager.snapshot('fixture-bot', '');
+    const expandedRef = String(expandedSnapshot.yaml ?? '').match(
+      /button[^\n]*\[ref=(e\d+)\]/,
+    )?.[1];
+    if (!expandedRef)
+      throw new Error('expanded Electron fixture did not produce a rich browser ref');
+    await manager.click('fixture-bot', expandedRef, { clickCount: 2, profile: '' });
     actionEvents = await browserView.webContents.executeJavaScript(`window.actionEvents`);
     const expectedEvents = [
-      { type: "click", detail: 1, x: 130, y: 70 },
-      { type: "click", detail: 1, x: 130, y: 70 },
-      { type: "click", detail: 2, x: 130, y: 70 },
-      { type: "dblclick", detail: 2, x: 130, y: 70 },
+      { type: 'click', detail: 1, x: 130, y: 70 },
+      { type: 'click', detail: 1, x: 130, y: 70 },
+      { type: 'click', detail: 2, x: 130, y: 70 },
+      { type: 'dblclick', detail: 2, x: 130, y: 70 },
     ];
     if (JSON.stringify(actionEvents) !== JSON.stringify(expectedEvents)) {
-      throw new Error(`expanded double-click sequence was incorrect: ${JSON.stringify(actionEvents)}`);
+      throw new Error(
+        `expanded double-click sequence was incorrect: ${JSON.stringify(actionEvents)}`,
+      );
     }
-    process.stdout.write("expanded-known-coordinate-click\n");
-    process.stdout.write("real-double-click-sequence\n");
+    process.stdout.write('expanded-known-coordinate-click\n');
+    process.stdout.write('real-double-click-sequence\n');
 
-    await manager.scroll("fixture-bot", "down", 300, "");
-    await waitForScrollTop(browserView, "#scroller", 300, "expanded nested scroll");
-    process.stdout.write("expanded-known-coordinate-scroll\n");
+    await manager.scroll('fixture-bot', 'down', 300, '');
+    await waitForScrollTop(browserView, '#scroller', 300, 'expanded nested scroll');
+    process.stdout.write('expanded-known-coordinate-scroll\n');
 
-    const expandedShot = await manager.screenshot("fixture-bot", "");
-    const expandedShotSize = nativeImage.createFromBuffer(Buffer.from(expandedShot.png, "base64")).getSize();
-    if (expandedShot.width !== 1024 || expandedShot.height !== 640
-      || expandedShotSize.width !== expandedShot.width || expandedShotSize.height !== expandedShot.height) {
-      throw new Error(`expanded screenshot pixels disagree with metadata: ${JSON.stringify({ metadata: [expandedShot.width, expandedShot.height], encoded: expandedShotSize })}`);
+    const expandedShot = await manager.screenshot('fixture-bot', '');
+    const expandedShotSize = nativeImage
+      .createFromBuffer(Buffer.from(expandedShot.png, 'base64'))
+      .getSize();
+    if (
+      expandedShot.width !== 1024 ||
+      expandedShot.height !== 640 ||
+      expandedShotSize.width !== expandedShot.width ||
+      expandedShotSize.height !== expandedShot.height
+    ) {
+      throw new Error(
+        `expanded screenshot pixels disagree with metadata: ${JSON.stringify({ metadata: [expandedShot.width, expandedShot.height], encoded: expandedShotSize })}`,
+      );
     }
-    process.stdout.write("fixed-screenshot-pixel-size\n");
+    process.stdout.write('fixed-screenshot-pixel-size\n');
 
-    for (const [selector, key] of [["#empty-password", "Enter"], ["#empty-secret-editor", "Backspace"]]) {
-      await browserView.webContents.executeJavaScript(`document.querySelector(${JSON.stringify(selector)}).focus()`);
-      manager.setHumanControl("fixture-bot", false, "");
+    for (const [selector, key] of [
+      ['#empty-password', 'Enter'],
+      ['#empty-secret-editor', 'Backspace'],
+    ]) {
+      await browserView.webContents.executeJavaScript(
+        `document.querySelector(${JSON.stringify(selector)}).focus()`,
+      );
+      manager.setHumanControl('fixture-bot', false, '');
       let protectedFocusRefused = false;
       try {
-        await manager.press("fixture-bot", key, "");
+        await manager.press('fixture-bot', key, '');
       } catch (error) {
         protectedFocusRefused = /require user control/.test(String(error?.message ?? error));
       }
       if (!protectedFocusRefused) throw new Error(`focused protected field accepted ${key}`);
     }
-    process.stdout.write("protected-focused-keys-refused\n");
+    process.stdout.write('protected-focused-keys-refused\n');
     await browserView.webContents.executeJavaScript(`(() => {
       const overlay = document.createElement("button");
       overlay.id = "late-overlay";
@@ -353,48 +420,61 @@ async function run() {
       document.body.append(overlay);
     })()`);
     let overlayRefused = false;
-    let overlayError = "";
+    let overlayError = '';
     try {
-      await manager.click("fixture-bot", reviewedRef);
+      await manager.click('fixture-bot', reviewedRef);
     } catch (error) {
       overlayError = String(error?.message ?? error);
       overlayRefused = /covers that ref/.test(String(error?.message ?? error));
     }
-    if (!overlayRefused) throw new Error(`late overlay was not refused before mouse-down: ${overlayError || "click unexpectedly succeeded"}`);
-    process.stdout.write("late-overlay-click-refused\n");
+    if (!overlayRefused)
+      throw new Error(
+        `late overlay was not refused before mouse-down: ${overlayError || 'click unexpectedly succeeded'}`,
+      );
+    process.stdout.write('late-overlay-click-refused\n');
 
-    await browserView.webContents.executeJavaScript(`document.getElementById("late-overlay").remove()`);
-    const relabelSnapshot = await manager.snapshot("fixture-bot", "");
-    const relabelRef = String(relabelSnapshot.yaml ?? "").match(/button[^\n]*\[ref=(e\d+)\]/)?.[1];
-    if (!relabelRef) throw new Error("real Electron fixture did not refresh its ref");
-    await browserView.webContents.executeJavaScript(`document.getElementById("reviewed").textContent = "Delete account"`);
+    await browserView.webContents.executeJavaScript(
+      `document.getElementById("late-overlay").remove()`,
+    );
+    const relabelSnapshot = await manager.snapshot('fixture-bot', '');
+    const relabelRef = String(relabelSnapshot.yaml ?? '').match(/button[^\n]*\[ref=(e\d+)\]/)?.[1];
+    if (!relabelRef) throw new Error('real Electron fixture did not refresh its ref');
+    await browserView.webContents.executeJavaScript(
+      `document.getElementById("reviewed").textContent = "Delete account"`,
+    );
     let relabelRefused = false;
     try {
-      await manager.click("fixture-bot", relabelRef);
+      await manager.click('fixture-bot', relabelRef);
     } catch (error) {
       relabelRefused = /stale because the page changed/.test(String(error?.message ?? error));
     }
-    if (!relabelRefused) throw new Error("relabelled ref was not invalidated");
-    process.stdout.write("relabelled-ref-refused\n");
+    if (!relabelRefused) throw new Error('relabelled ref was not invalidated');
+    process.stdout.write('relabelled-ref-refused\n');
 
     const lockedRootHtml = `<!doctype html><html style="overflow:hidden"><body style="margin:0;overflow:hidden">
       <div style="height:2400px">Locked page</div>
     </body></html>`;
-    await browserView.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(lockedRootHtml)}`);
-    manager.setHumanControl("fixture-bot", false, "");
-    await manager.scroll("fixture-bot", "down", 300, "");
+    await browserView.webContents.loadURL(
+      `data:text/html;charset=utf-8,${encodeURIComponent(lockedRootHtml)}`,
+    );
+    manager.setHumanControl('fixture-bot', false, '');
+    await manager.scroll('fixture-bot', 'down', 300, '');
     await new Promise((resolve) => setTimeout(resolve, 50));
-    const lockedScrollTop = await browserView.webContents.executeJavaScript(`document.scrollingElement.scrollTop`);
-    if (lockedScrollTop !== 0) throw new Error(`browser_scroll bypassed a root scroll lock by ${lockedScrollTop}px`);
-    process.stdout.write("root-scroll-lock-preserved\n");
+    const lockedScrollTop = await browserView.webContents.executeJavaScript(
+      `document.scrollingElement.scrollTop`,
+    );
+    if (lockedScrollTop !== 0)
+      throw new Error(`browser_scroll bypassed a root scroll lock by ${lockedScrollTop}px`);
+    process.stdout.write('root-scroll-lock-preserved\n');
   } finally {
     await closeFixture(manager, browserView, owner);
   }
 }
 
-app.whenReady()
+app
+  .whenReady()
   .then(() => {
-    process.stdout.write("fixture-ready\n");
+    process.stdout.write('fixture-ready\n');
     return run();
   })
   .then(() => app.quit())

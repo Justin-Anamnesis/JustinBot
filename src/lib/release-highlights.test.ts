@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { releaseHighlights } from "./release-highlights";
+import { describe, expect, it } from 'vitest';
+import { releaseHighlights } from './release-highlights';
 
 // The shape of this repository's releases, as Markdown and as the HTML the GitHub update feed carries.
 const markdown = `## New
@@ -23,35 +23,39 @@ const html = `<h2>New</h2>
 <li>Errors in chats &amp; rooms show as a banner you can close. They stay until closed.</li>
 </ul>`;
 
-describe("releaseHighlights", () => {
-  it("reads each item as its bold lead, skipping headings, group labels and references", () => {
+describe('releaseHighlights', () => {
+  it('reads each item as its bold lead, skipping headings, group labels and references', () => {
     expect(releaseHighlights(markdown)).toEqual([
-      "Several Google accounts for Antigravity.",
-      "Accounts live in their provider cards.",
-      "Faster start.",
-      "Switching threads scrolls to the newest message again.",
+      'Several Google accounts for Antigravity.',
+      'Accounts live in their provider cards.',
+      'Faster start.',
+      'Switching threads scrolls to the newest message again.',
     ]);
   });
 
-  it("reads the HTML a GitHub feed carries the same way, an item without a lead as its first sentence", () => {
+  it('reads the HTML a GitHub feed carries the same way, an item without a lead as its first sentence', () => {
     expect(releaseHighlights(html)).toEqual([
-      "Several Google accounts for Antigravity.",
-      "Switching threads scrolls to the newest message again.",
-      "Errors in chats & rooms show as a banner you can close.",
+      'Several Google accounts for Antigravity.',
+      'Switching threads scrolls to the newest message again.',
+      'Errors in chats & rooms show as a banner you can close.',
     ]);
   });
 
-  it("stops at the limit and has nothing to say for empty or bullet-less notes", () => {
+  it('stops at the limit and has nothing to say for empty or bullet-less notes', () => {
     expect(releaseHighlights(markdown, 2)).toHaveLength(2);
     expect(releaseHighlights(undefined)).toEqual([]);
-    expect(releaseHighlights("   ")).toEqual([]);
-    expect(releaseHighlights("Bug fixes and improvements.")).toEqual([]);
+    expect(releaseHighlights('   ')).toEqual([]);
+    expect(releaseHighlights('Bug fixes and improvements.')).toEqual([]);
   });
 
-  it("drops links to their label, author credits and long tails", () => {
-    expect(releaseHighlights("* Fix [the loader](https://x.dev/a) by @someone in https://github.com/x/y/pull/1")).toEqual(["Fix the loader"]);
-    const long = releaseHighlights(`- ${"word ".repeat(40)}`)[0]!;
+  it('drops links to their label, author credits and long tails', () => {
+    expect(
+      releaseHighlights(
+        '* Fix [the loader](https://x.dev/a) by @someone in https://github.com/x/y/pull/1',
+      ),
+    ).toEqual(['Fix the loader']);
+    const long = releaseHighlights(`- ${'word '.repeat(40)}`)[0]!;
     expect(long.length).toBeLessThanOrEqual(110);
-    expect(long.endsWith("…")).toBe(true);
+    expect(long.endsWith('…')).toBe(true);
   });
 });

@@ -4,4 +4,4 @@
 export const DESKTOP_VIEWER_TARGET = /^(local\/(?:shared|bot-[a-f0-9]{64}|pool-\d+)|vps\/[\w-]+)$/;
 
 /** A Local VM's proxy name, from its target key (`shared`, `bot:<sha256>` or `pool:<seat>`). */
-export const viewerTargetId = (target: { key: string }) => `local/${target.key.replace(":", "-")}`;
+export const viewerTargetId = (target: { key: string }) => `local/${target.key.replace(':', '-')}`;

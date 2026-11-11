@@ -5,19 +5,20 @@
  * can see progress, results, and where to review an approval without hunting
  * through the routines calendar.
  */
-import type { RoutineRunTrigger } from "./routines.ts";
+import type { RoutineRunTrigger } from './routines.ts';
 
 export interface RoutineRunCardData {
   runId: string;
   routineId: string;
   routineName: string;
   scheduledFor?: number;
-  status: "queued" | "running" | "waiting" | "completed" | "failed" | "cancelled" | "missed";
+  status: 'queued' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'missed';
   /** Present while a queued run is being held because its target bot or room
    * is busy. The status stays queued; this is the surfaced deferral fact. */
   deferredAt?: number;
   /** Exact terminal team-goal outcome when this run targeted a room. */
-  goalStatus?: "completed" | "needs-input" | "blocked" | "limit-reached" | "paused" | "stopped" | "failed";
+  goalStatus?:
+    'completed' | 'needs-input' | 'blocked' | 'limit-reached' | 'paused' | 'stopped' | 'failed';
   executionThreadId?: string;
   summary?: string;
   error?: string;
@@ -33,7 +34,7 @@ export interface AutomationLine {
   name: string;
   /** What started the run; "app" is a connected-app event, "wait" a wait's follow-up. A Bot API call starts a turn,
    * never a run, so "api" is never seen here. */
-  trigger: RoutineRunTrigger | "app" | "wait";
+  trigger: RoutineRunTrigger | 'app' | 'wait';
   executionThreadId: string;
   scheduledFor: number;
   /** The run needs the person: it asked them something or cannot go on without them. */

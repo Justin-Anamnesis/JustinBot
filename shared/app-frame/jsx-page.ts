@@ -2,31 +2,31 @@
 // pinned and come from cdn.jsdelivr.net, which a bot page's CSP already allows, through one import map; nothing is
 // bundled into the app. In a chat frame the shell transpiles the file itself with Sucrase; a published page carries
 // the server's transpiled code instead and loads no compiler.
-import { APP_THEME_STYLE } from "./helper.ts";
+import { APP_THEME_STYLE } from './helper.ts';
 
 /** Exact versions, each at least two weeks old when pinned; `sucrase` matches the server's own dependency. */
 export const JSX_PAGE_LIBRARIES = {
-  react: "19.3.0",
-  "react-dom": "19.3.0",
-  "@tailwindcss/browser": "4.3.3",
-  "lucide-react": "1.52.0",
-  echarts: "6.1.0",
-  sucrase: "3.35.1",
+  react: '19.3.0',
+  'react-dom': '19.3.0',
+  '@tailwindcss/browser': '4.3.3',
+  'lucide-react': '1.52.0',
+  echarts: '6.1.0',
+  sucrase: '3.35.1',
 } as const;
 
-const NPM = "https://cdn.jsdelivr.net/npm";
+const NPM = 'https://cdn.jsdelivr.net/npm';
 const REACT = `${NPM}/react@${JSX_PAGE_LIBRARIES.react}/+esm`;
 
 /** What a page's file may import. `mausbot` is the shell's own: Chart, useTheme, send, open and setContext. */
 export const JSX_PAGE_IMPORTS: Readonly<Record<string, string>> = {
   react: REACT,
-  "react/jsx-runtime": `${NPM}/react@${JSX_PAGE_LIBRARIES.react}/jsx-runtime/+esm`,
-  "react-dom": `${NPM}/react-dom@${JSX_PAGE_LIBRARIES["react-dom"]}/+esm`,
-  "react-dom/client": `${NPM}/react-dom@${JSX_PAGE_LIBRARIES["react-dom"]}/client/+esm`,
-  "lucide-react": `${NPM}/lucide-react@${JSX_PAGE_LIBRARIES["lucide-react"]}/+esm`,
+  'react/jsx-runtime': `${NPM}/react@${JSX_PAGE_LIBRARIES.react}/jsx-runtime/+esm`,
+  'react-dom': `${NPM}/react-dom@${JSX_PAGE_LIBRARIES['react-dom']}/+esm`,
+  'react-dom/client': `${NPM}/react-dom@${JSX_PAGE_LIBRARIES['react-dom']}/client/+esm`,
+  'lucide-react': `${NPM}/lucide-react@${JSX_PAGE_LIBRARIES['lucide-react']}/+esm`,
   echarts: `${NPM}/echarts@${JSX_PAGE_LIBRARIES.echarts}/dist/echarts.esm.min.js`,
 };
-export const JSX_PAGE_MODULES: readonly string[] = [...Object.keys(JSX_PAGE_IMPORTS), "mausbot"];
+export const JSX_PAGE_MODULES: readonly string[] = [...Object.keys(JSX_PAGE_IMPORTS), 'mausbot'];
 
 const CODEC = `${NPM}/@jridgewell/sourcemap-codec`;
 /** Fixes for jsDelivr's on-demand ESM builds, by address. react-dom/client and lucide-react import React by its peer
@@ -40,18 +40,26 @@ const IMPORT_REPAIRS: Readonly<Record<string, string>> = {
   [`${CODEC}@1.5.4/+esm`]: `${CODEC}@1.5.4/dist/sourcemap-codec.mjs`,
 };
 export const JSX_PAGE_SUCRASE = `${NPM}/sucrase@${JSX_PAGE_LIBRARIES.sucrase}/+esm`;
-export const JSX_PAGE_TAILWIND = `${NPM}/@tailwindcss/browser@${JSX_PAGE_LIBRARIES["@tailwindcss/browser"]}/dist/index.global.js`;
+export const JSX_PAGE_TAILWIND = `${NPM}/@tailwindcss/browser@${JSX_PAGE_LIBRARIES['@tailwindcss/browser']}/dist/index.global.js`;
 
 /** The same options in the frame and on the server, so a published page runs the code the preview ran. */
-export const JSX_TRANSFORM_OPTIONS = { transforms: ["jsx", "typescript", "imports"], jsxRuntime: "automatic", production: true } as const;
+export const JSX_TRANSFORM_OPTIONS = {
+  transforms: ['jsx', 'typescript', 'imports'],
+  jsxRuntime: 'automatic',
+  production: true,
+} as const;
 
 /** JSON, made safe to sit in a script element: no `<` survives, so neither `</script` nor `<!--` can appear. */
 function scriptJson(value: unknown): string {
-  return JSON.stringify(value).replace(/</g, "\\u003c");
+  return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
 function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 /** Plain ES2017 run as written in the page: `(function (env) {…})`. env: { doc, win, load(name), source?, page?, title }.
@@ -231,47 +239,49 @@ export const JSX_RUNTIME_SOURCE = `(function (env) {
 })`;
 
 const BASE_STYLE = [
-  "html,body{margin:0}",
-  "body{font-family:var(--font-sans,system-ui,sans-serif);color:var(--color-text-primary,#1d1d1f);",
-  "background:var(--color-background-primary,#fff);-webkit-font-smoothing:antialiased}",
-  "#mausbot-root:empty::before{content:\"Loading\\2026\";display:block;box-sizing:border-box;min-height:100vh;padding:24px;font:14px/20px system-ui,sans-serif;opacity:.6}",
-  ".mausbot-problem{position:fixed;inset:12px;overflow:auto;z-index:2147483646;border-radius:12px;padding:16px 18px;",
-  "font:14px/1.5 system-ui,sans-serif;background:#fff6f5;color:#5c1712;border:1px solid #f3c2bd;box-shadow:0 8px 24px rgba(0,0,0,.12)}",
-  "[data-theme=dark] .mausbot-problem{background:#2a1513;color:#ffd9d4;border-color:#6b2a24}",
-  ".mausbot-problem strong{display:block;font-size:15px;margin-bottom:6px}.mausbot-problem p{margin:0 0 8px}",
-  ".mausbot-problem pre{margin:8px 0;padding:10px 12px;border-radius:8px;background:rgba(0,0,0,.06);font:12px/1.5 ui-monospace,Menlo,monospace;",
-  "white-space:pre-wrap;overflow-wrap:anywhere}.mausbot-problem-note{opacity:.75;font-size:12.5px}",
-].join("");
+  'html,body{margin:0}',
+  'body{font-family:var(--font-sans,system-ui,sans-serif);color:var(--color-text-primary,#1d1d1f);',
+  'background:var(--color-background-primary,#fff);-webkit-font-smoothing:antialiased}',
+  '#mausbot-root:empty::before{content:"Loading\\2026";display:block;box-sizing:border-box;min-height:100vh;padding:24px;font:14px/20px system-ui,sans-serif;opacity:.6}',
+  '.mausbot-problem{position:fixed;inset:12px;overflow:auto;z-index:2147483646;border-radius:12px;padding:16px 18px;',
+  'font:14px/1.5 system-ui,sans-serif;background:#fff6f5;color:#5c1712;border:1px solid #f3c2bd;box-shadow:0 8px 24px rgba(0,0,0,.12)}',
+  '[data-theme=dark] .mausbot-problem{background:#2a1513;color:#ffd9d4;border-color:#6b2a24}',
+  '.mausbot-problem strong{display:block;font-size:15px;margin-bottom:6px}.mausbot-problem p{margin:0 0 8px}',
+  '.mausbot-problem pre{margin:8px 0;padding:10px 12px;border-radius:8px;background:rgba(0,0,0,.06);font:12px/1.5 ui-monospace,Menlo,monospace;',
+  'white-space:pre-wrap;overflow-wrap:anywhere}.mausbot-problem-note{opacity:.75;font-size:12.5px}',
+].join('');
 
 /** Tailwind's `dark:` follows the theme the chat hands the page, not only the system setting. */
-const TAILWIND_SETUP = "@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));";
+const TAILWIND_SETUP = '@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));';
 
 function shell(input: { title: string; head: string; boot: string }): string {
-  const importMap = { imports: { ...JSX_PAGE_IMPORTS, ...IMPORT_REPAIRS, sucrase: JSX_PAGE_SUCRASE } };
+  const importMap = {
+    imports: { ...JSX_PAGE_IMPORTS, ...IMPORT_REPAIRS, sucrase: JSX_PAGE_SUCRASE },
+  };
   return [
-    "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">",
-    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">',
+    '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<title>${escapeHtml(input.title)}</title>`,
     `<script type="importmap">${scriptJson(importMap)}</script>`,
     `<script src="${JSX_PAGE_TAILWIND}"></script>`,
     `<style type="text/tailwindcss">${TAILWIND_SETUP}</style>`,
     `<style>${BASE_STYLE}</style>`,
     input.head,
-    "</head><body><div id=\"mausbot-root\"></div>",
+    '</head><body><div id="mausbot-root"></div>',
     `<script type="module">${input.boot}</script>`,
-    "</body></html>",
-  ].join("");
+    '</body></html>',
+  ].join('');
 }
 
 /** The page a chat frame shows: the file rides along as JSON and the frame transpiles it. */
 export function jsxPageHtml(input: { title: string; source: string }): string {
   const env = `{ doc: document, win: window, load: function (name) { return import(name); }, title: ${scriptJson(input.title)}, source: ${scriptJson(input.source)} }`;
-  return shell({ title: input.title, head: "", boot: `(${JSX_RUNTIME_SOURCE})(${env});` });
+  return shell({ title: input.title, head: '', boot: `(${JSX_RUNTIME_SOURCE})(${env});` });
 }
 
 /** Code inside a script element: a `<` that would start `</script` or `<!--` is escaped, which reads the same in JS. */
 export function scriptSafe(code: string): string {
-  return code.replace(/<\/(script)/gi, "<\\/$1").replace(/<!--/g, "<\\!--");
+  return code.replace(/<\/(script)/gi, '<\\/$1').replace(/<!--/g, '<\\!--');
 }
 
 /** A published page: the server's transpiled code in a plain function, the theme colours the chat would give it, and no
@@ -279,5 +289,9 @@ export function scriptSafe(code: string): string {
 export function jsxPublishedHtml(input: { title: string; compiled: string }): string {
   const page = `<script>window.__mausbotPage=function(require,module,exports){${scriptSafe(input.compiled)}\n};</script>`;
   const env = `{ doc: document, win: window, load: function (name) { return import(name); }, title: ${scriptJson(input.title)}, page: window.__mausbotPage }`;
-  return shell({ title: input.title, head: `<style>${APP_THEME_STYLE}</style>${page}`, boot: `(${JSX_RUNTIME_SOURCE})(${env});` });
+  return shell({
+    title: input.title,
+    head: `<style>${APP_THEME_STYLE}</style>${page}`,
+    boot: `(${JSX_RUNTIME_SOURCE})(${env});`,
+  });
 }

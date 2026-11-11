@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 // Never installs the package itself: stock Ubuntu 24.04 hands a .deb to App Center, which may not install a local one.
 
@@ -10,16 +10,15 @@ export function linuxPackageType({
   appImage = process.env.APPIMAGE,
   readMarker,
 } = {}) {
-  if (platform !== "linux") return null;
-  if (typeof resourcesPath !== "string" || resourcesPath.length === 0) {
-    return appImage ? "AppImage" : null;
+  if (platform !== 'linux') return null;
+  if (typeof resourcesPath !== 'string' || resourcesPath.length === 0) {
+    return appImage ? 'AppImage' : null;
   }
   try {
-    const declared = readMarker(join(resourcesPath, "package-type"));
+    const declared = readMarker(join(resourcesPath, 'package-type'));
     if (declared) return declared.trim() || null;
-  } catch {
-  }
-  return appImage ? "AppImage" : null;
+  } catch {}
+  return appImage ? 'AppImage' : null;
 }
 
 const BUILDERS = {
@@ -36,14 +35,14 @@ export function shellQuote(value) {
 }
 
 export function stagedInstallFile(files, exists = existsSync) {
-  return files?.find((file) => typeof file === "string" && file.length > 0 && exists(file));
+  return files?.find((file) => typeof file === 'string' && file.length > 0 && exists(file));
 }
 
 export function packageInstallCommand(packageType, file) {
   const build = Object.hasOwn(BUILDERS, packageType) ? BUILDERS[packageType] : undefined;
   if (!build) throw new Error(`No install command for package type ${JSON.stringify(packageType)}`);
-  if (typeof file !== "string" || file.length === 0) {
-    throw new Error("The downloaded package is no longer available. Try the update again.");
+  if (typeof file !== 'string' || file.length === 0) {
+    throw new Error('The downloaded package is no longer available. Try the update again.');
   }
   return build(shellQuote(file));
 }

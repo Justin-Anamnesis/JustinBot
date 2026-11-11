@@ -6,8 +6,8 @@
 // Cloud's shared chat), only the person whose request runs does it; anyone else's line waits in the queue
 // and never reaches this. A turn waiting on the person (a question, a sign-in) or on a computer is
 // never stopped this way.
-import type { RuntimeEvent } from "../contracts.ts";
-import { conversationLanguage, serverLine } from "../server-lines.ts";
+import type { RuntimeEvent } from '../contracts.ts';
+import { conversationLanguage, serverLine } from '../server-lines.ts';
 
 export const PERSON_FIRST_MS = 60_000;
 /** How soon a turn that was waiting on the person or a computer when its time came is looked at again. */
@@ -53,8 +53,12 @@ export function ranFor(ms: number): string {
 
 export function stoppedLine(ms: number, language?: string): string {
   return ms < 90_000
-    ? serverLine(language, "server.personFirst.stoppedSeconds", { seconds: Math.max(1, Math.round(ms / 1000)) })
-    : serverLine(language, "server.personFirst.stoppedMinutes", { minutes: Math.round(ms / 60_000) });
+    ? serverLine(language, 'server.personFirst.stoppedSeconds', {
+        seconds: Math.max(1, Math.round(ms / 1000)),
+      })
+    : serverLine(language, 'server.personFirst.stoppedMinutes', {
+        minutes: Math.round(ms / 60_000),
+      });
 }
 
 /** What the model is told after the person's words, in the turn that answers them. */
@@ -62,25 +66,31 @@ export function stoppedNote(label: string, ms: number): string {
   return `[OpenMausBot: your step ${JSON.stringify(label)} had run for ${ranFor(ms)} with this message unread, so it was stopped for you to answer first. Answer this now. If that step still matters, do not wait inside a command again: check it once, then use wait_until or a one-time trigger to check back.]`;
 }
 
-function toolLabel(event: Extract<RuntimeEvent, { type: "item.started" }>): string {
-  const title = (event.title ?? "tool").trim() || "tool";
-  const summary = event.summary?.replace(/\s+/g, " ").trim();
+function toolLabel(event: Extract<RuntimeEvent, { type: 'item.started' }>): string {
+  const title = (event.title ?? 'tool').trim() || 'tool';
+  const summary = event.summary?.replace(/\s+/g, ' ').trim();
   return summary ? `${title}: ${summary}` : title;
 }
 
 export function createPersonFirst(deps: PersonFirstDeps) {
   const firstMs = Math.max(500, deps.firstMs ?? PERSON_FIRST_MS);
   const now = deps.now ?? Date.now;
-  const schedule = deps.schedule ?? ((run: () => void, ms: number) => {
-    const timer = setTimeout(run, ms);
-    timer.unref?.();
-    return () => clearTimeout(timer);
-  });
+  const schedule =
+    deps.schedule ??
+    ((run: () => void, ms: number) => {
+      const timer = setTimeout(run, ms);
+      timer.unref?.();
+      return () => clearTimeout(timer);
+    });
   const watches = new Map<string, Watch>();
 
   const watchOf = (threadId: string): Watch => {
     let watch = watches.get(threadId);
-    if (!watch) watches.set(threadId, (watch = { tools: new Map(), waits: [], read: false, cancel: null, acted: false }));
+    if (!watch)
+      watches.set(
+        threadId,
+        (watch = { tools: new Map(), waits: [], read: false, cancel: null, acted: false }),
+      );
     return watch;
   };
 
@@ -100,8 +110,11 @@ export function createPersonFirst(deps: PersonFirstDeps) {
     const ran = now() - tool.at;
     const waits = watch.waits.splice(0);
     const noted = waits.findLast((wait) => wait.requeue);
-    for (const wait of waits) wait.requeue?.(wait === noted ? stoppedNote(tool.label, ran) : undefined);
-    void Promise.resolve().then(() => deps.stop(threadId, stoppedLine(ran, conversationLanguage(threadId)))).catch(() => {});
+    for (const wait of waits)
+      wait.requeue?.(wait === noted ? stoppedNote(tool.label, ran) : undefined);
+    void Promise.resolve()
+      .then(() => deps.stop(threadId, stoppedLine(ran, conversationLanguage(threadId))))
+      .catch(() => {});
   };
 
   /** Acts once the oldest running tool call has held a waiting message for `firstMs`, else looks again then. */
@@ -144,29 +157,30 @@ export function createPersonFirst(deps: PersonFirstDeps) {
     onEvent(event: RuntimeEvent): void {
       const { threadId } = event;
       switch (event.type) {
-        case "turn.started":
-        case "turn.completed":
+        case 'turn.started':
+        case 'turn.completed':
           forget(threadId);
           return;
-        case "item.started":
-          if (event.itemType !== "tool" || !event.itemId) return;
+        case 'item.started':
+          if (event.itemType !== 'tool' || !event.itemId) return;
           watchOf(threadId).tools.set(event.itemId, { at: now(), label: toolLabel(event) });
           check(threadId);
           return;
-        case "item.completed": {
-          if (event.itemType === "assistant_text") {
+        case 'item.completed': {
+          if (event.itemType === 'assistant_text') {
             if (!event.synthetic) answered(threadId);
             return;
           }
           const watch = watches.get(threadId);
-          if (event.itemType !== "tool" || !watch) return;
+          if (event.itemType !== 'tool' || !watch) return;
           if (event.itemId) watch.tools.delete(event.itemId);
           watch.read = true;
           check(threadId);
           return;
         }
-        case "content.delta":
-          if (event.streamKind === "assistant_text" && !event.synthetic && event.delta.trim()) answered(threadId);
+        case 'content.delta':
+          if (event.streamKind === 'assistant_text' && !event.synthetic && event.delta.trim())
+            answered(threadId);
           return;
       }
     },

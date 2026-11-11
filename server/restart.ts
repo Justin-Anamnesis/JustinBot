@@ -4,7 +4,8 @@ export const MAX_RESTARTS = 5;
 export const STABLE_RUN_MS = 60_000;
 
 export function restartPolicy(now: () => number = Date.now) {
-  let restarts = 0, startedAt = now();
+  let restarts = 0,
+    startedAt = now();
   return {
     again(code: number | null, stopping = false): boolean {
       if (now() - startedAt >= STABLE_RUN_MS) restarts = 0;

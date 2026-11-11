@@ -1,8 +1,8 @@
-import { TriangleAlert } from "lucide-react";
-import { useEffect, useState } from "react";
+import { TriangleAlert } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
-import { t } from "@/lib/i18n";
-import { savedKeysUnreadable } from "@/lib/saved-keys-reset";
+import { t } from '@/lib/i18n';
+import { savedKeysUnreadable } from '@/lib/saved-keys-reset';
 
 /** The desktop's open "Reset saved keys" question, shared by every button so a remounted one cannot ask again. */
 let asking: Promise<void> | null = null;
@@ -16,16 +16,25 @@ export function SavedKeysReset({ notice = false }: { notice?: boolean }) {
   const [pending, setPending] = useState(() => asking !== null);
   useEffect(() => {
     let live = true;
-    void savedKeysUnreadable().then((answer) => { if (live) setUnreadable(answer); });
+    void savedKeysUnreadable().then((answer) => {
+      if (live) setUnreadable(answer);
+    });
     // The warning this button sits in can be swapped for another while the question is open: the new button waits too.
-    void asking?.finally(() => { if (live) setPending(false); });
-    return () => { live = false; };
+    void asking?.finally(() => {
+      if (live) setPending(false);
+    });
+    return () => {
+      live = false;
+    };
   }, []);
   if (!unreadable) return null;
   const reset = () => {
     if (asking) return;
     setPending(true);
-    const request = Promise.resolve(window.ogb?.credentialStore?.reset()).then(() => {}, () => {});
+    const request = Promise.resolve(window.ogb?.credentialStore?.reset()).then(
+      () => {},
+      () => {},
+    );
     asking = request.finally(() => {
       asking = null;
       setPending(false);
@@ -33,20 +42,19 @@ export function SavedKeysReset({ notice = false }: { notice?: boolean }) {
   };
   const button = (
     <button
-      type="button"
+      type='button'
       onClick={reset}
       disabled={pending}
-      className="ms-2 font-medium underline underline-offset-2 hover:opacity-80 disabled:opacity-60"
-    >
-      {t("connectors.resetSavedKeys")}
+      className='ms-2 font-medium underline underline-offset-2 hover:opacity-80 disabled:opacity-60'>
+      {t('connectors.resetSavedKeys')}
     </button>
   );
   if (!notice) return button;
   return (
-    <div className="mb-3 flex items-start gap-2 rounded-xl bg-warning/10 px-3 py-2 text-[13px] text-warning">
-      <TriangleAlert size={14} className="mt-px shrink-0" />
+    <div className='mb-3 flex items-start gap-2 rounded-xl bg-warning/10 px-3 py-2 text-[13px] text-warning'>
+      <TriangleAlert size={14} className='mt-px shrink-0' />
       <span>
-        {t("connectors.savedKeysUnreadable")}
+        {t('connectors.savedKeysUnreadable')}
         {button}
       </span>
     </div>

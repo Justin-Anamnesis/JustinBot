@@ -1,7 +1,7 @@
-import { prefixBytes } from "../context-rebuild.ts";
-import type { ChatContentPart } from "./chat-images.ts";
-import type { OpenAIChatMessage } from "./openai-chat.ts";
-import { object } from "./openai-chat-protocol.ts";
+import { prefixBytes } from '../context-rebuild.ts';
+import type { ChatContentPart } from './chat-images.ts';
+import type { OpenAIChatMessage } from './openai-chat.ts';
+import { object } from './openai-chat-protocol.ts';
 
 /** nginx's "413 Request Entity Too Large" page, Express's "request entity too large", "Payload Too Large", and
  * OpenAI's "Request too large for <model>". */
@@ -12,7 +12,7 @@ export function refusesRequestSize(status: number, body: string): boolean {
   if (status !== 400) return false;
   try {
     const error = object(object(JSON.parse(body))?.error);
-    return error?.code === "context_length_exceeded" || error?.type === "context_length_exceeded";
+    return error?.code === 'context_length_exceeded' || error?.type === 'context_length_exceeded';
   } catch {
     return false;
   }
@@ -29,7 +29,7 @@ export class RequestTooLargeError extends Error {
 export const IMAGE_OMITTED = "[image omitted to fit the provider's size limit]";
 export const TOOL_OUTPUT_SHORTENED = "\n[tool output shortened to fit the provider's size limit]";
 const omittedHistory = (count: number) =>
-  `[${count} earlier message${count === 1 ? "" : "s"} omitted to fit the provider's size limit; full history remains in the app.]`;
+  `[${count} earlier message${count === 1 ? '' : 's'} omitted to fit the provider's size limit; full history remains in the app.]`;
 const LONG_TOOL_OUTPUT_BYTES = 4_000;
 const SHORT_TOOL_OUTPUT_BYTES = 1_000;
 
@@ -40,10 +40,14 @@ export interface RequestSize {
 }
 
 const bytesOf = (value: unknown) => Buffer.byteLength(JSON.stringify(value));
-const isImage = (part: ChatContentPart) => part.type === "image_url";
-const imagesIn = (message: OpenAIChatMessage) => Array.isArray(message.content) ? message.content.filter(isImage).length : 0;
+const isImage = (part: ChatContentPart) => part.type === 'image_url';
+const imagesIn = (message: OpenAIChatMessage) =>
+  Array.isArray(message.content) ? message.content.filter(isImage).length : 0;
 
-export function requestSize(messages: readonly OpenAIChatMessage[], overheadBytes = 0): RequestSize {
+export function requestSize(
+  messages: readonly OpenAIChatMessage[],
+  overheadBytes = 0,
+): RequestSize {
   return {
     bytes: bytesOf(messages) + overheadBytes,
     messages: messages.length,
@@ -53,15 +57,31 @@ export function requestSize(messages: readonly OpenAIChatMessage[], overheadByte
 
 function withoutImages(message: OpenAIChatMessage): OpenAIChatMessage {
   if (!Array.isArray(message.content)) return message;
-  return { ...message, content: message.content.map((part) => isImage(part) ? { type: "text" as const, text: IMAGE_OMITTED } : part) };
+  return {
+    ...message,
+    content: message.content.map((part) =>
+      isImage(part) ? { type: 'text' as const, text: IMAGE_OMITTED } : part,
+    ),
+  };
 }
 
 function shortenedToolOutput(message: OpenAIChatMessage): OpenAIChatMessage {
-  const content = typeof message.content === "string" ? message.content : "";
-  const shorten = (text: string) => prefixBytes(text, SHORT_TOOL_OUTPUT_BYTES) + TOOL_OUTPUT_SHORTENED;
+  const content = typeof message.content === 'string' ? message.content : '';
+  const shorten = (text: string) =>
+    prefixBytes(text, SHORT_TOOL_OUTPUT_BYTES) + TOOL_OUTPUT_SHORTENED;
   let envelope: Record<string, unknown> | undefined;
-  try { envelope = object(JSON.parse(content)); } catch { envelope = undefined; }
-  return { ...message, content: typeof envelope?.result === "string" ? JSON.stringify({ ...envelope, result: shorten(envelope.result) }) : shorten(content) };
+  try {
+    envelope = object(JSON.parse(content));
+  } catch {
+    envelope = undefined;
+  }
+  return {
+    ...message,
+    content:
+      typeof envelope?.result === 'string'
+        ? JSON.stringify({ ...envelope, result: shorten(envelope.result) })
+        : shorten(content),
+  };
 }
 
 /** Aims at half of `refusedBytes`; null when nothing but the system prompt and `request` could shrink. */
@@ -84,10 +104,20 @@ export function smallerResend(
     sizes[index] = size;
     out[index] = next;
   };
-  const shrinkable = messages.flatMap((message, index) => index === requestAt || message.role === "system" ? [] : [index]);
+  const shrinkable = messages.flatMap((message, index) =>
+    index === requestAt || message.role === 'system' ? [] : [index],
+  );
   const steps = [
-    ...shrinkable.filter((index) => imagesIn(messages[index]!)).map((index) => () => replace(index, withoutImages(out[index]!))),
-    ...shrinkable.filter((index) => index > requestAt && messages[index]!.role === "tool" && sizes[index]! > LONG_TOOL_OUTPUT_BYTES)
+    ...shrinkable
+      .filter((index) => imagesIn(messages[index]!))
+      .map((index) => () => replace(index, withoutImages(out[index]!))),
+    ...shrinkable
+      .filter(
+        (index) =>
+          index > requestAt &&
+          messages[index]!.role === 'tool' &&
+          sizes[index]! > LONG_TOOL_OUTPUT_BYTES,
+      )
       .map((index) => () => replace(index, shortenedToolOutput(out[index]!))),
     ...shrinkable.filter((index) => index < requestAt).map((index) => () => replace(index, null)),
   ];
@@ -97,10 +127,16 @@ export function smallerResend(
   const dropped = out.slice(0, requestAt).filter((message) => message === null).length;
   const firstDropped = out.indexOf(null);
   const kept = out.flatMap((message, index) => [
-    ...(dropped && index === firstDropped ? [{ role: "assistant" as const, content: omittedHistory(dropped) }] : []),
+    ...(dropped && index === firstDropped
+      ? [{ role: 'assistant' as const, content: omittedHistory(dropped) }]
+      : []),
     ...(message ? [message] : []),
   ]);
-  return { messages: kept, before: { ...before, bytes: refusedBytes }, after: requestSize(kept, overhead) };
+  return {
+    messages: kept,
+    before: { ...before, bytes: refusedBytes },
+    after: requestSize(kept, overhead),
+  };
 }
 
 export function sizeChange(before: RequestSize, after: RequestSize): string {

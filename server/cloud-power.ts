@@ -5,18 +5,33 @@
 // never asks, and nothing here changes how the home behaves.
 //
 // Privacy: the report carries fixed codes and times only, like the health report.
-import { readFileSync, rmSync } from "node:fs";
-import type { IncomingHttpHeaders, ServerResponse } from "node:http";
-import { join } from "node:path";
-import { writeFileAtomic } from "./atomic.ts";
+import { readFileSync, rmSync } from 'node:fs';
+import type { IncomingHttpHeaders, ServerResponse } from 'node:http';
+import { join } from 'node:path';
+import { writeFileAtomic } from './atomic.ts';
 
 /** Why a home is not idle, as fixed codes (the Admin keeps the latest one for its operator page). */
-export type CloudPowerBusy = "turn" | "run" | "handoff" | "live-call" | "computer" | "maintenance" | "recent-activity" | "recent-work" | "just-woke" | "due-soon";
+export type CloudPowerBusy =
+  | 'turn'
+  | 'run'
+  | 'handoff'
+  | 'live-call'
+  | 'computer'
+  | 'maintenance'
+  | 'recent-activity'
+  | 'recent-work'
+  | 'just-woke'
+  | 'due-soon';
 
 export interface CloudPowerReport {
-  v: 1; at: number; bootedAt: number; wokeAt: number;
-  idle: boolean; busy: CloudPowerBusy[];
-  lastActivityAt: number | null; lastWorkAt: number | null;
+  v: 1;
+  at: number;
+  bootedAt: number;
+  wokeAt: number;
+  idle: boolean;
+  busy: CloudPowerBusy[];
+  lastActivityAt: number | null;
+  lastWorkAt: number | null;
   /** The earliest scheduled run (an enabled routine's next run or a queued run's retry, or 30 minutes on while a bot
    * waits for something), null when none: the Admin starts a sleeping home a minute before it. */
   nextDueAt: number | null;
@@ -54,40 +69,68 @@ export const CLOUD_IDLE_DUE_MS = 5 * 60_000;
 /** A sleep the Admin asked for but never carried out (the suspend failed, the Admin restarted) ends by itself. */
 export const CLOUD_SLEEP_PENDING_MS = 120_000;
 /** The clock tick that notices a resume: a jump this much larger than the tick means the machine was suspended. */
-const TICK_MS = 5_000, RESUME_JUMP_MS = 15_000;
+const TICK_MS = 5_000,
+  RESUME_JUMP_MS = 15_000;
 /** The first request this soon after a wake or a boot is taken for what woke the home (`wokeBy`). */
 export const WOKE_BY_MS = 30_000;
 /** Each kind of request, as a fixed code, by its path: never more of the request than that. Anything else is a page. */
 const WAKE_CODES: readonly [RegExp, string][] = [
-  [/^\/api\/events$/, "events"], [/^\/api\/sync(\/|$)/, "sync"], [/^\/api\/shared-computers(\/|$)/, "lending"],
-  [/^\/\.well-known\/openmausbot\/environment$/, "version"], [/^\/api\/phones(\/|$)/, "phone"], [/^\/api\/presence(\/|$)/, "presence"],
-  [/^\/api\/auth\/session$/, "session"], [/^\/(?:api\/)?(?:auth\/)?pair(?:ing)?(?:\/|$)/, "pair"], [/^\/api\/cloud\//, "admin"],
-  [/^\/api\/health$/, "health"], [/^\/hooks(\/|$)/, "webhook"], [/^\/mcp-oauth\//, "sign-in"], [/^\/api\//, "api"],
+  [/^\/api\/events$/, 'events'],
+  [/^\/api\/sync(\/|$)/, 'sync'],
+  [/^\/api\/shared-computers(\/|$)/, 'lending'],
+  [/^\/\.well-known\/openmausbot\/environment$/, 'version'],
+  [/^\/api\/phones(\/|$)/, 'phone'],
+  [/^\/api\/presence(\/|$)/, 'presence'],
+  [/^\/api\/auth\/session$/, 'session'],
+  [/^\/(?:api\/)?(?:auth\/)?pair(?:ing)?(?:\/|$)/, 'pair'],
+  [/^\/api\/cloud\//, 'admin'],
+  [/^\/api\/health$/, 'health'],
+  [/^\/hooks(\/|$)/, 'webhook'],
+  [/^\/mcp-oauth\//, 'sign-in'],
+  [/^\/api\//, 'api'],
 ];
 /** A request's kind (`wokeBy`): "events" (a page's live stream), "version" (the desktop's version check), "api" and so on. */
-export const wakeCode = (path: string) => WAKE_CODES.find(([pattern]) => pattern.test(path))?.[1] ?? "page";
+export const wakeCode = (path: string) =>
+  WAKE_CODES.find(([pattern]) => pattern.test(path))?.[1] ?? 'page';
 /** Paths that never count as someone using the home: the event stream, the public probe, Files and lending loops,
  * and the Admin's own power reads. */
-const BACKGROUND = [/^\/api\/events$/, /^\/api\/health$/, /^\/api\/sync(\/|$)/, /^\/api\/shared-computers(\/|$)/, /^\/api\/cloud\/power(\/|$)/];
-export const CLOUD_POWER_PATH = "/api/cloud/power";
-export const CLOUD_POWER_SLEEP_PATH = "/api/cloud/power/sleep";
-export const CLOUD_BACKGROUND_HEADER = "x-omb-background";
-export const CLOUD_POWER_HEADER = "x-omb-cloud-power";
-const MARKER = "cloud-sleep.json";
+const BACKGROUND = [
+  /^\/api\/events$/,
+  /^\/api\/health$/,
+  /^\/api\/sync(\/|$)/,
+  /^\/api\/shared-computers(\/|$)/,
+  /^\/api\/cloud\/power(\/|$)/,
+];
+export const CLOUD_POWER_PATH = '/api/cloud/power';
+export const CLOUD_POWER_SLEEP_PATH = '/api/cloud/power/sleep';
+export const CLOUD_BACKGROUND_HEADER = 'x-omb-background';
+export const CLOUD_POWER_HEADER = 'x-omb-cloud-power';
+const MARKER = 'cloud-sleep.json';
 /** Long-polls and streams that stay open by design: never "in flight" work. */
-const HELD = [/^\/api\/events$/, /^\/api\/sync\/changes$/, /^\/api\/shared-computers\/asks$/, /^\/api\/shared-computers\/[\w-]+\/(?:poll|link)$/];
+const HELD = [
+  /^\/api\/events$/,
+  /^\/api\/sync\/changes$/,
+  /^\/api\/shared-computers\/asks$/,
+  /^\/api\/shared-computers\/[\w-]+\/(?:poll|link)$/,
+];
 
 /** The answer a held poll (Files sync, lending) gets once the home agreed to sleep: the desktop pauses until it wakes. */
-export function answerAsleep(res: ServerResponse, json: (res: ServerResponse, status: number, body: unknown) => void) {
-  res.setHeader(CLOUD_POWER_HEADER, "asleep");
-  json(res, 503, { error: "asleep" });
+export function answerAsleep(
+  res: ServerResponse,
+  json: (res: ServerResponse, status: number, body: unknown) => void,
+) {
+  res.setHeader(CLOUD_POWER_HEADER, 'asleep');
+  json(res, 503, { error: 'asleep' });
 }
 
 /** A request counts as someone using the home unless it is a background path or the client marked it as background. */
-export function countsAsActivity(path: string, headers: Record<string, string | string[] | undefined>): boolean {
+export function countsAsActivity(
+  path: string,
+  headers: Record<string, string | string[] | undefined>,
+): boolean {
   if (BACKGROUND.some((pattern) => pattern.test(path))) return false;
   const marked = headers[CLOUD_BACKGROUND_HEADER];
-  return !(marked === "1" || (Array.isArray(marked) && marked.includes("1")));
+  return !(marked === '1' || (Array.isArray(marked) && marked.includes('1')));
 }
 
 /**
@@ -97,14 +140,17 @@ export function countsAsActivity(path: string, headers: Record<string, string | 
 export function wokeFromSleep(dataDir: string): boolean {
   const path = join(dataDir, MARKER);
   try {
-    readFileSync(path, "utf8");
-  } catch { return false; }
+    readFileSync(path, 'utf8');
+  } catch {
+    return false;
+  }
   rmSync(path, { force: true });
   return true;
 }
 
 export function createCloudPower(options: {
-  dataDir: string; probes: CloudPowerProbes;
+  dataDir: string;
+  probes: CloudPowerProbes;
   /** Tells connected clients the home is going to sleep (`{ kind: "power", state: "sleeping" }`). */
   broadcast(payload: Record<string, unknown>): void;
   now?: () => number;
@@ -118,17 +164,26 @@ export function createCloudPower(options: {
 }) {
   const now = options.now ?? Date.now;
   const bootedAt = now();
-  let wokeAt = bootedAt, lastActivityAt: number | null = null, lastWorkAt: number | null = null;
+  let wokeAt = bootedAt,
+    lastActivityAt: number | null = null,
+    lastWorkAt: number | null = null;
   /** The last wake from sleep; null while this process has only ever booted normally. */
   let sleptUntil: number | null = options.bootedFromSleep ? bootedAt : null;
   if (options.bootedFromSleep) options.onWoke?.();
   /** The first request since `wokeAt` (`arrived`), and whether one came. */
-  let wokeBy: CloudPowerReport["wokeBy"] = null, wokeSeen = false, bootWake = Boolean(options.bootedFromSleep);
-  let sleepingSince: number | null = null, inFlight = 0;
+  let wokeBy: CloudPowerReport['wokeBy'] = null,
+    wokeSeen = false,
+    bootWake = Boolean(options.bootedFromSleep);
+  let sleepingSince: number | null = null,
+    inFlight = 0;
   let sleepAbort = new AbortController();
   let lastTick = now();
 
-  const clearMarker = () => { try { rmSync(join(options.dataDir, MARKER), { force: true }); } catch {} };
+  const clearMarker = () => {
+    try {
+      rmSync(join(options.dataDir, MARKER), { force: true });
+    } catch {}
+  };
   const endSleep = () => {
     if (sleepingSince === null) return;
     sleepingSince = null;
@@ -142,12 +197,12 @@ export function createCloudPower(options: {
   const working = (): CloudPowerBusy[] => {
     const busy: CloudPowerBusy[] = [];
     const { probes } = options;
-    if (probes.turn()) busy.push("turn");
-    if (probes.run()) busy.push("run");
-    if (probes.handoff()) busy.push("handoff");
-    if (probes.liveCall()) busy.push("live-call");
-    if (probes.computer()) busy.push("computer");
-    if (probes.maintenance() || inFlight > 0) busy.push("maintenance");
+    if (probes.turn()) busy.push('turn');
+    if (probes.run()) busy.push('run');
+    if (probes.handoff()) busy.push('handoff');
+    if (probes.liveCall()) busy.push('live-call');
+    if (probes.computer()) busy.push('computer');
+    if (probes.maintenance() || inFlight > 0) busy.push('maintenance');
     return busy;
   };
   /** A resume: the clock jumped past the tick (noticed once, by the tick or by a request). */
@@ -174,12 +229,15 @@ export function createCloudPower(options: {
 
   const busyNow = (activityMs: number): CloudPowerBusy[] => {
     tick();
-    const at = now(), busy = working(), workingNow = busy.length > 0;
-    if (lastActivityAt !== null && at - lastActivityAt < activityMs) busy.push("recent-activity");
-    if (!workingNow && lastWorkAt !== null && at - lastWorkAt < CLOUD_IDLE_WORK_MS) busy.push("recent-work");
-    if (at - wokeAt < CLOUD_IDLE_AWAKE_MS) busy.push("just-woke");
+    const at = now(),
+      busy = working(),
+      workingNow = busy.length > 0;
+    if (lastActivityAt !== null && at - lastActivityAt < activityMs) busy.push('recent-activity');
+    if (!workingNow && lastWorkAt !== null && at - lastWorkAt < CLOUD_IDLE_WORK_MS)
+      busy.push('recent-work');
+    if (at - wokeAt < CLOUD_IDLE_AWAKE_MS) busy.push('just-woke');
     const due = options.probes.nextDueAt();
-    if (due !== null && due - at < CLOUD_IDLE_DUE_MS) busy.push("due-soon");
+    if (due !== null && due - at < CLOUD_IDLE_DUE_MS) busy.push('due-soon');
     return busy;
   };
 
@@ -194,7 +252,12 @@ export function createCloudPower(options: {
     if (HELD.some((pattern) => pattern.test(path))) return () => {};
     inFlight += 1;
     let released = false;
-    return () => { if (!released) { released = true; inFlight -= 1; } };
+    return () => {
+      if (!released) {
+        released = true;
+        inFlight -= 1;
+      }
+    };
   };
 
   return {
@@ -211,24 +274,43 @@ export function createCloudPower(options: {
       if (bootWake) options.onBootWakeRequest?.(at);
     },
     /** An authenticated request: someone using the home (`countsAsActivity`), and work in progress until it ends. */
-    request(path: string, headers: IncomingHttpHeaders, res: Pick<ServerResponse, "once">) {
+    request(path: string, headers: IncomingHttpHeaders, res: Pick<ServerResponse, 'once'>) {
       if (countsAsActivity(path, headers)) noteActivity();
-      res.once("close", begin(path));
+      res.once('close', begin(path));
     },
     report(activityMs = CLOUD_IDLE_ACTIVITY_MS): CloudPowerReport {
       const busy = busyNow(activityMs);
-      return { v: 1, at: now(), bootedAt, wokeAt, idle: busy.length === 0, busy, lastActivityAt, lastWorkAt, nextDueAt: options.probes.nextDueAt(), sleeping: sleeping(), wokeBy };
+      return {
+        v: 1,
+        at: now(),
+        bootedAt,
+        wokeAt,
+        idle: busy.length === 0,
+        busy,
+        lastActivityAt,
+        lastWorkAt,
+        nextDueAt: options.probes.nextDueAt(),
+        sleeping: sleeping(),
+        wokeBy,
+      };
     },
     /** The Admin is about to suspend or stop this machine: yes only when idle now. From here until a resume, someone's
      * use or CLOUD_SLEEP_PENDING_MS, held polls answer "asleep" and new ones are refused (`sleeping`). */
-    prepareSleep(activityMs = CLOUD_IDLE_ACTIVITY_MS): { ok: true; nextDueAt: number | null } | { ok: false; busy: CloudPowerBusy[] } {
+    prepareSleep(
+      activityMs = CLOUD_IDLE_ACTIVITY_MS,
+    ): { ok: true; nextDueAt: number | null } | { ok: false; busy: CloudPowerBusy[] } {
       const busy = busyNow(activityMs);
       if (busy.length) return { ok: false, busy };
       sleepingSince = now();
-      try { writeFileAtomic(join(options.dataDir, MARKER), JSON.stringify({ at: sleepingSince })); }
-      catch (error) { options.log?.(`cloud power: could not write the sleep marker: ${error instanceof Error ? error.message : String(error)}`); }
+      try {
+        writeFileAtomic(join(options.dataDir, MARKER), JSON.stringify({ at: sleepingSince }));
+      } catch (error) {
+        options.log?.(
+          `cloud power: could not write the sleep marker: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
       sleepAbort.abort();
-      options.broadcast({ kind: "power", state: "sleeping" });
+      options.broadcast({ kind: 'power', state: 'sleeping' });
       return { ok: true, nextDueAt: options.probes.nextDueAt() };
     },
     sleeping,
@@ -238,13 +320,19 @@ export function createCloudPower(options: {
     sleepSignal: () => sleepAbort.signal,
     /** Tests: the clock tick, without waiting for the timer. */
     tick,
-    close() { clearInterval(timer); },
+    close() {
+      clearInterval(timer);
+    },
   };
 }
 
 export type CloudPower = ReturnType<typeof createCloudPower>;
 
 /** The running home's power, for route modules built before it (Files sync); null on any server that is not a Cloud home. */
-let registered: Pick<CloudPower, "sleeping" | "sleepSignal" | "sleptUntil"> | null = null;
-export function registerCloudPower(power: Pick<CloudPower, "sleeping" | "sleepSignal" | "sleptUntil"> | null) { registered = power; }
+let registered: Pick<CloudPower, 'sleeping' | 'sleepSignal' | 'sleptUntil'> | null = null;
+export function registerCloudPower(
+  power: Pick<CloudPower, 'sleeping' | 'sleepSignal' | 'sleptUntil'> | null,
+) {
+  registered = power;
+}
 export const cloudPowerNow = () => registered;

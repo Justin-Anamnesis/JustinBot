@@ -4,8 +4,8 @@
  * through a one-use reference or a private file and never sees it. Clients
  * see a saved secret as a list row, never its value.
  */
-import { CUSTOM_SECRET_LABEL_MAX } from "./credential-request.ts";
-import type { LoginBots } from "./logins.ts";
+import { CUSTOM_SECRET_LABEL_MAX } from './credential-request.ts';
+import type { LoginBots } from './logins.ts';
 
 /** One saved secret as Settings shows it. There is no value field, and no
  * route ever returns one: a saved value is only ever replaced. */
@@ -14,7 +14,7 @@ export interface VaultSecret {
   /** What the person or the asking bot called it, such as Stripe secret key. */
   name: string;
   /** A bot's secure card, or Settings. */
-  source: "card" | "settings";
+  source: 'card' | 'settings';
   bots: LoginBots;
   /** Given on a card for OpenMausBot's own tools only, so it is never written to a file a bot's commands read. */
   refOnly?: true;
@@ -28,7 +28,11 @@ export const SECRET_VALUE_MAX_BYTES = 4_096;
 
 /** The form two secret names are compared in: "Stripe secret key" and "stripe-secret-key" are one name. */
 export function vaultNameKey(name: string): string {
-  return name.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  return name
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 }
 
 /** A secret from a linked password manager, as the Vault lists it: its name and field names, never a value. It is
@@ -38,7 +42,7 @@ export interface LinkedSecret {
   name: string;
   /** Its other fields, each asked for as "<name> <field>"; the name alone is its main value. */
   fields: string[];
-  source: "linked";
+  source: 'linked';
   /** Who it is linked from, such as 1password. */
   provider: string;
   bots: LoginBots;

@@ -1,5 +1,5 @@
-import type { Message, Store } from "../store.ts";
-import { toolResultPrefix } from "../tool-results.ts";
+import type { Message, Store } from '../store.ts';
+import { toolResultPrefix } from '../tool-results.ts';
 
 const MESSAGE_PAGE_MAX = 200;
 /** How much of a tool step's output a conversation page carries: the rest is fetched when the step is opened, so
@@ -15,7 +15,7 @@ export function pageSize(raw: string | null): number | null | undefined {
 }
 
 export function slimMessage(message: Message): Message | Record<string, unknown> {
-  if (message.kind !== "screen" || !message.png) return message;
+  if (message.kind !== 'screen' || !message.png) return message;
   const { png: _png, ...rest } = message;
   return { ...rest, hasImage: true };
 }
@@ -26,21 +26,36 @@ export function slimMessage(message: Message): Message | Record<string, unknown>
 export function pageMessage(message: Message): Message | Record<string, unknown> {
   const slim = slimMessage(message);
   const tool = message.tool;
-  if (!tool || message.kind !== "activity" || message.relay || message.roomRequest || message.comm || message.threadRef) return slim;
+  if (
+    !tool ||
+    message.kind !== 'activity' ||
+    message.relay ||
+    message.roomRequest ||
+    message.comm ||
+    message.threadRef
+  )
+    return slim;
   const output = tool.output;
   if (output === undefined || output.length <= TOOL_OUTPUT_PREVIEW) return slim;
-  return { ...slim, tool: { ...tool, output: toolResultPrefix(output, TOOL_OUTPUT_PREVIEW), clipped: true } };
+  return {
+    ...slim,
+    tool: { ...tool, output: toolResultPrefix(output, TOOL_OUTPUT_PREVIEW), clipped: true },
+  };
 }
 
 /** A conversation's messages one page at a time (newest first when `before` is absent), and the page around one message. */
-export function messagePages(store: Pick<Store, "messagesFor" | "messagesTail" | "activeLeaf">) {
+export function messagePages(store: Pick<Store, 'messagesFor' | 'messagesTail' | 'activeLeaf'>) {
   function messagePage(threadId: string, limit: number | undefined, before?: string | null) {
     if (limit === undefined) {
       return { messages: store.messagesFor(threadId), activeLeafId: store.activeLeaf(threadId) };
     }
     if (!before) {
       const tail = store.messagesTail(threadId, limit);
-      return { messages: tail.messages.map(pageMessage), hasMore: tail.hasMore, activeLeafId: tail.activeLeafId };
+      return {
+        messages: tail.messages.map(pageMessage),
+        hasMore: tail.hasMore,
+        activeLeafId: tail.activeLeafId,
+      };
     }
     const all = store.messagesFor(threadId);
     const end = all.findIndex((msg) => msg.id === before);

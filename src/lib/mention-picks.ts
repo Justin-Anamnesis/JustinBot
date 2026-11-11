@@ -1,4 +1,4 @@
-import { MENTION_PICKS_MAX, resolveMentions } from "../../shared/room-mentions";
+import { MENTION_PICKS_MAX, resolveMentions } from '../../shared/room-mentions';
 
 type Picked = { id: string; name: string };
 
@@ -18,7 +18,13 @@ export function mentionPicksFor(draftId: string) {
     ids(text: string): string[] {
       const picks = picksByDraft.get(draftId) ?? [];
       if (!picks.length) return [];
-      return resolveMentions(text, picks, picks.map((one) => one.id)).bots.map((one) => one.id).slice(0, MENTION_PICKS_MAX);
+      return resolveMentions(
+        text,
+        picks,
+        picks.map((one) => one.id),
+      )
+        .bots.map((one) => one.id)
+        .slice(0, MENTION_PICKS_MAX);
     },
     clear(): void {
       picksByDraft.delete(draftId);

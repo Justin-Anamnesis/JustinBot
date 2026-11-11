@@ -1,8 +1,8 @@
 // Read by the SSE fold too: auto-speak stands down for the bot on a call, or the two deadlock over the speaker.
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import { speechBridge } from "./speech";
-import { speaker } from "./tts";
+import { speechBridge } from './speech';
+import { speaker } from './tts';
 
 let current: string | null = null;
 const watchers = new Set<() => void>();

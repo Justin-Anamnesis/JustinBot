@@ -1,28 +1,28 @@
 // What the server says about installing an engine on the machine it runs on, and what the last install changed.
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
 export interface EngineInstall {
-  platform?: "darwin" | "win32" | "linux";
-  command?: Partial<Record<"darwin" | "win32" | "linux", string>>;
+  platform?: 'darwin' | 'win32' | 'linux';
+  command?: Partial<Record<'darwin' | 'win32' | 'linux', string>>;
   docsUrl?: string;
   signInCommand?: string;
   needsNode?: boolean;
   managed?: { label: string; downloadBytes: number };
   server?: { package?: string; standalone?: { version: string; downloadBytes: number } };
-  settings?: "connections";
+  settings?: 'connections';
   /** The CLI runs the copy OpenMausBot installed, which the person's terminal does not reach: set up in the app, not there. */
   appCopy?: boolean;
 }
 
-type Platform = NonNullable<EngineInstall["platform"]>;
+type Platform = NonNullable<EngineInstall['platform']>;
 
 function hostPlatform(): Platform {
   const platform = window.ogb?.platform;
-  if (platform === "darwin" || platform === "win32" || platform === "linux") return platform;
+  if (platform === 'darwin' || platform === 'win32' || platform === 'linux') return platform;
   const userAgent = navigator.userAgent;
-  if (userAgent.includes("Mac")) return "darwin";
-  if (userAgent.includes("Win")) return "win32";
-  return "linux";
+  if (userAgent.includes('Mac')) return 'darwin';
+  if (userAgent.includes('Win')) return 'win32';
+  return 'linux';
 }
 
 /** The command that installs this engine where the server runs, falling back to this computer's platform. */
@@ -59,7 +59,9 @@ export function forgetAppCopySwitches(): void {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 export function useAppCopySwitch(instanceId: string): boolean {

@@ -1,13 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from 'vitest';
 
-import { createGracefulShutdown } from "./graceful-shutdown.ts";
+import { createGracefulShutdown } from './graceful-shutdown.ts';
 
-describe("createGracefulShutdown", () => {
-  it("waits for capability and provider cleanup and only starts once", async () => {
+describe('createGracefulShutdown', () => {
+  it('waits for capability and provider cleanup and only starts once', async () => {
     let finishCapabilities!: () => void;
     let finishProviders!: () => void;
-    const capabilities = new Promise<void>((resolve) => { finishCapabilities = resolve; });
-    const providers = new Promise<void>((resolve) => { finishProviders = resolve; });
+    const capabilities = new Promise<void>((resolve) => {
+      finishCapabilities = resolve;
+    });
+    const providers = new Promise<void>((resolve) => {
+      finishProviders = resolve;
+    });
     const capabilityCleanup = vi.fn(() => capabilities);
     const providerCleanup = vi.fn(() => providers);
     const exit = vi.fn();
@@ -31,7 +35,7 @@ describe("createGracefulShutdown", () => {
     await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(0));
   });
 
-  it("uses the deadline when cleanup is wedged", async () => {
+  it('uses the deadline when cleanup is wedged', async () => {
     vi.useFakeTimers();
     try {
       const exit = vi.fn();

@@ -6,8 +6,8 @@
 // Each job calls the cheapest scraper treg lists for it, with its paging and sort options; when that one is down, it
 // falls back once to treg's routed endpoint, which works through the other scrapers in turn. Scrapers name the same
 // fields differently, so rows are read through short alias lists.
-import { parseXIncludedUsage, type XIncludedUsage } from "../shared/x-connector.ts";
-import type { ServiceCredential } from "./included-services.ts";
+import { parseXIncludedUsage, type XIncludedUsage } from '../shared/x-connector.ts';
+import type { ServiceCredential } from './included-services.ts';
 
 /** Posts one call may return. Fifty compact posts stay under the agents
  * server's result cap. */
@@ -31,48 +31,62 @@ const RESULT_BUDGET = 22_000;
  * endpoint for the same job (identity fields only, one page). The relay serves
  * exactly these (openmaus-cloud X_ENDPOINTS). */
 export const TREG_X_ENDPOINTS = {
-  search: "anyapi.x.search.posts",
-  searchRouted: "treg.x.search.posts",
-  userPosts: "anyapi.x.user.posts",
-  userPostsRouted: "treg.x.user.posts",
-  post: "anyapi.twitter.tweet",
-  replies: "anyapi.x.post.comments",
-  repliesRouted: "treg.x.post.comments",
-  profile: "treg.x.user.profile",
+  search: 'anyapi.x.search.posts',
+  searchRouted: 'treg.x.search.posts',
+  userPosts: 'anyapi.x.user.posts',
+  userPostsRouted: 'treg.x.user.posts',
+  post: 'anyapi.twitter.tweet',
+  replies: 'anyapi.x.post.comments',
+  repliesRouted: 'treg.x.post.comments',
+  profile: 'treg.x.user.profile',
 } as const;
 
 /** `off`: research is not on for this account (the plan's relay said so), not a failure a retry fixes. */
-export type XResearchErrorCode = "bad_input" | "bad_key" | "no_credit" | "rate_limited" | "not_found" | "unavailable" | "in_progress" | "off";
-export const TREG_TOP_UP_URL = "https://treg.to";
+export type XResearchErrorCode =
+  | 'bad_input'
+  | 'bad_key'
+  | 'no_credit'
+  | 'rate_limited'
+  | 'not_found'
+  | 'unavailable'
+  | 'in_progress'
+  | 'off';
+export const TREG_TOP_UP_URL = 'https://treg.to';
 
 /** Every sentence a bot or the Settings page can be shown about X research. */
 export const X_MESSAGES = {
-  noKey: "Research isn't set up on this server. Add a treg key in Settings → API keys, or use a paid MausBot Cloud plan.",
+  noKey:
+    "Research isn't set up on this server. Add a treg key in Settings → API keys, or use a paid MausBot Cloud plan.",
   botOff: "Research is off for this bot. Turn it on in this bot's settings under Access.",
-  badKey: "Sign in to MausBot Cloud again in Settings to use X research.",
-  ownBadKey: "treg rejected your key. Check it in Settings → API keys.",
+  badKey: 'Sign in to MausBot Cloud again in Settings to use X research.',
+  ownBadKey: 'treg rejected your key. Check it in Settings → API keys.',
   /** A Cloud home's relay token is the Admin's to replace; the person has no sign-in to redo there. */
-  homeBadKey: "X research isn't connected on this Cloud right now. It comes with your plan, so there is nothing to sign in to: try again later, and tell MausBot support if it keeps happening.",
+  homeBadKey:
+    "X research isn't connected on this Cloud right now. It comes with your plan, so there is nothing to sign in to: try again later, and tell MausBot support if it keeps happening.",
   noPlan: "X research comes with MausBot Cloud plans, and this account's plan isn't active.",
-  rateLimited: "X research is busy right now. Try again in a moment.",
-  badRequest: "That X research request was refused. Check the query, handle or post link.",
-  unavailable: "X research is temporarily unavailable. Try again shortly.",
-  postNotFound: "That X post was not found. It may be deleted or private.",
+  rateLimited: 'X research is busy right now. Try again in a moment.',
+  badRequest: 'That X research request was refused. Check the query, handle or post link.',
+  unavailable: 'X research is temporarily unavailable. Try again shortly.',
+  postNotFound: 'That X post was not found. It may be deleted or private.',
   accountNotFound: (handle: string) => `No X account named @${handle}.`,
   /** After the relay's sentence that the month's included calls are used up. */
-  addOwnKey: "Add your own treg key to keep going.",
+  addOwnKey: 'Add your own treg key to keep going.',
 } as const;
 
 export class XResearchError extends Error {
   readonly code: XResearchErrorCode;
   constructor(code: XResearchErrorCode, message: string) {
     super(message);
-    this.name = "XResearchError";
+    this.name = 'XResearchError';
     this.code = code;
   }
 }
 
-export interface XQuoted { url: string; author: string; text: string }
+export interface XQuoted {
+  url: string;
+  author: string;
+  text: string;
+}
 export interface XPost {
   id: string;
   url: string;
@@ -89,8 +103,16 @@ export interface XPost {
   quoted?: XQuoted;
 }
 /** `newestId` and `more` come first so they survive any cut. */
-export interface XPostList { newestId?: string; more: boolean; posts: XPost[] }
-export interface XPostWithReplies { post: XPost; replies?: XPost[]; moreReplies?: boolean }
+export interface XPostList {
+  newestId?: string;
+  more: boolean;
+  posts: XPost[];
+}
+export interface XPostWithReplies {
+  post: XPost;
+  replies?: XPost[];
+  moreReplies?: boolean;
+}
 export interface XProfile {
   handle: string;
   name?: string;
@@ -104,11 +126,24 @@ export interface XProfile {
   createdAt?: string;
   url: string;
 }
-export interface XPostRef { id: string; handle?: string }
+export interface XPostRef {
+  id: string;
+  handle?: string;
+}
 
 export interface XResearchClient {
-  search(input: { query: string; sort: "latest" | "top"; limit: number; sinceId?: string }): Promise<XPostList>;
-  userPosts(input: { handle: string; limit: number; sinceId?: string; includeReplies: boolean }): Promise<XPostList>;
+  search(input: {
+    query: string;
+    sort: 'latest' | 'top';
+    limit: number;
+    sinceId?: string;
+  }): Promise<XPostList>;
+  userPosts(input: {
+    handle: string;
+    limit: number;
+    sinceId?: string;
+    includeReplies: boolean;
+  }): Promise<XPostList>;
   post(input: { id: string; handle?: string; replies: boolean }): Promise<XPostWithReplies>;
   profile(handle: string): Promise<XProfile>;
 }
@@ -117,14 +152,39 @@ type Row = Record<string, unknown>;
 
 const POST_ID = /^\d{1,25}$/;
 const HANDLE = /^[A-Za-z0-9_]{1,15}$/;
-const X_HOSTS = new Set(["x.com", "www.x.com", "mobile.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"]);
+const X_HOSTS = new Set([
+  'x.com',
+  'www.x.com',
+  'mobile.x.com',
+  'twitter.com',
+  'www.twitter.com',
+  'mobile.twitter.com',
+]);
 /** First path parts that are X's own pages, never an account. */
-const RESERVED = new Set(["i", "home", "search", "explore", "settings", "notifications", "messages", "hashtag", "intent", "share", "compose", "login", "signup", "tos", "privacy"]);
+const RESERVED = new Set([
+  'i',
+  'home',
+  'search',
+  'explore',
+  'settings',
+  'notifications',
+  'messages',
+  'hashtag',
+  'intent',
+  'share',
+  'compose',
+  'login',
+  'signup',
+  'tos',
+  'privacy',
+]);
 
 /** An X link, with or without https:// typed in front; null for anything
  * else (a bare handle, or a link to another site). */
 function xUrl(value: string): URL | null {
-  const withScheme = /^(?:www\.|mobile\.)?(?:x|twitter)\.com\//i.test(value) ? `https://${value}` : value;
+  const withScheme = /^(?:www\.|mobile\.)?(?:x|twitter)\.com\//i.test(value)
+    ? `https://${value}`
+    : value;
   try {
     return new URL(withScheme);
   } catch {
@@ -133,7 +193,7 @@ function xUrl(value: string): URL | null {
 }
 
 function isRow(value: unknown): value is Row {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function at(value: unknown, ...path: string[]): unknown {
@@ -147,15 +207,15 @@ function at(value: unknown, ...path: string[]): unknown {
 
 function firstText(...values: unknown[]): string | undefined {
   for (const value of values) {
-    if (typeof value === "string" && value.trim()) return value;
+    if (typeof value === 'string' && value.trim()) return value;
   }
   return undefined;
 }
 
 function firstCount(...values: unknown[]): number | undefined {
   for (const value of values) {
-    const n = typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value;
-    if (typeof n === "number" && Number.isFinite(n)) return n;
+    const n = typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : value;
+    if (typeof n === 'number' && Number.isFinite(n)) return n;
   }
   return undefined;
 }
@@ -163,8 +223,9 @@ function firstCount(...values: unknown[]): number | undefined {
 /** A digit string, or a number JSON has not already rounded. */
 function idOf(...values: unknown[]): string | undefined {
   for (const value of values) {
-    if (typeof value === "string" && POST_ID.test(value)) return value;
-    if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) return String(value);
+    if (typeof value === 'string' && POST_ID.test(value)) return value;
+    if (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)
+      return String(value);
   }
   return undefined;
 }
@@ -176,9 +237,9 @@ export function normalizeHandle(raw: string): string | null {
   const url = xUrl(value);
   if (url) {
     if (!X_HOSTS.has(url.hostname)) return null;
-    value = url.pathname.split("/").filter(Boolean)[0] ?? "";
+    value = url.pathname.split('/').filter(Boolean)[0] ?? '';
   }
-  value = value.replace(/^@/, "");
+  value = value.replace(/^@/, '');
   return HANDLE.test(value) && !RESERVED.has(value.toLowerCase()) ? value : null;
 }
 
@@ -189,24 +250,32 @@ export function parsePostRef(raw: string): XPostRef | null {
   if (POST_ID.test(value)) return { id: value };
   const url = xUrl(value);
   if (!url || !X_HOSTS.has(url.hostname)) return null;
-  const parts = url.pathname.split("/").filter(Boolean);
-  const status = parts.indexOf("status");
+  const parts = url.pathname.split('/').filter(Boolean);
+  const status = parts.indexOf('status');
   const id = status >= 0 ? parts[status + 1] : undefined;
   if (!id || !POST_ID.test(id)) return null;
-  const handle = status === 1 && HANDLE.test(parts[0]!) && !RESERVED.has(parts[0]!.toLowerCase()) ? parts[0] : undefined;
+  const handle =
+    status === 1 && HANDLE.test(parts[0]!) && !RESERVED.has(parts[0]!.toLowerCase())
+      ? parts[0]
+      : undefined;
   return handle ? { id, handle } : { id };
 }
 
 /** Cut at a code point, so an emoji is never split in half. */
 function clip(value: string, limit: number): string {
   const points = Array.from(value);
-  return points.length <= limit ? value : `${points.slice(0, limit).join("")}…`;
+  return points.length <= limit ? value : `${points.slice(0, limit).join('')}…`;
 }
 
 /** Unix seconds (or milliseconds), or a date string, as ISO time. */
 function timeOf(value: unknown): string | undefined {
   const n = firstCount(value);
-  const when = n !== undefined ? new Date(n < 1e12 ? n * 1000 : n) : typeof value === "string" ? new Date(value) : undefined;
+  const when =
+    n !== undefined
+      ? new Date(n < 1e12 ? n * 1000 : n)
+      : typeof value === 'string'
+        ? new Date(value)
+        : undefined;
   return when && !Number.isNaN(when.getTime()) ? when.toISOString() : undefined;
 }
 
@@ -214,7 +283,9 @@ function timeOf(value: unknown): string | undefined {
  * give x.com/i/web/status/<id>, and a link without the handle sends a bot to
  * its browser to find out whose post it is, which defeats paying for treg. */
 function postUrl(id: string, handle: string | undefined, given: string | undefined): string {
-  return handle ? `https://x.com/${handle}/status/${id}` : given ?? `https://x.com/i/status/${id}`;
+  return handle
+    ? `https://x.com/${handle}/status/${id}`
+    : (given ?? `https://x.com/i/status/${id}`);
 }
 
 /** One post from any scraper's row, or null when it has no usable id.
@@ -227,46 +298,85 @@ export function toPost(raw: unknown, knownHandle?: string): XPost | null {
   const row: Row = { ...(isRow(raw.legacy) ? raw.legacy : {}), ...raw };
   const id = idOf(row.id_str, row.rest_id, row.id, row.tweet_id);
   if (!id) return null;
-  const user = at(row, "core", "user_results", "result");
+  const user = at(row, 'core', 'user_results', 'result');
   const handle = firstText(
-    row.authorUsername, row.authorHandle, row.username, row.screen_name,
-    at(row, "author", "userName"), at(row, "author", "username"), at(row, "author", "screen_name"), at(row, "author", "handle"),
-    at(row, "user", "screen_name"), at(row, "user", "username"),
-    at(user, "legacy", "screen_name"), at(user, "core", "screen_name"),
+    row.authorUsername,
+    row.authorHandle,
+    row.username,
+    row.screen_name,
+    at(row, 'author', 'userName'),
+    at(row, 'author', 'username'),
+    at(row, 'author', 'screen_name'),
+    at(row, 'author', 'handle'),
+    at(row, 'user', 'screen_name'),
+    at(row, 'user', 'username'),
+    at(user, 'legacy', 'screen_name'),
+    at(user, 'core', 'screen_name'),
     knownHandle,
-  )?.replace(/^@/, "");
-  const quotedRaw = [row.quoted, row.quotedTweet, row.quoted_tweet, row.quoted_status, at(row, "quoted_status_result", "result")].find(isRow);
+  )?.replace(/^@/, '');
+  const quotedRaw = [
+    row.quoted,
+    row.quotedTweet,
+    row.quoted_tweet,
+    row.quoted_status,
+    at(row, 'quoted_status_result', 'result'),
+  ].find(isRow);
   const quoted = quotedRaw ? toPost(quotedRaw) : null;
   return {
     id,
     url: postUrl(id, handle, firstText(row.url)),
-    author: handle ? `@${handle}` : "@unknown",
-    authorName: firstText(row.authorName, at(row, "author", "name"), at(row, "user", "name"), at(user, "legacy", "name"), at(user, "core", "name")),
+    author: handle ? `@${handle}` : '@unknown',
+    authorName: firstText(
+      row.authorName,
+      at(row, 'author', 'name'),
+      at(row, 'user', 'name'),
+      at(user, 'legacy', 'name'),
+      at(user, 'core', 'name'),
+    ),
     createdAt: timeOf(row.createdUtc ?? row.created_at ?? row.createdAt),
-    text: clip(firstText(at(row, "note_tweet", "note_tweet_results", "result", "text"), row.full_text, row.text) ?? "", TEXT_LIMIT),
+    text: clip(
+      firstText(
+        at(row, 'note_tweet', 'note_tweet_results', 'result', 'text'),
+        row.full_text,
+        row.text,
+      ) ?? '',
+      TEXT_LIMIT,
+    ),
     likes: firstCount(row.likeCount, row.likes, row.favorite_count, row.like_count),
     reposts: firstCount(row.retweetCount, row.repostCount, row.retweets, row.retweet_count),
     replies: firstCount(row.replyCount, row.replies, row.reply_count),
     quotes: firstCount(row.quoteCount, row.quotes, row.quote_count),
-    views: firstCount(row.viewCount, row.views, at(row, "views", "count"), row.view_count),
-    isReply: typeof row.isReply === "boolean" ? row.isReply : undefined,
-    quoted: quoted ? { url: quoted.url, author: quoted.author, text: clip(quoted.text, QUOTE_LIMIT) } : undefined,
+    views: firstCount(row.viewCount, row.views, at(row, 'views', 'count'), row.view_count),
+    isReply: typeof row.isReply === 'boolean' ? row.isReply : undefined,
+    quoted: quoted
+      ? { url: quoted.url, author: quoted.author, text: clip(quoted.text, QUOTE_LIMIT) }
+      : undefined,
   };
 }
 
 /** The rows of a catalog answer ({output: {data: {items | tweets}}}) or a
  * routed one ({output: {posts | comments}}). */
 function rowsOf(answer: Row): unknown[] {
-  const output = at(answer, "output");
-  for (const list of [at(output, "data", "items"), at(output, "data", "tweets"), at(output, "posts"), at(output, "comments"), at(output, "data", "replies")]) {
+  const output = at(answer, 'output');
+  for (const list of [
+    at(output, 'data', 'items'),
+    at(output, 'data', 'tweets'),
+    at(output, 'posts'),
+    at(output, 'comments'),
+    at(output, 'data', 'replies'),
+  ]) {
     if (Array.isArray(list)) return list;
   }
   return [];
 }
 
 function cursorOf(answer: Row): string | undefined {
-  const output = at(answer, "output");
-  return firstText(at(output, "data", "nextCursor"), at(output, "next_cursor"), at(output, "nextCursor"));
+  const output = at(answer, 'output');
+  return firstText(
+    at(output, 'data', 'nextCursor'),
+    at(output, 'next_cursor'),
+    at(output, 'nextCursor'),
+  );
 }
 
 /** How many leading posts fit in `budget` characters of JSON. */
@@ -292,67 +402,124 @@ function newestOf(posts: XPost[]): string | undefined {
 export function errorFor(status: number, body: unknown): XResearchError {
   // The relay's own refusals (openmaus-cloud server/cloud-services.ts); a 5xx
   // there is a scraper or our treg account, never the person's to fix.
-  if (status === 401 || status === 403) return new XResearchError("bad_key", X_MESSAGES.badKey);
-  if (status === 402) return new XResearchError("no_credit", X_MESSAGES.noPlan);
-  if (status === 422) return new XResearchError("bad_input", X_MESSAGES.badRequest);
+  if (status === 401 || status === 403) return new XResearchError('bad_key', X_MESSAGES.badKey);
+  if (status === 402) return new XResearchError('no_credit', X_MESSAGES.noPlan);
+  if (status === 422) return new XResearchError('bad_input', X_MESSAGES.badRequest);
   if (status === 429) {
     // The month's allowance: the relay's sentence names the plan, the number and the reset date.
-    const said = at(body, "message");
-    return new XResearchError("rate_limited", at(body, "error") === "quota_exceeded" && typeof said === "string" && said.length <= 300 ? `${said} ${X_MESSAGES.addOwnKey}` : X_MESSAGES.rateLimited);
+    const said = at(body, 'message');
+    return new XResearchError(
+      'rate_limited',
+      at(body, 'error') === 'quota_exceeded' && typeof said === 'string' && said.length <= 300
+        ? `${said} ${X_MESSAGES.addOwnKey}`
+        : X_MESSAGES.rateLimited,
+    );
   }
   // treg itself is rate-limiting (the relay keeps the call counted): another scraper through the same account would
   // only count against the plan again, so this is no outage to fall back from.
-  if (status === 503 && at(body, "error") === "overloaded") return new XResearchError("rate_limited", X_MESSAGES.rateLimited);
-  return new XResearchError("unavailable", X_MESSAGES.unavailable);
+  if (status === 503 && at(body, 'error') === 'overloaded')
+    return new XResearchError('rate_limited', X_MESSAGES.rateLimited);
+  return new XResearchError('unavailable', X_MESSAGES.unavailable);
 }
 
-const unavailable = () => new XResearchError("unavailable", X_MESSAGES.unavailable);
+const unavailable = () => new XResearchError('unavailable', X_MESSAGES.unavailable);
 
 /** What treg's own refusal says, from its JSON `detail` (a sentence, or `{error, message}`) or `message`. */
 function tregDetail(body: unknown): string | undefined {
-  const said = firstText(at(body, "detail"), at(body, "detail", "message"), at(body, "message"), at(body, "detail", "error"), at(body, "error"));
-  return said?.replace(/\s+/g, " ").trim().slice(0, 300);
+  const said = firstText(
+    at(body, 'detail'),
+    at(body, 'detail', 'message'),
+    at(body, 'message'),
+    at(body, 'detail', 'error'),
+    at(body, 'error'),
+  );
+  return said?.replace(/\s+/g, ' ').trim().slice(0, 300);
 }
 
-const micro = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null);
-export const dollarsText = (usd: number) => `$${usd >= 0.01 || usd === 0 ? usd.toFixed(2) : usd.toPrecision(2)}`;
+const micro = (value: unknown) =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null;
+export const dollarsText = (usd: number) =>
+  `$${usd >= 0.01 || usd === 0 ? usd.toFixed(2) : usd.toPrecision(2)}`;
 
 /** A refusal from treg itself, on the person's own key, as the sentence treg means: nothing here limits that key. */
 export function tregErrorFor(status: number, body: unknown, headers?: Headers): XResearchError {
   const detail = tregDetail(body);
-  const callId = headers?.get("x-treg-call-id")?.trim();
-  if ((status === 401 || status === 403) && !callId) return new XResearchError("bad_key", X_MESSAGES.ownBadKey);
+  const callId = headers?.get('x-treg-call-id')?.trim();
+  if ((status === 401 || status === 403) && !callId)
+    return new XResearchError('bad_key', X_MESSAGES.ownBadKey);
   if (status === 402) {
-    const balance = micro(at(body, "balance_micro") ?? at(body, "detail", "balance_micro"));
-    const needs = micro(at(body, "estimated_cost_micro") ?? at(body, "detail", "estimated_cost_micro"));
-    const link = firstText(at(body, "topup_url"), at(body, "detail", "topup_url"));
+    const balance = micro(at(body, 'balance_micro') ?? at(body, 'detail', 'balance_micro'));
+    const needs = micro(
+      at(body, 'estimated_cost_micro') ?? at(body, 'detail', 'estimated_cost_micro'),
+    );
+    const link = firstText(at(body, 'topup_url'), at(body, 'detail', 'topup_url'));
     const topUp = link && /^https:\/\/[^\s"<>]{1,300}$/.test(link) ? link : TREG_TOP_UP_URL;
-    const amounts = balance === null ? "" : ` (balance ${dollarsText(balance / 1_000_000)}${needs ? `, this call needs about ${dollarsText(needs / 1_000_000)}` : ""})`;
-    return new XResearchError("no_credit", `Your treg balance is too low for this call${amounts}. Top up at ${topUp}, then try again.`);
+    const amounts =
+      balance === null
+        ? ''
+        : ` (balance ${dollarsText(balance / 1_000_000)}${needs ? `, this call needs about ${dollarsText(needs / 1_000_000)}` : ''})`;
+    return new XResearchError(
+      'no_credit',
+      `Your treg balance is too low for this call${amounts}. Top up at ${topUp}, then try again.`,
+    );
   }
   if (status === 404) {
-    const near = at(body, "detail", "did_you_mean");
-    const suggestions = Array.isArray(near) ? near.filter((id): id is string => typeof id === "string").slice(0, 5) : [];
-    return new XResearchError("not_found", `${detail ?? "treg has no such endpoint."}${suggestions.length ? ` Did you mean ${suggestions.join(", ")}?` : ""}`);
+    const near = at(body, 'detail', 'did_you_mean');
+    const suggestions = Array.isArray(near)
+      ? near.filter((id): id is string => typeof id === 'string').slice(0, 5)
+      : [];
+    return new XResearchError(
+      'not_found',
+      `${detail ?? 'treg has no such endpoint.'}${suggestions.length ? ` Did you mean ${suggestions.join(', ')}?` : ''}`,
+    );
   }
-  if (status === 409) return new XResearchError("in_progress", "That call is still running at treg. Try it again in a moment.");
-  if (status === 410) return new XResearchError("unavailable", "That call finished at treg, but its answer wasn't kept. Run it again.");
-  if (status === 422) return new XResearchError("bad_input", `treg refused that request${detail ? `: ${detail}` : ". Check its parameters."}`);
+  if (status === 409)
+    return new XResearchError(
+      'in_progress',
+      'That call is still running at treg. Try it again in a moment.',
+    );
+  if (status === 410)
+    return new XResearchError(
+      'unavailable',
+      "That call finished at treg, but its answer wasn't kept. Run it again.",
+    );
+  if (status === 422)
+    return new XResearchError(
+      'bad_input',
+      `treg refused that request${detail ? `: ${detail}` : '. Check its parameters.'}`,
+    );
   if (status === 429 || status === 503) {
-    const wait = Number(at(body, "retry_after_s") ?? at(body, "detail", "retry_after_s") ?? headers?.get("retry-after"));
-    const when = Number.isFinite(wait) && wait > 0 ? `Try again in ${Math.ceil(wait)} seconds.` : "Try again shortly.";
-    const what = status === 429 ? "treg is rate-limiting this call" : "treg is busy right now";
-    return new XResearchError(status === 429 ? "rate_limited" : "unavailable", `${what}${detail ? ` (${detail})` : ""}. ${when}`);
+    const wait = Number(
+      at(body, 'retry_after_s') ??
+        at(body, 'detail', 'retry_after_s') ??
+        headers?.get('retry-after'),
+    );
+    const when =
+      Number.isFinite(wait) && wait > 0
+        ? `Try again in ${Math.ceil(wait)} seconds.`
+        : 'Try again shortly.';
+    const what = status === 429 ? 'treg is rate-limiting this call' : 'treg is busy right now';
+    return new XResearchError(
+      status === 429 ? 'rate_limited' : 'unavailable',
+      `${what}${detail ? ` (${detail})` : ''}. ${when}`,
+    );
   }
-  if (status < 500 && callId) return new XResearchError("bad_input", `The provider refused that request (HTTP ${status})${detail ? `: ${detail}` : "."}`);
-  return new XResearchError("unavailable", `treg couldn't complete that request (HTTP ${status})${detail ? `: ${detail}` : ""}. Try again shortly.`);
+  if (status < 500 && callId)
+    return new XResearchError(
+      'bad_input',
+      `The provider refused that request (HTTP ${status})${detail ? `: ${detail}` : '.'}`,
+    );
+  return new XResearchError(
+    'unavailable',
+    `treg couldn't complete that request (HTTP ${status})${detail ? `: ${detail}` : ''}. Try again shortly.`,
+  );
 }
 
 /** Read the body in chunks and give up the moment it crosses the cap. */
 export async function readCapped(response: Response): Promise<string> {
-  const announced = Number(response.headers.get("content-length") ?? 0);
+  const announced = Number(response.headers.get('content-length') ?? 0);
   if (announced > MAX_BODY_BYTES) throw unavailable();
-  if (!response.body) return "";
+  if (!response.body) return '';
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -366,7 +533,7 @@ export async function readCapped(response: Response): Promise<string> {
     }
     chunks.push(value);
   }
-  return Buffer.concat(chunks).toString("utf8");
+  return Buffer.concat(chunks).toString('utf8');
 }
 
 /** The cheapest scraper first; only an outage (not a bad token, an empty
@@ -375,7 +542,7 @@ async function withFallback<T>(primary: () => Promise<T>, fallback: () => Promis
   try {
     return await primary();
   } catch (error) {
-    if (error instanceof XResearchError && error.code === "unavailable") return fallback();
+    if (error instanceof XResearchError && error.code === 'unavailable') return fallback();
     throw error;
   }
 }
@@ -397,14 +564,22 @@ interface ListOptions {
 /** The headers that carry a research credential: the person's own key as treg's `X-Treg-Token`, the plan's relay
  * token as a bearer. Security: nothing else about the credential leaves here. */
 export function tregAuthHeaders(credential: ServiceCredential): Record<string, string> {
-  return credential.included ? { authorization: `Bearer ${credential.token}` } : { "x-treg-token": credential.token };
+  return credential.included
+    ? { authorization: `Bearer ${credential.token}` }
+    : { 'x-treg-token': credential.token };
 }
 
 /** `url` and `token` are the relay's (OMB_CLOUD_X_URL, or a desktop's from its Cloud sign-in), or, with `own`, treg's
  * own base URL and the person's treg key. */
-export function createXRelayClient(options: { url: string; token: string; own?: boolean; fetcher?: typeof fetch; timeoutMs?: number }): XResearchClient {
+export function createXRelayClient(options: {
+  url: string;
+  token: string;
+  own?: boolean;
+  fetcher?: typeof fetch;
+  timeoutMs?: number;
+}): XResearchClient {
   const fetcher = options.fetcher ?? fetch;
-  const base = options.url.replace(/\/+$/, "");
+  const base = options.url.replace(/\/+$/, '');
   const timeoutMs = options.timeoutMs ?? X_CLIENT_TIMEOUT_MS;
   const auth = tregAuthHeaders({ token: options.token, api: base, included: options.own !== true });
 
@@ -415,10 +590,10 @@ export function createXRelayClient(options: { url: string; token: string; own?: 
     let headers: Headers;
     try {
       const response = await fetcher(`${base}${path}`, {
-        method: "POST",
-        headers: { ...auth, accept: "application/json", "content-type": "application/json" },
+        method: 'POST',
+        headers: { ...auth, accept: 'application/json', 'content-type': 'application/json' },
         body: JSON.stringify(body),
-        redirect: "error",
+        redirect: 'error',
         signal: AbortSignal.timeout(timeoutMs),
       });
       status = response.status;
@@ -448,7 +623,10 @@ export function createXRelayClient(options: { url: string; token: string; own?: 
     let cursor: string | undefined;
     let more = false;
     for (let page = 0; page < opts.pages; page++) {
-      const answer = await call(endpoint, opts.paged ? { ...body, limit: opts.limit, ...(cursor ? { cursor } : {}) } : body);
+      const answer = await call(
+        endpoint,
+        opts.paged ? { ...body, limit: opts.limit, ...(cursor ? { cursor } : {}) } : body,
+      );
       const rows = rowsOf(answer);
       // The page is paid for, so every row is read: an old post can sit among
       // new ones (a pinned post, or a retweet a scraper lists under the
@@ -458,7 +636,7 @@ export function createXRelayClient(options: { url: string; token: string; own?: 
         const post = toPost(raw, opts.knownHandle);
         if (!post || (!opts.keepReplies && post.isReply === true)) return;
         if (since !== undefined && BigInt(post.id) <= since) {
-          if (opts.newestFirst && index > 0 && at(raw, "isPinned") !== true) reachedSeen = true;
+          if (opts.newestFirst && index > 0 && at(raw, 'isPinned') !== true) reachedSeen = true;
           return;
         }
         posts.push(post);
@@ -483,49 +661,95 @@ export function createXRelayClient(options: { url: string; token: string; own?: 
     search({ query, sort, limit, sinceId }) {
       const q = sinceId === undefined ? query : `${query} since_id:${sinceId}`;
       return withFallback(
-        () => list(TREG_X_ENDPOINTS.search, { query: q, queryType: sort === "top" ? "Top" : "Latest" }, { limit, sinceId, newestFirst: sort === "latest", keepReplies: true, paged: true, pages: MAX_PAGES }),
-        () => list(TREG_X_ENDPOINTS.searchRouted, { q }, { limit, sinceId, newestFirst: false, keepReplies: true, paged: false, pages: 1 }),
+        () =>
+          list(
+            TREG_X_ENDPOINTS.search,
+            { query: q, queryType: sort === 'top' ? 'Top' : 'Latest' },
+            {
+              limit,
+              sinceId,
+              newestFirst: sort === 'latest',
+              keepReplies: true,
+              paged: true,
+              pages: MAX_PAGES,
+            },
+          ),
+        () =>
+          list(
+            TREG_X_ENDPOINTS.searchRouted,
+            { q },
+            { limit, sinceId, newestFirst: false, keepReplies: true, paged: false, pages: 1 },
+          ),
       );
     },
     userPosts({ handle, limit, sinceId, includeReplies }) {
       const shared = { limit, sinceId, keepReplies: includeReplies, knownHandle: handle };
       return withFallback(
-        () => list(TREG_X_ENDPOINTS.userPosts, { handle }, { ...shared, newestFirst: true, paged: true, pages: MAX_PAGES }),
-        () => list(TREG_X_ENDPOINTS.userPostsRouted, { username: handle }, { ...shared, newestFirst: false, paged: false, pages: 1 }),
+        () =>
+          list(
+            TREG_X_ENDPOINTS.userPosts,
+            { handle },
+            { ...shared, newestFirst: true, paged: true, pages: MAX_PAGES },
+          ),
+        () =>
+          list(
+            TREG_X_ENDPOINTS.userPostsRouted,
+            { username: handle },
+            { ...shared, newestFirst: false, paged: false, pages: 1 },
+          ),
       );
     },
     async post({ id, handle, replies }) {
-      const url = handle ? `https://x.com/${handle}/status/${id}` : `https://x.com/i/web/status/${id}`;
+      const url = handle
+        ? `https://x.com/${handle}/status/${id}`
+        : `https://x.com/i/web/status/${id}`;
       const answer = await call(TREG_X_ENDPOINTS.post, { url });
-      const post = at(answer, "output", "found") === false ? null : toPost(at(answer, "output", "data"), handle);
-      if (!post) throw new XResearchError("not_found", X_MESSAGES.postNotFound);
+      const post =
+        at(answer, 'output', 'found') === false
+          ? null
+          : toPost(at(answer, 'output', 'data'), handle);
+      if (!post) throw new XResearchError('not_found', X_MESSAGES.postNotFound);
       if (!replies) return { post };
       const page = await withFallback(
-        () => list(TREG_X_ENDPOINTS.replies, { url }, { limit: REPLIES_PAGE, newestFirst: false, keepReplies: true, paged: true, pages: 1 }),
-        () => list(TREG_X_ENDPOINTS.repliesRouted, { tweet_id: id }, { limit: REPLIES_PAGE, newestFirst: false, keepReplies: true, paged: false, pages: 1 }),
+        () =>
+          list(
+            TREG_X_ENDPOINTS.replies,
+            { url },
+            { limit: REPLIES_PAGE, newestFirst: false, keepReplies: true, paged: true, pages: 1 },
+          ),
+        () =>
+          list(
+            TREG_X_ENDPOINTS.repliesRouted,
+            { tweet_id: id },
+            { limit: REPLIES_PAGE, newestFirst: false, keepReplies: true, paged: false, pages: 1 },
+          ),
       );
       const fit = fitting(page.posts, RESULT_BUDGET - JSON.stringify(post).length);
-      return { post, replies: page.posts.slice(0, fit), moreReplies: page.more || fit < page.posts.length };
+      return {
+        post,
+        replies: page.posts.slice(0, fit),
+        moreReplies: page.more || fit < page.posts.length,
+      };
     },
     async profile(handle) {
       // Routed already: treg tries each scraper and answers one normalized
       // shape, `username` null when every one missed.
       const answer = await call(TREG_X_ENDPOINTS.profile, { username: handle });
-      const out = at(answer, "output");
-      const username = firstText(at(out, "username"))?.replace(/^@/, "");
-      if (!username) throw new XResearchError("not_found", X_MESSAGES.accountNotFound(handle));
-      const verified = at(out, "is_verified");
+      const out = at(answer, 'output');
+      const username = firstText(at(out, 'username'))?.replace(/^@/, '');
+      if (!username) throw new XResearchError('not_found', X_MESSAGES.accountNotFound(handle));
+      const verified = at(out, 'is_verified');
       return {
         handle: `@${username}`,
-        name: firstText(at(out, "name")),
-        bio: firstText(at(out, "description")),
-        location: firstText(at(out, "location")),
-        website: firstText(at(out, "website")),
-        followers: firstCount(at(out, "followers")),
-        following: firstCount(at(out, "following")),
-        posts: firstCount(at(out, "posts_count")),
-        verified: typeof verified === "boolean" ? verified : undefined,
-        createdAt: timeOf(at(out, "created_at")),
+        name: firstText(at(out, 'name')),
+        bio: firstText(at(out, 'description')),
+        location: firstText(at(out, 'location')),
+        website: firstText(at(out, 'website')),
+        followers: firstCount(at(out, 'followers')),
+        following: firstCount(at(out, 'following')),
+        posts: firstCount(at(out, 'posts_count')),
+        verified: typeof verified === 'boolean' ? verified : undefined,
+        createdAt: timeOf(at(out, 'created_at')),
         url: `https://x.com/${username}`,
       };
     },
@@ -535,14 +759,20 @@ export function createXRelayClient(options: { url: string; token: string; own?: 
 /** This month's included X calls from the plan's relay (`GET <relay>/usage`, no treg call), or null when it can't say:
  * an own key (treg counts nothing of ours), a relay that refused or doesn't serve it, or an answer of another shape.
  * Security: the relay token goes only to the relay, as with every call. */
-export async function readIncludedXUsage(credential: ServiceCredential, options: { fetcher?: typeof fetch; timeoutMs?: number } = {}): Promise<XIncludedUsage | null> {
+export async function readIncludedXUsage(
+  credential: ServiceCredential,
+  options: { fetcher?: typeof fetch; timeoutMs?: number } = {},
+): Promise<XIncludedUsage | null> {
   if (!credential.included) return null;
   try {
-    const response = await (options.fetcher ?? fetch)(`${credential.api.replace(/\/+$/, "")}/usage`, {
-      headers: { ...tregAuthHeaders(credential), accept: "application/json" },
-      redirect: "error",
-      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
-    });
+    const response = await (options.fetcher ?? fetch)(
+      `${credential.api.replace(/\/+$/, '')}/usage`,
+      {
+        headers: { ...tregAuthHeaders(credential), accept: 'application/json' },
+        redirect: 'error',
+        signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
+      },
+    );
     const raw = await readCapped(response);
     return response.ok ? parseXIncludedUsage(JSON.parse(raw)) : null;
   } catch {
@@ -551,6 +781,14 @@ export async function readIncludedXUsage(credential: ServiceCredential, options:
 }
 
 /** The X client for a research credential: straight to treg with the person's own key, else through the plan's relay. */
-export function createXClient(credential: ServiceCredential, options: { fetcher?: typeof fetch; timeoutMs?: number } = {}): XResearchClient {
-  return createXRelayClient({ url: credential.api, token: credential.token, own: !credential.included, ...options });
+export function createXClient(
+  credential: ServiceCredential,
+  options: { fetcher?: typeof fetch; timeoutMs?: number } = {},
+): XResearchClient {
+  return createXRelayClient({
+    url: credential.api,
+    token: credential.token,
+    own: !credential.included,
+    ...options,
+  });
 }

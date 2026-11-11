@@ -1,13 +1,13 @@
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ensureDirs } from "../config.ts";
-import type { ProviderInstance } from "../contracts.ts";
-import { removeTempDir } from "../testing/cleanup.ts";
-import { recordEvents } from "../testing/events.ts";
-import { CLAUDE_ACCOUNT_ENV_KEYS, ClaudeDriver, resolveClaudeConfigDir } from "./claude.ts";
-import { AWS_CREDENTIAL_ENV_KEYS } from "./claude-bedrock-aws.ts";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ensureDirs } from '../config.ts';
+import type { ProviderInstance } from '../contracts.ts';
+import { removeTempDir } from '../testing/cleanup.ts';
+import { recordEvents } from '../testing/events.ts';
+import { CLAUDE_ACCOUNT_ENV_KEYS, ClaudeDriver, resolveClaudeConfigDir } from './claude.ts';
+import { AWS_CREDENTIAL_ENV_KEYS } from './claude-bedrock-aws.ts';
 
 // Reads synthetic account labels and records its spawn contract; never the real CLI, Keychain or network.
 const FAKE_CLI = `#!/usr/bin/env node
@@ -17,7 +17,7 @@ import { createInterface } from "node:readline";
 const args = process.argv.slice(2);
 const configDir = process.env.CLAUDE_CONFIG_DIR || join(process.env.HOME, ".claude");
 const auth = JSON.parse(readFileSync(join(configDir, "fixture-auth.json"), "utf8"));
-const keys = ${JSON.stringify([...CLAUDE_ACCOUNT_ENV_KEYS, ...AWS_CREDENTIAL_ENV_KEYS, "AWS_PROFILE", "AWS_REGION"])};
+const keys = ${JSON.stringify([...CLAUDE_ACCOUNT_ENV_KEYS, ...AWS_CREDENTIAL_ENV_KEYS, 'AWS_PROFILE', 'AWS_REGION'])};
 appendFileSync(join(configDir, "calls.ndjson"), JSON.stringify({
   args, configDir, home: process.env.HOME,
   env: Object.fromEntries(keys.map(key => [key, process.env[key]]))
@@ -42,177 +42,244 @@ let scratch: string;
 let cli: string;
 const instances: ProviderInstance[] = [];
 
-function account(name: string, auth: unknown = { loggedIn: true, email: `${name}@example.test`, orgName: `${name} team` }) {
+function account(
+  name: string,
+  auth: unknown = { loggedIn: true, email: `${name}@example.test`, orgName: `${name} team` },
+) {
   const dir = join(scratch, name);
   mkdirSync(dir, { recursive: true });
-  writeFileSync(join(dir, "fixture-auth.json"), JSON.stringify(auth));
-  writeFileSync(join(dir, "settings.json"), JSON.stringify({ customModels: [`${name}-model`] }));
+  writeFileSync(join(dir, 'fixture-auth.json'), JSON.stringify(auth));
+  writeFileSync(join(dir, 'settings.json'), JSON.stringify({ customModels: [`${name}-model`] }));
   return dir;
 }
 
-async function create(configDir?: string, environment: Record<string, string> = {}, extra: Record<string, unknown> = {}) {
+async function create(
+  configDir?: string,
+  environment: Record<string, string> = {},
+  extra: Record<string, unknown> = {},
+) {
   const instance = await ClaudeDriver.create({
     instanceId: `claude-${instances.length}`,
-    displayName: "Fixture Claude",
+    displayName: 'Fixture Claude',
     enabled: true,
-    config: { cli, configDir, permissionMode: "acceptEdits", ...extra },
+    config: { cli, configDir, permissionMode: 'acceptEdits', ...extra },
     environment,
   });
   instances.push(instance);
   return instance;
 }
 
-function calls(dir: string): Array<{ args: string[]; configDir: string; home: string; env: NodeJS.ProcessEnv }> {
-  return readFileSync(join(dir, "calls.ndjson"), "utf8").trim().split("\n").map(line => JSON.parse(line));
+function calls(
+  dir: string,
+): Array<{ args: string[]; configDir: string; home: string; env: NodeJS.ProcessEnv }> {
+  return readFileSync(join(dir, 'calls.ndjson'), 'utf8')
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line));
 }
 
 beforeEach(() => {
   ensureDirs();
-  scratch = mkdtempSync(join(tmpdir(), "omb-claude-accounts-"));
-  cli = join(scratch, "fake-claude.mjs");
+  scratch = mkdtempSync(join(tmpdir(), 'omb-claude-accounts-'));
+  cli = join(scratch, 'fake-claude.mjs');
   writeFileSync(cli, FAKE_CLI, { mode: 0o755 });
-  vi.stubEnv("CLAUDE_CONFIG_DIR", "");
+  vi.stubEnv('CLAUDE_CONFIG_DIR', '');
   for (const key of CLAUDE_ACCOUNT_ENV_KEYS) vi.stubEnv(key, `fixture-parent-${key}`);
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("offline fixture", { status: 503 })));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('offline fixture', { status: 503 })),
+  );
 });
 
 afterEach(async () => {
-  await Promise.all(instances.splice(0).map(instance => instance.dispose()));
+  await Promise.all(instances.splice(0).map((instance) => instance.dispose()));
   await removeTempDir(scratch);
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
-describe("Claude account configuration", () => {
-  it("keeps the default config unchanged and resolves explicit, inherited, and home-relative directories", () => {
-    const home = join(scratch, "home");
-    expect(ClaudeDriver.decodeConfig({ configDir: " " })).toEqual(ClaudeDriver.defaultConfig());
-    expect(ClaudeDriver.decodeConfig({ configDir: " ~/work " }).configDir).toBe("~/work");
-    expect(resolveClaudeConfigDir("~/work", { HOME: home })).toBe(join(home, "work"));
-    expect(resolveClaudeConfigDir("~", { USERPROFILE: home })).toBe(home);
-    expect(resolveClaudeConfigDir(undefined, { HOME: home })).toBe(join(home, ".claude"));
-    expect(resolveClaudeConfigDir("", { HOME: home, CLAUDE_CONFIG_DIR: "~/inherited" })).toBe(join(home, "inherited"));
-    expect(resolveClaudeConfigDir(join(scratch, "explicit"), { CLAUDE_CONFIG_DIR: join(scratch, "ignored") })).toBe(join(scratch, "explicit"));
-    for (const configDir of [12, null, "relative/path", "~other/work", "/bad\npath"]) {
+describe('Claude account configuration', () => {
+  it('keeps the default config unchanged and resolves explicit, inherited, and home-relative directories', () => {
+    const home = join(scratch, 'home');
+    expect(ClaudeDriver.decodeConfig({ configDir: ' ' })).toEqual(ClaudeDriver.defaultConfig());
+    expect(ClaudeDriver.decodeConfig({ configDir: ' ~/work ' }).configDir).toBe('~/work');
+    expect(resolveClaudeConfigDir('~/work', { HOME: home })).toBe(join(home, 'work'));
+    expect(resolveClaudeConfigDir('~', { USERPROFILE: home })).toBe(home);
+    expect(resolveClaudeConfigDir(undefined, { HOME: home })).toBe(join(home, '.claude'));
+    expect(resolveClaudeConfigDir('', { HOME: home, CLAUDE_CONFIG_DIR: '~/inherited' })).toBe(
+      join(home, 'inherited'),
+    );
+    expect(
+      resolveClaudeConfigDir(join(scratch, 'explicit'), {
+        CLAUDE_CONFIG_DIR: join(scratch, 'ignored'),
+      }),
+    ).toBe(join(scratch, 'explicit'));
+    for (const configDir of [12, null, 'relative/path', '~other/work', '/bad\npath']) {
       expect(() => ClaudeDriver.decodeConfig({ configDir })).toThrow(/configDir/);
     }
   });
 
-  it("isolates two concurrent instances across catalogs, auth probes, turns, and permission reviews", async () => {
-    const dirs = [account("work"), account("personal")];
-    vi.stubEnv("CLAUDE_CONFIG_DIR", account("parent"));
-    const providers = await Promise.all(dirs.map(dir => create(dir)));
-    await Promise.all(providers.map(async (provider, index) => {
-      const name = index === 0 ? "work" : "personal";
-      expect(provider.models.options.some(option => option.id === `${name}-model`)).toBe(true);
-      expect(provider.models.options.some(option => option.id === `${index === 0 ? "personal" : "work"}-model`)).toBe(false);
-      expect(await provider.snapshot()).toMatchObject({ authenticated: true, account: { email: `${name}@example.test`, organization: `${name} team` } });
-      const recorder = recordEvents(provider.adapter);
-      await provider.adapter.sendTurn({ threadId: `account-${name}`, text: "hello" });
-      await recorder.until(event => event.type === "turn.completed");
-      expect(recorder.events.some(event => event.type === "item.completed" && event.itemType === "assistant_text" && event.text === `${name}@example.test`)).toBe(true);
-      recorder.stop();
-      expect(await provider.reviewPermission?.("review fixture only")).toBe(`${name}@example.test`);
-      const recorded = calls(dirs[index]!);
-      expect(recorded).toHaveLength(5);
-      expect(recorded.filter(call => call.args[0] === "--help")).toHaveLength(1);
-      for (const call of recorded) {
-        expect(call.configDir).toBe(dirs[index]);
-        expect(call.home).toBe(process.env.HOME);
-        expect(call.env).toEqual({});
-      }
-    }));
+  it('isolates two concurrent instances across catalogs, auth probes, turns, and permission reviews', async () => {
+    const dirs = [account('work'), account('personal')];
+    vi.stubEnv('CLAUDE_CONFIG_DIR', account('parent'));
+    const providers = await Promise.all(dirs.map((dir) => create(dir)));
+    await Promise.all(
+      providers.map(async (provider, index) => {
+        const name = index === 0 ? 'work' : 'personal';
+        expect(provider.models.options.some((option) => option.id === `${name}-model`)).toBe(true);
+        expect(
+          provider.models.options.some(
+            (option) => option.id === `${index === 0 ? 'personal' : 'work'}-model`,
+          ),
+        ).toBe(false);
+        expect(await provider.snapshot()).toMatchObject({
+          authenticated: true,
+          account: { email: `${name}@example.test`, organization: `${name} team` },
+        });
+        const recorder = recordEvents(provider.adapter);
+        await provider.adapter.sendTurn({ threadId: `account-${name}`, text: 'hello' });
+        await recorder.until((event) => event.type === 'turn.completed');
+        expect(
+          recorder.events.some(
+            (event) =>
+              event.type === 'item.completed' &&
+              event.itemType === 'assistant_text' &&
+              event.text === `${name}@example.test`,
+          ),
+        ).toBe(true);
+        recorder.stop();
+        expect(await provider.reviewPermission?.('review fixture only')).toBe(
+          `${name}@example.test`,
+        );
+        const recorded = calls(dirs[index]!);
+        expect(recorded).toHaveLength(5);
+        expect(recorded.filter((call) => call.args[0] === '--help')).toHaveLength(1);
+        for (const call of recorded) {
+          expect(call.configDir).toBe(dirs[index]);
+          expect(call.home).toBe(process.env.HOME);
+          expect(call.env).toEqual({});
+        }
+      }),
+    );
   });
 
-  it("honors the existing environment account when configDir is absent", async () => {
-    const dir = account("existing");
-    vi.stubEnv("CLAUDE_CONFIG_DIR", dir);
+  it('honors the existing environment account when configDir is absent', async () => {
+    const dir = account('existing');
+    vi.stubEnv('CLAUDE_CONFIG_DIR', dir);
     const provider = await create();
-    expect(provider.models.options.some(option => option.id === "existing-model")).toBe(true);
-    expect(await provider.generateText?.("fixture review")).toBe("existing@example.test");
-    expect(calls(dir)[0]?.env.ANTHROPIC_AUTH_TOKEN).toBe("fixture-parent-ANTHROPIC_AUTH_TOKEN");
+    expect(provider.models.options.some((option) => option.id === 'existing-model')).toBe(true);
+    expect(await provider.generateText?.('fixture review')).toBe('existing@example.test');
+    expect(calls(dir)[0]?.env.ANTHROPIC_AUTH_TOKEN).toBe('fixture-parent-ANTHROPIC_AUTH_TOKEN');
     expect(calls(dir)[0]?.env.ANTHROPIC_API_KEY).toBeUndefined();
   });
 
   it("gives an endpoint without its own directory none of the parent's credentials", async () => {
-    const dir = account("endpoint-no-dir");
-    vi.stubEnv("CLAUDE_CONFIG_DIR", dir);
-    const provider = await create(undefined, { ANTHROPIC_BASE_URL: "https://api.anthropic.com", ANTHROPIC_API_KEY: "fixture-endpoint-key" }, { endpointModels: ["claude-sonnet-5"] });
-    await provider.generateText?.("fixture review");
-    expect(calls(dir)[0]?.env).toEqual({ ANTHROPIC_BASE_URL: "https://api.anthropic.com", ANTHROPIC_API_KEY: "fixture-endpoint-key" });
+    const dir = account('endpoint-no-dir');
+    vi.stubEnv('CLAUDE_CONFIG_DIR', dir);
+    const provider = await create(
+      undefined,
+      {
+        ANTHROPIC_BASE_URL: 'https://api.anthropic.com',
+        ANTHROPIC_API_KEY: 'fixture-endpoint-key',
+      },
+      { endpointModels: ['claude-sonnet-5'] },
+    );
+    await provider.generateText?.('fixture review');
+    expect(calls(dir)[0]?.env).toEqual({
+      ANTHROPIC_BASE_URL: 'https://api.anthropic.com',
+      ANTHROPIC_API_KEY: 'fixture-endpoint-key',
+    });
   });
 
-  it("preserves explicit custom endpoints and injected local models without inheriting subscription OAuth", async () => {
-    const dir = account("custom");
+  it('preserves explicit custom endpoints and injected local models without inheriting subscription OAuth', async () => {
+    const dir = account('custom');
     const provider = await create(dir, {
-      ANTHROPIC_BASE_URL: "http://127.0.0.1:9999",
-      ANTHROPIC_AUTH_TOKEN: "fixture-custom-key",
-      CLAUDE_CODE_OAUTH_TOKEN: "fixture-explicit-oauth-is-not-an-account-login",
-      CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR: "99",
-      UNSLOTH_STUDIO_AUTH_TOKEN: "fixture-local-key",
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:9999',
+      ANTHROPIC_AUTH_TOKEN: 'fixture-custom-key',
+      CLAUDE_CODE_OAUTH_TOKEN: 'fixture-explicit-oauth-is-not-an-account-login',
+      CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR: '99',
+      UNSLOTH_STUDIO_AUTH_TOKEN: 'fixture-local-key',
     });
-    await provider.reviewPermission?.("fixture review");
-    expect(calls(dir)[0]?.env).toEqual({ ANTHROPIC_BASE_URL: "http://127.0.0.1:9999", ANTHROPIC_AUTH_TOKEN: "fixture-custom-key" });
+    await provider.reviewPermission?.('fixture review');
+    expect(calls(dir)[0]?.env).toEqual({
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:9999',
+      ANTHROPIC_AUTH_TOKEN: 'fixture-custom-key',
+    });
     const recorder = recordEvents(provider.adapter);
-    await provider.adapter.sendTurn({ threadId: "account-injected", text: "hello", model: "unsloth::fixture-model" });
-    await recorder.until(event => event.type === "turn.completed");
+    await provider.adapter.sendTurn({
+      threadId: 'account-injected',
+      text: 'hello',
+      model: 'unsloth::fixture-model',
+    });
+    await recorder.until((event) => event.type === 'turn.completed');
     recorder.stop();
     // The turn is the last spawn (a version check may come before it).
     expect(calls(dir).at(-1)?.env).toEqual({
-      ANTHROPIC_BASE_URL: "http://127.0.0.1:8888",
-      ANTHROPIC_AUTH_TOKEN: "fixture-local-key",
-      ANTHROPIC_API_KEY: "fixture-local-key",
+      ANTHROPIC_BASE_URL: 'http://127.0.0.1:8888',
+      ANTHROPIC_AUTH_TOKEN: 'fixture-local-key',
+      ANTHROPIC_API_KEY: 'fixture-local-key',
     });
   });
 
   it("keeps a named account's inherited AWS credentials, since only Bedrock engines are AWS-scoped", async () => {
-    const dir = account("named-with-bedrock-env");
-    vi.stubEnv("AWS_ACCESS_KEY_ID", "fixture-parent-AWS_ACCESS_KEY_ID");
-    vi.stubEnv("AWS_SECRET_ACCESS_KEY", "fixture-parent-AWS_SECRET_ACCESS_KEY");
-    const provider = await create(dir, { CLAUDE_CODE_USE_BEDROCK: "1" });
-    await provider.generateText?.("fixture review");
+    const dir = account('named-with-bedrock-env');
+    vi.stubEnv('AWS_ACCESS_KEY_ID', 'fixture-parent-AWS_ACCESS_KEY_ID');
+    vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'fixture-parent-AWS_SECRET_ACCESS_KEY');
+    const provider = await create(dir, { CLAUDE_CODE_USE_BEDROCK: '1' });
+    await provider.generateText?.('fixture review');
     expect(calls(dir)[0]?.env).toMatchObject({
-      AWS_ACCESS_KEY_ID: "fixture-parent-AWS_ACCESS_KEY_ID",
-      AWS_SECRET_ACCESS_KEY: "fixture-parent-AWS_SECRET_ACCESS_KEY",
+      AWS_ACCESS_KEY_ID: 'fixture-parent-AWS_ACCESS_KEY_ID',
+      AWS_SECRET_ACCESS_KEY: 'fixture-parent-AWS_SECRET_ACCESS_KEY',
     });
   });
 
   it("strips the parent shell's AWS credentials for a Bedrock engine, keeping its own profile", async () => {
-    const dir = account("bedrock-engine");
-    vi.stubEnv("AWS_ACCESS_KEY_ID", "fixture-parent-AWS_ACCESS_KEY_ID");
-    vi.stubEnv("AWS_SECRET_ACCESS_KEY", "fixture-parent-AWS_SECRET_ACCESS_KEY");
-    vi.stubEnv("AWS_SESSION_TOKEN", "fixture-parent-AWS_SESSION_TOKEN");
+    const dir = account('bedrock-engine');
+    vi.stubEnv('AWS_ACCESS_KEY_ID', 'fixture-parent-AWS_ACCESS_KEY_ID');
+    vi.stubEnv('AWS_SECRET_ACCESS_KEY', 'fixture-parent-AWS_SECRET_ACCESS_KEY');
+    vi.stubEnv('AWS_SESSION_TOKEN', 'fixture-parent-AWS_SESSION_TOKEN');
     const provider = await create(
       dir,
-      { CLAUDE_CODE_USE_BEDROCK: "1", AWS_PROFILE: "fixture-bedrock-profile", AWS_REGION: "us-east-1" },
+      {
+        CLAUDE_CODE_USE_BEDROCK: '1',
+        AWS_PROFILE: 'fixture-bedrock-profile',
+        AWS_REGION: 'us-east-1',
+      },
       { bedrock: true },
     );
-    await provider.generateText?.("fixture review");
+    await provider.generateText?.('fixture review');
     expect(calls(dir)[0]?.env).toEqual({
-      CLAUDE_CODE_USE_BEDROCK: "1",
-      AWS_PROFILE: "fixture-bedrock-profile",
-      AWS_REGION: "us-east-1",
+      CLAUDE_CODE_USE_BEDROCK: '1',
+      AWS_PROFILE: 'fixture-bedrock-profile',
+      AWS_REGION: 'us-east-1',
     });
   });
 
-  it("publishes only bounded display identity from a successful auth status", async () => {
-    const dir = account("identity", {
-      loggedIn: true, email: " person@example.test ", orgName: " Team ",
-      accessToken: "must-not-appear", refreshToken: "must-not-appear", extra: { secret: "must-not-appear" },
+  it('publishes only bounded display identity from a successful auth status', async () => {
+    const dir = account('identity', {
+      loggedIn: true,
+      email: ' person@example.test ',
+      orgName: ' Team ',
+      accessToken: 'must-not-appear',
+      refreshToken: 'must-not-appear',
+      extra: { secret: 'must-not-appear' },
     });
     const provider = await create(dir);
     expect(await provider.snapshot()).toEqual({
-      state: "available", version: "fixture-claude", authenticated: true,
-      account: { email: "person@example.test", organization: "Team" }, billing: "subscription",
+      state: 'available',
+      version: 'fixture-claude',
+      authenticated: true,
+      account: { email: 'person@example.test', organization: 'Team' },
+      billing: 'subscription',
     });
     for (const auth of [
-      { loggedIn: false, email: "person@example.test", orgName: "Team" },
-      { loggedIn: true, email: "not an email", orgName: { secret: "no" } },
-      { loggedIn: true, email: "a".repeat(255) + "@example.test", orgName: "a".repeat(161) },
-      { loggedIn: true, email: "person\n@example.test", orgName: "hidden\u202ename" },
+      { loggedIn: false, email: 'person@example.test', orgName: 'Team' },
+      { loggedIn: true, email: 'not an email', orgName: { secret: 'no' } },
+      { loggedIn: true, email: 'a'.repeat(255) + '@example.test', orgName: 'a'.repeat(161) },
+      { loggedIn: true, email: 'person\n@example.test', orgName: 'hidden\u202ename' },
     ]) {
-      writeFileSync(join(dir, "fixture-auth.json"), JSON.stringify(auth));
-      expect(await provider.snapshot()).not.toHaveProperty("account");
+      writeFileSync(join(dir, 'fixture-auth.json'), JSON.stringify(auth));
+      expect(await provider.snapshot()).not.toHaveProperty('account');
     }
   });
 });

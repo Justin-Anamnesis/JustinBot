@@ -3,8 +3,8 @@
 // module reads English; server-line-packs.ts adds every other language when the server starts. The packaged server
 // bundles only the "server." keys (scripts/server-locale-plugin.mjs). Text only a model reads stays English and never
 // comes from here. A guard beside the packs (server-lines.test.ts) fails on an English line written straight into one.
-import en from "../src/locales/en.json" with { type: "json" };
-import { byLanguage } from "./language.ts";
+import en from '../src/locales/en.json' with { type: 'json' };
+import { byLanguage } from './language.ts';
 
 export type ServerLineKey = Extract<keyof typeof en, `server.${string}`>;
 type Pack = Partial<Record<string, string>>;
@@ -19,18 +19,35 @@ export function addServerLinePacks(more: Readonly<Record<string, Pack>>): void {
 
 /** The line in `language` (a language tag; undefined reads as English), with each `{name}` filled from `params`. A key
  * the language has no words for yet reads in English, as the app's own screens do. */
-export function serverLine(language: string | undefined, key: ServerLineKey, params?: Readonly<Record<string, string | number>>): string {
+export function serverLine(
+  language: string | undefined,
+  key: ServerLineKey,
+  params?: Readonly<Record<string, string | number>>,
+): string {
   const template = byLanguage(packs, language)[key] ?? ENGLISH[key] ?? key;
-  return params ? template.replace(/\{(\w+)\}/g, (match, name: string) => (Object.hasOwn(params, name) ? String(params[name]) : match)) : template;
+  return params
+    ? template.replace(/\{(\w+)\}/g, (match, name: string) =>
+        Object.hasOwn(params, name) ? String(params[name]) : match,
+      )
+    : template;
 }
 
-const escaped = (text: string) => text.replace(/[.*+?^$()|[\]{}\\]/g, "\\$&");
+const escaped = (text: string) => text.replace(/[.*+?^$()|[\]{}\\]/g, '\\$&');
 const matchers = new Map<string, RegExp>();
 /** A line's template as a pattern: its words as written, any text where a `{name}` goes. */
 function matcherOf(template: string): RegExp {
   let matcher = matchers.get(template);
   if (!matcher) {
-    matcher = new RegExp(["^", template.split(/\{\w+\}/).map(escaped).join("[\\s\\S]+"), "$"].join(""));
+    matcher = new RegExp(
+      [
+        '^',
+        template
+          .split(/\{\w+\}/)
+          .map(escaped)
+          .join('[\\s\\S]+'),
+        '$',
+      ].join(''),
+    );
     matchers.set(template, matcher);
   }
   return matcher;

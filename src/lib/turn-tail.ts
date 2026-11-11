@@ -1,4 +1,4 @@
-import type { Message } from "@/state/store";
+import type { Message } from '@/state/store';
 
 /** Whether the mascot and its status line show under the transcript. They stay for the whole turn: a bot's text in the
  * middle of a turn ("Now I'll build the dashboard") is not its end, and the engine may then spend minutes writing a
@@ -12,7 +12,7 @@ export function showWorkingDots(
 ): boolean {
   if (!busy) return false;
   if (!lastMessage) return true;
-  const settledReply = lastMessage.role === "bot" && lastMessage.kind === "text";
+  const settledReply = lastMessage.role === 'bot' && lastMessage.kind === 'text';
   if (!settledReply) return true;
   if (speakerBotId !== undefined && lastMessage.from?.botId !== speakerBotId) return true;
   return !turnEnded;
@@ -24,6 +24,7 @@ export function awaitedMemberId(
   lastMessage: Message | undefined,
 ): string | undefined {
   if (!working || speakerBotId) return undefined;
-  if (lastMessage?.kind !== "activity" || !lastMessage.tool || lastMessage.tool.ok !== undefined) return undefined;
+  if (lastMessage?.kind !== 'activity' || !lastMessage.tool || lastMessage.tool.ok !== undefined)
+    return undefined;
   return lastMessage.from?.botId;
 }

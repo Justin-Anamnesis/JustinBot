@@ -1,8 +1,8 @@
 // Provider capacity per Cloudflare account: the idle-tunnel scan, the usage
 // alerts, the /healthz detail, and the short provisioning gate. Nothing here
 // deletes a provider resource: a reclaim only marks an idle row 'deleting'.
-import { CloudflareAPI, CloudflareAPIError, type CloudflareFetch } from "./cloudflare-api";
-import type { ControlPlaneConfig, EndpointAccount } from "./config";
+import { CloudflareAPI, CloudflareAPIError, type CloudflareFetch } from './cloudflare-api';
+import type { ControlPlaneConfig, EndpointAccount } from './config';
 import {
   ACTED_ON_ENDPOINT_SQL,
   actedOnAccounts,
@@ -11,20 +11,24 @@ import {
   rejectionActive,
   snapshotFresh,
   type AccountSnapshot,
-} from "./endpoint-accounts";
-import type { JSONValue } from "./http";
+} from './endpoint-accounts';
+import type { JSONValue } from './http';
 import {
   idleTunnelReason,
   NEVER_CONNECTED_RECLAIM_MS,
   quietPeriodMs,
   type IdlePolicy,
   type IdleReason,
-} from "./tunnel-activity";
+} from './tunnel-activity';
 
 /** Cloudflare's tunnel quota (1045), a tunnel-creation 429 while the account
  * is at its tunnel limit (`cf_tunnel_quota`), and the zone's DNS record quota
  * (81045). */
-const CAPACITY_ERROR_CODES: ReadonlySet<string> = new Set(["cf_api_1045", "cf_tunnel_quota", "cf_api_81045"]);
+const CAPACITY_ERROR_CODES: ReadonlySet<string> = new Set([
+  'cf_api_1045',
+  'cf_tunnel_quota',
+  'cf_api_81045',
+]);
 export const CAPACITY_RETRY_AFTER_SECONDS = 600;
 export const CAPACITY_ALERT_PERCENT = 90;
 /** One page per account per five-minute run. 100 tunnels keep the response
@@ -39,7 +43,7 @@ const MANAGED_TUNNEL_NAME = /^omb-c-[0-9a-f]{32}$/;
 /** /healthz is the busiest public path and its capacity detail only a report
  * (allocation gating reads D1 directly), so each data center reuses one read. */
 const CAPACITY_HEALTH_CACHE_SECONDS = 120;
-const CAPACITY_HEALTH_CACHE = "healthz-capacity";
+const CAPACITY_HEALTH_CACHE = 'healthz-capacity';
 // Never routed. Bump the version when AccountSnapshot changes: copies outlive deploys.
 const DAY_MS = 24 * 60 * 60 * 1_000;
 /** Three cron runs: a pass missing a page for longer starts over. */
@@ -52,7 +56,7 @@ let previewMemo: { at: number; key: string; value: JSONValue | null } | null = n
 export function forgetReclaimPreview(): void {
   previewMemo = null;
 }
-const CAPACITY_HEALTH_CACHE_PATH = "/__internal/healthz-capacity-row/v2";
+const CAPACITY_HEALTH_CACHE_PATH = '/__internal/healthz-capacity-row/v2';
 
 interface ScanEndpointRow {
   installation_id: string;
@@ -97,13 +101,18 @@ async function snapshotRows(env: Env, config: ControlPlaneConfig): Promise<Accou
             dormant_endpoints, checked_at, capacity_rejected_at, capacity_rejected_code
        FROM managed_endpoint_account_capacity
       WHERE provider_account IN (SELECT value FROM json_each(?))`,
-  ).bind(JSON.stringify(accountIds(config))).all<AccountSnapshot>();
+  )
+    .bind(JSON.stringify(accountIds(config)))
+    .all<AccountSnapshot>();
   return found.results;
 }
 
 /** One snapshot per configured account; an account with no row yet reads as
  * empty (never scanned, never refused). */
-function snapshotMap(config: ControlPlaneConfig, rows: readonly AccountSnapshot[]): Map<string, AccountSnapshot> {
+function snapshotMap(
+  config: ControlPlaneConfig,
+  rows: readonly AccountSnapshot[],
+): Map<string, AccountSnapshot> {
   const snapshots = new Map(accountIds(config).map((id) => [id, emptySnapshot(id)]));
   for (const row of rows) {
     if (snapshots.has(row.provider_account)) snapshots.set(row.provider_account, row);
@@ -112,7 +121,10 @@ function snapshotMap(config: ControlPlaneConfig, rows: readonly AccountSnapshot[
 }
 
 /** Every configured account's capacity state in one D1 read. */
-export async function accountSnapshots(env: Env, config: ControlPlaneConfig): Promise<Map<string, AccountSnapshot>> {
+export async function accountSnapshots(
+  env: Env,
+  config: ControlPlaneConfig,
+): Promise<Map<string, AccountSnapshot>> {
   return snapshotMap(config, await snapshotRows(env, config));
 }
 
@@ -123,7 +135,8 @@ function capacityCacheKey(config: ControlPlaneConfig): string {
 /** Drops the cached rows in this data center only. Cron runs land in an
  * arbitrary data center, so the cache TTL is the real staleness bound. */
 export async function forgetCachedCapacity(config: ControlPlaneConfig): Promise<void> {
-  await caches.open(CAPACITY_HEALTH_CACHE)
+  await caches
+    .open(CAPACITY_HEALTH_CACHE)
     .then((cache) => cache.delete(capacityCacheKey(config)))
     .catch(() => false);
 }
@@ -141,9 +154,16 @@ async function cachedSnapshots(
   if (Array.isArray(cached)) return snapshotMap(config, cached);
   const rows = await snapshotRows(env, config);
   if (cache) {
-    ctx.waitUntil(cache.put(key, Response.json(rows, {
-      headers: { "cache-control": `max-age=${CAPACITY_HEALTH_CACHE_SECONDS}` },
-    })).catch(() => undefined));
+    ctx.waitUntil(
+      cache
+        .put(
+          key,
+          Response.json(rows, {
+            headers: { 'cache-control': `max-age=${CAPACITY_HEALTH_CACHE_SECONDS}` },
+          }),
+        )
+        .catch(() => undefined),
+    );
   }
   return snapshotMap(config, rows);
 }
@@ -166,7 +186,9 @@ export async function recordAccountRefusal(
        capacity_rejected_at = excluded.capacity_rejected_at,
        capacity_rejected_code = excluded.capacity_rejected_code,
        updated_at = excluded.updated_at`,
-  ).bind(account.accountId, now, code.slice(0, 64), now).run();
+  )
+    .bind(account.accountId, now, code.slice(0, 64), now)
+    .run();
   await forgetCachedCapacity(config);
 }
 
@@ -190,15 +212,26 @@ export async function releaseCleanedCapacity(
 ): Promise<void> {
   if (cleaned.size === 0) return;
   // An unknown count (NULL) stays unknown.
-  await env.DB.batch([...cleaned].map(([account, each]) => env.DB.prepare(
-    `UPDATE managed_endpoint_account_capacity
+  await env.DB.batch(
+    [...cleaned].map(([account, each]) =>
+      env.DB.prepare(
+        `UPDATE managed_endpoint_account_capacity
         SET tunnel_count = MAX(tunnel_count - ?, 0),
             dns_record_count = MAX(dns_record_count - ?, 0),
             capacity_rejected_at = CASE WHEN ? = 1 THEN NULL ELSE capacity_rejected_at END,
             capacity_rejected_code = CASE WHEN ? = 1 THEN NULL ELSE capacity_rejected_code END,
             updated_at = ?
       WHERE provider_account = ?`,
-  ).bind(each.tunnels, each.dnsRecords, each.deleted ? 1 : 0, each.deleted ? 1 : 0, now, account)));
+      ).bind(
+        each.tunnels,
+        each.dnsRecords,
+        each.deleted ? 1 : 0,
+        each.deleted ? 1 : 0,
+        now,
+        account,
+      ),
+    ),
+  );
   await forgetCachedCapacity(config);
 }
 
@@ -256,7 +289,9 @@ async function reclaimEligible(
 ): Promise<boolean> {
   const found = await env.DB.prepare(
     `SELECT 1 AS eligible FROM installation_endpoints WHERE ${RECLAIM_GUARD_SQL}`,
-  ).bind(...reclaimGuardBindings(account, row, tunnelId, reason, policy, now)).first<{ eligible: number }>();
+  )
+    .bind(...reclaimGuardBindings(account, row, tunnelId, reason, policy, now))
+    .first<{ eligible: number }>();
   return found !== null;
 }
 
@@ -279,31 +314,35 @@ async function markIdleEndpoint(
             last_error_code = NULL,
             updated_at = ?
       WHERE ${RECLAIM_GUARD_SQL}`,
-  ).bind(now, now, now, ...reclaimGuardBindings(account, row, tunnelId, reason, policy, now)).run();
+  )
+    .bind(now, now, now, ...reclaimGuardBindings(account, row, tunnelId, reason, policy, now))
+    .run();
   return result.meta.changes > 0;
 }
 
 function capacityAlert(
   requestId: string,
   account: EndpointAccount,
-  resource: "dns_records" | "tunnels",
+  resource: 'dns_records' | 'tunnels',
   used: number | null,
   limit: number,
 ): void {
   if (used === null || used * 100 < limit * CAPACITY_ALERT_PERCENT) return;
   // A stable `alert` field gives Workers Logs a single filter for alerting.
-  console.error(JSON.stringify({
-    message: "managed endpoint capacity high",
-    alert: "managed_endpoint_capacity",
-    requestId,
-    hostSuffix: account.companionHostSuffix,
-    resource,
-    used,
-    limit,
-    usagePercent: Math.floor((used * 100) / limit),
-    thresholdPercent: CAPACITY_ALERT_PERCENT,
-    full: used >= limit,
-  }));
+  console.error(
+    JSON.stringify({
+      message: 'managed endpoint capacity high',
+      alert: 'managed_endpoint_capacity',
+      requestId,
+      hostSuffix: account.companionHostSuffix,
+      resource,
+      used,
+      limit,
+      usagePercent: Math.floor((used * 100) / limit),
+      thresholdPercent: CAPACITY_ALERT_PERCENT,
+      full: used >= limit,
+    }),
+  );
 }
 
 /** Adds this page to the account's dry-run pass; the last page closes the
@@ -324,15 +363,27 @@ async function recordReclaimPreview(
   const days = previewMs / DAY_MS;
   try {
     const row = await env.DB.prepare(
-      "SELECT days, running, eligible, completed_at, updated_at FROM managed_endpoint_reclaim_preview WHERE provider_account = ?",
-    ).bind(account.accountId).first<{ completed_at: number | null; days: number; eligible: number | null; running: number | null; updated_at: number }>();
+      'SELECT days, running, eligible, completed_at, updated_at FROM managed_endpoint_reclaim_preview WHERE provider_account = ?',
+    )
+      .bind(account.accountId)
+      .first<{
+        completed_at: number | null;
+        days: number;
+        eligible: number | null;
+        running: number | null;
+        updated_at: number;
+      }>();
     // A pass counts only from its first page, at one threshold throughout,
     // with no gap: a running total last touched before the previous cron run
     // or two belongs to a preview that was switched off part-way.
-    const inPass = page === 1
-      || (row !== null && row.days === days && row.running !== null && row.updated_at >= now - PREVIEW_PASS_GAP_MS);
+    const inPass =
+      page === 1 ||
+      (row !== null &&
+        row.days === days &&
+        row.running !== null &&
+        row.updated_at >= now - PREVIEW_PASS_GAP_MS);
     const sameDays = row !== null && row.days === days;
-    const running = inPass ? (page === 1 ? 0 : row?.running ?? 0) + eligible : null;
+    const running = inPass ? (page === 1 ? 0 : (row?.running ?? 0)) + eligible : null;
     const finished = lastPage && running !== null;
     await env.DB.prepare(
       `INSERT INTO managed_endpoint_reclaim_preview (provider_account, days, running, eligible, completed_at, updated_at)
@@ -340,14 +391,16 @@ async function recordReclaimPreview(
        ON CONFLICT(provider_account) DO UPDATE SET
          days = excluded.days, running = excluded.running, eligible = excluded.eligible,
          completed_at = excluded.completed_at, updated_at = excluded.updated_at`,
-    ).bind(
-      account.accountId,
-      days,
-      lastPage ? null : running,
-      finished ? running : sameDays ? row.eligible : null,
-      finished ? now : sameDays ? row.completed_at : null,
-      now,
-    ).run();
+    )
+      .bind(
+        account.accountId,
+        days,
+        lastPage ? null : running,
+        finished ? running : sameDays ? row.eligible : null,
+        finished ? now : sameDays ? row.completed_at : null,
+        now,
+      )
+      .run();
   } catch {
     // The table is missing: no dry run until the migration is applied.
   }
@@ -355,25 +408,40 @@ async function recordReclaimPreview(
 
 /** What a full pass would reclaim at the preview threshold, summed over the
  * accounts: null until every account has finished a pass at it. */
-async function reclaimPreview(env: Env, config: ControlPlaneConfig, now: number): Promise<JSONValue | null> {
+async function reclaimPreview(
+  env: Env,
+  config: ControlPlaneConfig,
+  now: number,
+): Promise<JSONValue | null> {
   const previewMs = config.capacity.reclaimPreviewMs;
   if (previewMs === null) return null;
   const days = previewMs / DAY_MS;
-  const key = `${days}:${accountIds(config).join(",")}`;
-  if (previewMemo && previewMemo.key === key && now - previewMemo.at < PREVIEW_MEMO_MS) return previewMemo.value;
+  const key = `${days}:${accountIds(config).join(',')}`;
+  if (previewMemo && previewMemo.key === key && now - previewMemo.at < PREVIEW_MEMO_MS)
+    return previewMemo.value;
   const value = await readReclaimPreview(env, config, days);
   previewMemo = { at: now, key, value };
   return value;
 }
 
-async function readReclaimPreview(env: Env, config: ControlPlaneConfig, days: number): Promise<JSONValue | null> {
+async function readReclaimPreview(
+  env: Env,
+  config: ControlPlaneConfig,
+  days: number,
+): Promise<JSONValue | null> {
   const found = await env.DB.prepare(
     `SELECT provider_account, eligible FROM managed_endpoint_reclaim_preview
       WHERE days = ? AND provider_account IN (SELECT value FROM json_each(?))`,
-  ).bind(days, JSON.stringify(accountIds(config))).all<{ eligible: number | null; provider_account: string }>()
-    .then((result) => result.results, () => null);
+  )
+    .bind(days, JSON.stringify(accountIds(config)))
+    .all<{ eligible: number | null; provider_account: string }>()
+    .then(
+      (result) => result.results,
+      () => null,
+    );
   if (found === null) return null;
-  const complete = found.length === config.endpointAccounts.length && found.every((row) => row.eligible !== null);
+  const complete =
+    found.length === config.endpointAccounts.length && found.every((row) => row.eligible !== null);
   return {
     offlineDays: days,
     eligible: complete ? found.reduce((total, row) => total + (row.eligible ?? 0), 0) : null,
@@ -399,16 +467,18 @@ async function scanAccount(
   const page = Math.min(Math.max(previous.scan_page ?? 1, 1), MAX_SCAN_PAGE);
   const api = new CloudflareAPI(account, fetcher);
 
-  let listing: Awaited<ReturnType<CloudflareAPI["listTunnelPage"]>>;
+  let listing: Awaited<ReturnType<CloudflareAPI['listTunnelPage']>>;
   try {
     listing = await api.listTunnelPage(page, TUNNEL_SCAN_PAGE_SIZE);
   } catch (error) {
-    console.error(JSON.stringify({
-      message: "managed endpoint tunnel scan failed",
-      requestId,
-      hostSuffix,
-      errorCode: error instanceof CloudflareAPIError ? error.code : "endpoint_internal",
-    }));
+    console.error(
+      JSON.stringify({
+        message: 'managed endpoint tunnel scan failed',
+        requestId,
+        hostSuffix,
+        errorCode: error instanceof CloudflareAPIError ? error.code : 'endpoint_internal',
+      }),
+    );
     return null;
   }
 
@@ -416,17 +486,19 @@ async function scanAccount(
   try {
     dnsRecordCount = await api.countDNSRecords();
   } catch (error) {
-    console.error(JSON.stringify({
-      message: "managed endpoint DNS record count failed",
-      requestId,
-      hostSuffix,
-      errorCode: error instanceof CloudflareAPIError ? error.code : "endpoint_internal",
-    }));
+    console.error(
+      JSON.stringify({
+        message: 'managed endpoint DNS record count failed',
+        requestId,
+        hostSuffix,
+        errorCode: error instanceof CloudflareAPIError ? error.code : 'endpoint_internal',
+      }),
+    );
   }
 
-  const managed = listing.tunnels.filter((tunnel) => (
-    tunnel.managedConfig && MANAGED_TUNNEL_NAME.test(tunnel.name)
-  ));
+  const managed = listing.tunnels.filter(
+    (tunnel) => tunnel.managedConfig && MANAGED_TUNNEL_NAME.test(tunnel.name),
+  );
   // Only rows this account acts on: a row whose hostname is not one opaque label
   // under the account's suffix is never touched, so its tunnel is unmatched.
   const rows = new Map<string, ScanEndpointRow>();
@@ -435,13 +507,15 @@ async function scanAccount(
       `SELECT installation_id, tunnel_name
          FROM installation_endpoints
         WHERE provider_account = ?
-          AND ${opaqueHostnameSQL("hostname", "?")}
+          AND ${opaqueHostnameSQL('hostname', '?')}
           AND tunnel_name IN (SELECT value FROM json_each(?))`,
-    ).bind(
-      account.accountId,
-      account.companionHostSuffix,
-      JSON.stringify(managed.map((tunnel) => tunnel.name)),
-    ).all<ScanEndpointRow>();
+    )
+      .bind(
+        account.accountId,
+        account.companionHostSuffix,
+        JSON.stringify(managed.map((tunnel) => tunnel.name)),
+      )
+      .all<ScanEndpointRow>();
     for (const row of found.results) rows.set(row.tunnel_name, row);
   }
 
@@ -449,9 +523,10 @@ async function scanAccount(
   const idle: Record<IdleReason, number> = { never_connected: 0, offline: 0 };
   // The dry run: the same rules at OMB_TUNNEL_RECLAIM_PREVIEW_DAYS, counted
   // before anything is marked and never acted on.
-  const previewPolicy = config.capacity.reclaimPreviewMs === null
-    ? null
-    : { ...policy, offlineMs: config.capacity.reclaimPreviewMs };
+  const previewPolicy =
+    config.capacity.reclaimPreviewMs === null
+      ? null
+      : { ...policy, offlineMs: config.capacity.reclaimPreviewMs };
   let previewEligible = 0;
   let unmatched = 0;
   let eligible = 0;
@@ -464,17 +539,20 @@ async function scanAccount(
       unmatched += 1;
       continue;
     }
-    const previewReason = previewPolicy ? idleTunnelReason(tunnel.activity, now, previewPolicy) : null;
+    const previewReason = previewPolicy
+      ? idleTunnelReason(tunnel.activity, now, previewPolicy)
+      : null;
     if (
-      previewPolicy && previewReason
-      && await reclaimEligible(env, account, row, tunnel.id, previewReason, previewPolicy, now)
+      previewPolicy &&
+      previewReason &&
+      (await reclaimEligible(env, account, row, tunnel.id, previewReason, previewPolicy, now))
     ) {
       previewEligible += 1;
     }
     const reason = idleTunnelReason(tunnel.activity, now, policy);
     if (!reason) continue;
     idle[reason] += 1;
-    if (config.capacity.reclaimMode !== "on") {
+    if (config.capacity.reclaimMode !== 'on') {
       if (await reclaimEligible(env, account, row, tunnel.id, reason, policy, now)) eligible += 1;
       continue;
     }
@@ -498,17 +576,21 @@ async function scanAccount(
        FROM installation_endpoints e
        LEFT JOIN installations i ON i.id = e.installation_id
       WHERE e.provider_account = ?
-        AND ${opaqueHostnameSQL("e.hostname", "?")}`,
-  ).bind(account.accountId, account.companionHostSuffix).first<{ dormant_endpoints: number; reclaim_pending: number }>();
+        AND ${opaqueHostnameSQL('e.hostname', '?')}`,
+  )
+    .bind(account.accountId, account.companionHostSuffix)
+    .first<{ dormant_endpoints: number; reclaim_pending: number }>();
   const reclaimPending = counts?.reclaim_pending ?? 0;
   const dormantEndpoints = counts?.dormant_endpoints ?? 0;
 
-  const lastPage = listing.returned < TUNNEL_SCAN_PAGE_SIZE
-    || (listing.totalCount !== null && page * TUNNEL_SCAN_PAGE_SIZE >= listing.totalCount)
-    || page >= MAX_SCAN_PAGE;
+  const lastPage =
+    listing.returned < TUNNEL_SCAN_PAGE_SIZE ||
+    (listing.totalCount !== null && page * TUNNEL_SCAN_PAGE_SIZE >= listing.totalCount) ||
+    page >= MAX_SCAN_PAGE;
   const nextPage = lastPage ? 1 : page + 1;
-  const tunnelCount = listing.totalCount
-    ?? (page === 1 && listing.returned < TUNNEL_SCAN_PAGE_SIZE ? listing.returned : null);
+  const tunnelCount =
+    listing.totalCount ??
+    (page === 1 && listing.returned < TUNNEL_SCAN_PAGE_SIZE ? listing.returned : null);
 
   await env.DB.prepare(
     `INSERT INTO managed_endpoint_account_capacity
@@ -523,12 +605,23 @@ async function scanAccount(
        dormant_endpoints = excluded.dormant_endpoints,
        checked_at = excluded.checked_at,
        updated_at = excluded.updated_at`,
-  ).bind(account.accountId, nextPage, tunnelCount, dnsRecordCount, reclaimPending, dormantEndpoints, now, now).run();
+  )
+    .bind(
+      account.accountId,
+      nextPage,
+      tunnelCount,
+      dnsRecordCount,
+      reclaimPending,
+      dormantEndpoints,
+      now,
+      now,
+    )
+    .run();
 
   await recordReclaimPreview(env, config, account, page, lastPage, previewEligible, now);
 
-  capacityAlert(requestId, account, "tunnels", tunnelCount, account.tunnelLimit);
-  capacityAlert(requestId, account, "dns_records", dnsRecordCount, account.dnsRecordLimit);
+  capacityAlert(requestId, account, 'tunnels', tunnelCount, account.tunnelLimit);
+  capacityAlert(requestId, account, 'dns_records', dnsRecordCount, account.dnsRecordLimit);
 
   const summary: TunnelScanSummary = {
     dnsRecordCount,
@@ -544,12 +637,14 @@ async function scanAccount(
     tunnelCount,
     unmatched,
   };
-  console.log(JSON.stringify({
-    message: "managed endpoint tunnel scan",
-    requestId,
-    reclaimMode: config.capacity.reclaimMode,
-    ...summary,
-  }));
+  console.log(
+    JSON.stringify({
+      message: 'managed endpoint tunnel scan',
+      requestId,
+      reclaimMode: config.capacity.reclaimMode,
+      ...summary,
+    }),
+  );
   return {
     snapshot: {
       ...previous,
@@ -595,31 +690,35 @@ export async function scanTunnelCapacity(
       current.set(account.accountId, scanned.snapshot);
       summaries.push(scanned.summary);
     } catch {
-      console.error(JSON.stringify({
-        message: "managed endpoint tunnel scan failed",
-        requestId,
-        hostSuffix: account.companionHostSuffix,
-        errorCode: "endpoint_internal",
-      }));
+      console.error(
+        JSON.stringify({
+          message: 'managed endpoint tunnel scan failed',
+          requestId,
+          hostSuffix: account.companionHostSuffix,
+          errorCode: 'endpoint_internal',
+        }),
+      );
     }
   }
   await forgetCachedCapacity(config);
   if (config.endpointAccounts.length > 1) {
     const pool = poolHealth(config, current, now);
-    if (pool.status === "high" || pool.status === "full") {
+    if (pool.status === 'high' || pool.status === 'full') {
       // A full account stays full for good once it has filled; page on the
       // pool, which is what a new installation sees.
-      console.error(JSON.stringify({
-        message: "managed endpoint pool capacity high",
-        alert: "managed_endpoint_pool_capacity",
-        requestId,
-        status: pool.status,
-        accounts: pool.accounts.map((each) => ({
-          hostSuffix: each.account.companionHostSuffix,
-          newEndpoints: each.account.newEndpoints,
-          status: each.status,
-        })),
-      }));
+      console.error(
+        JSON.stringify({
+          message: 'managed endpoint pool capacity high',
+          alert: 'managed_endpoint_pool_capacity',
+          requestId,
+          status: pool.status,
+          accounts: pool.accounts.map((each) => ({
+            hostSuffix: each.account.companionHostSuffix,
+            newEndpoints: each.account.newEndpoints,
+            status: each.status,
+          })),
+        }),
+      );
     }
   }
   return summaries;
@@ -634,12 +733,14 @@ export async function reportEndpointAccountProblems(
   requestId: string,
 ): Promise<void> {
   if (config.endpointAccountIssues.length > 0) {
-    console.error(JSON.stringify({
-      message: "managed endpoint account configuration ignored",
-      alert: "managed_endpoint_account_config",
-      requestId,
-      issues: config.endpointAccountIssues,
-    }));
+    console.error(
+      JSON.stringify({
+        message: 'managed endpoint account configuration ignored',
+        alert: 'managed_endpoint_account_config',
+        requestId,
+        issues: config.endpointAccountIssues,
+      }),
+    );
   }
   const stranded = await env.DB.prepare(
     `SELECT COUNT(*) AS count
@@ -652,35 +753,41 @@ export async function reportEndpointAccountProblems(
              WHERE i.id = e.installation_id AND i.revoked_at IS NULL
           )
         )`,
-  ).bind(actedOnAccounts(config)).first<{ count: number }>();
+  )
+    .bind(actedOnAccounts(config))
+    .first<{ count: number }>();
   if ((stranded?.count ?? 0) > 0) {
-    console.error(JSON.stringify({
-      message: "managed endpoints in an unconfigured account",
-      alert: "managed_endpoint_account_unconfigured",
-      requestId,
-      endpoints: stranded?.count,
-    }));
+    console.error(
+      JSON.stringify({
+        message: 'managed endpoints in an unconfigured account',
+        alert: 'managed_endpoint_account_unconfigured',
+        requestId,
+        endpoints: stranded?.count,
+      }),
+    );
   }
 }
 
-type CapacityStatus = "full" | "high" | "ok" | "unknown";
+type CapacityStatus = 'full' | 'high' | 'ok' | 'unknown';
 
 function usageStatus(used: number | null, limit: number): CapacityStatus {
-  if (used === null) return "unknown";
-  if (used >= limit) return "full";
-  if (used * 100 >= limit * CAPACITY_ALERT_PERCENT) return "high";
-  return "ok";
+  if (used === null) return 'unknown';
+  if (used >= limit) return 'full';
+  if (used * 100 >= limit * CAPACITY_ALERT_PERCENT) return 'high';
+  return 'ok';
 }
 
-const STATUS_RANK: Record<Exclude<CapacityStatus, "unknown">, number> = { ok: 0, high: 1, full: 2 };
+const STATUS_RANK: Record<Exclude<CapacityStatus, 'unknown'>, number> = { ok: 0, high: 1, full: 2 };
 
-function knownStatus(statuses: CapacityStatus[], pick: "best" | "worst"): CapacityStatus {
-  let chosen: CapacityStatus = "unknown";
+function knownStatus(statuses: CapacityStatus[], pick: 'best' | 'worst'): CapacityStatus {
+  let chosen: CapacityStatus = 'unknown';
   for (const status of statuses) {
-    if (status === "unknown") continue;
+    if (status === 'unknown') continue;
     if (
-      chosen === "unknown"
-      || (pick === "worst" ? STATUS_RANK[status] > STATUS_RANK[chosen] : STATUS_RANK[status] < STATUS_RANK[chosen])
+      chosen === 'unknown' ||
+      (pick === 'worst'
+        ? STATUS_RANK[status] > STATUS_RANK[chosen]
+        : STATUS_RANK[status] < STATUS_RANK[chosen])
     ) {
       chosen = status;
     }
@@ -696,10 +803,16 @@ interface AccountHealth {
   status: CapacityStatus;
 }
 
-function accountHealth(account: EndpointAccount, snapshot: AccountSnapshot, now: number): AccountHealth {
+function accountHealth(
+  account: EndpointAccount,
+  snapshot: AccountSnapshot,
+  now: number,
+): AccountHealth {
   const stale = !snapshotFresh(snapshot, now);
-  const tunnelStatus = stale ? "unknown" : usageStatus(snapshot.tunnel_count, account.tunnelLimit);
-  const dnsStatus = stale ? "unknown" : usageStatus(snapshot.dns_record_count, account.dnsRecordLimit);
+  const tunnelStatus = stale ? 'unknown' : usageStatus(snapshot.tunnel_count, account.tunnelLimit);
+  const dnsStatus = stale
+    ? 'unknown'
+    : usageStatus(snapshot.dns_record_count, account.dnsRecordLimit);
   // A recent refusal is gating that account's new allocations.
   const rejected = rejectionActive(snapshot, now);
   return {
@@ -707,7 +820,7 @@ function accountHealth(account: EndpointAccount, snapshot: AccountSnapshot, now:
     rejected,
     snapshot,
     stale,
-    status: rejected ? "full" : knownStatus([tunnelStatus, dnsStatus], "worst"),
+    status: rejected ? 'full' : knownStatus([tunnelStatus, dnsStatus], 'worst'),
   };
 }
 
@@ -719,13 +832,22 @@ function poolHealth(
   snapshots: ReadonlyMap<string, AccountSnapshot>,
   now: number,
 ): { accounts: AccountHealth[]; open: AccountHealth[]; status: CapacityStatus } {
-  const accounts = config.endpointAccounts.map((account) => accountHealth(
-    account,
-    snapshots.get(account.accountId) ?? emptySnapshot(account.accountId),
-    now,
-  ));
+  const accounts = config.endpointAccounts.map((account) =>
+    accountHealth(
+      account,
+      snapshots.get(account.accountId) ?? emptySnapshot(account.accountId),
+      now,
+    ),
+  );
   const open = accounts.filter((each) => each.account.newEndpoints);
-  return { accounts, open, status: knownStatus(open.map((each) => each.status), "best") };
+  return {
+    accounts,
+    open,
+    status: knownStatus(
+      open.map((each) => each.status),
+      'best',
+    ),
+  };
 }
 
 function sumOrNull(values: Array<number | null>): number | null {
@@ -759,13 +881,16 @@ export async function capacityHealth(
       tunnels: { used: only.snapshot.tunnel_count, limit: only.account.tunnelLimit },
       dnsRecords: { used: only.snapshot.dns_record_count, limit: only.account.dnsRecordLimit },
       providerRejectedAt: only.rejected ? only.snapshot.capacity_rejected_at : null,
-      reclaim: { mode: config.capacity.reclaimMode, pending: only.snapshot.reclaim_pending, ...preview },
+      reclaim: {
+        mode: config.capacity.reclaimMode,
+        pending: only.snapshot.reclaim_pending,
+        ...preview,
+      },
     };
   }
   const { open } = pool;
-  const known = (pick: (each: AccountHealth) => number | null) => sumOrNull(open.map(
-    (each) => (each.stale ? null : pick(each)),
-  ));
+  const known = (pick: (each: AccountHealth) => number | null) =>
+    sumOrNull(open.map((each) => (each.stale ? null : pick(each))));
   const checkedAt = open.map((each) => each.snapshot.checked_at);
   const allRejected = open.every((each) => each.rejected);
   return {

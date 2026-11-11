@@ -1,23 +1,27 @@
-import fs from "node:fs";
-import path from "node:path";
+import fs from 'node:fs';
+import path from 'node:path';
 
 export const ROUTINE_WAKE_POLL_MS = 60_000;
 
 /** Keeps the system from idle-sleeping while letting the display turn off. */
-export const ROUTINE_WAKE_BLOCKER = "prevent-app-suspension";
+export const ROUTINE_WAKE_BLOCKER = 'prevent-app-suspension';
 
 export function routineWakeDecision({ enabled, onBattery, status }) {
-  if (!enabled) return { hold: false, reason: "off", at: null };
-  if (onBattery) return { hold: false, reason: "battery", at: null };
-  if (!status || status.hold !== true) return { hold: false, reason: "idle", at: null };
-  return { hold: true, reason: status.reason === "running" ? "running" : "due", at: typeof status.at === "number" ? status.at : null };
+  if (!enabled) return { hold: false, reason: 'off', at: null };
+  if (onBattery) return { hold: false, reason: 'battery', at: null };
+  if (!status || status.hold !== true) return { hold: false, reason: 'idle', at: null };
+  return {
+    hold: true,
+    reason: status.reason === 'running' ? 'running' : 'due',
+    at: typeof status.at === 'number' ? status.at : null,
+  };
 }
 
-const settingsFile = (userData) => path.join(userData, "routine-wake.json");
+const settingsFile = (userData) => path.join(userData, 'routine-wake.json');
 
 export function routineWakeSettings(userData) {
   try {
-    const parsed = JSON.parse(fs.readFileSync(settingsFile(userData), "utf8"));
+    const parsed = JSON.parse(fs.readFileSync(settingsFile(userData), 'utf8'));
     return { keepAwake: parsed?.keepAwake !== false };
   } catch {
     return { keepAwake: true };
@@ -34,8 +38,7 @@ export function rememberRoutineWake(userData, keepAwake) {
   } catch {
     try {
       fs.unlinkSync(temporary);
-    } catch {
-    }
+    } catch {}
   }
 }
 
@@ -50,12 +53,14 @@ export function rememberRoutineWake(userData, keepAwake) {
 export function createRoutineWakeHold(deps) {
   let blockerId = null;
   let timer = null;
-  let last = { hold: false, reason: "idle", at: null };
+  let last = { hold: false, reason: 'idle', at: null };
 
   const apply = (decision) => {
     if (decision.hold && blockerId === null) {
       blockerId = deps.blocker.start(ROUTINE_WAKE_BLOCKER);
-      deps.log?.(`routine wake: holding this computer awake (${decision.reason}${decision.at ? ` at ${new Date(decision.at).toISOString()}` : ""})`);
+      deps.log?.(
+        `routine wake: holding this computer awake (${decision.reason}${decision.at ? ` at ${new Date(decision.at).toISOString()}` : ''})`,
+      );
     } else if (!decision.hold && blockerId !== null) {
       if (deps.blocker.isStarted(blockerId)) deps.blocker.stop(blockerId);
       blockerId = null;
@@ -68,11 +73,21 @@ export function createRoutineWakeHold(deps) {
     const status = await Promise.resolve()
       .then(() => deps.fetchStatus())
       .catch(() => null);
-    apply(routineWakeDecision({ enabled: deps.settings().keepAwake, onBattery: deps.isOnBattery(), status }));
+    apply(
+      routineWakeDecision({
+        enabled: deps.settings().keepAwake,
+        onBattery: deps.isOnBattery(),
+        status,
+      }),
+    );
     return state();
   };
 
-  const state = () => ({ ...last, keepAwake: deps.settings().keepAwake, onBattery: deps.isOnBattery() });
+  const state = () => ({
+    ...last,
+    keepAwake: deps.settings().keepAwake,
+    onBattery: deps.isOnBattery(),
+  });
 
   return {
     start() {
@@ -84,7 +99,7 @@ export function createRoutineWakeHold(deps) {
     stop() {
       if (timer) clearInterval(timer);
       timer = null;
-      apply({ hold: false, reason: "stopped", at: null });
+      apply({ hold: false, reason: 'stopped', at: null });
     },
     poll,
     state,

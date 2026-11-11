@@ -1,28 +1,37 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { readAdvancedMode, useAdvancedMode } from "@/lib/interface-mode";
-import { ANCHOR_EFFECTS, currentStep, stepNumber, TOUR_STEPS, withTourFinished, type TourEffect, type TourStep } from "@/lib/guided-tour";
-import { t } from "@/lib/i18n";
-import type { MausState } from "@/lib/mascot";
-import { hintSeenPatch } from "@/lib/onboarding";
-import { sendKeyLabel, useSendKey } from "@/lib/send-key";
-import type { LocaleKey } from "@/locales";
-import { api, useStore } from "@/state/store";
-import { Spotlight } from "./Spotlight";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { readAdvancedMode, useAdvancedMode } from '@/lib/interface-mode';
+import {
+  ANCHOR_EFFECTS,
+  currentStep,
+  stepNumber,
+  TOUR_STEPS,
+  withTourFinished,
+  type TourEffect,
+  type TourStep,
+} from '@/lib/guided-tour';
+import { t } from '@/lib/i18n';
+import type { MausState } from '@/lib/mascot';
+import { hintSeenPatch } from '@/lib/onboarding';
+import { sendKeyLabel, useSendKey } from '@/lib/send-key';
+import type { LocaleKey } from '@/locales';
+import { api, useStore } from '@/state/store';
+import { Spotlight } from './Spotlight';
 
-const MASCOT: Record<TourStep["id"], MausState> = {
-  "tour.composer": "happy",
-  "tour.model": "curious",
-  "tour.computer": "working",
-  "tour.computer-browser": "curious",
-  "tour.tools": "curious",
-  "tour.apps": "happy",
-  "tour.apps-panel": "proud",
-  "tour.automations": "happy",
-  "tour.automations-page": "drowsy",
-  "tour.done": "celebrate",
+const MASCOT: Record<TourStep['id'], MausState> = {
+  'tour.composer': 'happy',
+  'tour.model': 'curious',
+  'tour.computer': 'working',
+  'tour.computer-browser': 'curious',
+  'tour.tools': 'curious',
+  'tour.apps': 'happy',
+  'tour.apps-panel': 'proud',
+  'tour.automations': 'happy',
+  'tour.automations-page': 'drowsy',
+  'tour.done': 'celebrate',
 };
 
-const copy = (step: TourStep, key: string) => t(step.copy ?? (`onboarding.tour.${step.id.slice(5)}` as LocaleKey), { key });
+const copy = (step: TourStep, key: string) =>
+  t(step.copy ?? (`onboarding.tour.${step.id.slice(5)}` as LocaleKey), { key });
 
 function visible(anchor: string): HTMLElement | null {
   const all = Array.from(document.querySelectorAll<HTMLElement>(`[data-tour="${anchor}"]`));
@@ -65,28 +74,28 @@ export function GuidedTour() {
   const run = useCallback(
     (effect: TourEffect | undefined) => {
       switch (effect) {
-        case "openComputer":
-          if (!state.computerOpen) dispatch({ type: "toggleComputer", open: true });
+        case 'openComputer':
+          if (!state.computerOpen) dispatch({ type: 'toggleComputer', open: true });
           return;
-        case "closeComputer":
-          dispatch({ type: "toggleComputer", open: false });
+        case 'closeComputer':
+          dispatch({ type: 'toggleComputer', open: false });
           return;
-        case "openTools": {
-          const trigger = visible("tools");
-          if (trigger && trigger.getAttribute("aria-expanded") !== "true") trigger.click();
+        case 'openTools': {
+          const trigger = visible('tools');
+          if (trigger && trigger.getAttribute('aria-expanded') !== 'true') trigger.click();
           return;
         }
-        case "openApps":
-          if (!press("nav-apps")) dispatch({ type: "togglePlugins", open: true });
+        case 'openApps':
+          if (!press('nav-apps')) dispatch({ type: 'togglePlugins', open: true });
           return;
-        case "closeApps":
-          dispatch({ type: "togglePlugins", open: false });
+        case 'closeApps':
+          dispatch({ type: 'togglePlugins', open: false });
           return;
-        case "openAutomations":
-          if (!press("nav-automations") && readAdvancedMode()) dispatch({ type: "showRoutines" });
+        case 'openAutomations':
+          if (!press('nav-automations') && readAdvancedMode()) dispatch({ type: 'showRoutines' });
           return;
-        case "backToChat":
-          dispatch({ type: "showChat" });
+        case 'backToChat':
+          dispatch({ type: 'showChat' });
           return;
         default:
           return;
@@ -96,16 +105,22 @@ export function GuidedTour() {
   );
 
   const save = useCallback(
-    (finish: boolean, id?: TourStep["id"]) => {
+    (finish: boolean, id?: TourStep['id']) => {
       // A skip must follow an in-flight Next, not disappear behind its guard.
       const operation = pending.current.then(async () => {
         const patch = finish
           ? { onboarding: { hintsSeen: withTourFinished(latestRecord.current) } }
-          : id ? hintSeenPatch(latestRecord.current, id) : null;
+          : id
+            ? hintSeenPatch(latestRecord.current, id)
+            : null;
         if (!patch) return;
-        const config = await api("/api/config", { method: "PUT", body: JSON.stringify(patch), signal: AbortSignal.timeout(10_000) });
+        const config = await api('/api/config', {
+          method: 'PUT',
+          body: JSON.stringify(patch),
+          signal: AbortSignal.timeout(10_000),
+        });
         latestRecord.current = config.onboarding;
-        dispatch({ type: "configStatus", config });
+        dispatch({ type: 'configStatus', config });
       });
       pending.current = operation.catch(() => {});
       return operation;
@@ -118,11 +133,17 @@ export function GuidedTour() {
       if (!step || saving.current || closed.current) return;
       saving.current = true;
       setFailed(false);
-      void save(false, step.id).then(() => {
-        // Move the interface only after progress is saved; a queued skip owns cleanup and must not have its panels
-        // reopened.
-        if (!closed.current && !(fromAnchor && step.onExit && ANCHOR_EFFECTS.has(step.onExit))) run(step.onExit);
-      }).catch(() => setFailed(true)).finally(() => { saving.current = false; });
+      void save(false, step.id)
+        .then(() => {
+          // Move the interface only after progress is saved; a queued skip owns cleanup and must not have its panels
+          // reopened.
+          if (!closed.current && !(fromAnchor && step.onExit && ANCHOR_EFFECTS.has(step.onExit)))
+            run(step.onExit);
+        })
+        .catch(() => setFailed(true))
+        .finally(() => {
+          saving.current = false;
+        });
     },
     [step, run, save],
   );
@@ -131,15 +152,20 @@ export function GuidedTour() {
     if (closed.current) return;
     closed.current = true;
     setDismissed(true);
-    if (state.computerOpen) run("closeComputer");
-    if (state.pluginsOpen) run("closeApps");
-    run("backToChat");
+    if (state.computerOpen) run('closeComputer');
+    if (state.pluginsOpen) run('closeApps');
+    run('backToChat');
     void save(true).catch(() => {});
-    dispatch({ type: "toggleTour", open: false });
+    dispatch({ type: 'toggleTour', open: false });
   }, [state.computerOpen, state.pluginsOpen, run, save, dispatch]);
 
   // Only ever started from Settings (Replay app tour): the welcome no longer hands over to it, now or after a reload.
-  const active = !dismissed && state.tourOpen && Boolean(record?.completedAt) && !state.welcomeOpen && step !== null;
+  const active =
+    !dismissed &&
+    state.tourOpen &&
+    Boolean(record?.completedAt) &&
+    !state.welcomeOpen &&
+    step !== null;
 
   useEffect(() => {
     if (!active || !step || entered.current === step.id) return;
@@ -167,33 +193,46 @@ export function GuidedTour() {
   }, [active, step, advance, run]);
 
   useEffect(() => {
-    if (!active || !step?.anchor || step.id === "tour.apps-panel" || step.id === "tour.automations-page" || step.id === "tour.done") return;
+    if (
+      !active ||
+      !step?.anchor ||
+      step.id === 'tour.apps-panel' ||
+      step.id === 'tour.automations-page' ||
+      step.id === 'tour.done'
+    )
+      return;
     const onClick = (event: MouseEvent) => {
       const target = event.target as Element | null;
       if (target?.closest(`[data-tour="${step.anchor}"]`)) advance(true);
     };
-    document.addEventListener("click", onClick, true);
-    return () => document.removeEventListener("click", onClick, true);
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
   }, [active, step, advance]);
 
   if (!active || !step) return null;
   if (window.ogb?.remoteClient?.active === true) return null;
 
   const { current, total } = stepNumber(step);
-  const closing = step.id === "tour.done";
+  const closing = step.id === 'tour.done';
   const anchor = fallback === step.id && step.fallbackAnchor ? step.fallbackAnchor : step.anchor;
   return (
     <Spotlight
       anchor={anchor}
       placement={step.placement}
       mascot={MASCOT[step.id]}
-      progress={closing ? undefined : t("onboarding.tour.progress", { current, total })}
-      primary={{ label: closing ? t("onboarding.tour.finish") : t("onboarding.tour.next"), onClick: closing ? finish : () => advance() }}
-      secondary={closing ? undefined : { label: t("onboarding.tour.skip"), onClick: finish }}
-      onDone={finish}
-    >
+      progress={closing ? undefined : t('onboarding.tour.progress', { current, total })}
+      primary={{
+        label: closing ? t('onboarding.tour.finish') : t('onboarding.tour.next'),
+        onClick: closing ? finish : () => advance(),
+      }}
+      secondary={closing ? undefined : { label: t('onboarding.tour.skip'), onClick: finish }}
+      onDone={finish}>
       {copy(step, sendKeyLabel(sendKey))}
-      {failed && <p role="alert" className="mt-2 text-danger">{t("onboarding.tour.error")}</p>}
+      {failed && (
+        <p role='alert' className='mt-2 text-danger'>
+          {t('onboarding.tour.error')}
+        </p>
+      )}
     </Spotlight>
   );
 }

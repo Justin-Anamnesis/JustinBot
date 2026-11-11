@@ -4,13 +4,13 @@
 // Admin's signed request, routes/cloud-signed.ts). What was last read is kept in routine-holds.json, so a restart neither
 // frees nor pauses anything before the engines are read again. A cause that begins and pauses routines writes one quiet
 // line in the owner's Chief's chat; nothing else is sent, so nobody who left is messaged.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import type { RoutineHoldCause } from "../../shared/routines.ts";
-import { writeFileAtomic } from "../atomic.ts";
-import type { RoutineManager } from "../routines.ts";
-import { conversationLanguage, serverLine, type ServerLineKey } from "../server-lines.ts";
-import type { Store } from "../store.ts";
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { RoutineHoldCause } from '../../shared/routines.ts';
+import { writeFileAtomic } from '../atomic.ts';
+import type { RoutineManager } from '../routines.ts';
+import { conversationLanguage, serverLine, type ServerLineKey } from '../server-lines.ts';
+import type { Store } from '../store.ts';
 
 /** While every connection is gone, whether one came back elsewhere (an app connected from another device) is read again at
  * most this often. */
@@ -18,16 +18,20 @@ const RECHECK_MS = 15 * 60_000;
 
 /** The owner's one line when a cause begins and pauses routines. */
 export const ROUTINE_HOLD_KEYS: Record<RoutineHoldCause, ServerLineKey> = {
-  plan_cancelled: "server.routines.held.planCancelled",
-  no_engine: "server.routines.held.noEngine",
-  no_connections: "server.routines.held.noConnections",
+  plan_cancelled: 'server.routines.held.planCancelled',
+  no_engine: 'server.routines.held.noEngine',
+  no_connections: 'server.routines.held.noConnections',
 };
 
-interface Saved { away?: true; planCancelled?: true; connectionsGone?: true }
+interface Saved {
+  away?: true;
+  planCancelled?: true;
+  connectionsGone?: true;
+}
 
 export interface RoutineHoldsHostDeps {
   dataDir: string;
-  store: Pick<Store, "bots" | "appendMessage">;
+  store: Pick<Store, 'bots' | 'appendMessage'>;
   /** MCP servers saved here. */
   mcpServers: () => number;
   /** Whether any app is connected here; null when that can't be read now. */
@@ -37,37 +41,61 @@ export interface RoutineHoldsHostDeps {
 }
 
 export function createRoutineHoldsHost(deps: RoutineHoldsHostDeps) {
-  const file = join(deps.dataDir, "routine-holds.json");
+  const file = join(deps.dataDir, 'routine-holds.json');
   const now = deps.now ?? Date.now;
   let saved: Saved = {};
   try {
-    const raw = JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
-    saved = { ...(raw.away === true ? { away: true } : {}), ...(raw.planCancelled === true ? { planCancelled: true } : {}), ...(raw.connectionsGone === true ? { connectionsGone: true } : {}) };
-  } catch { /* none kept yet */ }
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>;
+    saved = {
+      ...(raw.away === true ? { away: true } : {}),
+      ...(raw.planCancelled === true ? { planCancelled: true } : {}),
+      ...(raw.connectionsGone === true ? { connectionsGone: true } : {}),
+    };
+  } catch {
+    /* none kept yet */
+  }
   let rechecked = 0;
   let rechecking = false;
   /** The routines, once index.ts has made them (`attach`): what is read before then waits for them. */
-  let routines: Pick<RoutineManager, "holdFor"> | null = null;
+  let routines: Pick<RoutineManager, 'holdFor'> | null = null;
 
   function save(next: Saved): boolean {
     if (JSON.stringify(next) === JSON.stringify(saved)) return false;
     saved = next;
-    try { writeFileAtomic(file, JSON.stringify(saved), { mode: 0o600 }); }
-    catch (error) { deps.log?.(`[routines] could not keep why routines wait (${error instanceof Error ? error.name : "error"})`); }
+    try {
+      writeFileAtomic(file, JSON.stringify(saved), { mode: 0o600 });
+    } catch (error) {
+      deps.log?.(
+        `[routines] could not keep why routines wait (${error instanceof Error ? error.name : 'error'})`,
+      );
+    }
     return true;
   }
 
   function causes(): RoutineHoldCause[] {
-    return [...(saved.planCancelled ? ["plan_cancelled" as const] : []), ...(saved.away ? ["no_engine" as const] : []), ...(saved.connectionsGone ? ["no_connections" as const] : [])];
+    return [
+      ...(saved.planCancelled ? ['plan_cancelled' as const] : []),
+      ...(saved.away ? ['no_engine' as const] : []),
+      ...(saved.connectionsGone ? ['no_connections' as const] : []),
+    ];
   }
 
   /** The owner's Chief: the place's own one, else the first made (a Team Cloud's founder's). */
   function tell(cause: RoutineHoldCause): void {
-    const chief = deps.store.bots.filter((bot) => !bot.hidden && bot.chiefOfStaff)
-      .sort((a, b) => Number(Boolean(b.defaultBot)) - Number(Boolean(a.defaultBot)) || a.createdAt - b.createdAt)[0];
+    const chief = deps.store.bots
+      .filter((bot) => !bot.hidden && bot.chiefOfStaff)
+      .sort(
+        (a, b) =>
+          Number(Boolean(b.defaultBot)) - Number(Boolean(a.defaultBot)) ||
+          a.createdAt - b.createdAt,
+      )[0];
     if (chief) {
       const line = serverLine(conversationLanguage(chief.threadId), ROUTINE_HOLD_KEYS[cause]);
-      deps.store.appendMessage(chief.threadId, { role: "bot", kind: "activity", tool: { name: `notice: ${line}`, ok: true } });
+      deps.store.appendMessage(chief.threadId, {
+        role: 'bot',
+        kind: 'activity',
+        tool: { name: `notice: ${line}`, ok: true },
+      });
     }
   }
 
@@ -77,18 +105,21 @@ export function createRoutineHoldsHost(deps: RoutineHoldsHostDeps) {
     try {
       for (const cause of routines.holdFor(causes())) tell(cause);
     } catch (error) {
-      deps.log?.(`[routines] could not pause or resume routines (${error instanceof Error ? error.message : "error"})`);
+      deps.log?.(
+        `[routines] could not pause or resume routines (${error instanceof Error ? error.message : 'error'})`,
+      );
     }
-    if (saved.connectionsGone && !rechecking && now() - rechecked >= RECHECK_MS) void connections("recheck");
+    if (saved.connectionsGone && !rechecking && now() - rechecked >= RECHECK_MS)
+      void connections('recheck');
   }
 
   /** A connection removed (the hold begins when none is left), added (it ends), or read again while none was left. */
-  async function connections(change: "removed" | "added" | "recheck"): Promise<void> {
-    if (change === "added") {
+  async function connections(change: 'removed' | 'added' | 'recheck'): Promise<void> {
+    if (change === 'added') {
       if (save({ ...saved, connectionsGone: undefined })) review();
       return;
     }
-    if (change === "removed" && saved.connectionsGone) return;
+    if (change === 'removed' && saved.connectionsGone) return;
     rechecking = true;
     try {
       const left = deps.mcpServers() > 0 ? true : await deps.appsConnected().catch(() => null);
@@ -103,7 +134,7 @@ export function createRoutineHoldsHost(deps: RoutineHoldsHostDeps) {
 
   return {
     /** The routines are made: what was last read applies to them now. */
-    attach(manager: Pick<RoutineManager, "holdFor">): void {
+    attach(manager: Pick<RoutineManager, 'holdFor'>): void {
       routines = manager;
       review();
     },

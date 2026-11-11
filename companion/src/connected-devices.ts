@@ -36,8 +36,7 @@ export function createConnectedDeviceTracker() {
       stream.closed = true;
       try {
         stream.terminate();
-      } catch {
-      }
+      } catch {}
     }
     return true;
   };

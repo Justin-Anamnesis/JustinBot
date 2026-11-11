@@ -1,9 +1,15 @@
 // The Gmail drafts one request has reserved, shared by the turn that asked and the handoffs it started. Each turn's generation
 // and each coordination node keeps the set it got first, so a child reserves against its parent's drafts.
-type DraftOwner = { generation: string; generations: { has(id: string): boolean }; gmailDrafts?: Set<string> };
+type DraftOwner = {
+  generation: string;
+  generations: { has(id: string): boolean };
+  gmailDrafts?: Set<string>;
+};
 
 export function createGmailDrafts(deps: {
-  node(id: string): { threadId: string; parentId?: string | null; status: string } | null | undefined;
+  node(
+    id: string,
+  ): { threadId: string; parentId?: string | null; status: string } | null | undefined;
   ended(status: string): boolean;
   owner(threadId: string): DraftOwner | undefined;
 }) {
@@ -20,8 +26,10 @@ export function createGmailDrafts(deps: {
     const cached = byNode.get(id);
     if (cached) return cached;
     const owner = deps.owner(node.threadId);
-    const reserved = owner?.generations.has(id) && owner.gmailDrafts ? owner.gmailDrafts :
-      (node.parentId ? forNode(node.parentId) : undefined) ?? new Set<string>();
+    const reserved =
+      owner?.generations.has(id) && owner.gmailDrafts
+        ? owner.gmailDrafts
+        : ((node.parentId ? forNode(node.parentId) : undefined) ?? new Set<string>());
     byNode.set(id, reserved);
     return reserved;
   }
@@ -32,8 +40,10 @@ export function createGmailDrafts(deps: {
       const cached = byGeneration.get(generation);
       if (cached) return cached;
       const owner = deps.owner(threadId);
-      const reserved = owner?.generation === generation && owner.gmailDrafts ? owner.gmailDrafts :
-        forNode(handoffId ?? generation) ?? new Set<string>();
+      const reserved =
+        owner?.generation === generation && owner.gmailDrafts
+          ? owner.gmailDrafts
+          : (forNode(handoffId ?? generation) ?? new Set<string>());
       byGeneration.set(generation, reserved);
       return reserved;
     },

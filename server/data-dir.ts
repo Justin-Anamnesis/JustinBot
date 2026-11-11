@@ -1,6 +1,6 @@
-import { mkdtempSync } from "node:fs";
-import { homedir, tmpdir, userInfo } from "node:os";
-import { join } from "node:path";
+import { mkdtempSync } from 'node:fs';
+import { homedir, tmpdir, userInfo } from 'node:os';
+import { join } from 'node:path';
 
 let home: string | undefined;
 
@@ -9,6 +9,9 @@ let home: string | undefined;
 export function dataHome(): string {
   if (home !== undefined) return home;
   const real = homedir();
-  home = process.env.VITEST !== undefined && real === userInfo().homedir ? mkdtempSync(join(tmpdir(), "omb-test-home-")) : real;
+  home =
+    process.env.VITEST !== undefined && real === userInfo().homedir
+      ? mkdtempSync(join(tmpdir(), 'omb-test-home-'))
+      : real;
   return home;
 }

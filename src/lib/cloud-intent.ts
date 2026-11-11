@@ -1,10 +1,13 @@
-import { useSyncExternalStore } from "react";
-import type { OnboardingStatus, WelcomeViewer } from "@/lib/onboarding";
+import { useSyncExternalStore } from 'react';
+import type { OnboardingStatus, WelcomeViewer } from '@/lib/onboarding';
 
-const KEY = "omb.cloudIntent.pending";
-const SENT_KEY = "omb.cloudIntent.sent";
+const KEY = 'omb.cloudIntent.pending';
+const SENT_KEY = 'omb.cloudIntent.sent';
 
-export interface SentIntent { botId: string; at: number }
+export interface SentIntent {
+  botId: string;
+  at: number;
+}
 
 export function setupMessage(job: string): string {
   return `/setup ${job.trim()}`;
@@ -29,24 +32,37 @@ type Snapshot = {
   dismissed: boolean;
   sent: SentIntent | null;
 };
-let snapshot: Snapshot = { pending: readPending(), reopened: false, dismissed: false, sent: readSent() };
+let snapshot: Snapshot = {
+  pending: readPending(),
+  reopened: false,
+  dismissed: false,
+  sent: readSent(),
+};
 const listeners = new Set<() => void>();
 
 function readPending(): string | null {
-  try { return globalThis.localStorage?.getItem(KEY) || null; } catch { return null; }
+  try {
+    return globalThis.localStorage?.getItem(KEY) || null;
+  } catch {
+    return null;
+  }
 }
 
 function readSent(): SentIntent | null {
   try {
-    const value = JSON.parse(globalThis.localStorage?.getItem(SENT_KEY) || "null") as SentIntent | null;
-    return value && typeof value.botId === "string" && typeof value.at === "number" ? value : null;
-  } catch { return null; }
+    const value = JSON.parse(
+      globalThis.localStorage?.getItem(SENT_KEY) || 'null',
+    ) as SentIntent | null;
+    return value && typeof value.botId === 'string' && typeof value.at === 'number' ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 function update(next: Partial<Snapshot>) {
   snapshot = { ...snapshot, ...next };
   try {
-    if ("pending" in next) {
+    if ('pending' in next) {
       if (next.pending) globalThis.localStorage?.setItem(KEY, next.pending);
       else globalThis.localStorage?.removeItem(KEY);
     }
@@ -59,8 +75,13 @@ export function markIntentSent(botId: string, at = Date.now()): void {
   update({ pending: null, reopened: false, sent: { botId, at } });
 }
 
-export function jobRoutine<R extends { botId: string; createdAt: number }>(routines: readonly R[], sent: SentIntent | null): R | undefined {
-  const fresh = routines.filter((routine) => !sent || (routine.botId === sent.botId && routine.createdAt >= sent.at - 60_000));
+export function jobRoutine<R extends { botId: string; createdAt: number }>(
+  routines: readonly R[],
+  sent: SentIntent | null,
+): R | undefined {
+  const fresh = routines.filter(
+    (routine) => !sent || (routine.botId === sent.botId && routine.createdAt >= sent.at - 60_000),
+  );
   return fresh.sort((a, b) => a.createdAt - b.createdAt)[0];
 }
 
@@ -82,7 +103,10 @@ export function cloudIntentShown(due: boolean, intent: Snapshot): boolean {
 
 export function useCloudIntent(): Snapshot {
   return useSyncExternalStore(
-    (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
+    (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
     () => snapshot,
     () => snapshot,
   );

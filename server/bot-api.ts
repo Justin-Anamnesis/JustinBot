@@ -1,16 +1,16 @@
 // A bot's API: one key per bot, off by default, that lets an outside caller send the bot a message through the webhook
 // receiver and read its reply. The key is random, shown once and kept hashed only, like a webhook secret.
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { z } from "zod";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { z } from 'zod';
 
-import { writeFileAtomic } from "./atomic.ts";
-import { DATA_DIR } from "./config.ts";
-import { defuse } from "./records-block.ts";
-import { redactSecretsInText } from "../shared/redact.ts";
-import { API_WHO, AUTHORITY, fromNote } from "./provenance-label.ts";
-import { parseJson } from "./schema.ts";
+import { writeFileAtomic } from './atomic.ts';
+import { DATA_DIR } from './config.ts';
+import { defuse } from './records-block.ts';
+import { redactSecretsInText } from '../shared/redact.ts';
+import { API_WHO, AUTHORITY, fromNote } from './provenance-label.ts';
+import { parseJson } from './schema.ts';
 
 export const BOT_API_RATE_LIMIT = 10;
 const RATE_WINDOW_MS = 60_000;
@@ -20,7 +20,7 @@ export const BOT_API_MAX_MESSAGE_CHARS = 20_000;
 /** Per bot: one bot's callers can't push another's calls out. */
 const MAX_ATTEMPTS = 200;
 const SAVE_AFTER_MS = 1_000;
-const KEY_PREFIX = "bak_";
+const KEY_PREFIX = 'bak_';
 const REFUSED_BURST_MS = 15 * 60_000;
 
 const recordSchema = z.object({
@@ -37,7 +37,7 @@ const attemptSchema = z.object({
   id: z.string().min(1),
   botId: z.string().min(1),
   receivedAt: z.number().finite().nonnegative(),
-  outcome: z.enum(["accepted", "rejected"]),
+  outcome: z.enum(['accepted', 'rejected']),
   statusCode: z.number().int().min(100).max(599),
   threadId: z.string().optional(),
   preview: z.string().optional(),
@@ -67,11 +67,11 @@ export interface BotApiManagerOptions {
 }
 
 export function hashBotApiKey(key: string): string {
-  return createHash("sha256").update(key).digest("hex");
+  return createHash('sha256').update(key).digest('hex');
 }
 
 function newKey(): string {
-  return `${KEY_PREFIX}${randomBytes(32).toString("base64url")}`;
+  return `${KEY_PREFIX}${randomBytes(32).toString('base64url')}`;
 }
 
 export class BotApiManager {
@@ -85,17 +85,19 @@ export class BotApiManager {
   private unreadable = false;
 
   constructor(options: BotApiManagerOptions = {}) {
-    this.file = options.file ?? join(DATA_DIR, "bot-api.json");
+    this.file = options.file ?? join(DATA_DIR, 'bot-api.json');
     this.now = options.now ?? Date.now;
     try {
-      const parsed = fileSchema.safeParse(parseJson(readFileSync(this.file, "utf8")));
+      const parsed = fileSchema.safeParse(parseJson(readFileSync(this.file, 'utf8')));
       if (!parsed.success) throw parsed.error;
       this.bots = parsed.data.bots;
       this.attempts = parsed.data.attempts ?? [];
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         this.unreadable = true;
-        console.error(`bot api: ignoring unreadable ${this.file}: ${error instanceof SyntaxError ? "invalid JSON" : error instanceof Error ? error.message : "unable to read"}`);
+        console.error(
+          `bot api: ignoring unreadable ${this.file}: ${error instanceof SyntaxError ? 'invalid JSON' : error instanceof Error ? error.message : 'unable to read'}`,
+        );
       }
     }
   }
@@ -103,7 +105,12 @@ export class BotApiManager {
   status(botId: string): BotApiStatus {
     const record = this.bots.find((candidate) => candidate.botId === botId);
     if (!record) return { enabled: false, callCount: 0 };
-    return { enabled: true, keyCreatedAt: record.keyCreatedAt, callCount: record.callCount, ...(record.lastCalledAt !== undefined ? { lastCalledAt: record.lastCalledAt } : {}) };
+    return {
+      enabled: true,
+      keyCreatedAt: record.keyCreatedAt,
+      callCount: record.callCount,
+      ...(record.lastCalledAt !== undefined ? { lastCalledAt: record.lastCalledAt } : {}),
+    };
   }
 
   /** Turns the API on with a fresh key, or replaces the key of one already on. The key is returned once and never kept. */
@@ -115,9 +122,17 @@ export class BotApiManager {
     if (record) {
       record.keyHash = hashBotApiKey(key);
       record.keyCreatedAt = now;
-      if (mintedBy) record.mintedBy = mintedBy; else delete record.mintedBy;
+      if (mintedBy) record.mintedBy = mintedBy;
+      else delete record.mintedBy;
     } else {
-      this.bots.unshift({ botId, keyHash: hashBotApiKey(key), ...(mintedBy ? { mintedBy } : {}), createdAt: now, keyCreatedAt: now, callCount: 0 });
+      this.bots.unshift({
+        botId,
+        keyHash: hashBotApiKey(key),
+        ...(mintedBy ? { mintedBy } : {}),
+        createdAt: now,
+        keyCreatedAt: now,
+        callCount: 0,
+      });
     }
     this.rate.delete(botId);
     this.save();
@@ -136,14 +151,20 @@ export class BotApiManager {
 
   /** A teammate who left takes the keys they made: whoever still holds one was given it by them. */
   revokeMintedBy(person: string): string[] {
-    const gone = this.bots.filter((record) => record.mintedBy === person).map((record) => record.botId);
+    const gone = this.bots
+      .filter((record) => record.mintedBy === person)
+      .map((record) => record.botId);
     for (const botId of gone) this.disable(botId);
     return gone;
   }
 
   /** A deleted bot's API goes with it, its calls included. */
   removeForBot(botId: string): void {
-    if (!this.bots.some((candidate) => candidate.botId === botId) && !this.attempts.some((attempt) => attempt.botId === botId)) return;
+    if (
+      !this.bots.some((candidate) => candidate.botId === botId) &&
+      !this.attempts.some((attempt) => attempt.botId === botId)
+    )
+      return;
     this.assertWritable();
     this.bots = this.bots.filter((candidate) => candidate.botId !== botId);
     this.attempts = this.attempts.filter((attempt) => attempt.botId !== botId);
@@ -159,8 +180,8 @@ export class BotApiManager {
   authorize(botId: string, key: string): boolean {
     const record = this.bots.find((candidate) => candidate.botId === botId);
     if (!record || !key) return false;
-    const actual = Buffer.from(hashBotApiKey(key), "hex");
-    const expected = Buffer.from(record.keyHash, "hex");
+    const actual = Buffer.from(hashBotApiKey(key), 'hex');
+    const expected = Buffer.from(record.keyHash, 'hex');
     return actual.length === expected.length && timingSafeEqual(actual, expected);
   }
 
@@ -177,21 +198,38 @@ export class BotApiManager {
   /** The calls since it was last switched on, which is what its count counts. */
   callsSinceOn(botId: string): BotApiAttempt[] {
     const record = this.bots.find((candidate) => candidate.botId === botId);
-    return record ? this.listAttempts(botId).filter((attempt) => attempt.receivedAt >= record.createdAt) : [];
+    return record
+      ? this.listAttempts(botId).filter((attempt) => attempt.receivedAt >= record.createdAt)
+      : [];
   }
 
   listAttempts(botId: string): BotApiAttempt[] {
-    return this.attempts.filter((attempt) => attempt.botId === botId).map((attempt) => ({ ...attempt }));
+    return this.attempts
+      .filter((attempt) => attempt.botId === botId)
+      .map((attempt) => ({ ...attempt }));
   }
 
-  record(botId: string, details: Omit<BotApiAttempt, "id" | "botId" | "receivedAt">): BotApiAttempt {
-    const attempt: BotApiAttempt = { id: randomUUID(), botId, receivedAt: this.now(), outcome: details.outcome, statusCode: details.statusCode };
+  record(
+    botId: string,
+    details: Omit<BotApiAttempt, 'id' | 'botId' | 'receivedAt'>,
+  ): BotApiAttempt {
+    const attempt: BotApiAttempt = {
+      id: randomUUID(),
+      botId,
+      receivedAt: this.now(),
+      outcome: details.outcome,
+      statusCode: details.statusCode,
+    };
     if (details.threadId) attempt.threadId = details.threadId;
-    if (details.preview) attempt.preview = redactSecretsInText(details.preview).replace(/\s+/g, " ").trim().slice(0, 200);
+    if (details.preview)
+      attempt.preview = redactSecretsInText(details.preview)
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 200);
     if (details.reason) attempt.reason = redactSecretsInText(details.reason).slice(0, 500);
     this.keep(attempt);
     const record = this.bots.find((candidate) => candidate.botId === botId);
-    if (record && details.outcome === "accepted") {
+    if (record && details.outcome === 'accepted') {
       record.callCount += 1;
       record.lastCalledAt = attempt.receivedAt;
     }
@@ -203,12 +241,23 @@ export class BotApiManager {
   recordRefused(botId: string, statusCode: 401 | 403, reason: string): BotApiAttempt {
     const at = this.attempts.findLastIndex((attempt) => attempt.botId === botId);
     const burst = at === -1 ? undefined : this.attempts[at]!;
-    if (burst?.outcome === "rejected" && burst.statusCode === statusCode && this.now() - burst.receivedAt <= REFUSED_BURST_MS) {
+    if (
+      burst?.outcome === 'rejected' &&
+      burst.statusCode === statusCode &&
+      this.now() - burst.receivedAt <= REFUSED_BURST_MS
+    ) {
       burst.receivedAt = this.now();
       burst.repeats = (burst.repeats ?? 1) + 1;
       return burst;
     }
-    const attempt: BotApiAttempt = { id: randomUUID(), botId, receivedAt: this.now(), outcome: "rejected", statusCode, reason };
+    const attempt: BotApiAttempt = {
+      id: randomUUID(),
+      botId,
+      receivedAt: this.now(),
+      outcome: 'rejected',
+      statusCode,
+      reason,
+    };
     this.keep(attempt);
     return attempt;
   }
@@ -222,7 +271,10 @@ export class BotApiManager {
   /** A caller decides how often this runs, so it never writes per call: a synchronous save would block the server. */
   private saveSoon(): void {
     if (this.saveTimer) return;
-    this.saveTimer = setTimeout(() => { this.saveTimer = null; this.save(); }, SAVE_AFTER_MS);
+    this.saveTimer = setTimeout(() => {
+      this.saveTimer = null;
+      this.save();
+    }, SAVE_AFTER_MS);
     this.saveTimer.unref?.();
   }
 
@@ -234,32 +286,45 @@ export class BotApiManager {
   }
 
   private assertWritable(): void {
-    if (this.unreadable) throw Object.assign(new Error("The saved Bot API settings could not be read. Repair bot-api.json before changing them."), { status: 503 });
+    if (this.unreadable)
+      throw Object.assign(
+        new Error(
+          'The saved Bot API settings could not be read. Repair bot-api.json before changing them.',
+        ),
+        { status: 503 },
+      );
   }
 
   private save(): void {
     if (this.unreadable) return;
-    if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = null; }
+    if (this.saveTimer) {
+      clearTimeout(this.saveTimer);
+      this.saveTimer = null;
+    }
     mkdirSync(dirname(this.file), { recursive: true });
-    writeFileAtomic(this.file, JSON.stringify({ version: 1, bots: this.bots, attempts: this.attempts }, null, 2), { mode: 0o600 });
+    writeFileAtomic(
+      this.file,
+      JSON.stringify({ version: 1, bots: this.bots, attempts: this.attempts }, null, 2),
+      { mode: 0o600 },
+    );
   }
 }
 
-export const BOT_API_MESSAGE_DATA = "[UNTRUSTED BOT API MESSAGE]";
+export const BOT_API_MESSAGE_DATA = '[UNTRUSTED BOT API MESSAGE]';
 
 /** Security: the tag names a stored file for the turn to load, so a caller's copy of it never reaches the turn. */
 export function withoutAttachedImages(message: string): string {
-  return defuse(message).replace(/<(\s*attached-image)/gi, "($1");
+  return defuse(message).replace(/<(\s*attached-image)/gi, '($1');
 }
 
 /** The caller's words go to the model as data from outside, never as the person's request, and can't pass for a note. */
 export function botApiPrompt(message: string, receivedAt: number): string {
   return [
-    fromNote(API_WHO, "message", AUTHORITY.info),
+    fromNote(API_WHO, 'message', AUTHORITY.info),
     BOT_API_MESSAGE_DATA,
     defuse(`Received: ${new Date(receivedAt).toISOString()}`),
-    "",
+    '',
     withoutAttachedImages(message),
-    "[/UNTRUSTED BOT API MESSAGE]",
-  ].join("\n");
+    '[/UNTRUSTED BOT API MESSAGE]',
+  ].join('\n');
 }

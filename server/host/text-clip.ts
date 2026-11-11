@@ -8,4 +8,5 @@ export function clip(text: string, max: number): string {
 }
 
 /** `clip` after every run of whitespace, newlines included, becomes one space. */
-export const oneLine = (value: string, max: number): string => clip(value.replace(/\s+/g, " "), max);
+export const oneLine = (value: string, max: number): string =>
+  clip(value.replace(/\s+/g, ' '), max);

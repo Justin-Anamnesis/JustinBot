@@ -3,56 +3,40 @@
 // inventory. Raw workspace-wide `cargo metadata` must not be used here: its
 // feature-unified resolve graph includes dependencies enabled only by other
 // workspace members.
-import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const [
-  driverReportPath,
-  cursorThemeReportPath,
-  cargoLockPath,
-  outputDirectory,
-] = process.argv.slice(2);
-if (
-  !driverReportPath ||
-  !cursorThemeReportPath ||
-  !cargoLockPath ||
-  !outputDirectory
-) {
+const [driverReportPath, cursorThemeReportPath, cargoLockPath, outputDirectory] =
+  process.argv.slice(2);
+if (!driverReportPath || !cursorThemeReportPath || !cargoLockPath || !outputDirectory) {
   throw new Error(
-    "usage: node scripts/generate-cua-sbom.mjs " +
-      "<cua-driver.cargo-about.json> <cursor-theme.cargo-about.json> " +
-      "<upstream-Cargo.lock> <output-directory>",
+    'usage: node scripts/generate-cua-sbom.mjs ' +
+      '<cua-driver.cargo-about.json> <cursor-theme.cargo-about.json> ' +
+      '<upstream-Cargo.lock> <output-directory>',
   );
 }
 
-const SOURCE_COMMIT = "bd0e299c67dec6397b3d41a259452b2ea13a1cd5";
+const SOURCE_COMMIT = 'bd0e299c67dec6397b3d41a259452b2ea13a1cd5';
 const SOURCE_ROOT = `https://github.com/trycua/cua/tree/${SOURCE_COMMIT}/libs/cua-driver/rust`;
-const RELEASE_VERSION = "0.41.3";
-const ARCHIVE_SHA256 =
-  "a00a7bc4a648adbcbc93bfbf5a058daf71ce8838ee172e33b197aaf649ecee14";
-const DRIVER_SHA256 =
-  "83030028e7c9e3f4d753b3b27025135d44eb8d52f562cce0aaaf95777bc1b41f";
-const CURSOR_THEME_SHA256 =
-  "d39efb960d207e7328d7a9dd48e3b6565f74be073f9c2ca8dcba86a4d0f28312";
-const CARGO_LOCK_SHA256 =
-  "02ee8ebd8415e097036870a7fd39ba379c5e0d212a116715ca0660e83116f447";
-const INTER_LICENSE_SHA256 =
-  "ecfea75d8a36217d19528567070745a516072ffe907c9fffecbab92eb3b6fc59";
-const INTER_FONT_SHA256 =
-  "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031";
-const INTER_VERSION = "4.001";
-const INTER_COMMIT = "66647c0bbbe41a850d79d9c76fb13add3378940f";
-const REGISTRY_SOURCE_PREFIX =
-  "registry+https://github.com/rust-lang/crates.io-index";
+const RELEASE_VERSION = '0.41.3';
+const ARCHIVE_SHA256 = 'a00a7bc4a648adbcbc93bfbf5a058daf71ce8838ee172e33b197aaf649ecee14';
+const DRIVER_SHA256 = '83030028e7c9e3f4d753b3b27025135d44eb8d52f562cce0aaaf95777bc1b41f';
+const CURSOR_THEME_SHA256 = 'd39efb960d207e7328d7a9dd48e3b6565f74be073f9c2ca8dcba86a4d0f28312';
+const CARGO_LOCK_SHA256 = '02ee8ebd8415e097036870a7fd39ba379c5e0d212a116715ca0660e83116f447';
+const INTER_LICENSE_SHA256 = 'ecfea75d8a36217d19528567070745a516072ffe907c9fffecbab92eb3b6fc59';
+const INTER_FONT_SHA256 = '29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031';
+const INTER_VERSION = '4.001';
+const INTER_COMMIT = '66647c0bbbe41a850d79d9c76fb13add3378940f';
+const REGISTRY_SOURCE_PREFIX = 'registry+https://github.com/rust-lang/crates.io-index';
 
 const EXPECTED_DRIVER_REGISTRY_COUNT = 376;
 const EXPECTED_CURSOR_THEME_REGISTRY_COUNT = 239;
 const EXPECTED_REGISTRY_UNION_COUNT = 381;
 // cua-telemetry lives in the separate libs/cua workspace and carries that
 // workspace's version; every other Cua package is versioned with the driver.
-const TELEMETRY_VERSION = "0.12.1";
+const TELEMETRY_VERSION = '0.12.1';
 const EXPECTED_DRIVER_LOCAL = Object.freeze([
   `cua-driver@${RELEASE_VERSION}`,
   `cua-telemetry@${TELEMETRY_VERSION}`,
@@ -60,39 +44,37 @@ const EXPECTED_DRIVER_LOCAL = Object.freeze([
   `pip-preview@${RELEASE_VERSION}`,
   `platform-linux@${RELEASE_VERSION}`,
 ]);
-const EXPECTED_CURSOR_THEME_LOCAL = Object.freeze([
-  `cursor-overlay@${RELEASE_VERSION}`,
-]);
+const EXPECTED_CURSOR_THEME_LOCAL = Object.freeze([`cursor-overlay@${RELEASE_VERSION}`]);
 const EXPECTED_CURSOR_THEME_ONLY = Object.freeze([
-  "bumpalo@3.20.2",
-  "typed-path@0.12.3",
-  "zip@8.6.0",
-  "zlib-rs@0.6.6",
-  "zopfli@0.8.3",
+  'bumpalo@3.20.2',
+  'typed-path@0.12.3',
+  'zip@8.6.0',
+  'zlib-rs@0.6.6',
+  'zopfli@0.8.3',
 ]);
 const EXPECTED_MPL_COMPONENTS = Object.freeze([
-  "option-ext@0.2.0",
-  "uniffi@0.31.0",
-  "uniffi_core@0.31.0",
-  "uniffi_internal_macros@0.31.0",
-  "uniffi_macros@0.31.0",
-  "uniffi_meta@0.31.0",
-  "uniffi_pipeline@0.31.0",
+  'option-ext@0.2.0',
+  'uniffi@0.31.0',
+  'uniffi_core@0.31.0',
+  'uniffi_internal_macros@0.31.0',
+  'uniffi_macros@0.31.0',
+  'uniffi_meta@0.31.0',
+  'uniffi_pipeline@0.31.0',
 ]);
 // Every Cua path package in the two shipped graphs (`cargo tree -e normal,build`
 // for the release target), including publish = false crates that cargo-about
 // leaves out of its local roots.
 const TRYCUA_COMPONENTS = Object.freeze(
   [
-    "cua-cursor-motion",
-    "cua-driver",
-    "cua-driver-contract",
-    "cua-driver-core",
-    "cua-driver-sdk",
-    "cursor-overlay",
-    "cursor-theme-cli",
-    "pip-preview",
-    "platform-linux",
+    'cua-cursor-motion',
+    'cua-driver',
+    'cua-driver-contract',
+    'cua-driver-core',
+    'cua-driver-sdk',
+    'cursor-overlay',
+    'cursor-theme-cli',
+    'pip-preview',
+    'platform-linux',
   ]
     .map((name) =>
       Object.freeze({
@@ -103,25 +85,25 @@ const TRYCUA_COMPONENTS = Object.freeze(
     )
     .concat(
       Object.freeze({
-        name: "cua-telemetry",
+        name: 'cua-telemetry',
         version: TELEMETRY_VERSION,
         url: `https://github.com/trycua/cua/tree/${SOURCE_COMMIT}/libs/cua/crates/cua-telemetry`,
       }),
     ),
 );
-const TRYCUA_COUNT_WORD = "ten";
+const TRYCUA_COUNT_WORD = 'ten';
 
 function sha256(bytes) {
-  return createHash("sha256").update(bytes).digest("hex");
+  return createHash('sha256').update(bytes).digest('hex');
 }
 
 // A stable name-based UUID (version 5 layout) derived from the archive digest,
 // so a regenerated SBOM for the same archive keeps the same serial number.
 function archiveSerialNumber(digest) {
-  const hex = digest.slice(0, 32).split("");
-  hex[12] = "5";
+  const hex = digest.slice(0, 32).split('');
+  hex[12] = '5';
   hex[16] = ((Number.parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
-  const value = hex.join("");
+  const value = hex.join('');
   return `urn:uuid:${value.slice(0, 8)}-${value.slice(8, 12)}-${value.slice(12, 16)}-${value.slice(16, 20)}-${value.slice(20, 32)}`;
 }
 
@@ -138,16 +120,13 @@ function assertExactSet(actual, expected, label) {
   const expectedSorted = sorted(expected);
   if (JSON.stringify(actualSorted) !== JSON.stringify(expectedSorted)) {
     throw new Error(
-      `${label} differs; expected ${expectedSorted.join(", ")}; found ${actualSorted.join(", ")}`,
+      `${label} differs; expected ${expectedSorted.join(', ')}; found ${actualSorted.join(', ')}`,
     );
   }
 }
 
 function isRegistryPackage(pkg) {
-  return (
-    typeof pkg?.source === "string" &&
-    pkg.source.startsWith(REGISTRY_SOURCE_PREFIX)
-  );
+  return typeof pkg?.source === 'string' && pkg.source.startsWith(REGISTRY_SOURCE_PREFIX);
 }
 
 function inspectCargoAboutReport(report, label) {
@@ -163,8 +142,7 @@ function inspectCargoAboutReport(report, label) {
       throw new Error(`${label} contains incomplete package metadata`);
     }
     if (isRegistryPackage(pkg)) {
-      if (discovered.has(pkg.id))
-        throw new Error(`${label} contains duplicate ${pkg.id}`);
+      if (discovered.has(pkg.id)) throw new Error(`${label} contains duplicate ${pkg.id}`);
       discovered.set(pkg.id, {
         ...pkg,
         resolvedLicense: entry.license ?? pkg.license,
@@ -172,9 +150,7 @@ function inspectCargoAboutReport(report, label) {
     } else if (pkg.source == null) {
       local.add(packageKey(pkg));
     } else {
-      throw new Error(
-        `${label} contains an unreviewed package source: ${pkg.source}`,
-      );
+      throw new Error(`${label} contains an unreviewed package source: ${pkg.source}`);
     }
   }
 
@@ -185,11 +161,7 @@ function inspectCargoAboutReport(report, label) {
       if (isRegistryPackage(pkg)) licensed.add(pkg.id);
     }
   }
-  assertExactSet(
-    licensed,
-    discovered.keys(),
-    `${label} licensed registry package set`,
-  );
+  assertExactSet(licensed, discovered.keys(), `${label} licensed registry package set`);
   return { report, discovered, local };
 }
 
@@ -222,23 +194,18 @@ function mergeRegistryPackages(left, right) {
 function parseCargoLock(lockText) {
   const packages = new Map();
   for (const block of lockText.split(/(?=^\[\[package\]\]\s*$)/m)) {
-    if (!block.startsWith("[[package]]")) continue;
+    if (!block.startsWith('[[package]]')) continue;
     const value = (name) => {
-      const match = block.match(
-        new RegExp(`^${name} = ("(?:[^"\\\\]|\\\\.)*")$`, "m"),
-      );
+      const match = block.match(new RegExp(`^${name} = ("(?:[^"\\\\]|\\\\.)*")$`, 'm'));
       return match ? JSON.parse(match[1]) : undefined;
     };
-    const name = value("name");
-    const version = value("version");
-    const source = value("source");
-    const checksum = value("checksum");
-    if (!name || !version || !source?.startsWith(REGISTRY_SOURCE_PREFIX))
-      continue;
-    if (!/^[a-f0-9]{64}$/.test(checksum ?? "")) {
-      throw new Error(
-        `Cargo.lock has no SHA-256 checksum for ${name}@${version}`,
-      );
+    const name = value('name');
+    const version = value('version');
+    const source = value('source');
+    const checksum = value('checksum');
+    if (!name || !version || !source?.startsWith(REGISTRY_SOURCE_PREFIX)) continue;
+    if (!/^[a-f0-9]{64}$/.test(checksum ?? '')) {
+      throw new Error(`Cargo.lock has no SHA-256 checksum for ${name}@${version}`);
     }
     const key = `${name}@${version}`;
     const existing = packages.get(key);
@@ -252,7 +219,7 @@ function parseCargoLock(lockText) {
 
 function normalizeLicense(expression, label) {
   if (!expression) throw new Error(`missing license expression for ${label}`);
-  return expression.replaceAll("/", " OR ").replace(/\s+/g, " ").trim();
+  return expression.replaceAll('/', ' OR ').replace(/\s+/g, ' ').trim();
 }
 
 function cargoReference(name, version) {
@@ -262,76 +229,71 @@ function cargoReference(name, version) {
 function registryComponent(pkg, cargoLockPackages) {
   const key = packageKey(pkg);
   const locked = cargoLockPackages.get(key);
-  if (!locked)
-    throw new Error(`Cargo.lock does not contain selected package ${key}`);
+  if (!locked) throw new Error(`Cargo.lock does not contain selected package ${key}`);
   const distribution = `https://crates.io/api/v1/crates/${encodeURIComponent(pkg.name)}/${encodeURIComponent(pkg.version)}/download`;
   return {
-    type: "library",
-    "bom-ref": cargoReference(pkg.name, pkg.version),
-    group: "crates.io",
+    type: 'library',
+    'bom-ref': cargoReference(pkg.name, pkg.version),
+    group: 'crates.io',
     name: pkg.name,
     version: pkg.version,
     purl: cargoReference(pkg.name, pkg.version),
-    hashes: [{ alg: "SHA-256", content: locked.checksum }],
-    licenses: [
-      { expression: normalizeLicense(pkg.license ?? pkg.resolvedLicense, key) },
-    ],
+    hashes: [{ alg: 'SHA-256', content: locked.checksum }],
+    licenses: [{ expression: normalizeLicense(pkg.license ?? pkg.resolvedLicense, key) }],
     ...(pkg.description ? { description: pkg.description } : {}),
     externalReferences: [
-      { type: "distribution", url: distribution },
-      ...(typeof pkg.repository === "string" &&
-      /^https?:\/\//.test(pkg.repository)
-        ? [{ type: "vcs", url: pkg.repository }]
+      { type: 'distribution', url: distribution },
+      ...(typeof pkg.repository === 'string' && /^https?:\/\//.test(pkg.repository)
+        ? [{ type: 'vcs', url: pkg.repository }]
         : []),
     ],
     properties: [
-      { name: "openmausbot:cargo:package-id", value: pkg.id },
-      { name: "openmausbot:cargo:crate-sha256", value: locked.checksum },
+      { name: 'openmausbot:cargo:package-id', value: pkg.id },
+      { name: 'openmausbot:cargo:crate-sha256', value: locked.checksum },
     ],
   };
 }
 
 function trycuaComponent({ name, version, url }) {
   return {
-    type: "library",
-    "bom-ref": cargoReference(name, version),
-    group: "trycua",
+    type: 'library',
+    'bom-ref': cargoReference(name, version),
+    group: 'trycua',
     name,
     version,
     purl: cargoReference(name, version),
-    licenses: [{ license: { id: "MIT" } }],
-    externalReferences: [{ type: "vcs", url }],
+    licenses: [{ license: { id: 'MIT' } }],
+    externalReferences: [{ type: 'vcs', url }],
   };
 }
 
 function interComponent() {
   return {
-    type: "file",
-    "bom-ref": `pkg:generic/inter@${INTER_VERSION}`,
-    group: "rsms",
-    name: "Inter",
+    type: 'file',
+    'bom-ref': `pkg:generic/inter@${INTER_VERSION}`,
+    group: 'rsms',
+    name: 'Inter',
     version: INTER_VERSION,
     purl: `pkg:generic/inter@${INTER_VERSION}`,
-    hashes: [{ alg: "SHA-256", content: INTER_FONT_SHA256 }],
-    licenses: [{ license: { id: "OFL-1.1" } }],
-    copyright:
-      "Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)",
+    hashes: [{ alg: 'SHA-256', content: INTER_FONT_SHA256 }],
+    licenses: [{ license: { id: 'OFL-1.1' } }],
+    copyright: 'Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter)',
     externalReferences: [
       {
-        type: "vcs",
+        type: 'vcs',
         url: `https://github.com/rsms/inter/commit/${INTER_COMMIT}`,
       },
       {
-        type: "distribution",
+        type: 'distribution',
         url: `${SOURCE_ROOT}/crates/cursor-overlay/assets/Inter.ttf`,
       },
     ],
     properties: [
       {
-        name: "openmausbot:font:name-table-version",
-        value: "Version 4.001;git-66647c0bb",
+        name: 'openmausbot:font:name-table-version',
+        value: 'Version 4.001;git-66647c0bb',
       },
-      { name: "openmausbot:font:embedded-sha256", value: INTER_FONT_SHA256 },
+      { name: 'openmausbot:font:embedded-sha256', value: INTER_FONT_SHA256 },
     ],
   };
 }
@@ -345,13 +307,9 @@ function mergeLicenseRecords(reports, selectedRegistry, interLicenseText) {
     for (const license of report.licenses) {
       const usedBy = (license.used_by ?? [])
         .map((usage) => usage.crate)
-        .filter(
-          (pkg) => isRegistryPackage(pkg) && selectedRegistry.has(pkg.id),
-        );
+        .filter((pkg) => isRegistryPackage(pkg) && selectedRegistry.has(pkg.id));
       if (!usedBy.length) continue;
-      const recordKey = sha256(
-        `${license.id}\0${license.name}\0${license.text}`,
-      );
+      const recordKey = sha256(`${license.id}\0${license.name}\0${license.text}`);
       const record = records.get(recordKey) ?? {
         id: license.id,
         name: license.name,
@@ -361,32 +319,24 @@ function mergeLicenseRecords(reports, selectedRegistry, interLicenseText) {
       for (const pkg of usedBy) {
         record.usedBy.set(pkg.id, pkg);
         registryCoverage.add(pkg.id);
-        if (license.id === "MPL-2.0") mplComponents.add(packageKey(pkg));
+        if (license.id === 'MPL-2.0') mplComponents.add(packageKey(pkg));
       }
       records.set(recordKey, record);
     }
   }
-  assertExactSet(
-    registryCoverage,
-    selectedRegistry.keys(),
-    "merged license report coverage",
-  );
-  assertExactSet(
-    mplComponents,
-    EXPECTED_MPL_COMPONENTS,
-    "MPL-2.0 component set",
-  );
+  assertExactSet(registryCoverage, selectedRegistry.keys(), 'merged license report coverage');
+  assertExactSet(mplComponents, EXPECTED_MPL_COMPONENTS, 'MPL-2.0 component set');
 
-  records.set("inter-ofl-1.1", {
-    id: "OFL-1.1",
-    name: "SIL Open Font License 1.1",
+  records.set('inter-ofl-1.1', {
+    id: 'OFL-1.1',
+    name: 'SIL Open Font License 1.1',
     text: interLicenseText,
     usedBy: new Map([
       [
         `pkg:generic/inter@${INTER_VERSION}`,
         {
           id: `pkg:generic/inter@${INTER_VERSION}`,
-          name: "Inter",
+          name: 'Inter',
           version: INTER_VERSION,
           source: `https://github.com/rsms/inter/commit/${INTER_COMMIT}`,
         },
@@ -404,23 +354,22 @@ function mergeLicenseRecords(reports, selectedRegistry, interLicenseText) {
 
 function escapeHtml(value) {
   return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function normalizeEmbeddedText(value) {
   return String(value)
-    .replaceAll("\r\n", "\n")
-    .replaceAll("\r", "\n")
-    .replace(/[ \t]+$/gm, "");
+    .replaceAll('\r\n', '\n')
+    .replaceAll('\r', '\n')
+    .replace(/[ \t]+$/gm, '');
 }
 
 function componentLink(pkg) {
-  if (pkg.name === "Inter")
-    return `https://github.com/rsms/inter/commit/${INTER_COMMIT}`;
+  if (pkg.name === 'Inter') return `https://github.com/rsms/inter/commit/${INTER_COMMIT}`;
   return `https://crates.io/crates/${encodeURIComponent(pkg.name)}/${encodeURIComponent(pkg.version)}`;
 }
 
@@ -440,34 +389,32 @@ function renderLicenseHtml(records, registryPackages) {
       ([id, entry]) =>
         `<li><a href="#${escapeHtml(id)}">${escapeHtml(entry.name)}</a> (${entry.components.size})</li>`,
     )
-    .join("");
+    .join('');
   const inventoryHtml = [...registryPackages.values()]
     .sort((left, right) => packageKey(left).localeCompare(packageKey(right)))
     .map(
       (pkg) =>
         `<tr data-package-id="${escapeHtml(pkg.id)}"><td><a href="${escapeHtml(componentLink(pkg))}">${escapeHtml(pkg.name)}</a></td><td>${escapeHtml(pkg.version)}</td><td><code>${escapeHtml(normalizeLicense(pkg.license ?? pkg.resolvedLicense, packageKey(pkg)))}</code></td></tr>`,
     )
-    .join("\n");
+    .join('\n');
   let previousId;
   const licensesHtml = records
     .map((record) => {
       const heading =
         record.id === previousId
-          ? ""
+          ? ''
           : `<h3 id="${escapeHtml(record.id)}">${escapeHtml(record.name)}</h3>`;
       previousId = record.id;
       const usedBy = [...record.usedBy.values()]
-        .sort((left, right) =>
-          packageKey(left).localeCompare(packageKey(right)),
-        )
+        .sort((left, right) => packageKey(left).localeCompare(packageKey(right)))
         .map(
           (pkg) =>
             `<li data-component-id="${escapeHtml(pkg.id)}"><a href="${escapeHtml(componentLink(pkg))}">${escapeHtml(pkg.name)} ${escapeHtml(pkg.version)}</a></li>`,
         )
-        .join("");
+        .join('');
       return `<section>${heading}<h4>${escapeHtml(record.name)}</h4><p>Used by:</p><ul>${usedBy}</ul><pre>${escapeHtml(normalizeEmbeddedText(record.text))}</pre></section>`;
     })
-    .join("\n");
+    .join('\n');
 
   return `<!doctype html>
 <html lang="en">
@@ -500,37 +447,28 @@ const [driverBytes, cursorThemeBytes, cargoLockBytes] = await Promise.all([
   readFile(cargoLockPath),
 ]);
 if (sha256(cargoLockBytes) !== CARGO_LOCK_SHA256) {
-  throw new Error(
-    `Cargo.lock does not match the reviewed Cua ${RELEASE_VERSION} source commit`,
-  );
+  throw new Error(`Cargo.lock does not match the reviewed Cua ${RELEASE_VERSION} source commit`);
 }
 
-const repositoryRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-);
-const recordsDirectory = path.join(repositoryRoot, "third_party", "cua-driver");
+const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const recordsDirectory = path.join(repositoryRoot, 'third_party', 'cua-driver');
 const [interLicenseBytes, cuaLicenseBytes] = await Promise.all([
-  readFile(path.join(recordsDirectory, "Inter-OFL-1.1.txt")),
-  readFile(path.join(recordsDirectory, "LICENSE.md")),
+  readFile(path.join(recordsDirectory, 'Inter-OFL-1.1.txt')),
+  readFile(path.join(recordsDirectory, 'LICENSE.md')),
 ]);
 if (sha256(interLicenseBytes) !== INTER_LICENSE_SHA256) {
-  throw new Error("Inter license file differs from the reviewed OFL-1.1 text");
+  throw new Error('Inter license file differs from the reviewed OFL-1.1 text');
 }
 if (
-  sha256(cuaLicenseBytes) !==
-  "c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9"
+  sha256(cuaLicenseBytes) !== 'c0779290c1d4783169aa3dbfb55feb505e563ef8a004bbf55298ceffcfbda8d9'
 ) {
-  throw new Error("Cua MIT license differs from the reviewed upstream source");
+  throw new Error('Cua MIT license differs from the reviewed upstream source');
 }
 
-const driver = inspectCargoAboutReport(
-  JSON.parse(driverBytes),
-  "cua-driver cargo-about report",
-);
+const driver = inspectCargoAboutReport(JSON.parse(driverBytes), 'cua-driver cargo-about report');
 const cursorTheme = inspectCargoAboutReport(
   JSON.parse(cursorThemeBytes),
-  "cursor-theme cargo-about report",
+  'cursor-theme cargo-about report',
 );
 if (driver.discovered.size !== EXPECTED_DRIVER_REGISTRY_COUNT) {
   throw new Error(
@@ -542,21 +480,10 @@ if (cursorTheme.discovered.size !== EXPECTED_CURSOR_THEME_REGISTRY_COUNT) {
     `cursor-theme report must contain ${EXPECTED_CURSOR_THEME_REGISTRY_COUNT} registry packages`,
   );
 }
-assertExactSet(
-  driver.local,
-  EXPECTED_DRIVER_LOCAL,
-  "cua-driver local package roots",
-);
-assertExactSet(
-  cursorTheme.local,
-  EXPECTED_CURSOR_THEME_LOCAL,
-  "cursor-theme local package roots",
-);
+assertExactSet(driver.local, EXPECTED_DRIVER_LOCAL, 'cua-driver local package roots');
+assertExactSet(cursorTheme.local, EXPECTED_CURSOR_THEME_LOCAL, 'cursor-theme local package roots');
 
-const registryPackages = mergeRegistryPackages(
-  driver.discovered,
-  cursorTheme.discovered,
-);
+const registryPackages = mergeRegistryPackages(driver.discovered, cursorTheme.discovered);
 if (registryPackages.size !== EXPECTED_REGISTRY_UNION_COUNT) {
   throw new Error(
     `root-scoped registry union must contain ${EXPECTED_REGISTRY_UNION_COUNT} packages`,
@@ -567,10 +494,10 @@ assertExactSet(
     .filter((pkg) => !driver.discovered.has(pkg.id))
     .map(packageKey),
   EXPECTED_CURSOR_THEME_ONLY,
-  "cursor-theme-only registry package set",
+  'cursor-theme-only registry package set',
 );
 
-const cargoLockPackages = parseCargoLock(cargoLockBytes.toString("utf8"));
+const cargoLockPackages = parseCargoLock(cargoLockBytes.toString('utf8'));
 const registryComponents = [...registryPackages.values()].map((pkg) =>
   registryComponent(pkg, cargoLockPackages),
 );
@@ -584,15 +511,10 @@ const components = [
     left.version.localeCompare(right.version) ||
     left.group.localeCompare(right.group),
 );
-const componentReferences = new Set(
-  components.map((component) => component["bom-ref"]),
-);
+const componentReferences = new Set(components.map((component) => component['bom-ref']));
 if (componentReferences.size !== components.length)
-  throw new Error("SBOM contains duplicate bom-ref values");
-if (
-  components.length !==
-  EXPECTED_REGISTRY_UNION_COUNT + TRYCUA_COMPONENTS.length + 1
-) {
+  throw new Error('SBOM contains duplicate bom-ref values');
+if (components.length !== EXPECTED_REGISTRY_UNION_COUNT + TRYCUA_COMPONENTS.length + 1) {
   throw new Error(
     `SBOM component count is not the reviewed ${EXPECTED_REGISTRY_UNION_COUNT} + ${TRYCUA_COMPONENTS.length} + 1 inventory`,
   );
@@ -601,81 +523,74 @@ if (
 const licenseRecords = mergeLicenseRecords(
   [driver.report, cursorTheme.report],
   registryPackages,
-  interLicenseBytes.toString("utf8"),
+  interLicenseBytes.toString('utf8'),
 );
 const html = renderLicenseHtml(licenseRecords, registryPackages);
 
 const rootReference = `pkg:generic/cua-driver-linux-x64@${RELEASE_VERSION}`;
 const bom = {
-  bomFormat: "CycloneDX",
-  specVersion: "1.5",
+  bomFormat: 'CycloneDX',
+  specVersion: '1.5',
   serialNumber: archiveSerialNumber(ARCHIVE_SHA256),
   version: 1,
   metadata: {
     component: {
-      type: "application",
-      "bom-ref": rootReference,
-      name: "Cua Driver Linux x64 runtime",
+      type: 'application',
+      'bom-ref': rootReference,
+      name: 'Cua Driver Linux x64 runtime',
       version: RELEASE_VERSION,
-      licenses: [{ license: { id: "MIT" } }],
+      licenses: [{ license: { id: 'MIT' } }],
       externalReferences: [
         {
-          type: "distribution",
+          type: 'distribution',
           url: `https://github.com/trycua/cua/releases/tag/cua-driver-rs-v${RELEASE_VERSION}`,
         },
         {
-          type: "vcs",
+          type: 'vcs',
           url: `https://github.com/trycua/cua/commit/${SOURCE_COMMIT}`,
         },
       ],
       properties: [
-        { name: "openmausbot:archive:sha256", value: ARCHIVE_SHA256 },
-        { name: "openmausbot:cargo-lock:sha256", value: CARGO_LOCK_SHA256 },
-        { name: "openmausbot:target", value: "x86_64-unknown-linux-gnu" },
-        { name: "openmausbot:feature", value: "cua-driver/portal-input" },
+        { name: 'openmausbot:archive:sha256', value: ARCHIVE_SHA256 },
+        { name: 'openmausbot:cargo-lock:sha256', value: CARGO_LOCK_SHA256 },
+        { name: 'openmausbot:target', value: 'x86_64-unknown-linux-gnu' },
+        { name: 'openmausbot:feature', value: 'cua-driver/portal-input' },
         {
-          name: "openmausbot:registry-component-count",
+          name: 'openmausbot:registry-component-count',
           value: String(EXPECTED_REGISTRY_UNION_COUNT),
         },
         {
-          name: "openmausbot:trycua-component-count",
+          name: 'openmausbot:trycua-component-count',
           value: String(TRYCUA_COMPONENTS.length),
         },
         {
-          name: "openmausbot:file:cua-driver:sha256",
+          name: 'openmausbot:file:cua-driver:sha256',
           value: DRIVER_SHA256,
         },
         {
-          name: "openmausbot:file:cua-cursor-theme:sha256",
+          name: 'openmausbot:file:cua-cursor-theme:sha256',
           value: CURSOR_THEME_SHA256,
         },
       ],
     },
   },
   components,
-  dependencies: [
-    { ref: rootReference, dependsOn: sorted(componentReferences) },
-  ],
+  dependencies: [{ ref: rootReference, dependsOn: sorted(componentReferences) }],
 };
 
 const registryRows = [...registryPackages.values()]
   .sort((left, right) => packageKey(left).localeCompare(packageKey(right)))
   .map((pkg) => {
     const checksum = cargoLockPackages.get(packageKey(pkg)).checksum;
-    return `| ${pkg.name.replaceAll("|", "\\|")} | ${pkg.version} | ${normalizeLicense(pkg.license ?? pkg.resolvedLicense, packageKey(pkg)).replaceAll("|", "\\|")} | \`${checksum}\` |`;
+    return `| ${pkg.name.replaceAll('|', '\\|')} | ${pkg.version} | ${normalizeLicense(pkg.license ?? pkg.resolvedLicense, packageKey(pkg)).replaceAll('|', '\\|')} | \`${checksum}\` |`;
   });
-const trycuaRows = TRYCUA_COMPONENTS.map(
-  ({ name, version }) => `| ${name} | ${version} | MIT |`,
-);
+const trycuaRows = TRYCUA_COMPONENTS.map(({ name, version }) => `| ${name} | ${version} | MIT |`);
 const mplSourceRows = EXPECTED_MPL_COMPONENTS.map((component) => {
-  const separator = component.lastIndexOf("@");
+  const separator = component.lastIndexOf('@');
   const name = component.slice(0, separator);
   const version = component.slice(separator + 1);
   const checksum = cargoLockPackages.get(component)?.checksum;
-  if (!checksum)
-    throw new Error(
-      `Cargo.lock has no checksum for MPL component ${component}`,
-    );
+  if (!checksum) throw new Error(`Cargo.lock has no checksum for MPL component ${component}`);
   return `- [${component} source](https://crates.io/api/v1/crates/${encodeURIComponent(name)}/${encodeURIComponent(version)}/download) — crate SHA-256 \`${checksum}\`;`;
 });
 const notices = `# Cua Driver ${RELEASE_VERSION} third-party notices
@@ -694,7 +609,7 @@ OpenMausBot redistributes two executables from the official Cua Driver ${RELEASE
 
 The shipped build graph contains exactly the following MPL-2.0 components. Their corresponding Source Code Form is available from the versioned crates below:
 
-${mplSourceRows.join("\n")}
+${mplSourceRows.join('\n')}
 
 The complete MPL-2.0 text and package copyright notices appear in \`THIRD_PARTY_LICENSES.html\`. These files remain under their original licenses; OpenMausBot's and Cua's MIT licenses do not replace them.
 
@@ -706,13 +621,13 @@ The registry inventory is the union of two root-scoped \`cargo-about 0.8.4\` gra
 
 | Package | Version | License |
 |---|---:|---|
-${trycuaRows.join("\n")}
+${trycuaRows.join('\n')}
 
 ### crates.io release-build inventory
 
 | Package | Version | Declared license expression | Crate SHA-256 |
 |---|---:|---|---|
-${registryRows.join("\n")}
+${registryRows.join('\n')}
 
 ### Embedded non-Cargo asset
 
@@ -723,12 +638,9 @@ ${registryRows.join("\n")}
 
 await mkdir(outputDirectory, { recursive: true });
 await Promise.all([
-  writeFile(
-    path.join(outputDirectory, "SBOM.cdx.json"),
-    `${JSON.stringify(bom, null, 2)}\n`,
-  ),
-  writeFile(path.join(outputDirectory, "THIRD_PARTY_NOTICES.md"), notices),
-  writeFile(path.join(outputDirectory, "THIRD_PARTY_LICENSES.html"), html),
+  writeFile(path.join(outputDirectory, 'SBOM.cdx.json'), `${JSON.stringify(bom, null, 2)}\n`),
+  writeFile(path.join(outputDirectory, 'THIRD_PARTY_NOTICES.md'), notices),
+  writeFile(path.join(outputDirectory, 'THIRD_PARTY_LICENSES.html'), html),
 ]);
 console.log(
   `Generated CUA compliance records: ${registryPackages.size} registry + ` +

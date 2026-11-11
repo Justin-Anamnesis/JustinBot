@@ -29,7 +29,7 @@ function writePending(): void {
       write();
     } catch (error) {
       // The changes stay in memory and the next save of the file writes them; a failed save never ends the pass early.
-      console.error("a batched save failed; the next save of the file retries it", error);
+      console.error('a batched save failed; the next save of the file retries it', error);
     }
   }
 }

@@ -1,5 +1,5 @@
 // Event recorder for adapter tests: await the event that proves the behaviour instead of sleeping.
-import type { ProviderAdapter, RuntimeEvent } from "../contracts.ts";
+import type { ProviderAdapter, RuntimeEvent } from '../contracts.ts';
 
 export interface EventRecorder {
   events: RuntimeEvent[];
@@ -11,7 +11,8 @@ export interface EventRecorder {
 
 export function recordEvents(adapter: ProviderAdapter): EventRecorder {
   const events: RuntimeEvent[] = [];
-  const waiters: Array<{ pred: (e: RuntimeEvent) => boolean; resolve: (e: RuntimeEvent) => void }> = [];
+  const waiters: Array<{ pred: (e: RuntimeEvent) => boolean; resolve: (e: RuntimeEvent) => void }> =
+    [];
   const unsubscribe = adapter.onEvent((event) => {
     events.push(event);
     for (let i = waiters.length - 1; i >= 0; i--) {
@@ -33,7 +34,7 @@ export function recordEvents(adapter: ProviderAdapter): EventRecorder {
           if (idx !== -1) waiters.splice(idx, 1);
           reject(
             new Error(
-              `no matching event within ${timeoutMs}ms; saw: ${events.map((e) => e.type).join(", ") || "(none)"}`,
+              `no matching event within ${timeoutMs}ms; saw: ${events.map((e) => e.type).join(', ') || '(none)'}`,
             ),
           );
         }, timeoutMs);

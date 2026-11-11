@@ -3,13 +3,13 @@ export interface TeamMoveView {
   bot: { id: string; name: string };
   team: { id: string; name: string };
   /** `failed`: it is still on My Cloud, unchanged, and tries again by itself (or now, with Try again). */
-  phase: "moving" | "failed" | "done";
+  phase: 'moving' | 'failed' | 'done';
 }
 
 export interface TeamMove {
   bot: { id: string; name: string };
   team: { id: string; name: string; origin?: string };
-  phase: "copy" | "freeze" | "final" | "check" | "switch" | "done";
+  phase: 'copy' | 'freeze' | 'final' | 'check' | 'switch' | 'done';
   name?: string;
   label?: string;
   threadId?: string | null;
@@ -27,7 +27,7 @@ export interface TeamMove {
   doneAt?: number;
 }
 
-export type TeamMoveRefusalCode = "notInTeam" | "notABot" | "movingElsewhere";
+export type TeamMoveRefusalCode = 'notInTeam' | 'notABot' | 'movingElsewhere';
 /** Why main would not start a bot's move: `code` and `params` for the page to say in its own language, `message` its
  * English for a code the page does not know. */
 export interface TeamMoveRefusal {
@@ -35,9 +35,14 @@ export interface TeamMoveRefusal {
   params: Record<string, string>;
   message: string;
 }
-export declare const TEAM_MOVE_TEXT: Readonly<Record<TeamMoveRefusalCode, (params: Record<string, string>) => string>>;
+export declare const TEAM_MOVE_TEXT: Readonly<
+  Record<TeamMoveRefusalCode, (params: Record<string, string>) => string>
+>;
 /** An Error whose `message` is the English, as an older page reads it. */
-export function teamMoveRefusal(code: TeamMoveRefusalCode, params?: Record<string, string>): Error & { refusal: { code: TeamMoveRefusalCode; params: Record<string, string> } };
+export function teamMoveRefusal(
+  code: TeamMoveRefusalCode,
+  params?: Record<string, string>,
+): Error & { refusal: { code: TeamMoveRefusalCode; params: Record<string, string> } };
 
 export const CHECK_PASSES: number;
 export const RETRY_MS: number[];
@@ -46,9 +51,21 @@ export function parseTeamMoves(value: unknown): { v: 1; moves: TeamMove[] };
 export function routinesOn(held: unknown): string[];
 
 export interface TeamMoveIo {
-  engine: { move(options?: { final?: boolean }): Promise<unknown>; check(): Promise<{ ok: boolean }> };
-  myCloud: { call(method: string, route: string, body?: unknown): Promise<{ ok: boolean; status: number; body: any }> };
-  team: { begin(): Promise<{ name: string; done?: undefined } | { done: true; name?: string }>; done(on: string[]): Promise<void> };
+  engine: {
+    move(options?: { final?: boolean }): Promise<unknown>;
+    check(): Promise<{ ok: boolean }>;
+  };
+  myCloud: {
+    call(
+      method: string,
+      route: string,
+      body?: unknown,
+    ): Promise<{ ok: boolean; status: number; body: any }>;
+  };
+  team: {
+    begin(): Promise<{ name: string; done?: undefined } | { done: true; name?: string }>;
+    done(on: string[]): Promise<void>;
+  };
   prepare?(): Promise<Record<string, unknown>>;
   close(): Promise<void>;
 }
@@ -64,7 +81,10 @@ export function createTeamMove(deps: {
 }): {
   kick(): Promise<void>;
   view(): TeamMoveView | null;
-  start(input: { bot: { id: string; name: string }; team: { id: string; name: string; origin?: string } }): Promise<void>;
+  start(input: {
+    bot: { id: string; name: string };
+    team: { id: string; name: string; origin?: string };
+  }): Promise<void>;
   retry(): Promise<void>;
   seen(): TeamMoveView | null;
   moving(botId: string): TeamMove | null;

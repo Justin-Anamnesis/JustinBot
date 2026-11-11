@@ -1,4 +1,4 @@
-import type { WebhookTrigger, WebhookTriggerInput } from "../../shared/webhooks";
+import type { WebhookTrigger, WebhookTriggerInput } from '../../shared/webhooks';
 
 export type {
   WebhookTrigger,
@@ -7,7 +7,7 @@ export type {
   WebhookAttemptOutcome,
   WebhookAttempt,
   WebhookIngressStatus,
-} from "../../shared/webhooks";
+} from '../../shared/webhooks';
 
 export interface WebhookCredential {
   endpointUrl: string;
@@ -16,8 +16,8 @@ export interface WebhookCredential {
 }
 
 export function webhookActivationDefaults(
-  webhook?: Pick<WebhookTrigger, "enabled" | "verificationPending">,
-): Pick<WebhookTriggerInput, "enabled" | "verificationPending"> {
+  webhook?: Pick<WebhookTrigger, 'enabled' | 'verificationPending'>,
+): Pick<WebhookTriggerInput, 'enabled' | 'verificationPending'> {
   return {
     enabled: webhook?.enabled ?? true,
     verificationPending: webhook?.verificationPending ?? false,

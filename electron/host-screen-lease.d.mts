@@ -6,4 +6,7 @@ export function createHostScreenLease(options: {
   url: () => string;
   headers?: () => Record<string, string>;
   timeoutMs?: number;
-}): (id: string, signal: AbortSignal) => Promise<{ renew(): Promise<void>; release(): Promise<void> }>;
+}): (
+  id: string,
+  signal: AbortSignal,
+) => Promise<{ renew(): Promise<void>; release(): Promise<void> }>;

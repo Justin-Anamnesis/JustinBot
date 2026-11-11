@@ -1,9 +1,15 @@
 /** pi-ai's per-message usage: `input` excludes cached prompt tokens, and `cost` is pi's own priced USD. */
-export type PiUsage = { input?: number; output?: number; cacheRead?: number; cacheWrite?: number; cost?: { total?: number } };
+export type PiUsage = {
+  input?: number;
+  output?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  cost?: { total?: number };
+};
 export type TurnUsage = { input: number; output: number; cachedInput?: number };
 
 const usageCount = (value: unknown): number | undefined =>
-  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
+  typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
 
 /** One pi run's tokens and priced cost, in the app's shape where input includes cached tokens like the other drivers. */
 export class PiRunUsage {
@@ -19,9 +25,14 @@ export class PiRunUsage {
     this.counted = true;
     const total = this.usage;
     const cacheRead = usageCount(usage.cacheRead);
-    const cachedInput = cacheRead === undefined ? total?.cachedInput : (total?.cachedInput ?? 0) + cacheRead;
+    const cachedInput =
+      cacheRead === undefined ? total?.cachedInput : (total?.cachedInput ?? 0) + cacheRead;
     this.usage = {
-      input: (total?.input ?? 0) + (usageCount(usage.input) ?? 0) + (cacheRead ?? 0) + (usageCount(usage.cacheWrite) ?? 0),
+      input:
+        (total?.input ?? 0) +
+        (usageCount(usage.input) ?? 0) +
+        (cacheRead ?? 0) +
+        (usageCount(usage.cacheWrite) ?? 0),
       output: (total?.output ?? 0) + (usageCount(usage.output) ?? 0),
       ...(cachedInput === undefined ? {} : { cachedInput }),
     };

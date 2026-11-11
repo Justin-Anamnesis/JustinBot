@@ -4,15 +4,23 @@
 //
 //   pnpm build:server && pnpm exec vite build && node scripts/build-npm-package.mjs
 //   cd release/npm && npm pack        # or npm publish --access public
-import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const out = join(root, "release", "npm");
-const app = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const out = join(root, 'release', 'npm');
+const app = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
 
-for (const required of ["dist-server/index.js", "dist-server/openmausbot.js", "dist/index.html"]) {
+for (const required of ['dist-server/index.js', 'dist-server/openmausbot.js', 'dist/index.html']) {
   if (!existsSync(join(root, required))) {
     console.error(`missing ${required}: run \`pnpm build:server && pnpm exec vite build\` first`);
     process.exit(1);
@@ -21,56 +29,58 @@ for (const required of ["dist-server/index.js", "dist-server/openmausbot.js", "d
 
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
-cpSync(join(root, "dist-server"), join(out, "dist-server"), { recursive: true });
-cpSync(join(root, "dist"), join(out, "dist"), { recursive: true });
-if (existsSync(join(root, "skills"))) cpSync(join(root, "skills"), join(out, "skills"), { recursive: true });
+cpSync(join(root, 'dist-server'), join(out, 'dist-server'), { recursive: true });
+cpSync(join(root, 'dist'), join(out, 'dist'), { recursive: true });
+if (existsSync(join(root, 'skills')))
+  cpSync(join(root, 'skills'), join(out, 'skills'), { recursive: true });
 // The enterprise layer, under the path the server loads it from.
 // Source-available under its own license; inert without OMB_LICENSE_KEY.
-const enterpriseBundle = join(root, "dist-server", "enterprise", "server", "index.js");
+const enterpriseBundle = join(root, 'dist-server', 'enterprise', 'server', 'index.js');
 if (existsSync(enterpriseBundle)) {
-  mkdirSync(join(out, "enterprise", "server"), { recursive: true });
-  copyFileSync(enterpriseBundle, join(out, "enterprise", "server", "index.js"));
-  for (const file of ["LICENSE", "README.md"]) {
-    if (existsSync(join(root, "enterprise", file))) copyFileSync(join(root, "enterprise", file), join(out, "enterprise", file));
+  mkdirSync(join(out, 'enterprise', 'server'), { recursive: true });
+  copyFileSync(enterpriseBundle, join(out, 'enterprise', 'server', 'index.js'));
+  for (const file of ['LICENSE', 'README.md']) {
+    if (existsSync(join(root, 'enterprise', file)))
+      copyFileSync(join(root, 'enterprise', file), join(out, 'enterprise', file));
   }
 }
-cpSync(join(root, "LICENSE"), join(out, "LICENSE"));
+cpSync(join(root, 'LICENSE'), join(out, 'LICENSE'));
 
 // The bin lives next to the bundle so serverEntry() finds index.js by path.
-writeFileSync(join(out, "cli.js"), `#!/usr/bin/env node\nimport "./dist-server/openmausbot.js";\n`);
+writeFileSync(join(out, 'cli.js'), `#!/usr/bin/env node\nimport "./dist-server/openmausbot.js";\n`);
 
 writeFileSync(
-  join(out, "package.json"),
+  join(out, 'package.json'),
   JSON.stringify(
     {
-      name: "openmausbot",
+      name: 'openmausbot',
       version: app.version,
-      description: "Run the OpenMausBot server anywhere and pair your devices to it",
-      license: "Apache-2.0",
-      type: "module",
-      bin: { openmausbot: "cli.js" },
+      description: 'Run the OpenMausBot server anywhere and pair your devices to it',
+      license: 'Apache-2.0',
+      type: 'module',
+      bin: { openmausbot: 'cli.js' },
       // Never bundled, so npm installs them beside the server: DuckDB and
       // resvg are native addons that npm picks per platform from their
       // optional packages, and the 1Password SDK reads its WebAssembly core
       // from beside itself.
       dependencies: {
-        "@1password/sdk": app.dependencies["@1password/sdk"],
-        "@duckdb/node-api": app.dependencies["@duckdb/node-api"],
-        "@resvg/resvg-js": app.dependencies["@resvg/resvg-js"],
+        '@1password/sdk': app.dependencies['@1password/sdk'],
+        '@duckdb/node-api': app.dependencies['@duckdb/node-api'],
+        '@resvg/resvg-js': app.dependencies['@resvg/resvg-js'],
       },
-      files: ["cli.js", "dist-server", "dist", "skills", "enterprise", "LICENSE", "README.md"],
-      engines: { node: ">=24" },
-      repository: { type: "git", url: "https://github.com/milind-soni/OpenMausBot.git" },
-      homepage: "https://github.com/milind-soni/OpenMausBot#readme",
-      keywords: ["openmausbot", "agents", "self-hosted", "server"],
+      files: ['cli.js', 'dist-server', 'dist', 'skills', 'enterprise', 'LICENSE', 'README.md'],
+      engines: { node: '>=24' },
+      repository: { type: 'git', url: 'https://github.com/milind-soni/OpenMausBot.git' },
+      homepage: 'https://github.com/milind-soni/OpenMausBot#readme',
+      keywords: ['openmausbot', 'agents', 'self-hosted', 'server'],
     },
     null,
     2,
-  ) + "\n",
+  ) + '\n',
 );
 
 writeFileSync(
-  join(out, "README.md"),
+  join(out, 'README.md'),
   `# openmausbot
 
 Your own team of AI bots, with guided terminal setup. Requires Node 24+.

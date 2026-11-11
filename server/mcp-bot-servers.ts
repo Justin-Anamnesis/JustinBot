@@ -2,12 +2,18 @@
 // are in one bot's folder is that bot's own: no other bot can reach those files, and it starts only for that bot. Files in
 // one of a bot's conversation folders (task-workspaces/<bot>/<thread>) go when that conversation does, boxed or not, so a
 // server the bot adds from there is copied into the bot's own folder first, under tools/.
-import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
-import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync } from 'node:fs';
+import { basename, delimiter, isAbsolute, join, relative, resolve, sep } from 'node:path';
 
-import type { StdioMcpSpec } from "./contracts.ts";
-import { engineInstallRoots } from "./engine-roots.ts";
-import { addDisabledMcpServer, isRemoteMcpServer, parseStoredMcpServer, type DisabledMcpServerAdd, type StoredStdioMcpServer } from "./mcp-registry.ts";
+import type { StdioMcpSpec } from './contracts.ts';
+import { engineInstallRoots } from './engine-roots.ts';
+import {
+  addDisabledMcpServer,
+  isRemoteMcpServer,
+  parseStoredMcpServer,
+  type DisabledMcpServerAdd,
+  type StoredStdioMcpServer,
+} from './mcp-registry.ts';
 
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 /** What one server's files copied out of a conversation folder may add up to. */
@@ -23,7 +29,8 @@ export interface BotFolderUse {
 
 /** One value of a command, argument or environment variable, as the paths it may hold. */
 function pathsIn(value: string): string[] {
-  const text = value.startsWith("--") && value.includes("=") ? value.slice(value.indexOf("=") + 1) : value;
+  const text =
+    value.startsWith('--') && value.includes('=') ? value.slice(value.indexOf('=') + 1) : value;
   return text.split(delimiter).filter((part) => isAbsolute(part));
 }
 
@@ -33,21 +40,26 @@ function values(server: StdioMcpSpec): string[] {
 
 function segments(path: string, root: string): string[] | null {
   const rel = relative(root, path);
-  if (!rel || rel.startsWith("..") || isAbsolute(rel)) return null;
+  if (!rel || rel.startsWith('..') || isAbsolute(rel)) return null;
   return rel.split(sep);
 }
 
 /** The bot whose folders this server's paths are in, "several" when they are in more than one bot's, else null. */
-export function botFolderUse(server: StdioMcpSpec, dataDir: string): BotFolderUse | "several" | null {
-  const workspaces = join(dataDir, "workspaces"), tasks = join(dataDir, "task-workspaces");
+export function botFolderUse(
+  server: StdioMcpSpec,
+  dataDir: string,
+): BotFolderUse | 'several' | null {
+  const workspaces = join(dataDir, 'workspaces'),
+    tasks = join(dataDir, 'task-workspaces');
   let botId: string | null = null;
   const temporary: string[] = [];
   for (const value of values(server)) {
     const full = resolve(value);
-    const own = segments(full, workspaces), task = segments(full, tasks);
+    const own = segments(full, workspaces),
+      task = segments(full, tasks);
     const owner = own?.[0] ?? task?.[0];
     if (!owner || !ID.test(owner)) continue;
-    if (botId && botId !== owner) return "several";
+    if (botId && botId !== owner) return 'several';
     botId = owner;
     if (task && task.length >= 2 && ID.test(task[1]!)) {
       const entry = join(tasks, owner, task[1]!, ...(task.length >= 3 ? [task[2]!] : []));
@@ -61,7 +73,11 @@ export function botFolderUse(server: StdioMcpSpec, dataDir: string): BotFolderUs
  * server's own files (settings, sessions, saved logins), which no bot's command may name. */
 export function serverFileUse(server: StdioMcpSpec, dataDir: string): string | null {
   const root = resolve(dataDir);
-  const open = [join(root, "workspaces"), join(root, "task-workspaces"), ...engineInstallRoots(root).map((path) => resolve(path))];
+  const open = [
+    join(root, 'workspaces'),
+    join(root, 'task-workspaces'),
+    ...engineInstallRoots(root).map((path) => resolve(path)),
+  ];
   for (const value of values(server)) {
     const full = resolve(value);
     if (full !== root && segments(full, root) === null) continue;
@@ -71,7 +87,10 @@ export function serverFileUse(server: StdioMcpSpec, dataDir: string): string | n
 }
 
 /** Bytes and files under `path`, never following a link; null once past the limits. */
-function size(path: string, total = { bytes: 0, files: 0 }): { bytes: number; files: number } | null {
+function size(
+  path: string,
+  total = { bytes: 0, files: 0 },
+): { bytes: number; files: number } | null {
   const stat = lstatSync(path);
   total.bytes += stat.size;
   total.files += 1;
@@ -83,9 +102,10 @@ function size(path: string, total = { bytes: 0, files: 0 }): { bytes: number; fi
 }
 
 function rebase(value: string, from: string, to: string): string {
-  const rebasePath = (path: string) => (path === from ? to : path.startsWith(from + sep) ? to + path.slice(from.length) : path);
-  if (value.startsWith("--") && value.includes("=")) {
-    const at = value.indexOf("=") + 1;
+  const rebasePath = (path: string) =>
+    path === from ? to : path.startsWith(from + sep) ? to + path.slice(from.length) : path;
+  if (value.startsWith('--') && value.includes('=')) {
+    const at = value.indexOf('=') + 1;
     return value.slice(0, at) + value.slice(at).split(delimiter).map(rebasePath).join(delimiter);
   }
   return value.split(delimiter).map(rebasePath).join(delimiter);
@@ -97,32 +117,59 @@ export type KeptServer =
 
 /** Copies the server's files out of the bot's conversation folders into `workspaces/<bot>/tools/` and points the
  * server there. */
-export function keepInBotFolder(server: StoredStdioMcpServer, use: BotFolderUse, dataDir: string): KeptServer {
+export function keepInBotFolder(
+  server: StoredStdioMcpServer,
+  use: BotFolderUse,
+  dataDir: string,
+): KeptServer {
   if (!use.temporary.length) return { ok: true, server, moved: [] };
-  const own = join(dataDir, "workspaces", use.botId), tools = join(own, "tools");
+  const own = join(dataDir, 'workspaces', use.botId),
+    tools = join(own, 'tools');
   try {
     mkdirSync(tools, { recursive: true, mode: 0o700 });
     // Security: a bot may have made tools/ a link to somewhere else; files are only ever written inside its own folder.
-    if (!lstatSync(tools).isDirectory() || segments(realpathSync(tools), realpathSync(own))?.length !== 1) {
-      return { ok: false, error: "Its tools folder is not a plain folder inside this bot's own folder." };
+    if (
+      !lstatSync(tools).isDirectory() ||
+      segments(realpathSync(tools), realpathSync(own))?.length !== 1
+    ) {
+      return {
+        ok: false,
+        error: "Its tools folder is not a plain folder inside this bot's own folder.",
+      };
     }
   } catch {
     return { ok: false, error: "This bot's own folder could not be prepared." };
   }
   const moved: Array<{ from: string; to: string }> = [];
   for (const from of use.temporary) {
-    if (!existsSync(from)) return { ok: false, error: "Its files were in a conversation's temporary folder, and that folder is gone." };
-    if (!size(from)) return { ok: false, error: `Its folder is too big to keep: over ${MAX_KEPT_BYTES / 1024 ** 2} MB or ${MAX_KEPT_FILES.toLocaleString("en-US")} files.` };
+    if (!existsSync(from))
+      return {
+        ok: false,
+        error: "Its files were in a conversation's temporary folder, and that folder is gone.",
+      };
+    if (!size(from))
+      return {
+        ok: false,
+        error: `Its folder is too big to keep: over ${MAX_KEPT_BYTES / 1024 ** 2} MB or ${MAX_KEPT_FILES.toLocaleString('en-US')} files.`,
+      };
     const name = basename(from);
     let to = join(tools, name);
     for (let n = 2; existsSync(to); n += 1) {
-      if (n > 99) return { ok: false, error: "Its tools folder already has too many copies of this name." };
+      if (n > 99)
+        return { ok: false, error: 'Its tools folder already has too many copies of this name.' };
       to = join(tools, `${name}-${n}`);
     }
-    cpSync(from, to, { recursive: true, errorOnExist: true, force: false, preserveTimestamps: true, verbatimSymlinks: true });
+    cpSync(from, to, {
+      recursive: true,
+      errorOnExist: true,
+      force: false,
+      preserveTimestamps: true,
+      verbatimSymlinks: true,
+    });
     moved.push({ from, to });
   }
-  const rebaseAll = (value: string) => moved.reduce((current, { from, to }) => rebase(current, from, to), value);
+  const rebaseAll = (value: string) =>
+    moved.reduce((current, { from, to }) => rebase(current, from, to), value);
   return {
     ok: true,
     moved,
@@ -130,12 +177,16 @@ export function keepInBotFolder(server: StoredStdioMcpServer, use: BotFolderUse,
       ...server,
       command: rebaseAll(server.command),
       args: server.args.map(rebaseAll),
-      env: Object.fromEntries(Object.entries(server.env).map(([key, value]) => [key, rebaseAll(value)])),
+      env: Object.fromEntries(
+        Object.entries(server.env).map(([key, value]) => [key, rebaseAll(value)]),
+      ),
     },
   };
 }
 
-export type BotMcpServerAdd = DisabledMcpServerAdd & { moved?: Array<{ from: string; to: string }> };
+export type BotMcpServerAdd = DisabledMcpServerAdd & {
+  moved?: Array<{ from: string; to: string }>;
+};
 
 export type BotKept =
   | { ok: true; server: StoredStdioMcpServer; moved: Array<{ from: string; to: string }> }
@@ -144,31 +195,62 @@ export type BotKept =
 /** A command server a bot adds or changes, with files from one of its conversation folders kept in its own folder.
  * `boxed`: no bot reaches another's folders, so a server using this bot's files becomes its own, and one using another
  * bot's files is refused; unboxed, every bot reaches them and the server stays every bot's. */
-export function keepForBot(server: StoredStdioMcpServer, botId: string, dataDir: string, boxed: boolean): BotKept {
+export function keepForBot(
+  server: StoredStdioMcpServer,
+  botId: string,
+  dataDir: string,
+  boxed: boolean,
+): BotKept {
   // Security: boxed, the data folder is not there for a bot; a command that names the server's own files is asking the
   // server to show them (the box shows none of them, whatever a command line says: bot-box/plan.ts).
   if (boxed && serverFileUse(server, dataDir)) {
-    return { ok: false, status: 400, error: "That command names a file of the server's own, which no bot can reach. Use files in your own folder." };
+    return {
+      ok: false,
+      status: 400,
+      error:
+        "That command names a file of the server's own, which no bot can reach. Use files in your own folder.",
+    };
   }
   const use = botFolderUse(server, dataDir);
-  const theirs = use !== null && (use === "several" || use.botId !== botId);
+  const theirs = use !== null && (use === 'several' || use.botId !== botId);
   if (theirs && boxed) {
-    return { ok: false, status: 400, error: "That command uses files in another bot's folder, which only that bot can reach. Use files in your own folder." };
+    return {
+      ok: false,
+      status: 400,
+      error:
+        "That command uses files in another bot's folder, which only that bot can reach. Use files in your own folder.",
+    };
   }
   if (!use || theirs) return { ok: true, server, moved: [] };
   const kept = keepInBotFolder(server, use, dataDir);
-  if (!kept.ok) return { ok: false, status: 400, error: `This server could not be kept: ${kept.error}` };
-  return { ok: true, server: boxed ? { ...kept.server, bot: botId } : kept.server, moved: kept.moved };
+  if (!kept.ok)
+    return { ok: false, status: 400, error: `This server could not be kept: ${kept.error}` };
+  return {
+    ok: true,
+    server: boxed ? { ...kept.server, bot: botId } : kept.server,
+    moved: kept.moved,
+  };
 }
 
 /** A bot's mcp_server add: saved off first, its files kept as keepForBot says. */
-export function addBotMcpServer(current: Record<string, unknown>, body: unknown, botId: string, dataDir: string, boxed: boolean): BotMcpServerAdd {
+export function addBotMcpServer(
+  current: Record<string, unknown>,
+  body: unknown,
+  botId: string,
+  dataDir: string,
+  boxed: boolean,
+): BotMcpServerAdd {
   const added = addDisabledMcpServer(current, body);
   if (!added.ok || isRemoteMcpServer(added.server)) return added;
   const kept = keepForBot(added.server, botId, dataDir, boxed);
   if (!kept.ok) return kept;
   if (kept.server === added.server) return added;
-  return { ...added, server: kept.server, next: { ...current, [added.name]: kept.server }, moved: kept.moved };
+  return {
+    ...added,
+    server: kept.server,
+    next: { ...current, [added.name]: kept.server },
+    moved: kept.moved,
+  };
 }
 
 export interface ClaimedMcpServers {
@@ -179,16 +261,25 @@ export interface ClaimedMcpServers {
 
 /** Existing installs where bots are boxed: every server no bot owns yet whose files are in the folders of one bot that
  * exists becomes that bot's own, its conversation-folder files kept in its own folder. Null when nothing changes. */
-export function claimBotMcpServers(raw: Record<string, unknown> | undefined, dataDir: string, isBot: (botId: string) => boolean): ClaimedMcpServers | null {
+export function claimBotMcpServers(
+  raw: Record<string, unknown> | undefined,
+  dataDir: string,
+  isBot: (botId: string) => boolean,
+): ClaimedMcpServers | null {
   const next: Record<string, unknown> = { ...raw };
   const claimed: Record<string, string[]> = {};
   for (const [name, value] of Object.entries(raw ?? {})) {
     const parsed = parseStoredMcpServer(name, value);
-    if (!parsed.ok || isRemoteMcpServer(parsed.server) || parsed.server.bot || parsed.server.runsOn) continue;
+    if (!parsed.ok || isRemoteMcpServer(parsed.server) || parsed.server.bot || parsed.server.runsOn)
+      continue;
     const use = botFolderUse(parsed.server, dataDir);
-    if (!use || use === "several" || !isBot(use.botId)) continue;
+    if (!use || use === 'several' || !isBot(use.botId)) continue;
     let kept: KeptServer;
-    try { kept = keepInBotFolder(parsed.server, use, dataDir); } catch (error) { kept = { ok: false, error: String(error) }; }
+    try {
+      kept = keepInBotFolder(parsed.server, use, dataDir);
+    } catch (error) {
+      kept = { ok: false, error: String(error) };
+    }
     if (!kept.ok) console.warn(`[mcp] ${name}: kept in place for its bot: ${kept.error}`);
     next[name] = { ...(kept.ok ? kept.server : parsed.server), bot: use.botId };
     (claimed[use.botId] ??= []).push(name);
@@ -197,7 +288,10 @@ export function claimBotMcpServers(raw: Record<string, unknown> | undefined, dat
 }
 
 /** Without the servers that were this deleted bot's own; null when it had none. */
-export function withoutBotMcpServers(raw: Record<string, unknown> | undefined, botId: string): Record<string, unknown> | null {
+export function withoutBotMcpServers(
+  raw: Record<string, unknown> | undefined,
+  botId: string,
+): Record<string, unknown> | null {
   const kept = Object.entries(raw ?? {}).filter(([name, value]) => {
     const parsed = parseStoredMcpServer(name, value);
     return !(parsed.ok && !isRemoteMcpServer(parsed.server) && parsed.server.bot === botId);

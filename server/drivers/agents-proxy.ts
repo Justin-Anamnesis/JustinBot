@@ -9,16 +9,16 @@
 //   OMB_MAUSBOT  "1" for the person's MausBot, the only bot shown its notification tools
 //   OMB_AGENTS_TOOL_BRIDGE  "1" lists a few tools and puts the rest behind find_tool and use_tool
 // scripts/bundle-server.mjs inlines agents-mcp and agents-catalog/-call/-client/-bridge into this file, which the harness spawns.
-import readline from "node:readline";
+import readline from 'node:readline';
 
-import { agentsMcp } from "./agents-mcp.ts";
-import type { Json } from "./agents-client.ts";
+import { agentsMcp } from './agents-mcp.ts';
+import type { Json } from './agents-client.ts';
 
 const handle = agentsMcp(process.env);
-const send = (msg: Json) => process.stdout.write(JSON.stringify(msg) + "\n");
+const send = (msg: Json) => process.stdout.write(JSON.stringify(msg) + '\n');
 
 const rl = readline.createInterface({ input: process.stdin, terminal: false });
-rl.on("line", (line) => {
+rl.on('line', (line) => {
   const t = line.trim();
   if (!t) return;
   let msg: Json;
@@ -27,8 +27,18 @@ rl.on("line", (line) => {
   } catch {
     return;
   }
-  void handle(msg).then((reply) => { if (reply) send(reply); }, (e) => {
-    if (msg.id !== undefined) send({ jsonrpc: "2.0", id: msg.id, error: { code: -32603, message: (e as Error).message } } as Json);
-  });
+  void handle(msg).then(
+    (reply) => {
+      if (reply) send(reply);
+    },
+    (e) => {
+      if (msg.id !== undefined)
+        send({
+          jsonrpc: '2.0',
+          id: msg.id,
+          error: { code: -32603, message: (e as Error).message },
+        } as Json);
+    },
+  );
 });
-rl.on("close", () => process.exit(0));
+rl.on('close', () => process.exit(0));

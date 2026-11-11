@@ -1,38 +1,50 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import { activeLocale } from "./i18n";
-import { isMacPlatform } from "./keyboard-shortcuts";
+import { activeLocale } from './i18n';
+import { isMacPlatform } from './keyboard-shortcuts';
 
-export const SEND_KEY_KEY = "omb-send-key";
+export const SEND_KEY_KEY = 'omb-send-key';
 
 /** The Enter-adds-a-line modes are for input methods that confirm a conversion with Enter (Japanese). */
-export const SEND_KEYS = ["enter", "shift-enter", "mod-enter"] as const;
+export const SEND_KEYS = ['enter', 'shift-enter', 'mod-enter'] as const;
 export type SendKey = (typeof SEND_KEYS)[number];
 
 export function defaultSendKey(locale: string = activeLocale()): SendKey {
-  return locale === "ja" || locale.startsWith("ja-") ? "mod-enter" : "enter";
+  return locale === 'ja' || locale.startsWith('ja-') ? 'mod-enter' : 'enter';
 }
 
-export function parseSendKey(value: string | null | undefined, fallback: SendKey = defaultSendKey()): SendKey {
+export function parseSendKey(
+  value: string | null | undefined,
+  fallback: SendKey = defaultSendKey(),
+): SendKey {
   return SEND_KEYS.find((mode) => mode === value) ?? fallback;
 }
 
 /** isComposing, or keyCode 229: WebKit delivers the confirming Enter after compositionend. */
-export function imeComposing(event: Pick<KeyboardEvent, "isComposing" | "keyCode">): boolean {
+export function imeComposing(event: Pick<KeyboardEvent, 'isComposing' | 'keyCode'>): boolean {
   return event.isComposing || event.keyCode === 229;
 }
 
 export function sendsMessage(
-  event: Pick<KeyboardEvent, "key" | "shiftKey" | "ctrlKey" | "metaKey" | "isComposing" | "keyCode">,
+  event: Pick<
+    KeyboardEvent,
+    'key' | 'shiftKey' | 'ctrlKey' | 'metaKey' | 'isComposing' | 'keyCode'
+  >,
   mode: SendKey,
 ): boolean {
-  if (event.key !== "Enter" || imeComposing(event)) return false;
+  if (event.key !== 'Enter' || imeComposing(event)) return false;
   if (event.ctrlKey || event.metaKey) return true;
-  return mode === "enter" ? !event.shiftKey : mode === "shift-enter" && event.shiftKey;
+  return mode === 'enter' ? !event.shiftKey : mode === 'shift-enter' && event.shiftKey;
 }
 
 export function sendKeyLabel(mode: SendKey, mac: boolean = isMacPlatform()): string {
-  return mode === "enter" ? "Enter" : mode === "shift-enter" ? "Shift+Enter" : mac ? "⌘+Enter" : "Ctrl+Enter";
+  return mode === 'enter'
+    ? 'Enter'
+    : mode === 'shift-enter'
+      ? 'Shift+Enter'
+      : mac
+        ? '⌘+Enter'
+        : 'Ctrl+Enter';
 }
 
 let sessionChoice: SendKey | undefined;
@@ -68,13 +80,13 @@ function onStorage(event: StorageEvent) {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (listeners.size === 1 && typeof window !== "undefined") {
-    window.addEventListener("storage", onStorage);
+  if (listeners.size === 1 && typeof window !== 'undefined') {
+    window.addEventListener('storage', onStorage);
   }
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && typeof window !== "undefined") {
-      window.removeEventListener("storage", onStorage);
+    if (listeners.size === 0 && typeof window !== 'undefined') {
+      window.removeEventListener('storage', onStorage);
     }
   };
 }
@@ -83,8 +95,7 @@ export function setSendKey(mode: SendKey): void {
   sessionChoice = mode;
   try {
     storage()?.setItem(SEND_KEY_KEY, mode);
-  } catch {
-  }
+  } catch {}
   notify();
 }
 

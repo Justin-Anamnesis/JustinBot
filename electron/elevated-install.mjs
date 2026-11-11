@@ -1,14 +1,14 @@
-import { execFile } from "node:child_process";
-import { accessSync, constants, lstatSync } from "node:fs";
-import { isAbsolute } from "node:path";
-import { installDetail } from "./update-words.mjs";
+import { execFile } from 'node:child_process';
+import { accessSync, constants, lstatSync } from 'node:fs';
+import { isAbsolute } from 'node:path';
+import { installDetail } from './update-words.mjs';
 
 // Installs a downloaded .deb behind one polkit prompt. Root copies the file to a root-only dir and checks the feed's SHA-512 before apt-get sees it,
 // so a file swapped in the user-writable cache after the download is refused. Only this fixed script runs as root, never renderer text.
 
 // pkexec is only trusted at its system location, not wherever PATH finds one.
-export const PKEXEC = "/usr/bin/pkexec";
-const SHELL = "/bin/sh";
+export const PKEXEC = '/usr/bin/pkexec';
+const SHELL = '/bin/sh';
 const INSTALL_TIMEOUT_MS = 15 * 60 * 1000;
 
 // $1: the staged .deb, $2: its expected SHA-512 as lowercase hex.
@@ -40,8 +40,8 @@ export function canInstallElevated({
   pkexec = PKEXEC,
   access = accessSync,
 } = {}) {
-  if (platform !== "linux") return false;
-  if (env.OMB_UPDATE_INSTALL === "terminal") return false;
+  if (platform !== 'linux') return false;
+  if (env.OMB_UPDATE_INSTALL === 'terminal') return false;
   if (!env.DISPLAY && !env.WAYLAND_DISPLAY) return false;
   try {
     access(pkexec, constants.X_OK);
@@ -53,15 +53,18 @@ export function canInstallElevated({
 
 // electron-updater records the SHA-512 as base64 (a feed may carry hex); the script compares lowercase hex.
 export function sha512Hex(value) {
-  if (typeof value !== "string" || value.length === 0) return null;
+  if (typeof value !== 'string' || value.length === 0) return null;
   if (/^[0-9a-f]{128}$/i.test(value)) return value.toLowerCase();
   if (!/^[A-Za-z0-9+/]{86}==$/.test(value)) return null;
-  return Buffer.from(value, "base64").toString("hex");
+  return Buffer.from(value, 'base64').toString('hex');
 }
 
 function lastLine(text) {
-  const lines = String(text ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
-  return lines.at(-1)?.slice(0, 200) ?? "";
+  const lines = String(text ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines.at(-1)?.slice(0, 200) ?? '';
 }
 
 // Never throws. Resolves { ok: true } or { ok: false, reason, detail }, reason one of:
@@ -78,22 +81,22 @@ export function installPackageElevated({
   const expected = sha512Hex(sha512);
   let regular = false;
   try {
-    regular = typeof file === "string" && stat(file).isFile();
+    regular = typeof file === 'string' && stat(file).isFile();
   } catch {
     regular = false;
   }
-  if (typeof file !== "string" || !isAbsolute(file) || !file.endsWith(".deb") || !regular) {
+  if (typeof file !== 'string' || !isAbsolute(file) || !file.endsWith('.deb') || !regular) {
     return Promise.resolve({
       ok: false,
-      reason: "unverifiable",
-      ...installDetail("native.update.packageMissing"),
+      reason: 'unverifiable',
+      ...installDetail('native.update.packageMissing'),
     });
   }
   if (!expected) {
     return Promise.resolve({
       ok: false,
-      reason: "unverifiable",
-      ...installDetail("native.update.noChecksum"),
+      reason: 'unverifiable',
+      ...installDetail('native.update.noChecksum'),
     });
   }
 
@@ -102,33 +105,50 @@ export function installPackageElevated({
     try {
       child = run(
         pkexec,
-        [SHELL, "-c", ELEVATED_INSTALL_SCRIPT, "sh", file, expected],
-        { timeout, killSignal: "SIGTERM" },
+        [SHELL, '-c', ELEVATED_INSTALL_SCRIPT, 'sh', file, expected],
+        { timeout, killSignal: 'SIGTERM' },
         (error, _stdout, stderr) => {
           if (!error) return resolve({ ok: true });
-          if (error.code === "ENOENT") {
-            return resolve({ ok: false, reason: "unavailable", ...installDetail("native.update.noPkexec") });
+          if (error.code === 'ENOENT') {
+            return resolve({
+              ok: false,
+              reason: 'unavailable',
+              ...installDetail('native.update.noPkexec'),
+            });
           }
           if (error.code === PKEXEC_DISMISSED) {
-            return resolve({ ok: false, reason: "declined", ...installDetail("native.update.promptClosed") });
+            return resolve({
+              ok: false,
+              reason: 'declined',
+              ...installDetail('native.update.promptClosed'),
+            });
           }
           if (error.code === PKEXEC_NOT_AUTHORIZED) {
-            return resolve({ ok: false, reason: "refused", ...installDetail("native.update.noAdmin") });
+            return resolve({
+              ok: false,
+              reason: 'refused',
+              ...installDetail('native.update.noAdmin'),
+            });
           }
           if (error.code === CHECKSUM_MISMATCH) {
             return resolve({
               ok: false,
-              reason: "checksum",
-              ...installDetail("native.update.checksumMismatch"),
+              reason: 'checksum',
+              ...installDetail('native.update.checksumMismatch'),
             });
           }
-          const reason = error.killed ? installDetail("native.update.installTimedOut").detail : lastLine(stderr) || error.message;
-          const words = installDetail("native.update.installFailed", { reason, ...(error.killed ? { timedOut: "true" } : {}) });
-          resolve({ ok: false, reason: "failed", ...words, detail: words.detail.slice(0, 240) });
+          const reason = error.killed
+            ? installDetail('native.update.installTimedOut').detail
+            : lastLine(stderr) || error.message;
+          const words = installDetail('native.update.installFailed', {
+            reason,
+            ...(error.killed ? { timedOut: 'true' } : {}),
+          });
+          resolve({ ok: false, reason: 'failed', ...words, detail: words.detail.slice(0, 240) });
         },
       );
     } catch (error) {
-      resolve({ ok: false, reason: "unavailable", detail: String(error?.message ?? error) });
+      resolve({ ok: false, reason: 'unavailable', detail: String(error?.message ?? error) });
       return;
     }
     child?.stdin?.end?.();

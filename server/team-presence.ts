@@ -13,8 +13,8 @@ export const WINDOW_TTL_MS = 150_000;
 export const THREAD_GAP_MS = 750;
 
 export type PresenceEvent =
-  | { type: "person"; email: string; here: boolean }
-  | { type: "thread"; threadId: string; people: string[] };
+  | { type: 'person'; email: string; here: boolean }
+  | { type: 'thread'; threadId: string; people: string[] };
 
 export interface PresenceClock {
   now(): number;
@@ -78,12 +78,15 @@ export function createTeamPresence(deps: TeamPresenceDeps) {
     if (!one || one.announced === one.here || one.frameTimer) return;
     const wait = one.lastFrameAt + PERSON_GAP_MS - clock.now();
     if (wait > 0) {
-      one.frameTimer = clock.later(() => { one.frameTimer = undefined; announce(email); }, wait);
+      one.frameTimer = clock.later(() => {
+        one.frameTimer = undefined;
+        announce(email);
+      }, wait);
       return;
     }
     one.announced = one.here;
     one.lastFrameAt = clock.now();
-    deps.emit({ type: "person", email, here: one.here });
+    deps.emit({ type: 'person', email, here: one.here });
   }
 
   function arrive(email: string): Person {
@@ -101,15 +104,18 @@ export function createTeamPresence(deps: TeamPresenceDeps) {
   function scheduleAway(email: string, one: Person): void {
     if (one.streams > 0) return;
     one.awayTimer?.cancel();
-    one.awayTimer = clock.later(() => {
-      one.awayTimer = undefined;
-      if (one.streams > 0 || !one.here) return;
-      const left = clock.now() - one.lastActive;
-      if (left < graceMs) return scheduleAway(email, one);
-      one.here = false;
-      for (const [key, window] of windows) if (window.email === email) dropWindow(key);
-      announce(email);
-    }, Math.max(0, one.lastActive + graceMs - clock.now()));
+    one.awayTimer = clock.later(
+      () => {
+        one.awayTimer = undefined;
+        if (one.streams > 0 || !one.here) return;
+        const left = clock.now() - one.lastActive;
+        if (left < graceMs) return scheduleAway(email, one);
+        one.here = false;
+        for (const [key, window] of windows) if (window.email === email) dropWindow(key);
+        announce(email);
+      },
+      Math.max(0, one.lastActive + graceMs - clock.now()),
+    );
   }
 
   function touched(threadId: string | null): void {
@@ -140,7 +146,7 @@ export function createTeamPresence(deps: TeamPresenceDeps) {
     dirty.clear();
     for (const threadId of threads) {
       const open = viewers(threadId);
-      if (open.length > 0) deps.emit({ type: "thread", threadId, people: open });
+      if (open.length > 0) deps.emit({ type: 'thread', threadId, people: open });
     }
   }
 
@@ -192,7 +198,10 @@ export function createTeamPresence(deps: TeamPresenceDeps) {
     close(): void {
       threadTimer?.cancel();
       sweepTimer?.cancel();
-      for (const one of people.values()) { one.awayTimer?.cancel(); one.frameTimer?.cancel(); }
+      for (const one of people.values()) {
+        one.awayTimer?.cancel();
+        one.frameTimer?.cancel();
+      }
     },
   };
 }

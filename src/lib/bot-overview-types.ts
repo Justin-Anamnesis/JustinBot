@@ -1,4 +1,4 @@
-import type { RoutineSchedule } from "@/lib/routines";
+import type { RoutineSchedule } from '@/lib/routines';
 
 export interface BotOverview {
   who: { name: string; title: string; blurb: string; soulLead: string };
@@ -12,10 +12,10 @@ export interface BotOverview {
 }
 
 export interface SetupStep {
-  id: "identity" | "soul" | "folder" | "apps" | "schedule";
+  id: 'identity' | 'soul' | 'folder' | 'apps' | 'schedule';
   label: string;
   done: boolean;
-  section?: "identity" | "soul" | "access" | "routines";
+  section?: 'identity' | 'soul' | 'access' | 'routines';
 }
 
 export interface OverviewRoutineLine {

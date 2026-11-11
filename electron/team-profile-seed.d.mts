@@ -7,6 +7,8 @@ export function seedTeamProfile(deps: {
   tries?: number;
   wait?(ms: number): Promise<void>;
   log?(line: string): void;
-}): Promise<"seeded" | "nothing" | "signed-out" | "failed">;
+}): Promise<'seeded' | 'nothing' | 'signed-out' | 'failed'>;
 
-export function createTeamProfileSeeds(deps: Omit<Parameters<typeof seedTeamProfile>[0], "origin">): { opened(origin: string): void };
+export function createTeamProfileSeeds(
+  deps: Omit<Parameters<typeof seedTeamProfile>[0], 'origin'>,
+): { opened(origin: string): void };

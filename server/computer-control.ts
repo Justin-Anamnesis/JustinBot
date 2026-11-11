@@ -2,7 +2,7 @@
 // person holds control the bot's actions are refused, never queued: a queued click would land on whatever is under it later.
 // A plea is settled only by its sign-in card. In memory on purpose: a hold that survived a restart would brick the computer.
 
-import type { ComputerHelpRef } from "../shared/wire.ts";
+import type { ComputerHelpRef } from '../shared/wire.ts';
 
 export interface ControlSnapshot {
   /** True while the person is driving; the bot's hands are refused. */
@@ -65,7 +65,11 @@ export class ComputerControl {
   take(botId: string): ControlSnapshot {
     const entry = this.entries.get(botId);
     if (entry?.heldSinceMs != null) return this.snapshot(botId);
-    this.entries.set(botId, { heldSinceMs: this.now(), pleas: entry?.pleas ?? [], controlLeaseId: null });
+    this.entries.set(botId, {
+      heldSinceMs: this.now(),
+      pleas: entry?.pleas ?? [],
+      controlLeaseId: null,
+    });
     return this.changed(botId);
   }
 
@@ -108,10 +112,12 @@ export class ComputerControl {
 
   /** Never grants anything by itself; the same card asking again replaces its own plea. */
   requestHelp(botId: string, reason: unknown, ref: ComputerHelpRef): ControlSnapshot {
-    const text = typeof reason === "string" ? reason.trim().slice(0, MAX_REASON_CHARS) : "";
+    const text = typeof reason === 'string' ? reason.trim().slice(0, MAX_REASON_CHARS) : '';
     const entry = this.entries.get(botId) ?? { heldSinceMs: null, pleas: [], controlLeaseId: null };
-    entry.pleas = [...entry.pleas.filter((plea) => plea.ref.messageId !== ref.messageId),
-      { reason: text || `sign in to ${ref.site}`, ref }];
+    entry.pleas = [
+      ...entry.pleas.filter((plea) => plea.ref.messageId !== ref.messageId),
+      { reason: text || `sign in to ${ref.site}`, ref },
+    ];
     this.entries.set(botId, entry);
     return this.changed(botId);
   }
@@ -133,7 +139,8 @@ export class ComputerControl {
   }
 
   private drop(botId: string, entry: Entry): void {
-    if (entry.pleas.length) this.entries.set(botId, { heldSinceMs: null, pleas: entry.pleas, controlLeaseId: null });
+    if (entry.pleas.length)
+      this.entries.set(botId, { heldSinceMs: null, pleas: entry.pleas, controlLeaseId: null });
     else this.entries.delete(botId);
   }
 

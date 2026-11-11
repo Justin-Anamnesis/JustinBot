@@ -6,17 +6,24 @@
 
 /** Why a change applied without a person: the conversation's Full access, any other level, or (routines only) the bot's
  * own routine. Also the decision log's source. */
-export type DirectApply = "full-access" | "level" | "self";
+export type DirectApply = 'full-access' | 'level' | 'self';
 
 /** Server-owned and decided per request, never from request input. Null: the owner confirms on a card. */
-export type DirectApplyCheck = (botId: string, threadId: string, targetBotId: string) => DirectApply | null;
+export type DirectApplyCheck = (
+  botId: string,
+  threadId: string,
+  targetBotId: string,
+) => DirectApply | null;
 
 /** What Undo says, applying nothing, once the thing changed since. */
 export const UNDO_STALE = "Changed since, so it can't be undone here.";
 
-export function appliesNow(args: { fullAccess: boolean; ownerMustConfirm: boolean }): DirectApply | null {
+export function appliesNow(args: {
+  fullAccess: boolean;
+  ownerMustConfirm: boolean;
+}): DirectApply | null {
   if (args.ownerMustConfirm) return null;
-  return args.fullAccess ? "full-access" : "level";
+  return args.fullAccess ? 'full-access' : 'level';
 }
 
 /** Trigger (routine) requests only: why a change applied, for the decision log. Every trigger change applies since
@@ -27,6 +34,6 @@ export function directApply(args: {
   targetBotId: string;
   blocked: boolean;
 }): DirectApply | null {
-  if (args.fullAccess) return "full-access";
-  return args.targetBotId === args.botId && !args.blocked ? "self" : null;
+  if (args.fullAccess) return 'full-access';
+  return args.targetBotId === args.botId && !args.blocked ? 'self' : null;
 }

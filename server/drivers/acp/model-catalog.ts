@@ -1,5 +1,9 @@
-import type { ModelCatalog } from "../../contracts.ts";
-import { readStartupModelCacheEntry, unconfirmedModelCatalog, writeStartupModelCache } from "../../startup-model-catalog.ts";
+import type { ModelCatalog } from '../../contracts.ts';
+import {
+  readStartupModelCacheEntry,
+  unconfirmedModelCatalog,
+  writeStartupModelCache,
+} from '../../startup-model-catalog.ts';
 
 export interface AcpModelCatalog {
   models: ModelCatalog;
@@ -19,7 +23,7 @@ export function acpModelCatalog(input: {
 }): AcpModelCatalog {
   const { instanceId, resolve } = input;
   const saved = resolve ? readStartupModelCacheEntry(instanceId) : null;
-  let models = input.startFromSaved ? saved?.catalog ?? input.fixed : input.fixed;
+  let models = input.startFromSaved ? (saved?.catalog ?? input.fixed) : input.fixed;
   let readFromEngine = Boolean(saved?.checkedAt);
   let accountModels: ReadonlySet<string> | null = saved?.checkedAt ? idsOf(saved.catalog) : null;
   let current: { fresh: boolean; done: Promise<void> } | null = null;
@@ -33,21 +37,37 @@ export function acpModelCatalog(input: {
         readFromEngine = true;
         accountModels = idsOf(resolved);
       } else unconfirmedModelCatalog(models);
-    } catch { unconfirmedModelCatalog(models); }
-    try { writeStartupModelCache(instanceId, models); } catch {}
+    } catch {
+      unconfirmedModelCatalog(models);
+    }
+    try {
+      writeStartupModelCache(instanceId, models);
+    } catch {}
   };
 
   return {
-    get models() { return models; },
-    set models(catalog) { models = catalog; },
-    get accountModels() { return accountModels; },
-    set accountModels(ids) { accountModels = ids; },
-    get unconfirmed() { return Boolean(resolve) && !readFromEngine; },
+    get models() {
+      return models;
+    },
+    set models(catalog) {
+      models = catalog;
+    },
+    get accountModels() {
+      return accountModels;
+    },
+    set accountModels(ids) {
+      accountModels = ids;
+    },
+    get unconfirmed() {
+      return Boolean(resolve) && !readFromEngine;
+    },
     refresh(fresh = false) {
       if (current && (current.fresh || !fresh)) return current.done;
       const next = { fresh, done: (current?.done ?? Promise.resolve()).then(() => read(fresh)) };
       current = next;
-      void next.done.finally(() => { if (current === next) current = null; });
+      void next.done.finally(() => {
+        if (current === next) current = null;
+      });
       return next.done;
     },
   };

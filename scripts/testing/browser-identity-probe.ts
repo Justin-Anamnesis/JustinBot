@@ -1,8 +1,8 @@
 // A loopback site that reports what a browser says it is from four places: the page, a dedicated worker, a service worker and
 // a cross-site frame (localhost against 127.0.0.1, so Chrome puts it in a process of its own), plus the request headers.
-import { createServer, type IncomingMessage, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server } from 'node:http';
 
-import { HIGH_ENTROPY_HINTS } from "../../server/browser/chrome/identity.ts";
+import { HIGH_ENTROPY_HINTS } from '../../server/browser/chrome/identity.ts';
 
 export interface ReportedIdentity {
   ua: string;
@@ -35,9 +35,12 @@ export interface ProbeReports {
 
 const READ = `async () => ({ ua: navigator.userAgent, brands: navigator.userAgentData ? navigator.userAgentData.brands : null,
   high: navigator.userAgentData ? await navigator.userAgentData.getHighEntropyValues(${JSON.stringify(HIGH_ENTROPY_HINTS)}) : null })`;
-const ACCEPT_CH = "Sec-CH-UA-Full-Version-List, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Model, Sec-CH-UA-Bitness";
+const ACCEPT_CH =
+  'Sec-CH-UA-Full-Version-List, Sec-CH-UA-Platform-Version, Sec-CH-UA-Arch, Sec-CH-UA-Model, Sec-CH-UA-Bitness';
 
-const page = (crossOrigin: string) => `<!doctype html><meta charset="utf-8"><title>identity probe</title>
+const page = (
+  crossOrigin: string,
+) => `<!doctype html><meta charset="utf-8"><title>identity probe</title>
 <body style="margin:0"><p>identity probe</p><iframe src="${crossOrigin}/frame" style="width:200px;height:60px;border:0"></iframe>
 <script>
 const read = ${READ};
@@ -97,8 +100,19 @@ self.addEventListener('message', (event) => event.waitUntil((async () => {
   event.ports[0].postMessage(report);
 })()));`;
 
-const HEADERS = ["user-agent", "sec-ch-ua", "sec-ch-ua-mobile", "sec-ch-ua-platform", "sec-ch-ua-platform-version", "sec-ch-ua-arch", "sec-ch-ua-bitness", "sec-ch-ua-full-version-list", "accept-language"];
-const picked = (request: IncomingMessage) => Object.fromEntries(HEADERS.map((name) => [name, request.headers[name] as string | undefined]));
+const HEADERS = [
+  'user-agent',
+  'sec-ch-ua',
+  'sec-ch-ua-mobile',
+  'sec-ch-ua-platform',
+  'sec-ch-ua-platform-version',
+  'sec-ch-ua-arch',
+  'sec-ch-ua-bitness',
+  'sec-ch-ua-full-version-list',
+  'accept-language',
+];
+const picked = (request: IncomingMessage) =>
+  Object.fromEntries(HEADERS.map((name) => [name, request.headers[name] as string | undefined]));
 
 export interface IdentityProbe {
   url: string;
@@ -111,33 +125,39 @@ export interface IdentityProbe {
 export async function startIdentityProbe(): Promise<IdentityProbe> {
   const reports: ProbeReports = { headers: {} };
   let port = 0;
-  const handler = (request: IncomingMessage, response: import("node:http").ServerResponse) => {
-    const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+  const handler = (request: IncomingMessage, response: import('node:http').ServerResponse) => {
+    const path = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
     const send = (type: string, body: string, extra: Record<string, string> = {}) => {
-      response.writeHead(200, { "content-type": type, "cache-control": "no-store", ...extra });
+      response.writeHead(200, { 'content-type': type, 'cache-control': 'no-store', ...extra });
       response.end(body);
     };
-    if (path === "/probe") {
+    if (path === '/probe') {
       reports.headers.document = picked(request);
-      return send("text/html; charset=utf-8", page(`http://localhost:${port}`), { "accept-ch": ACCEPT_CH });
+      return send('text/html; charset=utf-8', page(`http://localhost:${port}`), {
+        'accept-ch': ACCEPT_CH,
+      });
     }
-    if (path === "/frame") {
+    if (path === '/frame') {
       reports.headers.frame = picked(request);
-      return send("text/html; charset=utf-8", frame, { "accept-ch": ACCEPT_CH });
+      return send('text/html; charset=utf-8', frame, { 'accept-ch': ACCEPT_CH });
     }
-    if (path === "/worker.js") return send("text/javascript", worker);
-    if (path === "/sw.js") return send("text/javascript", serviceWorker);
-    if (path.startsWith("/headers/")) {
-      reports.headers[path.slice("/headers/".length)] = picked(request);
-      return send("application/json", "{}");
+    if (path === '/worker.js') return send('text/javascript', worker);
+    if (path === '/sw.js') return send('text/javascript', serviceWorker);
+    if (path.startsWith('/headers/')) {
+      reports.headers[path.slice('/headers/'.length)] = picked(request);
+      return send('application/json', '{}');
     }
     const report = /^\/report\/(page|worker|serviceworker|frame)$/u.exec(path);
-    if (report && request.method === "POST") {
-      let body = "";
-      request.setEncoding("utf8");
-      request.on("data", (chunk: string) => { if (body.length < 1_000_000) body += chunk; });
-      request.on("end", () => {
-        try { (reports as unknown as Record<string, unknown>)[report[1]!] = JSON.parse(body); } catch {}
+    if (report && request.method === 'POST') {
+      let body = '';
+      request.setEncoding('utf8');
+      request.on('data', (chunk: string) => {
+        if (body.length < 1_000_000) body += chunk;
+      });
+      request.on('end', () => {
+        try {
+          (reports as unknown as Record<string, unknown>)[report[1]!] = JSON.parse(body);
+        } catch {}
         response.writeHead(204);
         response.end();
       });
@@ -148,38 +168,62 @@ export async function startIdentityProbe(): Promise<IdentityProbe> {
   };
   const servers: Server[] = [];
   const primary = createServer(handler);
-  await new Promise<void>((resolve, reject) => { primary.once("error", reject); primary.listen(0, "127.0.0.1", resolve); });
+  await new Promise<void>((resolve, reject) => {
+    primary.once('error', reject);
+    primary.listen(0, '127.0.0.1', resolve);
+  });
   port = (primary.address() as { port: number }).port;
   servers.push(primary);
   // Chrome may reach "localhost" over IPv6 first.
   const v6 = createServer(handler);
-  await new Promise<void>((resolve) => { v6.once("error", () => resolve()); v6.listen(port, "::1", () => { servers.push(v6); resolve(); }); });
+  await new Promise<void>((resolve) => {
+    v6.once('error', () => resolve());
+    v6.listen(port, '::1', () => {
+      servers.push(v6);
+      resolve();
+    });
+  });
   return {
     url: `http://127.0.0.1:${port}/probe`,
     reports,
     async complete(timeoutMs) {
       const deadline = Date.now() + timeoutMs;
-      while (!(reports.page && reports.worker && reports.serviceworker && reports.frame && reports.headers.serviceworker)) {
+      while (!(
+        reports.page &&
+        reports.worker &&
+        reports.serviceworker &&
+        reports.frame &&
+        reports.headers.serviceworker
+      )) {
         if (Date.now() > deadline) {
-          const missing = ["page", "worker", "serviceworker", "frame"].filter((name) => !(reports as unknown as Record<string, unknown>)[name]);
-          throw new Error(`the probe page did not report from: ${missing.join(", ") || "the service worker's fetch"}`);
+          const missing = ['page', 'worker', 'serviceworker', 'frame'].filter(
+            (name) => !(reports as unknown as Record<string, unknown>)[name],
+          );
+          throw new Error(
+            `the probe page did not report from: ${missing.join(', ') || "the service worker's fetch"}`,
+          );
         }
         await new Promise((resolve) => setTimeout(resolve, 100));
       }
       return reports;
     },
-    close: async () => { await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve)))); },
+    close: async () => {
+      await Promise.all(servers.map((server) => new Promise((resolve) => server.close(resolve))));
+    },
   };
 }
 
 const PLATFORM_TOKENS: Partial<Record<NodeJS.Platform, string>> = {
-  darwin: "Macintosh; Intel Mac OS X 10_15_7",
-  win32: "Windows NT 10.0; Win64; x64",
-  linux: "X11; Linux x86_64",
+  darwin: 'Macintosh; Intel Mac OS X 10_15_7',
+  win32: 'Windows NT 10.0; Win64; x64',
+  linux: 'X11; Linux x86_64',
 };
 
 /** Chrome's reduced user agent for a major version, which is what a headed Chrome sends; written out here, not read from the
  * browser, so the check does not grade the browser against itself. */
-export function expectedUserAgent(major: string, platform: NodeJS.Platform = process.platform): string {
-  return `Mozilla/5.0 (${PLATFORM_TOKENS[platform] ?? "X11; Linux x86_64"}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`;
+export function expectedUserAgent(
+  major: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  return `Mozilla/5.0 (${PLATFORM_TOKENS[platform] ?? 'X11; Linux x86_64'}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`;
 }

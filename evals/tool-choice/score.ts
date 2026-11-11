@@ -9,7 +9,7 @@ export interface ToolChoiceCase {
 
 /** A tool name as a thread's activity row or a stream event gives it, without its server. */
 export function bareToolName(name: string): string {
-  return name.replace(/^mcp__[^_]+(?:_[^_]+)*?__/, "");
+  return name.replace(/^mcp__[^_]+(?:_[^_]+)*?__/, '');
 }
 
 export interface CaseScore {
@@ -20,15 +20,24 @@ export interface CaseScore {
 }
 
 /** The first of the turn's tool calls that isn't a lookup decides the case; a later right tool still counts, since the tool list is what's on trial. */
-export function scoreCase(testCase: Pick<ToolChoiceCase, "tools">, calls: readonly string[]): CaseScore {
+export function scoreCase(
+  testCase: Pick<ToolChoiceCase, 'tools'>,
+  calls: readonly string[],
+): CaseScore {
   const names = calls.map(bareToolName);
-  const lookups = new Set(["find_tool", "ToolSearch"]);
+  const lookups = new Set(['find_tool', 'ToolSearch']);
   const chosen = names.find((name) => testCase.tools.includes(name));
-  return { pass: chosen !== undefined, chosen: chosen ?? names.find((name) => !lookups.has(name)), searched: names.some((name) => lookups.has(name)) };
+  return {
+    pass: chosen !== undefined,
+    chosen: chosen ?? names.find((name) => !lookups.has(name)),
+    searched: names.some((name) => lookups.has(name)),
+  };
 }
 
 /** Pass rate, plus what a bridge or a shorter prompt has to beat. */
-export function summarize(rows: ReadonlyArray<{ score: CaseScore; costUsd?: number; inputTokens?: number }>) {
+export function summarize(
+  rows: ReadonlyArray<{ score: CaseScore; costUsd?: number; inputTokens?: number }>,
+) {
   const passed = rows.filter((row) => row.score.pass).length;
   return {
     cases: rows.length,

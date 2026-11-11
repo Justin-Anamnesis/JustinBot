@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import { Building2, Check } from "lucide-react";
-import type { ManagedDesktopBridge, ManagedDesktopState } from "../../../../electron/managed-desktop.mjs";
-import { productName } from "@/lib/brand";
-import { t } from "@/lib/i18n";
-import { companyModelCount, DEFAULT_ADMIN_ORIGIN } from "@/lib/onboarding";
-import { staggerIndex } from "./shared";
+import { useEffect, useRef, useState } from 'react';
+import { Building2, Check } from 'lucide-react';
+import type {
+  ManagedDesktopBridge,
+  ManagedDesktopState,
+} from '../../../../electron/managed-desktop.mjs';
+import { productName } from '@/lib/brand';
+import { t } from '@/lib/i18n';
+import { companyModelCount, DEFAULT_ADMIN_ORIGIN } from '@/lib/onboarding';
+import { staggerIndex } from './shared';
 
-const linkClass = "w-fit text-[12px] text-ink-secondary underline-offset-2 transition-colors hover:text-ink hover:underline";
+const linkClass =
+  'w-fit text-[12px] text-ink-secondary underline-offset-2 transition-colors hover:text-ink hover:underline';
 
 export function OrganisationRow({
   bridge,
@@ -23,13 +27,13 @@ export function OrganisationRow({
   const pending = useRef(false);
   const generation = useRef(0);
   const revision = useRef(0);
-  const status = useRef<ManagedDesktopState["status"] | undefined>(undefined);
+  const status = useRef<ManagedDesktopState['status'] | undefined>(undefined);
   const connected = useRef(onConnected);
   connected.current = onConnected;
 
   const accept = (next: ManagedDesktopState) => {
     const changed = status.current !== next.status;
-    const arrived = changed && next.status === "connected" && status.current !== undefined;
+    const arrived = changed && next.status === 'connected' && status.current !== undefined;
     status.current = next.status;
     setConnection(next);
     if (changed) setFailed(false);
@@ -55,6 +59,7 @@ export function OrganisationRow({
       generation.current++;
       unsubscribe();
     };
+    // prettier-ignore
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bridge]);
 
@@ -83,36 +88,41 @@ export function OrganisationRow({
 
   let body: React.ReactNode;
   let action: React.ReactNode = null;
-  if (connection.status === "signed-out") {
+  if (connection.status === 'signed-out') {
     body = (
       <>
-        <p className="text-[13px] leading-snug text-ink-secondary">
-          <span className="font-medium text-ink">{t("onboarding.org.title", { app: productName() })}</span>{" "}
-          {t("onboarding.org.body")}
+        <p className='text-[13px] leading-snug text-ink-secondary'>
+          <span className='font-medium text-ink'>
+            {t('onboarding.org.title', { app: productName() })}
+          </span>{' '}
+          {t('onboarding.org.body')}
         </p>
-        <button type="button" onClick={onOpenSettings} className={linkClass}>
-          {t("onboarding.org.otherAddress")}
+        <button type='button' onClick={onOpenSettings} className={linkClass}>
+          {t('onboarding.org.otherAddress')}
         </button>
       </>
     );
     action = (
       <button
-        type="button"
+        type='button'
         disabled={busy}
         onClick={() => void perform(() => bridge.begin({ portalOrigin: DEFAULT_ADMIN_ORIGIN }))}
-        className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-[filter] hover:brightness-110 disabled:opacity-50"
-      >
-        {busy ? t("organization.working") : t("onboarding.org.signIn")}
+        className='shrink-0 rounded-lg bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-[filter] hover:brightness-110 disabled:opacity-50'>
+        {busy ? t('organization.working') : t('onboarding.org.signIn')}
       </button>
     );
-  } else if (connection.status === "connecting") {
+  } else if (connection.status === 'connecting') {
     body = (
       <>
-        <p role="status" className="text-[13px] font-medium text-ink">{t("onboarding.org.finish")}</p>
+        <p role='status' className='text-[13px] font-medium text-ink'>
+          {t('onboarding.org.finish')}
+        </p>
         {connection.enrollment && (
-          <p className="text-[12px] text-ink-secondary">
-            {t("onboarding.org.finishHelp")}{" "}
-            <code dir="ltr" className="select-all rounded bg-inset px-1.5 py-0.5 tracking-widest text-ink">
+          <p className='text-[12px] text-ink-secondary'>
+            {t('onboarding.org.finishHelp')}{' '}
+            <code
+              dir='ltr'
+              className='select-all rounded bg-inset px-1.5 py-0.5 tracking-widest text-ink'>
               {connection.enrollment.userCode}
             </code>
           </p>
@@ -121,30 +131,34 @@ export function OrganisationRow({
     );
     action = (
       <button
-        type="button"
+        type='button'
         disabled={busy}
         onClick={() => void perform(() => bridge.cancelEnrollment())}
-        className="shrink-0 rounded-md px-2 py-1 text-[12px] text-ink-secondary transition-colors hover:bg-raised hover:text-ink disabled:opacity-50"
-      >
-        {t("organization.cancel")}
+        className='shrink-0 rounded-md px-2 py-1 text-[12px] text-ink-secondary transition-colors hover:bg-raised hover:text-ink disabled:opacity-50'>
+        {t('organization.cancel')}
       </button>
     );
-  } else if (connection.status === "connected") {
+  } else if (connection.status === 'connected') {
     body = (
       <>
-        <p className="truncate text-[13px] font-medium text-ink">{t("onboarding.org.connected", { organization: name ?? "" })}</p>
-        <p className="text-[12px] text-ink-secondary">
-          {count > 0 ? t("onboarding.org.models", { count }) : t("organization.noModels")}
+        <p className='truncate text-[13px] font-medium text-ink'>
+          {t('onboarding.org.connected', { organization: name ?? '' })}
+        </p>
+        <p className='text-[12px] text-ink-secondary'>
+          {count > 0 ? t('onboarding.org.models', { count }) : t('organization.noModels')}
         </p>
       </>
     );
-    action = count > 0 ? <Check size={16} strokeWidth={2.5} className="shrink-0 text-success" aria-hidden="true" /> : null;
+    action =
+      count > 0 ? (
+        <Check size={16} strokeWidth={2.5} className='shrink-0 text-success' aria-hidden='true' />
+      ) : null;
   } else {
     body = (
       <>
-        {name && <p className="truncate text-[13px] font-medium text-ink">{name}</p>}
-        <button type="button" onClick={onOpenSettings} className={linkClass}>
-          {t("onboarding.org.manage")}
+        {name && <p className='truncate text-[13px] font-medium text-ink'>{name}</p>}
+        <button type='button' onClick={onOpenSettings} className={linkClass}>
+          {t('onboarding.org.manage')}
         </button>
       </>
     );
@@ -152,16 +166,21 @@ export function OrganisationRow({
 
   return (
     <div
-      className="animate-rise mt-4 flex items-center gap-3 rounded-xl border border-hairline/40 bg-card px-3.5 py-3"
-      style={staggerIndex(1)}
-    >
-      <Building2 size={18} className="shrink-0 text-ink-secondary" aria-hidden="true" />
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
+      className='animate-rise mt-4 flex items-center gap-3 rounded-xl border border-hairline/40 bg-card px-3.5 py-3'
+      style={staggerIndex(1)}>
+      <Building2 size={18} className='shrink-0 text-ink-secondary' aria-hidden='true' />
+      <div className='flex min-w-0 flex-1 flex-col gap-1'>
         {body}
         {connection.message && (
-          <p role="status" className="text-[12px] text-ink-secondary">{connection.message}</p>
+          <p role='status' className='text-[12px] text-ink-secondary'>
+            {connection.message}
+          </p>
         )}
-        {failed && <p role="alert" className="text-[12px] text-danger">{t("organization.actionFailed")}</p>}
+        {failed && (
+          <p role='alert' className='text-[12px] text-danger'>
+            {t('organization.actionFailed')}
+          </p>
+        )}
       </div>
       {action}
     </div>

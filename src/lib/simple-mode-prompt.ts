@@ -1,8 +1,8 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
 /** The Simple mode popup was closed in this browser. Kept per browser, next to the mode it is about (interface-mode's
  * omb-advanced-mode), since each browser keeps its own mode. */
-export const SIMPLE_MODE_PROMPT_KEY = "omb-simple-mode-prompt";
+export const SIMPLE_MODE_PROMPT_KEY = 'omb-simple-mode-prompt';
 
 /** Where this page cannot write its storage, its memory stands in, so the popup still closes for the session. */
 let closedHere = false;
@@ -11,7 +11,7 @@ const listeners = new Set<() => void>();
 export function simpleModePromptSeen(): boolean {
   if (closedHere) return true;
   try {
-    return globalThis.localStorage?.getItem(SIMPLE_MODE_PROMPT_KEY) === "1";
+    return globalThis.localStorage?.getItem(SIMPLE_MODE_PROMPT_KEY) === '1';
   } catch {
     // Storage this page cannot read would ask again at every launch.
     return true;
@@ -20,7 +20,7 @@ export function simpleModePromptSeen(): boolean {
 
 export function markSimpleModePromptSeen(): void {
   try {
-    globalThis.localStorage?.setItem(SIMPLE_MODE_PROMPT_KEY, "1");
+    globalThis.localStorage?.setItem(SIMPLE_MODE_PROMPT_KEY, '1');
   } catch {
     closedHere = true;
   }
@@ -34,10 +34,12 @@ function onStorage(event: StorageEvent) {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (listeners.size === 1 && typeof window !== "undefined") window.addEventListener("storage", onStorage);
+  if (listeners.size === 1 && typeof window !== 'undefined')
+    window.addEventListener('storage', onStorage);
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && typeof window !== "undefined") window.removeEventListener("storage", onStorage);
+    if (listeners.size === 0 && typeof window !== 'undefined')
+      window.removeEventListener('storage', onStorage);
   };
 }
 

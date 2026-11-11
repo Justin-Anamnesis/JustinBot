@@ -1,21 +1,21 @@
 // The mocked removal stands in for docker-over-SSH: these tests pin which aliases may reach it.
-import type { IncomingMessage, ServerResponse } from "node:http";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AppConfig } from "../config.ts";
-import type { RequestAuth } from "../request-auth.ts";
-import type { BotRecord } from "../store.ts";
-import * as vps from "../vps-computer.ts";
-import { createComputerRoutes, type ComputerRouteDeps } from "./computers.ts";
-import { PASS, type RouteContext } from "./table.ts";
+import type { AppConfig } from '../config.ts';
+import type { RequestAuth } from '../request-auth.ts';
+import type { BotRecord } from '../store.ts';
+import * as vps from '../vps-computer.ts';
+import { createComputerRoutes, type ComputerRouteDeps } from './computers.ts';
+import { PASS, type RouteContext } from './table.ts';
 
-vi.mock("../vps-computer.ts", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../vps-computer.ts")>();
+vi.mock('../vps-computer.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../vps-computer.ts')>();
   return { ...actual, removeManagedVpsComputer: vi.fn() };
 });
 
 const remove = vi.mocked(vps.removeManagedVpsComputer);
-const CONTAINER = "openmausbot-vps-test-abc123";
+const CONTAINER = 'openmausbot-vps-test-abc123';
 
 beforeEach(() => {
   remove.mockReset();
@@ -37,16 +37,16 @@ function fixture(bots: BotRecord[], cfg: AppConfig) {
   const postRemove = async (body: Record<string, unknown>) => {
     const sent: Array<{ status: number; body: any }> = [];
     const out = await handler({
-      req: { headers: { "content-type": "application/json" } } as unknown as IncomingMessage,
+      req: { headers: { 'content-type': 'application/json' } } as unknown as IncomingMessage,
       res: {} as ServerResponse,
       url: new URL(`http://localhost/api/computers/vps/${CONTAINER}/remove`),
       path: `/api/computers/vps/${CONTAINER}/remove`,
-      method: "POST",
-      auth: { kind: "loopback", scopes: ["admin"] } as RequestAuth,
+      method: 'POST',
+      auth: { kind: 'loopback', scopes: ['admin'] } as RequestAuth,
       json: ((_res: ServerResponse, status: number, response: unknown) => {
         sent.push({ status, body: response });
-      }) as RouteContext["json"],
-      readBody: (async () => body) as RouteContext["readBody"],
+      }) as RouteContext['json'],
+      readBody: (async () => body) as RouteContext['readBody'],
     });
     expect(out).not.toBe(PASS);
     expect(sent).toHaveLength(1);
@@ -56,13 +56,13 @@ function fixture(bots: BotRecord[], cfg: AppConfig) {
 }
 
 const cfgWith = (sshAlias: string): AppConfig => ({ vps: { sshAlias } }) as AppConfig;
-const botWith = (vpsAlias?: string): BotRecord => ({ id: "bot-1", vpsAlias }) as BotRecord;
+const botWith = (vpsAlias?: string): BotRecord => ({ id: 'bot-1', vpsAlias }) as BotRecord;
 
-describe("POST /api/computers/vps/:name/remove", () => {
-  it("refuses an alias no bot or default uses without touching SSH", async () => {
-    const { postRemove } = fixture([botWith("alpha-vps")], cfgWith("production-vps"));
+describe('POST /api/computers/vps/:name/remove', () => {
+  it('refuses an alias no bot or default uses without touching SSH', async () => {
+    const { postRemove } = fixture([botWith('alpha-vps')], cfgWith('production-vps'));
 
-    const refused = await postRemove({ confirmName: CONTAINER, alias: "foreign-vps" });
+    const refused = await postRemove({ confirmName: CONTAINER, alias: 'foreign-vps' });
 
     expect(refused.status).toBe(400);
     expect(refused.body.error).toMatch(/default server or a bot's own SSH alias/);
@@ -70,23 +70,33 @@ describe("POST /api/computers/vps/:name/remove", () => {
   });
 
   it("lets a bot's own alias and the default through to removal", async () => {
-    const { postRemove } = fixture([botWith("alpha-vps")], cfgWith("production-vps"));
+    const { postRemove } = fixture([botWith('alpha-vps')], cfgWith('production-vps'));
 
-    const perBot = await postRemove({ confirmName: CONTAINER, alias: "alpha-vps" });
+    const perBot = await postRemove({ confirmName: CONTAINER, alias: 'alpha-vps' });
 
     expect(perBot.status).toBe(200);
-    expect(remove).toHaveBeenCalledWith({ vps: { sshAlias: "alpha-vps" } }, [], CONTAINER, CONTAINER);
+    expect(remove).toHaveBeenCalledWith(
+      { vps: { sshAlias: 'alpha-vps' } },
+      [],
+      CONTAINER,
+      CONTAINER,
+    );
 
     remove.mockClear();
-    const fallback = await postRemove({ confirmName: CONTAINER, alias: "production-vps" });
+    const fallback = await postRemove({ confirmName: CONTAINER, alias: 'production-vps' });
 
     expect(fallback.status).toBe(200);
-    expect(remove).toHaveBeenCalledWith({ vps: { sshAlias: "production-vps" } }, [], CONTAINER, CONTAINER);
+    expect(remove).toHaveBeenCalledWith(
+      { vps: { sshAlias: 'production-vps' } },
+      [],
+      CONTAINER,
+      CONTAINER,
+    );
   });
 
-  it("keeps using the default server when no alias is given", async () => {
-    const cfg = cfgWith("production-vps");
-    const { postRemove } = fixture([botWith("alpha-vps")], cfg);
+  it('keeps using the default server when no alias is given', async () => {
+    const cfg = cfgWith('production-vps');
+    const { postRemove } = fixture([botWith('alpha-vps')], cfg);
 
     const removed = await postRemove({ confirmName: CONTAINER });
 

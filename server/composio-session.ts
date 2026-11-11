@@ -1,10 +1,10 @@
 // A Composio project key (ak_…) creates or reuses one Tool Router Session, which owns connection state, auth links and the
 // MCP endpoint. A PATCH replaces a Session's whole `auth_configs` map and keeps its id and MCP URL (API v3.1, Oct 2026):
 // https://docs.composio.dev/reference/sdk-reference/python/session
-import { randomUUID } from "node:crypto";
-import { z } from "zod";
+import { randomUUID } from 'node:crypto';
+import { z } from 'zod';
 
-import { saveConfig, type AppConfig } from "./config.ts";
+import { saveConfig, type AppConfig } from './config.ts';
 import {
   apiBase,
   canonicalToolkitSlug,
@@ -17,20 +17,24 @@ import {
   type AuthConfigChoice,
   type ConnectedAccountResponse,
   type AuthConfigMap,
-} from "./composio-project.ts";
+} from './composio-project.ts';
 
 const sessionResponseSchema = z.object({
   session_id: z.string().min(1),
-  mcp: z.object({ type: z.enum(["http", "sse"]), url: z.string().min(1) }),
-  config: z.object({
-    user_id: z.string().optional(),
-    multi_account: z.object({
-      enable: z.boolean().optional(),
-      max_accounts_per_toolkit: z.number().optional(),
-      require_explicit_selection: z.boolean().optional(),
-    }).optional(),
-    auth_configs: z.record(z.string(), z.string()).optional(),
-  }).optional(),
+  mcp: z.object({ type: z.enum(['http', 'sse']), url: z.string().min(1) }),
+  config: z
+    .object({
+      user_id: z.string().optional(),
+      multi_account: z
+        .object({
+          enable: z.boolean().optional(),
+          max_accounts_per_toolkit: z.number().optional(),
+          require_explicit_selection: z.boolean().optional(),
+        })
+        .optional(),
+      auth_configs: z.record(z.string(), z.string()).optional(),
+    })
+    .optional(),
 });
 export type SessionResponse = z.infer<typeof sessionResponseSchema>;
 
@@ -42,7 +46,11 @@ export const MULTI_ACCOUNT_CONFIG = {
 
 interface SessionCreateRequest {
   user_id: string;
-  manage_connections: { enable: boolean; enable_wait_for_connections: boolean; enable_connection_removal: boolean };
+  manage_connections: {
+    enable: boolean;
+    enable_wait_for_connections: boolean;
+    enable_connection_removal: boolean;
+  };
   multi_account: typeof MULTI_ACCOUNT_CONFIG;
   /** Sent only when the project has configs: an empty map pins "no custom auth" for the Session. */
   auth_configs?: AuthConfigMap;
@@ -61,8 +69,16 @@ export function trustedSessionMcpUrl(value: string): boolean {
   } catch {
     return false;
   }
-  if (mcp.protocol === "https:" && (mcp.hostname === "composio.dev" || mcp.hostname.endsWith(".composio.dev"))) return true;
-  if (mcp.protocol !== "https:" && !(mcp.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(mcp.hostname))) return false;
+  if (
+    mcp.protocol === 'https:' &&
+    (mcp.hostname === 'composio.dev' || mcp.hostname.endsWith('.composio.dev'))
+  )
+    return true;
+  if (
+    mcp.protocol !== 'https:' &&
+    !(mcp.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(mcp.hostname))
+  )
+    return false;
   const override = process.env.OMB_COMPOSIO_API;
   if (!override) return false;
   try {
@@ -75,7 +91,7 @@ export function trustedSessionMcpUrl(value: string): boolean {
 function parseSessionResponse(session: SessionResponse): SessionResponse {
   const mcp = new URL(session.mcp.url);
   if (!trustedSessionMcpUrl(session.mcp.url)) {
-    throw new Error("Composio returned an untrusted Session MCP URL");
+    throw new Error('Composio returned an untrusted Session MCP URL');
   }
   return { ...session, mcp: { ...session.mcp, url: mcp.toString() } };
 }
@@ -97,7 +113,10 @@ export function authConfigRefusal(id: string): string | undefined {
   return refusedAuthConfigs.get(id);
 }
 
-async function getProjectSession(apiKey: string, sessionId: string): Promise<SessionResponse | null> {
+async function getProjectSession(
+  apiKey: string,
+  sessionId: string,
+): Promise<SessionResponse | null> {
   const res = await fetch(`${apiBase()}/tool_router/session/${encodeURIComponent(sessionId)}`, {
     headers: projectHeaders(apiKey),
     signal: AbortSignal.timeout(15_000),
@@ -109,7 +128,9 @@ async function getProjectSession(apiKey: string, sessionId: string): Promise<Ses
 
 function sessionCoversAuthConfigs(session: SessionResponse, wanted: AuthConfigMap): boolean {
   const have = session.config?.auth_configs ?? {};
-  const haveLower = Object.fromEntries(Object.entries(have).map(([slug, id]) => [canonicalToolkitSlug(slug), id]));
+  const haveLower = Object.fromEntries(
+    Object.entries(have).map(([slug, id]) => [canonicalToolkitSlug(slug), id]),
+  );
   return Object.entries(wanted).every(([slug, id]) => haveLower[slug] === id);
 }
 
@@ -118,23 +139,34 @@ function authConfigsKey(sessionId: string, wanted: AuthConfigMap): string {
 }
 
 function authConfigsReady(session: SessionResponse, wanted: AuthConfigMap): boolean {
-  return sessionCoversAuthConfigs(session, wanted) || authConfigUpgradeAttempted.has(authConfigsKey(session.session_id, wanted));
+  return (
+    sessionCoversAuthConfigs(session, wanted) ||
+    authConfigUpgradeAttempted.has(authConfigsKey(session.session_id, wanted))
+  );
 }
 
 const REFUSED_SESSION_STATUSES = new Set([400, 404, 409, 422]);
 
 /** An auth config Composio refuses is left out of the new Session (all of them, if its answer names none): no config
  * may block the rest. */
-async function createProjectSession(apiKey: string, userId: string, authConfigs: AuthConfigMap): Promise<string> {
+async function createProjectSession(
+  apiKey: string,
+  userId: string,
+  authConfigs: AuthConfigMap,
+): Promise<string> {
   const post = (configs: AuthConfigMap) => {
     const sessionRequest: SessionCreateRequest = {
       user_id: userId,
-      manage_connections: { enable: true, enable_wait_for_connections: true, enable_connection_removal: true },
+      manage_connections: {
+        enable: true,
+        enable_wait_for_connections: true,
+        enable_connection_removal: true,
+      },
       multi_account: MULTI_ACCOUNT_CONFIG,
     };
     if (Object.keys(configs).length) sessionRequest.auth_configs = configs;
     return fetch(`${apiBase()}/tool_router/session`, {
-      method: "POST",
+      method: 'POST',
       headers: projectHeaders(apiKey, true),
       body: JSON.stringify(sessionRequest),
       signal: AbortSignal.timeout(30_000),
@@ -146,12 +178,16 @@ async function createProjectSession(apiKey: string, userId: string, authConfigs:
     const said = await responseError(res, `HTTP ${res.status}`);
     const kept = Object.fromEntries(Object.entries(named).filter(([, id]) => !said.includes(id)));
     const next = Object.keys(kept).length < Object.keys(named).length ? kept : {};
-    for (const id of Object.values(named)) if (!Object.values(next).includes(id)) refusedAuthConfigs.set(id, said);
+    for (const id of Object.values(named))
+      if (!Object.values(next).includes(id)) refusedAuthConfigs.set(id, said);
     named = next;
-    console.warn(`[composio] Composio refused a Session naming the project's auth configs (${said}); creating it without them`);
+    console.warn(
+      `[composio] Composio refused a Session naming the project's auth configs (${said}); creating it without them`,
+    );
     res = await post(named);
   }
-  if (!res.ok) throw new Error(await responseError(res, `Composio rejected this key (HTTP ${res.status})`));
+  if (!res.ok)
+    throw new Error(await responseError(res, `Composio rejected this key (HTTP ${res.status})`));
   const session = parseSessionResponse(sessionResponseSchema.parse(await res.json()));
   authConfigUpgradeAttempted.add(authConfigsKey(session.session_id, authConfigs));
   return session.session_id;
@@ -167,7 +203,7 @@ async function earlierInstallationUser(apiKey: string): Promise<string | null> {
   const users = new Set<string>();
   let pages = 0;
   const enough = (page: ConnectedAccountResponse[]) => {
-    for (const { user_id } of page) if (user_id?.startsWith("openmausbot_")) users.add(user_id);
+    for (const { user_id } of page) if (user_id?.startsWith('openmausbot_')) users.add(user_id);
     pages += 1;
     return users.size > 1 || pages >= EARLIER_USER_PAGES;
   };
@@ -175,9 +211,14 @@ async function earlierInstallationUser(apiKey: string): Promise<string | null> {
     const accounts = await listConnectedAccounts(apiKey, null, [], enough);
     // A project too big to read in a few pages can't say there's only one: setup goes on as before, with a new user.
     if (users.size !== 1 || pages >= EARLIER_USER_PAGES) return null;
-    return accounts.find((account) => account.status === "ACTIVE" && users.has(account.user_id ?? ""))?.user_id ?? null;
+    return (
+      accounts.find((account) => account.status === 'ACTIVE' && users.has(account.user_id ?? ''))
+        ?.user_id ?? null
+    );
   } catch (error) {
-    console.warn(`[composio] Could not read the project's earlier connections: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(
+      `[composio] Could not read the project's earlier connections: ${error instanceof Error ? error.message : String(error)}`,
+    );
     return null;
   }
 }
@@ -189,8 +230,8 @@ export async function prepareProjectSession(
   options: { reuseEarlierUser?: boolean } = {},
 ): Promise<{ apiKey: string; userId: string; sessionId: string }> {
   const trimmed = apiKey.trim();
-  if (!trimmed) throw new Error("Enter a Composio project API key");
-  if (!trimmed.startsWith("ak_")) throw new Error("Composio project API keys start with ak_");
+  if (!trimmed) throw new Error('Enter a Composio project API key');
+  if (!trimmed.startsWith('ak_')) throw new Error('Composio project API keys start with ak_');
 
   // A Session names its auth configs at creation, so the project's are read before deciding to reuse it.
   const authConfigs = knownAuthConfigs ?? (await projectAuthConfigs(trimmed)).configs;
@@ -209,7 +250,10 @@ export async function prepareProjectSession(
   }
 
   // Security: the earlier user holds another installation's apps, so only a caller that says this server is one person's may look.
-  const userId = priorUserId ?? (options.reuseEarlierUser ? await earlierInstallationUser(trimmed) : null) ?? `openmausbot_${randomUUID()}`;
+  const userId =
+    priorUserId ??
+    (options.reuseEarlierUser ? await earlierInstallationUser(trimmed) : null) ??
+    `openmausbot_${randomUUID()}`;
   const sessionId = await createProjectSession(trimmed, userId, authConfigs);
   return { apiKey: trimmed, userId, sessionId };
 }
@@ -219,12 +263,15 @@ const sessionKeepers = new WeakMap<object, (ids: SessionIds) => void>();
 
 /** Keeps the Session of a `composio` that is not the saved config's (a Team Cloud member's own Composio user in the
  * team's project) with `keep`, never in config.json. */
-export function keepSessionWith(composio: NonNullable<AppConfig["composio"]>, keep: (ids: SessionIds) => void): void {
+export function keepSessionWith(
+  composio: NonNullable<AppConfig['composio']>,
+  keep: (ids: SessionIds) => void,
+): void {
   sessionKeepers.set(composio, keep);
 }
 
 async function adoptProjectSession(
-  composio: NonNullable<AppConfig["composio"]>,
+  composio: NonNullable<AppConfig['composio']>,
   apiKey: string,
   userId: string,
   sessionId: string,
@@ -233,46 +280,64 @@ async function adoptProjectSession(
   composio.userId = userId;
   composio.sessionId = sessionId;
   const keep = sessionKeepers.get(composio);
-  if (keep) keep({ userId, sessionId }); else saveConfig({ composio: { userId, sessionId } });
+  if (keep) keep({ userId, sessionId });
+  else saveConfig({ composio: { userId, sessionId } });
   const created = await getProjectSession(apiKey, sessionId);
-  if (!created) throw new Error("Composio Session disappeared after creation");
+  if (!created) throw new Error('Composio Session disappeared after creation');
   return created;
 }
 
 /** The same Session naming `configs`, so a bot mid-conversation keeps its MCP endpoint; null when Composio won't. */
-async function nameAuthConfigsInPlace(apiKey: string, session: SessionResponse, configs: AuthConfigMap): Promise<SessionResponse | null> {
-  const res = await fetch(`${apiBase()}/tool_router/session/${encodeURIComponent(session.session_id)}`, {
-    method: "PATCH",
-    headers: projectHeaders(apiKey, true),
-    body: JSON.stringify({ auth_configs: configs }),
-    signal: AbortSignal.timeout(30_000),
-  });
+async function nameAuthConfigsInPlace(
+  apiKey: string,
+  session: SessionResponse,
+  configs: AuthConfigMap,
+): Promise<SessionResponse | null> {
+  const res = await fetch(
+    `${apiBase()}/tool_router/session/${encodeURIComponent(session.session_id)}`,
+    {
+      method: 'PATCH',
+      headers: projectHeaders(apiKey, true),
+      body: JSON.stringify({ auth_configs: configs }),
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
   if (!res.ok) {
-    console.warn(`[composio] Composio would not change the Session's auth configs (${await responseError(res, `HTTP ${res.status}`)}); making a new Session`);
+    console.warn(
+      `[composio] Composio would not change the Session's auth configs (${await responseError(res, `HTTP ${res.status}`)}); making a new Session`,
+    );
     return null;
   }
   authConfigUpgradeAttempted.add(authConfigsKey(session.session_id, configs));
   return getProjectSession(apiKey, session.session_id);
 }
 
-export async function ensureProjectSession(cfg: AppConfig, wanted?: AuthConfigMap): Promise<SessionResponse> {
+export async function ensureProjectSession(
+  cfg: AppConfig,
+  wanted?: AuthConfigMap,
+): Promise<SessionResponse> {
   const composio = cfg.composio;
   const apiKey = projectApiKey(cfg);
-  if (!composio || !apiKey) throw new Error("No Composio project key configured");
+  if (!composio || !apiKey) throw new Error('No Composio project key configured');
   const configs = wanted ?? (await projectAuthConfigs(apiKey)).configs;
   const member = sessionKeepers.has(composio);
   if (composio.sessionId) {
     const existing = await getProjectSession(apiKey, composio.sessionId);
     // Security: a member's Session is used only while it is their own Composio user's, never the team's or another member's.
-    if (member && existing?.config?.user_id && existing.config.user_id !== composio.userId) delete composio.sessionId;
-    else if (existing && (supportsMultiAccount(existing) || multiAccountUpgradeAttempted.has(existing.session_id))) {
+    if (member && existing?.config?.user_id && existing.config.user_id !== composio.userId)
+      delete composio.sessionId;
+    else if (
+      existing &&
+      (supportsMultiAccount(existing) || multiAccountUpgradeAttempted.has(existing.session_id))
+    ) {
       if (authConfigsReady(existing, configs)) return existing;
       const named = await nameAuthConfigsInPlace(apiKey, existing, configs);
       if (named) return named;
     }
   }
   const prepared = await prepareProjectSession(apiKey, composio, configs);
-  if (member && prepared.userId !== composio.userId) throw new Error("Composio returned a Session for another user");
+  if (member && prepared.userId !== composio.userId)
+    throw new Error('Composio returned a Session for another user');
   return adoptProjectSession(composio, apiKey, prepared.userId, prepared.sessionId);
 }
 
@@ -285,9 +350,13 @@ export interface ToolkitSession {
 
 /** The Session, ready to connect `toolkit` with the project's own auth config for it when there is one. A fresh lookup that
  * finds none is not kept, so the next one sees a config made meanwhile. */
-export async function sessionForToolkit(cfg: AppConfig, toolkit: string, options: { fresh?: boolean } = {}): Promise<ToolkitSession> {
+export async function sessionForToolkit(
+  cfg: AppConfig,
+  toolkit: string,
+  options: { fresh?: boolean } = {},
+): Promise<ToolkitSession> {
   const apiKey = projectApiKey(cfg);
-  if (!apiKey) throw new Error("No Composio project key configured");
+  if (!apiKey) throw new Error('No Composio project key configured');
   let project = await projectAuthConfigs(apiKey, options);
   const choice = project.choices[toolkit] ?? null;
   if (!choice && options.fresh) forgetProjectAuthConfigs(apiKey);
@@ -296,5 +365,9 @@ export async function sessionForToolkit(cfg: AppConfig, toolkit: string, options
     project = await projectAuthConfigs(apiKey);
   }
   const session = await ensureProjectSession(cfg, project.configs);
-  return { session, choice: project.choices[toolkit] ?? choice, ...(project.readError ? { readError: project.readError } : {}) };
+  return {
+    session,
+    choice: project.choices[toolkit] ?? choice,
+    ...(project.readError ? { readError: project.readError } : {}),
+  };
 }

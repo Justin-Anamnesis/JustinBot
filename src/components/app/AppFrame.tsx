@@ -1,11 +1,11 @@
-import { useLayoutEffect, useRef, type MutableRefObject } from "react";
-import { appVersion, openExternalLink } from "@/lib/app-links";
-import { useStore } from "@/state/store";
-import type { AppBlockedReason, AppDocument } from "../../../shared/app";
-import { RPC_HOST_REFUSED, type JsonRpcError } from "../../../shared/app-frame/bridge";
-import { callAppRpc, newAppSendId, postAppContext, sendAppMessage } from "./app-api";
-import { mountAppFrame } from "./app-frame-host";
-import { appHostContext, appMaxHeight, appThemeContext } from "./app-host-context";
+import { useLayoutEffect, useRef, type MutableRefObject } from 'react';
+import { appVersion, openExternalLink } from '@/lib/app-links';
+import { useStore } from '@/state/store';
+import type { AppBlockedReason, AppDocument } from '../../../shared/app';
+import { RPC_HOST_REFUSED, type JsonRpcError } from '../../../shared/app-frame/bridge';
+import { callAppRpc, newAppSendId, postAppContext, sendAppMessage } from './app-api';
+import { mountAppFrame } from './app-frame-host';
+import { appHostContext, appMaxHeight, appThemeContext } from './app-host-context';
 
 export interface AppFrameHandle {
   teardown(): Promise<void>;
@@ -14,9 +14,9 @@ export interface AppFrameHandle {
 }
 
 export type AppFrameProblem =
-  | { kind: "sign-in"; server: string }
-  | { kind: "offline" }
-  | { kind: "blocked"; reason: AppBlockedReason; text?: string };
+  | { kind: 'sign-in'; server: string }
+  | { kind: 'offline' }
+  | { kind: 'blocked'; reason: AppBlockedReason; text?: string };
 
 export interface AppFrameProps {
   doc: AppDocument;
@@ -58,18 +58,18 @@ export function AppFrame(props: AppFrameProps) {
       height: latest.current.height,
       hostContext: appHostContext({ width: container.clientWidth || 600, maxHeight }),
       hostVersion: appVersion(),
-      ...(import.meta.env?.DEV ? { log: (params: unknown) => console.info("[app]", params) } : {}),
+      ...(import.meta.env?.DEV ? { log: (params: unknown) => console.info('[app]', params) } : {}),
       ...(fill ? { fill: true } : {}),
       adapter: {
         async callRpc(method, params) {
           const outcome = await callAppRpc({ botId, threadId, messageId, method, params });
           if (outcome.ok) return outcome.result;
           if (outcome.signIn) {
-            latest.current.onProblem({ kind: "sign-in", server: outcome.signIn.server });
-            throw refusal("Sign-in needed");
+            latest.current.onProblem({ kind: 'sign-in', server: outcome.signIn.server });
+            throw refusal('Sign-in needed');
           }
-          if (outcome.blocked) latest.current.onProblem({ kind: "blocked", ...outcome.blocked });
-          else if (outcome.status === 0) latest.current.onProblem({ kind: "offline" });
+          if (outcome.blocked) latest.current.onProblem({ kind: 'blocked', ...outcome.blocked });
+          else if (outcome.status === 0) latest.current.onProblem({ kind: 'offline' });
           throw outcome.error;
         },
         async sendMessage(text) {
@@ -85,8 +85,11 @@ export function AppFrame(props: AppFrameProps) {
     });
     latest.current.handle.current = { teardown: () => host.teardown(), iframe: host.iframe };
 
-    const skin = typeof MutationObserver === "undefined" ? null : new MutationObserver(() => host.contextChanged(appThemeContext()));
-    skin?.observe(document.documentElement, { attributes: true, attributeFilter: ["data-skin"] });
+    const skin =
+      typeof MutationObserver === 'undefined'
+        ? null
+        : new MutationObserver(() => host.contextChanged(appThemeContext()));
+    skin?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-skin'] });
     let width = Math.round(container.clientWidth);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const measure = () => {
@@ -98,15 +101,17 @@ export function AppFrame(props: AppFrameProps) {
       maxHeight = nextMax;
       host.contextChanged({ containerDimensions: { width, maxHeight } });
     };
-    const later = () => { if (timer === undefined) timer = setTimeout(measure, 150); };
-    const sized = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(later);
+    const later = () => {
+      if (timer === undefined) timer = setTimeout(measure, 150);
+    };
+    const sized = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(later);
     sized?.observe(container);
-    window.addEventListener("resize", later);
+    window.addEventListener('resize', later);
 
     return () => {
       skin?.disconnect();
       sized?.disconnect();
-      window.removeEventListener("resize", later);
+      window.removeEventListener('resize', later);
       if (timer !== undefined) clearTimeout(timer);
       if (latest.current.handle.current) latest.current.handle.current = null;
       // The row is going: the frame waits out the View's teardown somewhere hidden.
@@ -115,5 +120,5 @@ export function AppFrame(props: AppFrameProps) {
     // A new document is a new frame; nothing else remounts it.
   }, [doc, botId, threadId, fill]);
 
-  return <div ref={box} data-app-frame-box className={fill ? "h-full w-full" : "w-full"} />;
+  return <div ref={box} data-app-frame-box className={fill ? 'h-full w-full' : 'w-full'} />;
 }

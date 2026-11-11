@@ -5,7 +5,10 @@
 export function patchMacUpdater(source) {
   function replace(before, after) {
     const count = source.split(before).length - 1;
-    if (count !== 1) throw new Error(`Expected one Mac updater site to patch, found ${count}: ${before.slice(0, 80)}`);
+    if (count !== 1)
+      throw new Error(
+        `Expected one Mac updater site to patch, found ${count}: ${before.slice(0, 80)}`,
+      );
     source = source.replace(before, after);
   }
 
@@ -32,7 +35,7 @@ export function patchMacUpdater(source) {
               }
             });
 `,
-    "",
+    '',
   );
   replace(
     `              errorOccurred = true;

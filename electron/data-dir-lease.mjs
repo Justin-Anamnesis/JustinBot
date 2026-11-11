@@ -1,20 +1,30 @@
-import { execFileSync } from "node:child_process";
-import { createHash, randomUUID } from "node:crypto";
-import { existsSync, linkSync, mkdirSync, readdirSync, readFileSync, readlinkSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
-import { hostname, uptime } from "node:os";
-import { join } from "node:path";
+import { execFileSync } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
+import {
+  existsSync,
+  linkSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  readlinkSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { hostname, uptime } from 'node:os';
+import { join } from 'node:path';
 
-const LEASE_NAME = "openmausbot-server.lease";
-const DELEGATED_CHILD_DIR = ".openmausbot-server-child";
+const LEASE_NAME = 'openmausbot-server.lease';
+const DELEGATED_CHILD_DIR = '.openmausbot-server-child';
 // Internal parent-to-child capability, obtained only from utilityServerLeaseEnvironment(); never public configuration.
-const CHILD_LEASE_ENV = "OPENMAUSBOT_INTERNAL_DATA_DIR_LEASE";
+const CHILD_LEASE_ENV = 'OPENMAUSBOT_INTERNAL_DATA_DIR_LEASE';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const MAX_PID = 0x7fffffff;
 const MAX_BOOT_ID = 128;
 const MAX_REAPER_GENERATIONS = 128;
 
 export class DataDirLeaseError extends Error {
-  name = "DataDirLeaseError";
+  name = 'DataDirLeaseError';
 }
 
 function leaseError(message, cause) {
@@ -33,18 +43,19 @@ let cachedBootSession;
 
 function readBootSession() {
   try {
-    if (process.platform === "linux") {
-      return normalizeBootId(readFileSync("/proc/sys/kernel/random/boot_id", "utf8"));
+    if (process.platform === 'linux') {
+      return normalizeBootId(readFileSync('/proc/sys/kernel/random/boot_id', 'utf8'));
     }
-    if (process.platform === "darwin") {
-      return normalizeBootId(execFileSync("/usr/sbin/sysctl", ["-n", "kern.bootsessionuuid"], {
-        encoding: "utf8",
-        timeout: 5_000,
-        stdio: ["ignore", "pipe", "ignore"],
-      }));
+    if (process.platform === 'darwin') {
+      return normalizeBootId(
+        execFileSync('/usr/sbin/sysctl', ['-n', 'kern.bootsessionuuid'], {
+          encoding: 'utf8',
+          timeout: 5_000,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        }),
+      );
     }
-  } catch {
-  }
+  } catch {}
   return null;
 }
 
@@ -65,7 +76,7 @@ function uptimeMs() {
 }
 
 function isBootIdentity(value) {
-  return value === null || (typeof value === "string" && normalizeBootId(value) === value);
+  return value === null || (typeof value === 'string' && normalizeBootId(value) === value);
 }
 
 /**
@@ -76,9 +87,9 @@ function isBootIdentity(value) {
 let cachedPidNamespace;
 
 function readPidNamespace() {
-  if (process.platform !== "linux") return null;
+  if (process.platform !== 'linux') return null;
   try {
-    return /^pid:\[([1-9][0-9]{0,19})\]$/.exec(readlinkSync("/proc/self/ns/pid"))?.[1] ?? null;
+    return /^pid:\[([1-9][0-9]{0,19})\]$/.exec(readlinkSync('/proc/self/ns/pid'))?.[1] ?? null;
   } catch {
     return null;
   }
@@ -90,20 +101,20 @@ function pidNamespace() {
 }
 
 function isPidNamespace(value) {
-  return value === null || (typeof value === "string" && /^[1-9][0-9]{0,19}$/.test(value));
+  return value === null || (typeof value === 'string' && /^[1-9][0-9]{0,19}$/.test(value));
 }
 
 /** Linux: when a process started, in clock ticks since boot (/proc/<pid>/stat field 22); null when unreadable. */
 function processStartTicks(pid) {
-  if (process.platform !== "linux") return null;
+  if (process.platform !== 'linux') return null;
   let stat;
   try {
-    stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
   } catch {
     return null;
   }
   // Field 2, the command name, is in parentheses and may itself hold spaces and parentheses.
-  const ticks = Number(stat.slice(stat.lastIndexOf(")") + 2).split(" ")[19]);
+  const ticks = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19]);
   return Number.isSafeInteger(ticks) && ticks >= 0 ? ticks : null;
 }
 
@@ -119,14 +130,14 @@ function processIdentity() {
 /** Unless the record provably predates this boot, one made in another pid namespace belongs to another container. */
 function fromAnotherPidNamespace(record) {
   const current = bootSession();
-  if (current !== null && typeof record.boot === "string" && record.boot !== current) return false;
+  if (current !== null && typeof record.boot === 'string' && record.boot !== current) return false;
   const ns = pidNamespace();
-  return ns !== null && typeof record.ns === "string" && record.ns !== ns;
+  return ns !== null && typeof record.ns === 'string' && record.ns !== ns;
 }
 
 function ownerPredatesThisBoot(owner) {
   const current = bootSession();
-  if (current !== null && typeof owner.boot === "string") return owner.boot !== current;
+  if (current !== null && typeof owner.boot === 'string') return owner.boot !== current;
   // A since-boot clock never runs backwards within one boot, so a larger recorded uptime predates a reboot.
   if (Number.isInteger(owner.uptime)) return uptimeMs() < owner.uptime;
   return false;
@@ -142,46 +153,50 @@ function sameMachine(record) {
   if (fromAnotherPidNamespace(record)) return false;
   if (record.host === hostname()) return true;
   const boot = bootSession();
-  return boot !== null && typeof record.boot === "string" && record.boot === boot;
+  return boot !== null && typeof record.boot === 'string' && record.boot === boot;
 }
 
 function otherMachineAdvice(path, t) {
-  if (t) return t("native.boot.sharedFolderAdvice", { path: JSON.stringify(path) });
+  if (t) return t('native.boot.sharedFolderAdvice', { path: JSON.stringify(path) });
   return ` If OpenMausBot is not running on another computer or container that shares this folder, quit OpenMausBot, delete ${JSON.stringify(path)} and start again.`;
 }
 
 function isLeaseOwner(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  return value.version === 1
-    && isPid(value.pid)
-    && typeof value.host === "string"
-    && value.host.length > 0
-    && value.host.length <= 255
-    && !/[\r\n\0]/.test(value.host)
-    && typeof value.token === "string"
-    && UUID.test(value.token)
-    && typeof value.createdAt === "number"
-    && Number.isFinite(value.createdAt)
-    && value.createdAt > 0
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  return (
+    value.version === 1 &&
+    isPid(value.pid) &&
+    typeof value.host === 'string' &&
+    value.host.length > 0 &&
+    value.host.length <= 255 &&
+    !/[\r\n\0]/.test(value.host) &&
+    typeof value.token === 'string' &&
+    UUID.test(value.token) &&
+    typeof value.createdAt === 'number' &&
+    Number.isFinite(value.createdAt) &&
+    value.createdAt > 0 &&
     // Optional so an older build's lease stays readable during an upgrade.
-    && (value.boot === undefined || isBootIdentity(value.boot))
-    && (value.uptime === undefined || (Number.isInteger(value.uptime) && value.uptime >= 0))
-    && (value.ns === undefined || isPidNamespace(value.ns))
-    && (value.start === undefined || isStartTicks(value.start));
+    (value.boot === undefined || isBootIdentity(value.boot)) &&
+    (value.uptime === undefined || (Number.isInteger(value.uptime) && value.uptime >= 0)) &&
+    (value.ns === undefined || isPidNamespace(value.ns)) &&
+    (value.start === undefined || isStartTicks(value.start))
+  );
 }
 
 function isReaperOwner(value, targetToken) {
-  return isLeaseOwner(value)
-    && value.targetToken === targetToken;
+  return isLeaseOwner(value) && value.targetToken === targetToken;
 }
 
 function parseRecord(path, invalidMessage, validate) {
   let raw;
   try {
-    raw = readFileSync(path, "utf8");
+    raw = readFileSync(path, 'utf8');
   } catch (error) {
-    if (error?.code === "ENOENT") return null;
-    throw leaseError("OpenMausBot cannot read the data-directory lease; refusing to start to protect its state.", error);
+    if (error?.code === 'ENOENT') return null;
+    throw leaseError(
+      'OpenMausBot cannot read the data-directory lease; refusing to start to protect its state.',
+      error,
+    );
   }
   let record;
   try {
@@ -196,7 +211,7 @@ function parseRecord(path, invalidMessage, validate) {
 function readOwner(path) {
   return parseRecord(
     path,
-    "The OpenMausBot data-directory lease is invalid; refusing to start to protect its state.",
+    'The OpenMausBot data-directory lease is invalid; refusing to start to protect its state.',
     isLeaseOwner,
   );
 }
@@ -204,7 +219,7 @@ function readOwner(path) {
 function readReaper(path, targetToken) {
   return parseRecord(
     path,
-    "The OpenMausBot stale-lease recovery record is invalid; refusing to start to protect its state.",
+    'The OpenMausBot stale-lease recovery record is invalid; refusing to start to protect its state.',
     (value) => isReaperOwner(value, targetToken),
   );
 }
@@ -214,10 +229,13 @@ function processIsAlive(pid) {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    if (error?.code === "ESRCH") return false;
+    if (error?.code === 'ESRCH') return false;
     // EPERM means the pid exists but this account cannot signal it.
-    if (error?.code === "EPERM") return true;
-    throw leaseError("OpenMausBot could not verify the data-directory lease owner; refusing to start.", error);
+    if (error?.code === 'EPERM') return true;
+    throw leaseError(
+      'OpenMausBot could not verify the data-directory lease owner; refusing to start.',
+      error,
+    );
   }
 }
 
@@ -241,30 +259,38 @@ function parseWmiDateTime(value) {
 
 /** Windows: when a process started, in ms since the epoch; null when it has exited or neither probe can read it. */
 function processCreationTimeMs(pid) {
-  if (process.platform !== "win32") return null;
+  if (process.platform !== 'win32') return null;
   return wmicCreationTimeMs(pid) ?? cimCreationTimeMs(pid);
 }
 
 /** A Windows probe's stdout, its window hidden; throws when it fails or runs past `timeout`. */
 function windowsOutput(file, args, timeout) {
-  return execFileSync(file, args, { encoding: "utf8", timeout, windowsHide: true, stdio: ["ignore", "pipe", "ignore"] });
+  return execFileSync(file, args, {
+    encoding: 'utf8',
+    timeout,
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
 }
 
 function wmicCreationTimeMs(pid) {
   try {
-    const output = windowsOutput("wmic", ["process", "where", `ProcessId=${pid}`, "get", "CreationDate", "/format:csv"], 5_000);
+    const output = windowsOutput(
+      'wmic',
+      ['process', 'where', `ProcessId=${pid}`, 'get', 'CreationDate', '/format:csv'],
+      5_000,
+    );
     for (const line of output.split(/\r?\n/)) {
       const trimmed = line.trim();
       if (!trimmed) continue;
       const lower = trimmed.toLowerCase();
-      if (lower === "node,creationdate" || lower.startsWith("node,")) continue;
-      const parts = trimmed.split(",");
+      if (lower === 'node,creationdate' || lower.startsWith('node,')) continue;
+      const parts = trimmed.split(',');
       const raw = parts[parts.length - 1].trim();
       const parsed = parseWmiDateTime(raw);
       if (parsed !== null) return parsed;
     }
-  } catch {
-  }
+  } catch {}
   return null;
 }
 
@@ -273,12 +299,25 @@ function wmicCreationTimeMs(pid) {
  * the lease can never be recovered. Windows PowerShell ships with every Windows; named by full path, never via PATH.
  */
 function cimCreationTimeMs(pid) {
-  const powershell = join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const powershell = join(
+    process.env.SystemRoot || 'C:\\Windows',
+    'System32',
+    'WindowsPowerShell',
+    'v1.0',
+    'powershell.exe',
+  );
   try {
-    const output = windowsOutput(powershell, [
-      "-NoLogo", "-NoProfile", "-NonInteractive", "-Command",
-      `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if ($p) { ([DateTimeOffset]$p.CreationDate).ToUnixTimeMilliseconds() }`,
-    ], 15_000);
+    const output = windowsOutput(
+      powershell,
+      [
+        '-NoLogo',
+        '-NoProfile',
+        '-NonInteractive',
+        '-Command',
+        `$p = Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}'; if ($p) { ([DateTimeOffset]$p.CreationDate).ToUnixTimeMilliseconds() }`,
+      ],
+      15_000,
+    );
     const ms = Number(output.trim());
     return output.trim() && Number.isSafeInteger(ms) && ms > 0 ? ms : null;
   } catch {
@@ -288,12 +327,17 @@ function cimCreationTimeMs(pid) {
 
 /** Pids are reused within a boot: a process that started at another moment, or after the lease, is not its owner. */
 function ownerIdentityMatches(owner) {
-  if (process.platform === "linux") {
-    if (!Number.isSafeInteger(owner.start) || typeof owner.ns !== "string" || owner.ns !== pidNamespace()) return true;
+  if (process.platform === 'linux') {
+    if (
+      !Number.isSafeInteger(owner.start) ||
+      typeof owner.ns !== 'string' ||
+      owner.ns !== pidNamespace()
+    )
+      return true;
     const started = processStartTicks(owner.pid);
     return started === null || started === owner.start;
   }
-  if (process.platform !== "win32") return true;
+  if (process.platform !== 'win32') return true;
   const created = processCreationTimeMs(owner.pid);
   if (created === null) return true;
   return created < owner.createdAt;
@@ -303,14 +347,18 @@ function unlinkExact(path, message) {
   try {
     unlinkSync(path);
   } catch (error) {
-    if (error?.code !== "ENOENT") throw leaseError(message, error);
+    if (error?.code !== 'ENOENT') throw leaseError(message, error);
   }
 }
 
 function publishRecord(path, record, prepareMessage, acquireMessage) {
   const candidatePath = `${path}.candidate-${record.pid}-${record.token}`;
   try {
-    writeFileSync(candidatePath, `${JSON.stringify(record)}\n`, { flag: "wx", mode: 0o600, flush: true });
+    writeFileSync(candidatePath, `${JSON.stringify(record)}\n`, {
+      flag: 'wx',
+      mode: 0o600,
+      flush: true,
+    });
   } catch (error) {
     throw leaseError(prepareMessage, error);
   }
@@ -319,16 +367,16 @@ function publishRecord(path, record, prepareMessage, acquireMessage) {
       linkSync(candidatePath, path);
       return true;
     } catch (error) {
-      if (error?.code === "EEXIST") return false;
+      if (error?.code === 'EEXIST') return false;
       throw leaseError(acquireMessage, error);
     }
   } finally {
-    unlinkExact(candidatePath, "OpenMausBot could not remove its lease candidate.");
+    unlinkExact(candidatePath, 'OpenMausBot could not remove its lease candidate.');
   }
 }
 
 function successorReaperPath(leasePath, targetToken, reaperToken) {
-  const digest = createHash("sha256").update(reaperToken).digest("hex").slice(0, 32);
+  const digest = createHash('sha256').update(reaperToken).digest('hex').slice(0, 32);
   return `${leasePath}.reap-${targetToken}-${digest}`;
 }
 
@@ -347,12 +395,15 @@ function claimReaperAuthority(leasePath, expected) {
       ...processIdentity(),
       targetToken: expected.token,
     };
-    if (publishRecord(
-      reaperPath,
-      candidate,
-      "OpenMausBot could not prepare stale-lease recovery.",
-      "OpenMausBot could not safely recover the stale data-directory lease.",
-    )) return true;
+    if (
+      publishRecord(
+        reaperPath,
+        candidate,
+        'OpenMausBot could not prepare stale-lease recovery.',
+        'OpenMausBot could not safely recover the stale data-directory lease.',
+      )
+    )
+      return true;
 
     const current = readReaper(reaperPath, expected.token);
     if (!current) continue;
@@ -364,7 +415,9 @@ function claimReaperAuthority(leasePath, expected) {
     if (ownerIsAlive(current)) return false;
     reaperPath = successorReaperPath(leasePath, expected.token, current.token);
   }
-  throw leaseError("OpenMausBot could not recover the stale data-directory lease after repeated interrupted attempts.");
+  throw leaseError(
+    'OpenMausBot could not recover the stale data-directory lease after repeated interrupted attempts.',
+  );
 }
 
 function retireDeadOwner(leasePath, expected) {
@@ -377,13 +430,13 @@ function retireDeadOwner(leasePath, expected) {
     );
   }
   if (ownerIsAlive(current)) return false;
-  unlinkExact(leasePath, "OpenMausBot could not retire the stale data-directory lease.");
+  unlinkExact(leasePath, 'OpenMausBot could not retire the stale data-directory lease.');
   return true;
 }
 
 function validateDataDir(dataDir) {
-  if (typeof dataDir !== "string" || dataDir.trim().length === 0 || /[\r\n\0]/.test(dataDir)) {
-    throw leaseError("OpenMausBot cannot lease an invalid data directory.");
+  if (typeof dataDir !== 'string' || dataDir.trim().length === 0 || /[\r\n\0]/.test(dataDir)) {
+    throw leaseError('OpenMausBot cannot lease an invalid data directory.');
   }
   return dataDir;
 }
@@ -396,14 +449,13 @@ function prepareDataDir(dataDir, legacyDataDir) {
     if (!existsSync(dataDir) && existsSync(legacyDataDir)) {
       try {
         renameSync(legacyDataDir, dataDir);
-      } catch {
-      }
+      } catch {}
     }
   }
   try {
     mkdirSync(dataDir, { recursive: true, mode: 0o700 });
   } catch (error) {
-    throw leaseError("OpenMausBot cannot create its data directory.", error);
+    throw leaseError('OpenMausBot cannot create its data directory.', error);
   }
   return join(dataDir, LEASE_NAME);
 }
@@ -429,7 +481,7 @@ function capabilityFor(owner) {
 }
 
 function parseCapability(value) {
-  if (typeof value !== "string") return null;
+  if (typeof value !== 'string') return null;
   const match = /^v1:([1-9][0-9]{0,9}):([0-9a-f-]{36})$/.exec(value);
   if (!match || !UUID.test(match[2])) return null;
   const pid = Number(match[1]);
@@ -442,10 +494,10 @@ function consumeChildCapability(environment) {
   try {
     delete environment[CHILD_LEASE_ENV];
   } catch (error) {
-    throw leaseError("OpenMausBot could not consume its private desktop lease delegation.", error);
+    throw leaseError('OpenMausBot could not consume its private desktop lease delegation.', error);
   }
   if (environment[CHILD_LEASE_ENV] !== undefined) {
-    throw leaseError("OpenMausBot could not consume its private desktop lease delegation.");
+    throw leaseError('OpenMausBot could not consume its private desktop lease delegation.');
   }
   return value;
 }
@@ -453,23 +505,28 @@ function consumeChildCapability(environment) {
 function validateChildDelegation(dataDir, encoded) {
   validateDataDir(dataDir);
   const capability = parseCapability(encoded);
-  const invalid = () => leaseError("The OpenMausBot desktop lease delegation is invalid; refusing to start to protect its state.");
+  const invalid = () =>
+    leaseError(
+      'The OpenMausBot desktop lease delegation is invalid; refusing to start to protect its state.',
+    );
   if (!capability) throw invalid();
   const parentLeasePath = join(dataDir, LEASE_NAME);
-  const matchesLiveParent = (owner) => Boolean(owner
-    && owner.pid === capability.pid
-    && owner.token === capability.token
-    && sameMachine(owner)
-    && ownerIsAlive(owner));
+  const matchesLiveParent = (owner) =>
+    Boolean(
+      owner &&
+      owner.pid === capability.pid &&
+      owner.token === capability.token &&
+      sameMachine(owner) &&
+      ownerIsAlive(owner),
+    );
   if (!matchesLiveParent(readOwner(parentLeasePath))) {
     throw invalid();
   }
 
   // The parent capability may serve a fallback port, but only one live utility server holds this subordinate lease.
-  const childLease = acquireDataDirLeaseInternal(
-    join(dataDir, DELEGATED_CHILD_DIR),
-    { guardDelegatedChild: false },
-  );
+  const childLease = acquireDataDirLeaseInternal(join(dataDir, DELEGATED_CHILD_DIR), {
+    guardDelegatedChild: false,
+  });
   if (!matchesLiveParent(readOwner(parentLeasePath))) {
     childLease.release();
     throw invalid();
@@ -496,9 +553,13 @@ function acquireDataDirLeaseInternal(dataDir, options = {}) {
   };
   const candidatePath = `${leasePath}.candidate-${owner.pid}-${owner.token}`;
   try {
-    writeFileSync(candidatePath, `${JSON.stringify(owner)}\n`, { flag: "wx", mode: 0o600, flush: true });
+    writeFileSync(candidatePath, `${JSON.stringify(owner)}\n`, {
+      flag: 'wx',
+      mode: 0o600,
+      flush: true,
+    });
   } catch (error) {
-    throw leaseError("OpenMausBot cannot prepare its data-directory lease.", error);
+    throw leaseError('OpenMausBot cannot prepare its data-directory lease.', error);
   }
 
   let acquired = false;
@@ -509,8 +570,8 @@ function acquireDataDirLeaseInternal(dataDir, options = {}) {
         acquired = true;
         break;
       } catch (error) {
-        if (error?.code !== "EEXIST") {
-          throw leaseError("OpenMausBot cannot acquire its data-directory lease.", error);
+        if (error?.code !== 'EEXIST') {
+          throw leaseError('OpenMausBot cannot acquire its data-directory lease.', error);
         }
       }
 
@@ -527,14 +588,16 @@ function acquireDataDirLeaseInternal(dataDir, options = {}) {
         );
       }
       if (!retireDeadOwner(leasePath, current)) {
-        throw leaseError("A stale OpenMausBot data-directory lease is already being recovered; try again shortly.");
+        throw leaseError(
+          'A stale OpenMausBot data-directory lease is already being recovered; try again shortly.',
+        );
       }
     }
   } finally {
-    unlinkExact(candidatePath, "OpenMausBot could not remove its lease candidate.");
+    unlinkExact(candidatePath, 'OpenMausBot could not remove its lease candidate.');
   }
 
-  if (!acquired) throw leaseError("OpenMausBot could not acquire its data-directory lease.");
+  if (!acquired) throw leaseError('OpenMausBot could not acquire its data-directory lease.');
   let released = false;
   return Object.freeze({
     ownerPid: owner.pid,
@@ -543,19 +606,27 @@ function acquireDataDirLeaseInternal(dataDir, options = {}) {
       if (released) return false;
       if (options.guardDelegatedChild !== false) assertNoLiveDelegatedChild(dataDir);
       const current = readOwner(leasePath);
-      if (!current || current.pid !== owner.pid || current.host !== owner.host || current.token !== owner.token) {
-        throw leaseError("OpenMausBot will not release a data-directory lease owned by another process.");
+      if (
+        !current ||
+        current.pid !== owner.pid ||
+        current.host !== owner.host ||
+        current.token !== owner.token
+      ) {
+        throw leaseError(
+          'OpenMausBot will not release a data-directory lease owned by another process.',
+        );
       }
       try {
         unlinkSync(leasePath);
       } catch (error) {
-        throw leaseError("OpenMausBot could not release its data-directory lease.", error);
+        throw leaseError('OpenMausBot could not release its data-directory lease.', error);
       }
       released = true;
       return true;
     },
     utilityServerLeaseEnvironment() {
-      if (released) throw leaseError("OpenMausBot cannot delegate a released data-directory lease.");
+      if (released)
+        throw leaseError('OpenMausBot cannot delegate a released data-directory lease.');
       return Object.freeze({ [CHILD_LEASE_ENV]: capabilityFor(owner) });
     },
   });
@@ -588,7 +659,14 @@ export function clearRecordsFromEarlierRunOfThisContainer(dataDir) {
   const boot = bootSession();
   const ns = pidNamespace();
   if (boot === null || ns === null) return [];
-  return clearRecords(dataDir, (record) => record.host === hostname() && record.boot === boot && typeof record.ns === "string" && record.ns !== ns);
+  return clearRecords(
+    dataDir,
+    (record) =>
+      record.host === hostname() &&
+      record.boot === boot &&
+      typeof record.ns === 'string' &&
+      record.ns !== ns,
+  );
 }
 
 function clearRecords(dataDir, stale) {
@@ -597,19 +675,24 @@ function clearRecords(dataDir, stale) {
   try {
     entries = readdirSync(dataDir);
   } catch (error) {
-    if (error?.code === "ENOENT") return [];
-    throw leaseError("OpenMausBot cannot read its data directory.", error);
+    if (error?.code === 'ENOENT') return [];
+    throw leaseError('OpenMausBot cannot read its data directory.', error);
   }
   const paths = [
     join(dataDir, LEASE_NAME),
     join(dataDir, DELEGATED_CHILD_DIR, LEASE_NAME),
-    ...entries.filter((name) => name.startsWith(`${LEASE_NAME}.reap-`)).map((name) => join(dataDir, name)),
+    ...entries
+      .filter((name) => name.startsWith(`${LEASE_NAME}.reap-`))
+      .map((name) => join(dataDir, name)),
   ];
   const cleared = [];
   for (const path of paths) {
     const record = readOwner(path);
     if (!record || !stale(record)) continue;
-    unlinkExact(path, "OpenMausBot could not remove the data-directory record another machine left.");
+    unlinkExact(
+      path,
+      'OpenMausBot could not remove the data-directory record another machine left.',
+    );
     cleared.push({ path, host: record.host, pid: record.pid });
   }
   return cleared;

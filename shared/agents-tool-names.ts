@@ -8,7 +8,7 @@ type Args = Record<string, unknown>;
 const given = (args: Args, key: string) => args[key] !== undefined && args[key] !== null;
 
 function record(value: unknown): value is Args {
-  return value !== null && typeof value === "object" && !Array.isArray(value);
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 export interface AgentsActionTool {
@@ -18,16 +18,42 @@ export interface AgentsActionTool {
 }
 
 export const AGENTS_ACTION_TOOLS: Readonly<Record<string, AgentsActionTool>> = {
-  trigger_info: { members: ["list_triggers", "list_trigger_events"], member: (args) => args.action === "events" ? "list_trigger_events" : "list_triggers" },
-  trigger: { members: ["create_trigger", "manage_trigger"], member: (args) => args.action === "create" ? "create_trigger" : "manage_trigger" },
-  delete_trigger: { members: ["manage_trigger"], member: () => "manage_trigger" },
-  manage_room: { members: ["manage_room", "create_room"], member: (args) => args.action === "create" ? "create_room" : "manage_room" },
-  session_search: { members: ["session_search", "session_read"], member: (args) => given(args, "thread_id") || given(args, "message_id") ? "session_read" : "session_search" },
-  show_widget: { members: ["show_widget", "update_widget"], member: (args) => given(args, "widget_id") ? "update_widget" : "show_widget" },
-  show_html: { members: ["show_html", "update_html"], member: (args) => given(args, "app_id") ? "update_html" : "show_html" },
+  trigger_info: {
+    members: ['list_triggers', 'list_trigger_events'],
+    member: (args) => (args.action === 'events' ? 'list_trigger_events' : 'list_triggers'),
+  },
+  trigger: {
+    members: ['create_trigger', 'manage_trigger'],
+    member: (args) => (args.action === 'create' ? 'create_trigger' : 'manage_trigger'),
+  },
+  delete_trigger: { members: ['manage_trigger'], member: () => 'manage_trigger' },
+  manage_room: {
+    members: ['manage_room', 'create_room'],
+    member: (args) => (args.action === 'create' ? 'create_room' : 'manage_room'),
+  },
+  session_search: {
+    members: ['session_search', 'session_read'],
+    member: (args) =>
+      given(args, 'thread_id') || given(args, 'message_id') ? 'session_read' : 'session_search',
+  },
+  show_widget: {
+    members: ['show_widget', 'update_widget'],
+    member: (args) => (given(args, 'widget_id') ? 'update_widget' : 'show_widget'),
+  },
+  show_html: {
+    members: ['show_html', 'update_html'],
+    member: (args) => (given(args, 'app_id') ? 'update_html' : 'show_html'),
+  },
   x_search: {
-    members: ["x_search", "x_user_posts", "x_post", "x_profile"],
-    member: (args) => args.action === "user_posts" ? "x_user_posts" : args.action === "post" ? "x_post" : args.action === "profile" ? "x_profile" : "x_search",
+    members: ['x_search', 'x_user_posts', 'x_post', 'x_profile'],
+    member: (args) =>
+      args.action === 'user_posts'
+        ? 'x_user_posts'
+        : args.action === 'post'
+          ? 'x_post'
+          : args.action === 'profile'
+            ? 'x_profile'
+            : 'x_search',
   },
 };
 
@@ -40,34 +66,67 @@ export interface AgentsAlias {
 
 const as = (name: string, args: Args) => ({ name, arguments: args });
 /** An id the call must carry to mean an update: empty when it was left out, so the tool refuses rather than creates. */
-const required = (args: Args, key: string): Args => ({ ...args, [key]: args[key] ?? "" });
+const required = (args: Args, key: string): Args => ({ ...args, [key]: args[key] ?? '' });
 
 export const AGENTS_TOOL_ALIASES: Readonly<Record<string, AgentsAlias>> = {
-  list_triggers: { tools: ["trigger_info"], resolve: (args) => as("trigger_info", { ...args, action: "list" }) },
-  list_trigger_events: { tools: ["trigger_info"], resolve: (args) => as("trigger_info", { ...args, action: "events" }) },
-  create_trigger: { tools: ["trigger"], resolve: (args) => as("trigger", { ...args, action: "create" }) },
+  list_triggers: {
+    tools: ['trigger_info'],
+    resolve: (args) => as('trigger_info', { ...args, action: 'list' }),
+  },
+  list_trigger_events: {
+    tools: ['trigger_info'],
+    resolve: (args) => as('trigger_info', { ...args, action: 'events' }),
+  },
+  create_trigger: {
+    tools: ['trigger'],
+    resolve: (args) => as('trigger', { ...args, action: 'create' }),
+  },
   manage_trigger: {
-    tools: ["trigger", "delete_trigger"],
+    tools: ['trigger', 'delete_trigger'],
     resolve: ({ changes, ...args }) => {
       const fields = record(changes) ? changes : {};
-      if (args.action === "delete") {
+      if (args.action === 'delete') {
         const { action: _delete, ...target } = args;
-        return as("delete_trigger", { ...fields, ...target });
+        return as('delete_trigger', { ...fields, ...target });
       }
-      return as("trigger", { ...fields, ...args, action: args.action === "create" ? undefined : args.action });
+      return as('trigger', {
+        ...fields,
+        ...args,
+        action: args.action === 'create' ? undefined : args.action,
+      });
     },
   },
-  create_room: { tools: ["manage_room"], resolve: (args) => as("manage_room", { ...args, action: "create" }) },
-  session_read: { tools: ["session_search"], resolve: (args) => as("session_search", required(required(args, "thread_id"), "message_id")) },
-  update_widget: { tools: ["show_widget"], resolve: (args) => as("show_widget", required(args, "widget_id")) },
-  update_html: { tools: ["show_html"], resolve: (args) => as("show_html", required(args, "app_id")) },
-  x_user_posts: { tools: ["x_search"], resolve: (args) => as("x_search", { ...args, action: "user_posts" }) },
-  x_post: { tools: ["x_search"], resolve: (args) => as("x_search", { ...args, action: "post" }) },
-  x_profile: { tools: ["x_search"], resolve: (args) => as("x_search", { ...args, action: "profile" }) },
+  create_room: {
+    tools: ['manage_room'],
+    resolve: (args) => as('manage_room', { ...args, action: 'create' }),
+  },
+  session_read: {
+    tools: ['session_search'],
+    resolve: (args) => as('session_search', required(required(args, 'thread_id'), 'message_id')),
+  },
+  update_widget: {
+    tools: ['show_widget'],
+    resolve: (args) => as('show_widget', required(args, 'widget_id')),
+  },
+  update_html: {
+    tools: ['show_html'],
+    resolve: (args) => as('show_html', required(args, 'app_id')),
+  },
+  x_user_posts: {
+    tools: ['x_search'],
+    resolve: (args) => as('x_search', { ...args, action: 'user_posts' }),
+  },
+  x_post: { tools: ['x_search'], resolve: (args) => as('x_search', { ...args, action: 'post' }) },
+  x_profile: {
+    tools: ['x_search'],
+    resolve: (args) => as('x_search', { ...args, action: 'profile' }),
+  },
 };
 
-const aliasOf = (name: string) => Object.hasOwn(AGENTS_TOOL_ALIASES, name) ? AGENTS_TOOL_ALIASES[name] : undefined;
-const actionToolOf = (name: string) => Object.hasOwn(AGENTS_ACTION_TOOLS, name) ? AGENTS_ACTION_TOOLS[name] : undefined;
+const aliasOf = (name: string) =>
+  Object.hasOwn(AGENTS_TOOL_ALIASES, name) ? AGENTS_TOOL_ALIASES[name] : undefined;
+const actionToolOf = (name: string) =>
+  Object.hasOwn(AGENTS_ACTION_TOOLS, name) ? AGENTS_ACTION_TOOLS[name] : undefined;
 
 /** The tool a call runs and its arguments: an alias as its action tool's call, any other name as it came. */
 export function resolveAgentsCall(name: string, args: Args): { name: string; arguments: Args } {
@@ -95,5 +154,7 @@ export function agentsCallIdentities(name: string, args?: unknown): string[][] {
   }
   const tool = actionToolOf(name);
   if (!tool) return [[name]];
-  return args === undefined ? tool.members.map((member) => named(name, member)) : [named(name, tool.member(record(args) ? args : {}))];
+  return args === undefined
+    ? tool.members.map((member) => named(name, member))
+    : [named(name, tool.member(record(args) ? args : {}))];
 }

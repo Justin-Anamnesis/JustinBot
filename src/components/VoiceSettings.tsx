@@ -1,12 +1,12 @@
 // Security: the harness holds the cloud provider keys; the renderer never talks to ElevenLabs or Fish Audio itself.
-import { DEFAULT_OPENAI_VOICE, OPENAI_VOICES } from "../../shared/openai-voice";
-import { useEffect, useRef, useState } from "react";
-import { Check, Loader2, Volume2 } from "lucide-react";
+import { DEFAULT_OPENAI_VOICE, OPENAI_VOICES } from '../../shared/openai-voice';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Loader2, Volume2 } from 'lucide-react';
 
-import { api, useStore, type Bot, type ConfigStatus } from "@/state/store";
-import { useDesktopCapabilities } from "@/components/DesktopCapabilities";
-import { speaker } from "@/lib/tts";
-import { useSpeech } from "@/lib/tts/useSpeech";
+import { api, useStore, type Bot, type ConfigStatus } from '@/state/store';
+import { useDesktopCapabilities } from '@/components/DesktopCapabilities';
+import { speaker } from '@/lib/tts';
+import { useSpeech } from '@/lib/tts/useSpeech';
 import {
   listLocalSystemVoices,
   localSystemVoicesAvailable,
@@ -15,20 +15,20 @@ import {
   setRemoteSystemVoice,
   setRemoteVoiceProvider,
   type RemoteVoiceProvider,
-} from "@/lib/local-voice";
-import { t } from "@/lib/i18n";
-import { cn } from "@/lib/cn";
-import { voiceKeyDraftValue, type VoiceKeyDraft } from "@/lib/voice-key-draft";
-import { VoicePicker, type PickerVoice } from "./VoicePicker";
-import { Select } from "./Select";
-import { Switch } from "./SettingsPrimitives";
-import { KeysLink } from "./keys/KeysLink";
+} from '@/lib/local-voice';
+import { t } from '@/lib/i18n';
+import { cn } from '@/lib/cn';
+import { voiceKeyDraftValue, type VoiceKeyDraft } from '@/lib/voice-key-draft';
+import { VoicePicker, type PickerVoice } from './VoicePicker';
+import { Select } from './Select';
+import { Switch } from './SettingsPrimitives';
+import { KeysLink } from './keys/KeysLink';
 
 const FISH_MODELS = [
-  { value: "s2.1-pro", label: "voice.fish.modelPro" },
-  { value: "s2.1-pro-free", label: "voice.fish.modelFree" },
+  { value: 's2.1-pro', label: 'voice.fish.modelPro' },
+  { value: 's2.1-pro-free', label: 'voice.fish.modelFree' },
 ] as const;
-type FishModel = (typeof FISH_MODELS)[number]["value"];
+type FishModel = (typeof FISH_MODELS)[number]['value'];
 
 export function VoiceSettings({
   bot,
@@ -36,72 +36,93 @@ export function VoiceSettings({
   workspaceConfigurationLocked = false,
 }: {
   bot: Bot;
-  onPatch: (patch: Partial<Pick<Bot, "voice" | "speakReplies" | "voiceNotes" | "voiceNoteEveryReply">>) => void;
+  onPatch: (
+    patch: Partial<Pick<Bot, 'voice' | 'speakReplies' | 'voiceNotes' | 'voiceNoteEveryReply'>>,
+  ) => void;
   workspaceConfigurationLocked?: boolean;
 }) {
   const { state, dispatch } = useStore();
   const tts = state.config?.tts;
 
-  const [keyDraft, setKeyDraft] = useState<VoiceKeyDraft>({ provider: null, value: "" });
-  const [serverUrl, setServerUrl] = useState("");
-  const [model, setModel] = useState("");
+  const [keyDraft, setKeyDraft] = useState<VoiceKeyDraft>({ provider: null, value: '' });
+  const [serverUrl, setServerUrl] = useState('');
+  const [model, setModel] = useState('');
   const [saving, setSaving] = useState(false);
   const [savingServer, setSavingServer] = useState(false);
   const [savingFishModel, setSavingFishModel] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [voices, setVoices] = useState<Array<{ id: string; label: string; description?: string }>>([]);
+  const [voices, setVoices] = useState<Array<{ id: string; label: string; description?: string }>>(
+    [],
+  );
   const [loadingVoices, setLoadingVoices] = useState(false);
   const [addingVoice, setAddingVoice] = useState<PickerVoice | null>(null);
   const addGeneration = useRef(0);
   const currentBot = useRef({ id: bot.id, voice: bot.voice });
   const [addError, setAddError] = useState<string | null>(null);
-  const [voiceQuery, setVoiceQuery] = useState("");
-  const [searchedQuery, setSearchedQuery] = useState("");
+  const [voiceQuery, setVoiceQuery] = useState('');
+  const [searchedQuery, setSearchedQuery] = useState('');
 
   const { capabilities } = useDesktopCapabilities();
   const speech = useSpeech();
-  const preparingSample = speech.status === "preparing" && speech.botId === bot.id && !speech.messageId;
+  const preparingSample =
+    speech.status === 'preparing' && speech.botId === bot.id && !speech.messageId;
   const localMacClient = workspaceConfigurationLocked && localSystemVoicesAvailable();
-  const [deviceProvider, setDeviceProvider] = useState<RemoteVoiceProvider>(() => remoteVoiceProvider());
+  const [deviceProvider, setDeviceProvider] = useState<RemoteVoiceProvider>(() =>
+    remoteVoiceProvider(),
+  );
   const [deviceVoice, setDeviceVoice] = useState(() => remoteSystemVoice(bot.id));
-  const usesLocalSystem = localMacClient && deviceProvider === "system";
-  const provider = tts?.provider ?? "elevenlabs";
-  const searchable = (provider === "fish" || provider === "elevenlabs" || provider === "gemini") && !usesLocalSystem;
-  const voiceSearch = searchable && provider !== "gemini" ? searchedQuery : "";
-  const pickedVoice = searchable && provider !== "gemini" ? (bot.voice ?? "") : "";
-  const cloudProvider = provider === "gemini"
-    ? { id: "gemini" as const, name: "Gemini", credential: "geminiTtsKey" as const, configField: "geminiKey" as const,
-        placeholder: t("voice.gemini.keyPlaceholder"), keyUrl: "https://aistudio.google.com/api-keys" }
-    : provider === "fish"
-    ? {
-        id: "fish" as const,
-        name: "Fish Audio",
-        credential: "fishAudioKey" as const,
-        configField: "fishKey" as const,
-        placeholder: t("voice.fish.keyPlaceholder"),
-        keyUrl: "https://fish.audio/app/api-keys/",
-      }
-    : provider === "elevenlabs"
+  const usesLocalSystem = localMacClient && deviceProvider === 'system';
+  const provider = tts?.provider ?? 'elevenlabs';
+  const searchable =
+    (provider === 'fish' || provider === 'elevenlabs' || provider === 'gemini') && !usesLocalSystem;
+  const voiceSearch = searchable && provider !== 'gemini' ? searchedQuery : '';
+  const pickedVoice = searchable && provider !== 'gemini' ? (bot.voice ?? '') : '';
+  const cloudProvider =
+    provider === 'gemini'
       ? {
-          id: "elevenlabs" as const,
-          name: "ElevenLabs",
-          credential: "ttsKey" as const,
-          configField: "key" as const,
-          placeholder: t("voice.elevenlabs.keyPlaceholder"),
-          keyUrl: "https://elevenlabs.io/app/settings/api-keys",
+          id: 'gemini' as const,
+          name: 'Gemini',
+          credential: 'geminiTtsKey' as const,
+          configField: 'geminiKey' as const,
+          placeholder: t('voice.gemini.keyPlaceholder'),
+          keyUrl: 'https://aistudio.google.com/api-keys',
         }
-      : null;
-  const key = cloudProvider ? voiceKeyDraftValue(keyDraft, cloudProvider.id) : "";
-  const hostProviderLabel = provider === "gemini" ? t("voice.hostLabel", { provider: "Gemini" }) : provider === "fish"
-    ? t("voice.hostLabel", { provider: t("voice.fish.label") })
-    : provider === "elevenlabs"
-      ? t("voice.hostLabel", { provider: t("voice.elevenlabs.label") })
-      : provider === "chatterbox"
-        ? t("voice.hostLabel", { provider: t("voice.chatterboxLabel") })
-        : provider === "openai" ? t("voice.hostLabel", { provider: "OpenAI" })
-          : provider === "xai" ? t("voice.grok.host") : t("voice.host");
-  const systemVoicesAvailable = capabilities.host.platform === "darwin";
+      : provider === 'fish'
+        ? {
+            id: 'fish' as const,
+            name: 'Fish Audio',
+            credential: 'fishAudioKey' as const,
+            configField: 'fishKey' as const,
+            placeholder: t('voice.fish.keyPlaceholder'),
+            keyUrl: 'https://fish.audio/app/api-keys/',
+          }
+        : provider === 'elevenlabs'
+          ? {
+              id: 'elevenlabs' as const,
+              name: 'ElevenLabs',
+              credential: 'ttsKey' as const,
+              configField: 'key' as const,
+              placeholder: t('voice.elevenlabs.keyPlaceholder'),
+              keyUrl: 'https://elevenlabs.io/app/settings/api-keys',
+            }
+          : null;
+  const key = cloudProvider ? voiceKeyDraftValue(keyDraft, cloudProvider.id) : '';
+  const hostProviderLabel =
+    provider === 'gemini'
+      ? t('voice.hostLabel', { provider: 'Gemini' })
+      : provider === 'fish'
+        ? t('voice.hostLabel', { provider: t('voice.fish.label') })
+        : provider === 'elevenlabs'
+          ? t('voice.hostLabel', { provider: t('voice.elevenlabs.label') })
+          : provider === 'chatterbox'
+            ? t('voice.hostLabel', { provider: t('voice.chatterboxLabel') })
+            : provider === 'openai'
+              ? t('voice.hostLabel', { provider: 'OpenAI' })
+              : provider === 'xai'
+                ? t('voice.grok.host')
+                : t('voice.host');
+  const systemVoicesAvailable = capabilities.host.platform === 'darwin';
   const hostConfigured = Boolean(tts?.configured);
   const included = Boolean(tts?.included);
   const configured = usesLocalSystem || hostConfigured;
@@ -110,30 +131,36 @@ export function VoiceSettings({
     setDeviceVoice(remoteSystemVoice(bot.id));
   }, [bot.id]);
 
-  useEffect(() => { currentBot.current = { id: bot.id, voice: bot.voice }; }, [bot.id, bot.voice]);
+  useEffect(() => {
+    currentBot.current = { id: bot.id, voice: bot.voice };
+  }, [bot.id, bot.voice]);
 
   const sampleVoice = usesLocalSystem ? deviceVoice : bot.voice;
-  useEffect(() => () => {
-    const playing = speaker.state;
-    if (playing.status !== "idle" && playing.botId === bot.id && !playing.messageId) speaker.stop();
-  }, [bot.id, sampleVoice, provider]);
+  useEffect(
+    () => () => {
+      const playing = speaker.state;
+      if (playing.status !== 'idle' && playing.botId === bot.id && !playing.messageId)
+        speaker.stop();
+    },
+    [bot.id, sampleVoice, provider],
+  );
 
   useEffect(() => {
     const timer = setTimeout(() => setSearchedQuery(voiceQuery.trim()), 300);
     return () => clearTimeout(timer);
   }, [voiceQuery]);
 
-  useEffect(() => setVoiceQuery(""), [provider]);
+  useEffect(() => setVoiceQuery(''), [provider]);
 
   useEffect(() => {
-    setServerUrl(tts?.baseUrl ?? "");
-    setModel(tts?.model ?? "");
+    setServerUrl(tts?.baseUrl ?? '');
+    setModel(tts?.model ?? '');
   }, [tts?.baseUrl, tts?.model]);
 
   // Security: discard the draft on every provider change, and keep it tagged, so one provider's credential never goes
   // to another service.
   useEffect(() => {
-    setKeyDraft({ provider: null, value: "" });
+    setKeyDraft({ provider: null, value: '' });
   }, [provider]);
 
   useEffect(() => setVoices([]), [provider, usesLocalSystem]);
@@ -142,8 +169,8 @@ export function VoiceSettings({
     if (usesLocalSystem) {
       const load = () => setVoices(listLocalSystemVoices());
       load();
-      window.speechSynthesis.addEventListener("voiceschanged", load);
-      return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
+      window.speechSynthesis.addEventListener('voiceschanged', load);
+      return () => window.speechSynthesis.removeEventListener('voiceschanged', load);
     }
     if (!hostConfigured) {
       setVoices([]);
@@ -152,10 +179,10 @@ export function VoiceSettings({
     let alive = true;
     setLoadingVoices(true);
     const params = new URLSearchParams();
-    if (voiceSearch) params.set("q", voiceSearch);
-    if (provider === "fish" && pickedVoice) params.set("current", pickedVoice);
+    if (voiceSearch) params.set('q', voiceSearch);
+    if (provider === 'fish' && pickedVoice) params.set('current', pickedVoice);
     const query = params.toString();
-    api(`/api/tts/voices${query ? `?${query}` : ""}`)
+    api(`/api/tts/voices${query ? `?${query}` : ''}`)
       .then((r: { voices?: typeof voices; error?: string }) => {
         if (!alive) return;
         setVoices(r.voices ?? []);
@@ -197,26 +224,36 @@ export function VoiceSettings({
     const generation = ++addGeneration.current;
     const current = () => generation === addGeneration.current;
     setAddingVoice(voice);
-    api("/api/tts/voices/add", {
-      method: "POST",
-      body: JSON.stringify({ publicOwnerId: voice.publicOwnerId, voiceId: voice.id, name: voice.label }),
+    api('/api/tts/voices/add', {
+      method: 'POST',
+      body: JSON.stringify({
+        publicOwnerId: voice.publicOwnerId,
+        voiceId: voice.id,
+        name: voice.label,
+      }),
     })
       .then((r: { voiceId: string }) => current() && chooseVoice(r.voiceId))
       .catch((e: Error) => current() && setAddError(e.message))
       .finally(() => current() && setAddingVoice(null));
   };
 
-  const setProvider = (next: "elevenlabs" | "fish" | "system" | "chatterbox" | "xai" | "gemini" | "openai") => {
-    if (next === provider || switching || (next === "system" && !systemVoicesAvailable)) return;
+  const setProvider = (
+    next: 'elevenlabs' | 'fish' | 'system' | 'chatterbox' | 'xai' | 'gemini' | 'openai',
+  ) => {
+    if (next === provider || switching || (next === 'system' && !systemVoicesAvailable)) return;
     setSwitching(true);
-    setKeyDraft({ provider: null, value: "" });
+    setKeyDraft({ provider: null, value: '' });
     setError(null);
-    api("/api/config", { method: "PUT", body: JSON.stringify({ tts: { provider: next } }) })
+    api('/api/config', { method: 'PUT', body: JSON.stringify({ tts: { provider: next } }) })
       .then((status: ConfigStatus) => {
-        if (next === "openai" && currentBot.current.id === bot.id && !OPENAI_VOICES.some((voice) => voice === currentBot.current.voice)) {
+        if (
+          next === 'openai' &&
+          currentBot.current.id === bot.id &&
+          !OPENAI_VOICES.some((voice) => voice === currentBot.current.voice)
+        ) {
           onPatch({ voice: DEFAULT_OPENAI_VOICE });
         }
-        dispatch({ type: "configStatus", config: status });
+        dispatch({ type: 'configStatus', config: status });
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setSwitching(false));
@@ -224,19 +261,20 @@ export function VoiceSettings({
 
   const saveKey = () => {
     const nextKey = key.trim();
-    if (!nextKey || !cloudProvider || keyDraft.provider !== cloudProvider.id) return Promise.resolve();
+    if (!nextKey || !cloudProvider || keyDraft.provider !== cloudProvider.id)
+      return Promise.resolve();
     setSaving(true);
     setError(null);
     const request = window.ogb?.setCredential
       ? window.ogb.setCredential(cloudProvider.credential, nextKey)
-      : api("/api/config", {
-          method: "PUT",
+      : api('/api/config', {
+          method: 'PUT',
           body: JSON.stringify({ tts: { [cloudProvider.configField]: nextKey } }),
         });
     return request
       .then((status: ConfigStatus) => {
-        dispatch({ type: "configStatus", config: status });
-        setKeyDraft({ provider: null, value: "" });
+        dispatch({ type: 'configStatus', config: status });
+        setKeyDraft({ provider: null, value: '' });
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setSaving(false));
@@ -246,13 +284,16 @@ export function VoiceSettings({
     const next = serverUrl.trim();
     if (!next || savingServer) return Promise.resolve();
     if (!/^https?:\/\//i.test(next)) {
-      setError(t("voice.serverAddressError"));
+      setError(t('voice.serverAddressError'));
       return Promise.resolve();
     }
     setSavingServer(true);
     setError(null);
-    return api("/api/config", { method: "PUT", body: JSON.stringify({ tts: { baseUrl: next, model: model.trim() } }) })
-      .then((status: ConfigStatus) => dispatch({ type: "configStatus", config: status }))
+    return api('/api/config', {
+      method: 'PUT',
+      body: JSON.stringify({ tts: { baseUrl: next, model: model.trim() } }),
+    })
+      .then((status: ConfigStatus) => dispatch({ type: 'configStatus', config: status }))
       .catch((e: Error) => setError(e.message))
       .finally(() => setSavingServer(false));
   };
@@ -261,61 +302,77 @@ export function VoiceSettings({
     if (next === tts?.fishModel || savingFishModel) return;
     setSavingFishModel(true);
     setError(null);
-    api("/api/config", { method: "PUT", body: JSON.stringify({ tts: { fishModel: next } }) })
-      .then((status: ConfigStatus) => dispatch({ type: "configStatus", config: status }))
+    api('/api/config', { method: 'PUT', body: JSON.stringify({ tts: { fishModel: next } }) })
+      .then((status: ConfigStatus) => dispatch({ type: 'configStatus', config: status }))
       .catch((e: Error) => setError(e.message))
       .finally(() => setSavingFishModel(false));
   };
 
   if (!tts) return null;
 
-  const selectedVoice = usesLocalSystem ? deviceVoice : (bot.voice ?? "");
+  const selectedVoice = usesLocalSystem ? deviceVoice : (bot.voice ?? '');
   const ready = usesLocalSystem || (hostConfigured && Boolean(selectedVoice || tts.voice));
   const selectedDescription = voices.find((voice) => voice.id === selectedVoice)?.description;
-  const providerName = cloudProvider?.name ?? (provider === "xai" ? "Grok" : provider === "chatterbox" ? "Chatterbox" : t("voice.macBuiltIn"));
+  const providerName =
+    cloudProvider?.name ??
+    (provider === 'xai'
+      ? 'Grok'
+      : provider === 'chatterbox'
+        ? 'Chatterbox'
+        : t('voice.macBuiltIn'));
   const everyReply = bot.voiceNoteEveryReply ?? tts?.everyReply === true;
 
   return (
-    <div className="rounded-xl bg-card p-4">
-      <div className="text-[15px] font-medium text-ink">{t("voice.title")}</div>
-      <div className="mt-0.5 text-[13px] text-ink-secondary">
-        {localMacClient
-          ? t("voice.macChoice")
-          : workspaceConfigurationLocked
-            ? t("voice.agentChoice")
-            : <>{t("voice.description")}
-              {provider === "system"
-                ? systemVoicesAvailable
-                  ? ` ${t("voice.macInstalled")}`
-                  : ` ${t("voice.macUnavailable")}`
-                : provider === "xai"
-                  ? ` ${t("voice.grok.sharedKey")}`
-                : provider === "chatterbox"
-                  ? ` ${t("voice.chatterboxShared")}`
-                  : ` ${t("voice.providerShared", { provider: cloudProvider?.name ?? t("voice.provider") })}`}</>}
+    <div className='rounded-xl bg-card p-4'>
+      <div className='text-[15px] font-medium text-ink'>{t('voice.title')}</div>
+      <div className='mt-0.5 text-[13px] text-ink-secondary'>
+        {localMacClient ? (
+          t('voice.macChoice')
+        ) : workspaceConfigurationLocked ? (
+          t('voice.agentChoice')
+        ) : (
+          <>
+            {t('voice.description')}
+            {provider === 'system'
+              ? systemVoicesAvailable
+                ? ` ${t('voice.macInstalled')}`
+                : ` ${t('voice.macUnavailable')}`
+              : provider === 'xai'
+                ? ` ${t('voice.grok.sharedKey')}`
+                : provider === 'chatterbox'
+                  ? ` ${t('voice.chatterboxShared')}`
+                  : ` ${t('voice.providerShared', { provider: cloudProvider?.name ?? t('voice.provider') })}`}
+          </>
+        )}
       </div>
 
       {localMacClient && (
-        <div className="mt-4">
-          <div className="mb-2 text-[13px] text-ink-secondary">{t("voice.macOutput")}</div>
-          <div className="inline-flex rounded-xl bg-inset p-1" role="radiogroup" aria-label={t("voice.macOutput")}>
-            {([
-              { value: "system", label: t("voice.macBuiltIn"), available: true },
-              { value: "host", label: hostProviderLabel, available: hostConfigured },
-            ] as const).map((option) => (
+        <div className='mt-4'>
+          <div className='mb-2 text-[13px] text-ink-secondary'>{t('voice.macOutput')}</div>
+          <div
+            className='inline-flex rounded-xl bg-inset p-1'
+            role='radiogroup'
+            aria-label={t('voice.macOutput')}>
+            {(
+              [
+                { value: 'system', label: t('voice.macBuiltIn'), available: true },
+                { value: 'host', label: hostProviderLabel, available: hostConfigured },
+              ] as const
+            ).map((option) => (
               <button
                 key={option.value}
-                type="button"
-                role="radio"
+                type='button'
+                role='radio'
                 aria-checked={deviceProvider === option.value}
                 disabled={!option.available}
-                title={!option.available ? t("voice.hostNotConfigured") : undefined}
+                title={!option.available ? t('voice.hostNotConfigured') : undefined}
                 onClick={() => chooseDeviceProvider(option.value)}
                 className={cn(
-                  "rounded-lg px-3.5 py-1.5 text-[13px] transition-colors disabled:opacity-50",
-                  deviceProvider === option.value ? "bg-raised text-ink shadow" : "text-ink-secondary hover:text-ink",
-                )}
-              >
+                  'rounded-lg px-3.5 py-1.5 text-[13px] transition-colors disabled:opacity-50',
+                  deviceProvider === option.value
+                    ? 'bg-raised text-ink shadow'
+                    : 'text-ink-secondary hover:text-ink',
+                )}>
                 {option.label}
               </button>
             ))}
@@ -324,32 +381,58 @@ export function VoiceSettings({
       )}
 
       {!workspaceConfigurationLocked && (
-        <div className="mt-4">
-          <div className="mb-2 text-[13px] text-ink-secondary">{t("voice.engine")}</div>
-          <div className="grid grid-cols-4 gap-1 rounded-xl bg-inset p-1" role="radiogroup" aria-label={t("voice.engine")}>
-            {([
-              { value: "elevenlabs", label: t("voice.elevenlabs.label"), available: true, span: "col-span-1" },
-              { value: "fish", label: t("voice.fish.label"), available: true, span: "col-span-1" },
-              { value: "openai", label: "OpenAI", available: true, span: "col-span-1" },
-              { value: "xai", label: t("voice.grok.label"), available: true, span: "col-span-1" },
-              { value: "gemini", label: "Gemini", available: true, span: "col-span-1" },
-              { value: "system", label: t("voice.macBuiltIn"), available: systemVoicesAvailable, span: "col-span-1" },
-              { value: "chatterbox", label: t("voice.chatterboxLocal"), available: true, span: "col-span-1" },
-            ] as const).map((option) => (
+        <div className='mt-4'>
+          <div className='mb-2 text-[13px] text-ink-secondary'>{t('voice.engine')}</div>
+          <div
+            className='grid grid-cols-4 gap-1 rounded-xl bg-inset p-1'
+            role='radiogroup'
+            aria-label={t('voice.engine')}>
+            {(
+              [
+                {
+                  value: 'elevenlabs',
+                  label: t('voice.elevenlabs.label'),
+                  available: true,
+                  span: 'col-span-1',
+                },
+                {
+                  value: 'fish',
+                  label: t('voice.fish.label'),
+                  available: true,
+                  span: 'col-span-1',
+                },
+                { value: 'openai', label: 'OpenAI', available: true, span: 'col-span-1' },
+                { value: 'xai', label: t('voice.grok.label'), available: true, span: 'col-span-1' },
+                { value: 'gemini', label: 'Gemini', available: true, span: 'col-span-1' },
+                {
+                  value: 'system',
+                  label: t('voice.macBuiltIn'),
+                  available: systemVoicesAvailable,
+                  span: 'col-span-1',
+                },
+                {
+                  value: 'chatterbox',
+                  label: t('voice.chatterboxLocal'),
+                  available: true,
+                  span: 'col-span-1',
+                },
+              ] as const
+            ).map((option) => (
               <button
                 key={option.value}
-                type="button"
-                role="radio"
+                type='button'
+                role='radio'
                 aria-checked={provider === option.value}
                 disabled={switching || !option.available}
-                title={!option.available ? t("voice.macOnly") : undefined}
+                title={!option.available ? t('voice.macOnly') : undefined}
                 onClick={() => setProvider(option.value)}
                 className={cn(
-                  "min-w-0 rounded-lg px-2 py-1.5 text-[13px] leading-tight transition-colors disabled:opacity-50",
+                  'min-w-0 rounded-lg px-2 py-1.5 text-[13px] leading-tight transition-colors disabled:opacity-50',
                   option.span,
-                  provider === option.value ? "bg-raised text-ink shadow" : "text-ink-secondary hover:text-ink",
-                )}
-              >
+                  provider === option.value
+                    ? 'bg-raised text-ink shadow'
+                    : 'text-ink-secondary hover:text-ink',
+                )}>
                 {option.label}
               </button>
             ))}
@@ -358,179 +441,225 @@ export function VoiceSettings({
       )}
 
       {!workspaceConfigurationLocked && cloudProvider && (
-        <div className="mt-4">
-        <div className="mb-1.5 flex items-center gap-2 text-[13px] text-ink-secondary">
-          <span className={cn("size-1.5 rounded-full", configured ? "bg-success" : "bg-raised-hover")} />
-          <span>{t("voice.providerKey", { provider: cloudProvider.name })}</span>
-          {configured && <span className="text-[11px] text-success">{included ? t("keys.includedWithCloudPro") : t("voice.connected")}</span>}
-        </div>
-        <div className="flex gap-2">
-          <input
-            type="password"
-            value={key}
-            onChange={(e) => setKeyDraft({ provider: cloudProvider.id, value: e.target.value })}
-            onKeyDown={(e) => e.key === "Enter" && key.trim() && void saveKey()}
-            placeholder={configured && !included ? t("voice.keySavedPlaceholder") : cloudProvider.placeholder}
-            aria-label={t("voice.keyLabel", { name: cloudProvider.name })}
-            autoComplete="off"
-            className="w-full rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none"
-          />
-          <button
-            onClick={() => void saveKey()}
-            disabled={saving || !key.trim()}
-            className="flex w-[72px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-control py-2 text-[13px] text-ink hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {saving ? <Loader2 size={13} className="animate-spin" /> : <><Check size={13} />{t("common.save")}</>}
-          </button>
-        </div>
-        {!configured && (
-          <a
-            href={cloudProvider.keyUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-1.5 inline-block text-[12px] font-medium text-accent hover:underline"
-          >
-            {t("voice.getKey", { provider: cloudProvider.name })}
-          </a>
-        )}
+        <div className='mt-4'>
+          <div className='mb-1.5 flex items-center gap-2 text-[13px] text-ink-secondary'>
+            <span
+              className={cn('size-1.5 rounded-full', configured ? 'bg-success' : 'bg-raised-hover')}
+            />
+            <span>{t('voice.providerKey', { provider: cloudProvider.name })}</span>
+            {configured && (
+              <span className='text-[11px] text-success'>
+                {included ? t('keys.includedWithCloudPro') : t('voice.connected')}
+              </span>
+            )}
+          </div>
+          <div className='flex gap-2'>
+            <input
+              type='password'
+              value={key}
+              onChange={(e) => setKeyDraft({ provider: cloudProvider.id, value: e.target.value })}
+              onKeyDown={(e) => e.key === 'Enter' && key.trim() && void saveKey()}
+              placeholder={
+                configured && !included ? t('voice.keySavedPlaceholder') : cloudProvider.placeholder
+              }
+              aria-label={t('voice.keyLabel', { name: cloudProvider.name })}
+              autoComplete='off'
+              className='w-full rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none'
+            />
+            <button
+              onClick={() => void saveKey()}
+              disabled={saving || !key.trim()}
+              className='flex w-[72px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-control py-2 text-[13px] text-ink hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50'>
+              {saving ? (
+                <Loader2 size={13} className='animate-spin' />
+              ) : (
+                <>
+                  <Check size={13} />
+                  {t('common.save')}
+                </>
+              )}
+            </button>
+          </div>
+          {!configured && (
+            <a
+              href={cloudProvider.keyUrl}
+              target='_blank'
+              rel='noopener noreferrer'
+              className='mt-1.5 inline-block text-[12px] font-medium text-accent hover:underline'>
+              {t('voice.getKey', { provider: cloudProvider.name })}
+            </a>
+          )}
         </div>
       )}
 
-      {!workspaceConfigurationLocked && provider === "fish" && (
-        <div className="mt-4">
-          <div className="mb-1.5 text-[13px] text-ink-secondary">{t("voice.fish.model")}</div>
+      {!workspaceConfigurationLocked && provider === 'fish' && (
+        <div className='mt-4'>
+          <div className='mb-1.5 text-[13px] text-ink-secondary'>{t('voice.fish.model')}</div>
           <Select
-            value={tts.fishModel ?? "s2.1-pro"}
+            value={tts.fishModel ?? 's2.1-pro'}
             onChange={(e) => saveFishModel(e.target.value as FishModel)}
             disabled={savingFishModel}
-            aria-label={t("voice.fish.model")}
-            className="w-full"
-          >
+            aria-label={t('voice.fish.model')}
+            className='w-full'>
             {FISH_MODELS.map((option) => (
               <option key={option.value} value={option.value}>
                 {t(option.label)}
               </option>
             ))}
           </Select>
-          <div className="mt-1.5 text-[12px] leading-relaxed text-ink-secondary">{t("voice.fish.modelHint")}</div>
+          <div className='mt-1.5 text-[12px] leading-relaxed text-ink-secondary'>
+            {t('voice.fish.modelHint')}
+          </div>
         </div>
       )}
 
-      {provider === "openai" && (
-        <div className="mt-4 space-y-1.5 text-[13px] leading-relaxed text-ink-secondary">
-          <p>{t("voice.openai.description")}</p>
-          {!hostConfigured && <p>{t("voice.openai.missingKey")} <KeysLink id="openai" /></p>}
+      {provider === 'openai' && (
+        <div className='mt-4 space-y-1.5 text-[13px] leading-relaxed text-ink-secondary'>
+          <p>{t('voice.openai.description')}</p>
+          {!hostConfigured && (
+            <p>
+              {t('voice.openai.missingKey')} <KeysLink id='openai' />
+            </p>
+          )}
         </div>
       )}
 
-      {provider === "xai" && (
-        <p className="mt-4 text-[13px] text-ink-secondary">
-          {hostConfigured ? t("voice.grok.ready") : <>{t("voice.grok.missingKey")} <KeysLink id="xai" /></>}
+      {provider === 'xai' && (
+        <p className='mt-4 text-[13px] text-ink-secondary'>
+          {hostConfigured ? (
+            t('voice.grok.ready')
+          ) : (
+            <>
+              {t('voice.grok.missingKey')} <KeysLink id='xai' />
+            </>
+          )}
         </p>
       )}
 
-      {!workspaceConfigurationLocked && provider === "chatterbox" && (
-        <div className="mt-4">
-        <div className="mb-1.5 flex items-center gap-2 text-[13px] text-ink-secondary">
-          <span className={cn("size-1.5 rounded-full", configured ? "bg-success" : "bg-raised-hover")} />
-          <span>{t("voice.chatterboxServer")}</span>
-          {configured && <span className="text-[11px] text-success">{t("common.saved")}</span>}
-        </div>
-        <div className="flex gap-2">
+      {!workspaceConfigurationLocked && provider === 'chatterbox' && (
+        <div className='mt-4'>
+          <div className='mb-1.5 flex items-center gap-2 text-[13px] text-ink-secondary'>
+            <span
+              className={cn('size-1.5 rounded-full', configured ? 'bg-success' : 'bg-raised-hover')}
+            />
+            <span>{t('voice.chatterboxServer')}</span>
+            {configured && <span className='text-[11px] text-success'>{t('common.saved')}</span>}
+          </div>
+          <div className='flex gap-2'>
+            <input
+              type='url'
+              value={serverUrl}
+              onChange={(e) => setServerUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && void saveServer()}
+              placeholder='http://127.0.0.1:4123'
+              aria-label={t('voice.chatterboxAddress')}
+              autoComplete='off'
+              spellCheck={false}
+              className='w-full rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none'
+            />
+            <button
+              onClick={() => void saveServer()}
+              disabled={savingServer || !serverUrl.trim()}
+              className='flex w-[72px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-control py-2 text-[13px] text-ink hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50'>
+              {savingServer ? (
+                <Loader2 size={13} className='animate-spin' />
+              ) : (
+                <>
+                  <Check size={13} />
+                  {t('common.save')}
+                </>
+              )}
+            </button>
+          </div>
           <input
-            type="url"
-            value={serverUrl}
-            onChange={(e) => setServerUrl(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && void saveServer()}
-            placeholder="http://127.0.0.1:4123"
-            aria-label={t("voice.chatterboxAddress")}
-            autoComplete="off"
+            type='text'
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && void saveServer()}
+            placeholder={t('voice.chatterboxModelPlaceholder')}
+            aria-label={t('voice.chatterboxModel')}
+            autoComplete='off'
             spellCheck={false}
-            className="w-full rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none"
+            className='mt-2 w-full rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none'
           />
-          <button
-            onClick={() => void saveServer()}
-            disabled={savingServer || !serverUrl.trim()}
-            className="flex w-[72px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-control py-2 text-[13px] text-ink hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {savingServer ? <Loader2 size={13} className="animate-spin" /> : <><Check size={13} />{t("common.save")}</>}
-          </button>
-        </div>
-        <input
-          type="text"
-          value={model}
-          onChange={(e) => setModel(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && void saveServer()}
-          placeholder={t("voice.chatterboxModelPlaceholder")}
-          aria-label={t("voice.chatterboxModel")}
-          autoComplete="off"
-          spellCheck={false}
-          className="mt-2 w-full rounded-lg border border-hairline/40 bg-inset px-3 py-2 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none"
-        />
-        <div className="mt-1.5 text-[12px] leading-relaxed text-ink-secondary">
-          {t("voice.chatterboxHelp")}{" "}
-          <a
-            href="https://github.com/resemble-ai/chatterbox"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-medium text-accent hover:underline"
-          >
-            {t("voice.chatterboxHowTo")}
-          </a>
-        </div>
+          <div className='mt-1.5 text-[12px] leading-relaxed text-ink-secondary'>
+            {t('voice.chatterboxHelp')}{' '}
+            <a
+              href='https://github.com/resemble-ai/chatterbox'
+              target='_blank'
+              rel='noopener noreferrer'
+              className='font-medium text-accent hover:underline'>
+              {t('voice.chatterboxHowTo')}
+            </a>
+          </div>
         </div>
       )}
 
-      {!workspaceConfigurationLocked && provider === "gemini" && (
-        <label className="mt-4 block text-[13px] text-ink-secondary">
-          {t("voice.gemini.model")}
-          <Select value={tts.model || "gemini-3.8-flash-lite-tts"} className="mt-2 w-full" onChange={(event) => {
-            void api("/api/config", { method: "PUT", body: JSON.stringify({ tts: { model: event.target.value } }) })
-              .then((status: ConfigStatus) => dispatch({ type: "configStatus", config: status }))
-              .catch((error: Error) => setError(error.message));
-          }}>
-            <option value="gemini-3.8-flash-lite-tts">Gemini 3.8 Flash-Lite TTS</option>
-            <option value="gemini-3.8-flash-tts">Gemini 3.8 Flash TTS</option>
+      {!workspaceConfigurationLocked && provider === 'gemini' && (
+        <label className='mt-4 block text-[13px] text-ink-secondary'>
+          {t('voice.gemini.model')}
+          <Select
+            value={tts.model || 'gemini-3.8-flash-lite-tts'}
+            className='mt-2 w-full'
+            onChange={(event) => {
+              void api('/api/config', {
+                method: 'PUT',
+                body: JSON.stringify({ tts: { model: event.target.value } }),
+              })
+                .then((status: ConfigStatus) => dispatch({ type: 'configStatus', config: status }))
+                .catch((error: Error) => setError(error.message));
+            }}>
+            <option value='gemini-3.8-flash-lite-tts'>Gemini 3.8 Flash-Lite TTS</option>
+            <option value='gemini-3.8-flash-tts'>Gemini 3.8 Flash TTS</option>
           </Select>
         </label>
       )}
 
       {configured && (
-        <div className="mt-4">
-          <div className="mb-1.5 text-[13px] text-ink-secondary">{t("voice.title")}</div>
-          <div className="flex gap-2">
+        <div className='mt-4'>
+          <div className='mb-1.5 text-[13px] text-ink-secondary'>{t('voice.title')}</div>
+          <div className='flex gap-2'>
             {searchable ? (
               <VoicePicker
                 key={provider}
                 value={selectedVoice}
-                voices={provider === "gemini" ? voices.filter((voice) => voice.label.toLowerCase().includes(voiceQuery.trim().toLowerCase())) : voices}
-                loading={loadingVoices || (provider !== "gemini" && voiceQuery.trim() !== searchedQuery)}
+                voices={
+                  provider === 'gemini'
+                    ? voices.filter((voice) =>
+                        voice.label.toLowerCase().includes(voiceQuery.trim().toLowerCase()),
+                      )
+                    : voices
+                }
+                loading={
+                  loadingVoices || (provider !== 'gemini' && voiceQuery.trim() !== searchedQuery)
+                }
                 query={voiceQuery}
                 onQuery={setVoiceQuery}
                 onPick={pickVoice}
                 pending={addingVoice ?? undefined}
-                defaultLabel={tts.voice ? t("voice.yourVoice", { provider: providerName }) : t("voice.pick")}
-                ariaLabel={t("voice.pickerLabel", { name: bot.name })}
+                defaultLabel={
+                  tts.voice ? t('voice.yourVoice', { provider: providerName }) : t('voice.pick')
+                }
+                ariaLabel={t('voice.pickerLabel', { name: bot.name })}
               />
             ) : (
               <Select
                 value={selectedVoice}
                 onChange={(e) => chooseVoice(e.target.value)}
-                aria-label={t("voice.pickerLabel", { name: bot.name })}
+                aria-label={t('voice.pickerLabel', { name: bot.name })}
                 data-voice-picker
-                className="w-full"
-              >
-                <option value="">
+                className='w-full'>
+                <option value=''>
                   {loadingVoices
-                    ? t("voice.loading")
+                    ? t('voice.loading')
                     : usesLocalSystem
-                      ? t("voice.macDefault")
+                      ? t('voice.macDefault')
                       : tts.voice
-                        ? t("voice.yourVoice", { provider: providerName })
-                        : t("voice.pick")}
+                        ? t('voice.yourVoice', { provider: providerName })
+                        : t('voice.pick')}
                 </option>
                 {selectedVoice && !voices.some((voice) => voice.id === selectedVoice) && (
-                  <option value={selectedVoice}>{t("voice.current")}</option>
+                  <option value={selectedVoice}>{t('voice.current')}</option>
                 )}
                 {voices.map((v) => (
                   <option key={v.id} value={v.id}>
@@ -540,72 +669,101 @@ export function VoiceSettings({
               </Select>
             )}
             <button
-              onClick={() => void speaker.speak(t("voice.sample"), { voiceId: bot.voice, botId: bot.id })}
+              onClick={() =>
+                void speaker.speak(t('voice.sample'), { voiceId: bot.voice, botId: bot.id })
+              }
               disabled={!ready || preparingSample}
               aria-busy={preparingSample}
-              title={ready ? t("voice.hear") : t("voice.pickFirst")}
-              aria-label={t("voice.hear")}
-              className="flex w-[72px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-control py-2 text-[13px] text-ink hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {preparingSample ? <Loader2 size={14} className="animate-spin" /> : <Volume2 size={14} />} {t("voice.try")}
+              title={ready ? t('voice.hear') : t('voice.pickFirst')}
+              aria-label={t('voice.hear')}
+              className='flex w-[72px] shrink-0 items-center justify-center gap-1.5 rounded-lg bg-control py-2 text-[13px] text-ink hover:bg-raised-hover disabled:cursor-not-allowed disabled:opacity-50'>
+              {preparingSample ? (
+                <Loader2 size={14} className='animate-spin' />
+              ) : (
+                <Volume2 size={14} />
+              )}{' '}
+              {t('voice.try')}
             </button>
           </div>
-          {addError && <div role="alert" className="mt-1.5 text-[12px] text-danger">{addError}</div>}
+          {addError && (
+            <div role='alert' className='mt-1.5 text-[12px] text-danger'>
+              {addError}
+            </div>
+          )}
           {!searchable && selectedDescription && (
-            <div className="mt-1.5 text-[12px] leading-relaxed text-ink-secondary">{selectedDescription}</div>
+            <div className='mt-1.5 text-[12px] leading-relaxed text-ink-secondary'>
+              {selectedDescription}
+            </div>
           )}
           {!usesLocalSystem && (selectedVoice || tts.voice) && (
-            <div data-voice-whose className="mt-1.5 text-[12px] leading-relaxed text-ink-secondary">
-              {selectedVoice ? t("voice.usesOwn") : t("voice.usesYours", { provider: providerName })}
+            <div data-voice-whose className='mt-1.5 text-[12px] leading-relaxed text-ink-secondary'>
+              {selectedVoice
+                ? t('voice.usesOwn')
+                : t('voice.usesYours', { provider: providerName })}
             </div>
           )}
         </div>
       )}
 
-      <div className="mt-4 flex items-center justify-between gap-4 border-t border-hairline/40 pt-4">
+      <div className='mt-4 flex items-center justify-between gap-4 border-t border-hairline/40 pt-4'>
         <div>
-          <div className="text-[13px] font-medium text-ink">{t("voice.readReplies")}</div>
-          <div className="mt-0.5 text-[12px] leading-relaxed text-ink-secondary">
-            {t("voice.readRepliesHelp")}
+          <div className='text-[13px] font-medium text-ink'>{t('voice.readReplies')}</div>
+          <div className='mt-0.5 text-[12px] leading-relaxed text-ink-secondary'>
+            {t('voice.readRepliesHelp')}
           </div>
         </div>
         <Switch
           checked={Boolean(bot.speakReplies)}
-          aria-label={t("voice.readReplies")}
+          aria-label={t('voice.readReplies')}
           onClick={() => onPatch({ speakReplies: !bot.speakReplies })}
         />
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-4">
+      <div className='mt-4 flex items-center justify-between gap-4'>
         <div>
-          <div className="text-[13px] font-medium text-ink">{t("voice.notes")}</div>
-          <div className="mt-0.5 text-[12px] leading-relaxed text-ink-secondary">
-            {t("voice.notesHelp")}
+          <div className='text-[13px] font-medium text-ink'>{t('voice.notes')}</div>
+          <div className='mt-0.5 text-[12px] leading-relaxed text-ink-secondary'>
+            {t('voice.notesHelp')}
           </div>
         </div>
         <Switch
           checked={bot.voiceNotes !== false}
-          aria-label={t("voice.notes")}
+          aria-label={t('voice.notes')}
           onClick={() => onPatch({ voiceNotes: bot.voiceNotes === false })}
         />
       </div>
 
-      <div data-voice-every-reply className="mt-4 flex items-center justify-between gap-4">
+      <div data-voice-every-reply className='mt-4 flex items-center justify-between gap-4'>
         <div>
-          <div className="text-[13px] font-medium text-ink">{t("voice.everyReply")}</div>
-          <div className="mt-0.5 text-[12px] leading-relaxed text-ink-secondary">
-            {bot.voiceNoteEveryReply == null
-              ? t(tts?.everyReply ? "voice.everyReply.followsOn" : "voice.everyReply.followsOff")
-              : <>{t("voice.everyReply.own")}{" "}
-                  <button type="button" className="font-medium text-accent hover:underline" onClick={() => onPatch({ voiceNoteEveryReply: null })}>
-                    {t("voice.everyReply.follow")}
-                  </button></>}
+          <div className='text-[13px] font-medium text-ink'>{t('voice.everyReply')}</div>
+          <div className='mt-0.5 text-[12px] leading-relaxed text-ink-secondary'>
+            {bot.voiceNoteEveryReply == null ? (
+              t(tts?.everyReply ? 'voice.everyReply.followsOn' : 'voice.everyReply.followsOff')
+            ) : (
+              <>
+                {t('voice.everyReply.own')}{' '}
+                <button
+                  type='button'
+                  className='font-medium text-accent hover:underline'
+                  onClick={() => onPatch({ voiceNoteEveryReply: null })}>
+                  {t('voice.everyReply.follow')}
+                </button>
+              </>
+            )}
           </div>
         </div>
-        <Switch checked={everyReply} aria-label={t("voice.everyReply")} onClick={() => onPatch({ voiceNoteEveryReply: !everyReply })} />
+        <Switch
+          checked={everyReply}
+          aria-label={t('voice.everyReply')}
+          onClick={() => onPatch({ voiceNoteEveryReply: !everyReply })}
+        />
       </div>
 
-      {error && <div role="alert" className="mt-2 text-[12px] text-danger">{error}</div>}
+      {error && (
+        <div role='alert' className='mt-2 text-[12px] text-danger'>
+          {error}
+        </div>
+      )}
     </div>
   );
 }

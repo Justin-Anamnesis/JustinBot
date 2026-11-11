@@ -1,15 +1,15 @@
-import type { ServerTextParams } from "./server-text.ts";
+import type { ServerTextParams } from './server-text.ts';
 /** Durable progress receipt for one goal-driven channel run. */
 export type GroupGoalRunStatus =
-  | "working"
-  | "completed"
-  | "needs-input"
-  | "blocked"
-  | "limit-reached"
+  | 'working'
+  | 'completed'
+  | 'needs-input'
+  | 'blocked'
+  | 'limit-reached'
   /** The operator (or a guard) parked the run. */
-  | "paused"
-  | "stopped"
-  | "failed";
+  | 'paused'
+  | 'stopped'
+  | 'failed';
 
 export interface GroupGoalRunCardData {
   runId: string;

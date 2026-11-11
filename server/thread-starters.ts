@@ -1,7 +1,7 @@
 // Who each thread is for (server-private, 0600, never on the wire): decides whose session may answer its cards on a shared workspace.
-import { readFileSync } from "node:fs";
+import { readFileSync } from 'node:fs';
 
-import { writeFileAtomic } from "./atomic.ts";
+import { writeFileAtomic } from './atomic.ts';
 
 const KEY = /^p_[\w-]{22}$/;
 const THREAD = /^[\w-]{1,128}$/;
@@ -15,13 +15,14 @@ export class ThreadStarters {
     this.file = file;
     let raw: unknown;
     try {
-      raw = JSON.parse(readFileSync(file, "utf8"));
+      raw = JSON.parse(readFileSync(file, 'utf8'));
     } catch {
       return;
     }
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return;
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return;
     for (const [threadId, person] of Object.entries(raw)) {
-      if (THREAD.test(threadId) && typeof person === "string" && KEY.test(person)) this.starters.set(threadId, person);
+      if (THREAD.test(threadId) && typeof person === 'string' && KEY.test(person))
+        this.starters.set(threadId, person);
     }
   }
 
@@ -51,19 +52,28 @@ export class ThreadStarters {
       this.starters.set(threadId, to);
       moved.push(threadId);
     }
-    if (moved.length) writeFileAtomic(this.file, JSON.stringify(Object.fromEntries(this.starters)) + "\n", { mode: 0o600 });
+    if (moved.length)
+      writeFileAtomic(this.file, JSON.stringify(Object.fromEntries(this.starters)) + '\n', {
+        mode: 0o600,
+      });
     return moved;
   }
 
   /** Record once; a thread keeps the person it was first opened for. */
   set(threadId: string, person: string | undefined): void {
-    if (!person || !KEY.test(person) || !THREAD.test(threadId) || this.starters.has(threadId)) return;
+    if (!person || !KEY.test(person) || !THREAD.test(threadId) || this.starters.has(threadId))
+      return;
     this.starters.set(threadId, person);
-    while (this.starters.size > MAX_ENTRIES) this.starters.delete(this.starters.keys().next().value!);
+    while (this.starters.size > MAX_ENTRIES)
+      this.starters.delete(this.starters.keys().next().value!);
     try {
-      writeFileAtomic(this.file, JSON.stringify(Object.fromEntries(this.starters)) + "\n", { mode: 0o600 });
+      writeFileAtomic(this.file, JSON.stringify(Object.fromEntries(this.starters)) + '\n', {
+        mode: 0o600,
+      });
     } catch (error) {
-      console.warn(`thread starters: could not save ${this.file}: ${error instanceof Error ? error.message : String(error)}`);
+      console.warn(
+        `thread starters: could not save ${this.file}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 }

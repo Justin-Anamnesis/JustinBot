@@ -1,14 +1,18 @@
 // What each thread's running turn is doing right now, read from the live runtime frames: the engine's own report of a
 // tool call (turn.progress), reasoning or reply text streaming, and the turn's end. Held per thread outside the app
 // reducer, so a frame re-renders only the chat that shows that thread, and only when what it shows changes.
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import type { RuntimeEvent } from "../../shared/runtime-events";
-import { progressKey, type TurnProgressActivity, type TurnProgressFields } from "../../shared/turn-progress";
+import type { RuntimeEvent } from '../../shared/runtime-events';
+import {
+  progressKey,
+  type TurnProgressActivity,
+  type TurnProgressFields,
+} from '../../shared/turn-progress';
 
 export type LiveStatus =
-  | ({ activity: TurnProgressActivity } & Omit<TurnProgressFields, "type" | "activity">)
-  | { activity: "thinking" | "reply"; itemId?: undefined };
+  | ({ activity: TurnProgressActivity } & Omit<TurnProgressFields, 'type' | 'activity'>)
+  | { activity: 'thinking' | 'reply'; itemId?: undefined };
 
 export interface TurnLive {
   turnId?: string;
@@ -25,12 +29,21 @@ const listeners = new Map<string, Set<() => void>>();
 function sameStatus(a: LiveStatus | null, b: LiveStatus | null): boolean {
   if (a === b) return true;
   if (!a || !b) return false;
-  return ("bytes" in a ? a.bytes : undefined) === ("bytes" in b ? b.bytes : undefined) && progressKey(a) === progressKey(b);
+  return (
+    ('bytes' in a ? a.bytes : undefined) === ('bytes' in b ? b.bytes : undefined) &&
+    progressKey(a) === progressKey(b)
+  );
 }
 
 function put(threadId: string, next: TurnLive): void {
   const current = threads.get(threadId);
-  if (current && current.turnId === next.turnId && current.ended === next.ended && sameStatus(current.status, next.status)) return;
+  if (
+    current &&
+    current.turnId === next.turnId &&
+    current.ended === next.ended &&
+    sameStatus(current.status, next.status)
+  )
+    return;
   threads.delete(threadId);
   threads.set(threadId, next);
   if (threads.size > MAX_THREADS) threads.delete(threads.keys().next().value!);
@@ -46,25 +59,44 @@ export function noteTurnEvent(event: RuntimeEvent): void {
   const turnId = event.turnId ?? current?.turnId;
   const live: TurnLive = sameTurn ? current : { turnId, ended: false, status: null };
   switch (event.type) {
-    case "turn.started":
+    case 'turn.started':
       return put(threadId, { turnId, ended: false, status: null });
-    case "turn.completed":
-    case "cap.exhausted":
-    case "session.exited":
+    case 'turn.completed':
+    case 'cap.exhausted':
+    case 'session.exited':
       return put(threadId, { turnId, ended: true, status: null });
-    case "turn.progress": {
+    case 'turn.progress': {
       const { activity, tool, file, bytes, itemId, target, detail, quiet, tail } = event;
-      return put(threadId, { turnId, ended: false, status: {
-        activity, ...(tool ? { tool } : {}), ...(file ? { file } : {}), ...(bytes !== undefined ? { bytes } : {}), ...(itemId ? { itemId } : {}),
-        ...(target ? { target } : {}), ...(detail ? { detail } : {}), ...(quiet ? { quiet } : {}), ...(tail?.length ? { tail } : {}),
-      } });
+      return put(threadId, {
+        turnId,
+        ended: false,
+        status: {
+          activity,
+          ...(tool ? { tool } : {}),
+          ...(file ? { file } : {}),
+          ...(bytes !== undefined ? { bytes } : {}),
+          ...(itemId ? { itemId } : {}),
+          ...(target ? { target } : {}),
+          ...(detail ? { detail } : {}),
+          ...(quiet ? { quiet } : {}),
+          ...(tail?.length ? { tail } : {}),
+        },
+      });
     }
-    case "content.delta":
-      return put(threadId, { turnId, ended: false, status: { activity: event.streamKind === "reasoning_text" ? "thinking" : "reply" } });
-    case "item.started":
-      return put(threadId, { ...live, ended: false, status: live.status?.itemId && live.status.itemId === event.itemId ? live.status : null });
-    case "item.completed":
-    case "request.opened":
+    case 'content.delta':
+      return put(threadId, {
+        turnId,
+        ended: false,
+        status: { activity: event.streamKind === 'reasoning_text' ? 'thinking' : 'reply' },
+      });
+    case 'item.started':
+      return put(threadId, {
+        ...live,
+        ended: false,
+        status: live.status?.itemId && live.status.itemId === event.itemId ? live.status : null,
+      });
+    case 'item.completed':
+    case 'request.opened':
       return put(threadId, { ...live, status: null });
     default:
       if (live !== current) put(threadId, live);

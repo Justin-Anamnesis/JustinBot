@@ -1,6 +1,6 @@
-import { existsSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
-import type { ResolvedSpawn } from "./env-path.ts";
+import { existsSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
+import type { ResolvedSpawn } from './env-path.ts';
 
 // Portable Hermes v1.4.17's hermes.bat initializes embedded Python before running
 // hermes_cli.main. Windows cannot spawn the batch file directly; ACP also needs
@@ -39,9 +39,12 @@ runpy.run_module("hermes_cli.main", run_name="__main__")
 `;
 
 export function resolvePortableHermes(shim: string, text: string): ResolvedSpawn | null {
-  if (basename(shim).toLowerCase() !== "hermes.bat") return null;
+  if (basename(shim).toLowerCase() !== 'hermes.bat') return null;
   const root = resolve(dirname(shim));
-  if (!/^"%PYTHON_EXE%" -m hermes_cli\.main %\*\s*$/im.test(text)
-    || !existsSync(join(root, "hermes_cli", "main.py"))) return null;
-  return { command: join(root, "python_embedded", "python.exe"), args: ["-c", BOOTSTRAP, root] };
+  if (
+    !/^"%PYTHON_EXE%" -m hermes_cli\.main %\*\s*$/im.test(text) ||
+    !existsSync(join(root, 'hermes_cli', 'main.py'))
+  )
+    return null;
+  return { command: join(root, 'python_embedded', 'python.exe'), args: ['-c', BOOTSTRAP, root] };
 }

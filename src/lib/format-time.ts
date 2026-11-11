@@ -1,1 +1,1 @@
-export { formatTime } from "./clock-time";
+export { formatTime } from './clock-time';

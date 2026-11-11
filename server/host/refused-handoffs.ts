@@ -1,9 +1,9 @@
 // A routine's run that tried to hand work to a bot it may not reach. coordinate_bots refuses while the turn runs, and the
 // model may say anything after, so the run keeps who it was refused and ends saying so plainly, instead of "completed":
 // nothing arrived. The person who wrote the routine reads it in their inbox, whoever else the bot's failures reach.
-import { namesTeammate, unreachableTeammate, type RosterMember } from "../peer-roster.ts";
-import { serverLine } from "../server-lines.ts";
-import type { Delivery } from "./person-inbox.ts";
+import { namesTeammate, unreachableTeammate, type RosterMember } from '../peer-roster.ts';
+import { serverLine } from '../server-lines.ts';
+import type { Delivery } from './person-inbox.ts';
 
 type Refused = { target: RosterMember; from: RosterMember };
 
@@ -30,9 +30,10 @@ export function createRefusedHandoffs(deps: RefusedHandoffDeps) {
   const toldWriter = new Map<string, string>();
 
   function words(threadId: string, seen: readonly Refused[]): string {
-    const language = deps.language(threadId), bot = seen[0]!.from.name;
-    const named = (some: readonly Refused[]) => some.map(({ target }) => target.name).join(", ");
-    return serverLine(language, "server.runs.handoffApart", { bot, target: named(seen) });
+    const language = deps.language(threadId),
+      bot = seen[0]!.from.name;
+    const named = (some: readonly Refused[]) => some.map(({ target }) => target.name).join(', ');
+    return serverLine(language, 'server.runs.handoffApart', { bot, target: named(seen) });
   }
 
   return {
@@ -41,27 +42,40 @@ export function createRefusedHandoffs(deps: RefusedHandoffDeps) {
       if (!deps.runOf(threadId)) return;
       const seen = refused.get(threadId) ?? new Map<string, Refused>();
       for (const raw of named) {
-        const target = status >= 400 ? unreachableTeammate(deps.bots(), from, raw, (bot) => deps.hides?.(from, bot) === true) : null;
+        const target =
+          status >= 400
+            ? unreachableTeammate(deps.bots(), from, raw, (bot) => deps.hides?.(from, bot) === true)
+            : null;
         if (target) seen.set(target.id, { target, from });
-        if (status < 400) for (const [id, was] of seen) if (namesTeammate(was.target, raw)) seen.delete(id);
+        if (status < 400)
+          for (const [id, was] of seen) if (namesTeammate(was.target, raw)) seen.delete(id);
       }
       if (seen.size) refused.set(threadId, seen);
       else refused.delete(threadId);
     },
     /** The run in this conversation is ending well: what it must say instead, once; null when nothing was refused. */
     take(threadId: string): string | null {
-      const seen = [...refused.get(threadId)?.values() ?? []];
+      const seen = [...(refused.get(threadId)?.values() ?? [])];
       if (!seen.length) return null;
       refused.delete(threadId);
       const said = words(threadId, seen);
-      const run = deps.runOf(threadId), writer = run && deps.writerOf(run.routineId);
-      const asked = run ? deps.askedPerson(run.botId, threadId) : null, inboxedAnyway = writer === asked && !deps.theirOwn(threadId, asked!);
+      const run = deps.runOf(threadId),
+        writer = run && deps.writerOf(run.routineId);
+      const asked = run ? deps.askedPerson(run.botId, threadId) : null,
+        inboxedAnyway = writer === asked && !deps.theirOwn(threadId, asked!);
       if (run && writer && !inboxedAnyway && toldWriter.get(run.routineId) !== said) {
         toldWriter.set(run.routineId, said);
         const from = seen[0]!.from;
         deps.inbox().deliver(writer, {
-          kind: "notice", from: { name: from.name, botId: from.id }, origin: { botId: run.botId, threadId }, notify: "routine-failed",
-          title: serverLine(deps.language(threadId), "server.runs.handoffRefusedTitle", { bot: from.name }), text: said, quiet: writer === asked,
+          kind: 'notice',
+          from: { name: from.name, botId: from.id },
+          origin: { botId: run.botId, threadId },
+          notify: 'routine-failed',
+          title: serverLine(deps.language(threadId), 'server.runs.handoffRefusedTitle', {
+            bot: from.name,
+          }),
+          text: said,
+          quiet: writer === asked,
         });
       }
       return said;

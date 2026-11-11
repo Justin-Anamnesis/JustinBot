@@ -3,24 +3,34 @@
 // awake (one this computer's bots can go to while the person keeps them here: its one tap lets them move, as anyone's first
 // move); a server is one while it says it is theirs alone (and one to go to while nothing moves yet). Never a team's
 // Cloud, nor a server others sign in to.
-import { BACKGROUND_HEADERS } from "./cloud-power.mjs";
-import { awayIn, parseJournal } from "./one-home.mjs";
-import { handSaved, serverRequests } from "./own-home-main.mjs";
-import { teamPlaces } from "./team-places.mjs";
-import { createTwoPlaces, installTwoPlaces } from "./two-places.mjs";
-import nativeText from "./native-text.cjs";
+import { BACKGROUND_HEADERS } from './cloud-power.mjs';
+import { awayIn, parseJournal } from './one-home.mjs';
+import { handSaved, serverRequests } from './own-home-main.mjs';
+import { teamPlaces } from './team-places.mjs';
+import { createTwoPlaces, installTwoPlaces } from './two-places.mjs';
+import nativeText from './native-text.cjs';
 
 /** How often main looks whether the places changed (a server said it is the person's own, My Cloud became ready). */
 const WATCH_MS = 60_000;
-const ROUTE = "/api/places/elsewhere";
+const ROUTE = '/api/places/elsewhere';
 
 async function json(response) {
-  if (!response.ok) { await response.body?.cancel(); return null; }
-  try { return await response.json(); } catch { return null; }
+  if (!response.ok) {
+    await response.body?.cancel();
+    return null;
+  }
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
 }
 async function sent(response, what) {
   await response.body?.cancel();
-  if (!response.ok) throw Object.assign(new Error(`${what} answered ${response.status}`), { status: response.status });
+  if (!response.ok)
+    throw Object.assign(new Error(`${what} answered ${response.status}`), {
+      status: response.status,
+    });
 }
 
 /**
@@ -42,47 +52,143 @@ async function sent(response, what) {
  * now (a sleeping Cloud is never asked). `account()` and `teamsRemembered`: the person's teams, read as places that have
  * bots. `tell()`: the suggestion changed, so this computer's page asks again.
  */
-export function installTwoPlacesMain({ ipcMain, guard, localRequest, fetch: fetchImpl, environments, cloud, oneHome, ownHome, dismissed, account = null, teamsRemembered = null, tell, log = () => {}, t = nativeText.englishText.t }) {
-  const put = (payload) => ({ method: "PUT", body: JSON.stringify(payload), signal: AbortSignal.timeout(10_000) });
-  const teams = account && teamsRemembered ? teamPlaces({ account, fetch: fetchImpl, remembered: teamsRemembered }) : () => [];
+export function installTwoPlacesMain({
+  ipcMain,
+  guard,
+  localRequest,
+  fetch: fetchImpl,
+  environments,
+  cloud,
+  oneHome,
+  ownHome,
+  dismissed,
+  account = null,
+  teamsRemembered = null,
+  tell,
+  log = () => {},
+  t = nativeText.englishText.t,
+}) {
+  const put = (payload) => ({
+    method: 'PUT',
+    body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const teams =
+    account && teamsRemembered
+      ? teamPlaces({ account, fetch: fetchImpl, remembered: teamsRemembered })
+      : () => [];
   const places = () => {
     const out = [];
-    const mine = cloud(), keep = oneHome.keep.state();
+    const mine = cloud(),
+      keep = oneHome.keep.state();
     if (mine.origin && !mine.asleep) {
-      const request = (route, init = {}) => fetchImpl(`${mine.origin}${route}`, { credentials: "include", cache: "no-store", redirect: "error", signal: AbortSignal.timeout(10_000), ...init,
-        headers: { accept: "application/json", origin: mine.origin, ...BACKGROUND_HEADERS, ...init.headers } });
-      out.push({ key: `cloud:${mine.origin}`, name: t("cloudSetup.myCloud"), kind: "cloud",
-        read: async () => (cloud().asleep ? null : json(await request("/api/cloud-send?move=1"))),
-        tell: async (payload) => sent(await request(ROUTE, { ...put(payload), headers: { "content-type": "application/json" } }), t("cloudSetup.myCloud")),
-        ...(keep.on && !keep.moved ? { bring: () => oneHome.keep.set(false) } : {}) });
+      const request = (route, init = {}) =>
+        fetchImpl(`${mine.origin}${route}`, {
+          credentials: 'include',
+          cache: 'no-store',
+          redirect: 'error',
+          signal: AbortSignal.timeout(10_000),
+          ...init,
+          headers: {
+            accept: 'application/json',
+            origin: mine.origin,
+            ...BACKGROUND_HEADERS,
+            ...init.headers,
+          },
+        });
+      out.push({
+        key: `cloud:${mine.origin}`,
+        name: t('cloudSetup.myCloud'),
+        kind: 'cloud',
+        read: async () => (cloud().asleep ? null : json(await request('/api/cloud-send?move=1'))),
+        tell: async (payload) =>
+          sent(
+            await request(ROUTE, {
+              ...put(payload),
+              headers: { 'content-type': 'application/json' },
+            }),
+            t('cloudSetup.myCloud'),
+          ),
+        ...(keep.on && !keep.moved ? { bring: () => oneHome.keep.set(false) } : {}),
+      });
     }
     for (const place of environments().filter((entry) => handSaved(entry) && ownHome.owns(entry))) {
       const server = serverRequests(place, fetchImpl);
-      out.push({ key: `server:${place.origin}`, name: place.name, kind: "server",
-        read: async () => json(await server.request("GET", "/api/cloud-send?move=1", { signal: AbortSignal.timeout(10_000) })),
-        tell: async (payload) => sent(await server.request("PUT", ROUTE, { ...put(payload), headers: { "content-type": "application/json" } }), place.name),
-        ...(ownHome.offers(place) ? { bring: () => ownHome.start(place.id) } : {}) });
+      out.push({
+        key: `server:${place.origin}`,
+        name: place.name,
+        kind: 'server',
+        read: async () =>
+          json(
+            await server.request('GET', '/api/cloud-send?move=1', {
+              signal: AbortSignal.timeout(10_000),
+            }),
+          ),
+        tell: async (payload) =>
+          sent(
+            await server.request('PUT', ROUTE, {
+              ...put(payload),
+              headers: { 'content-type': 'application/json' },
+            }),
+            place.name,
+          ),
+        ...(ownHome.offers(place) ? { bring: () => ownHome.start(place.id) } : {}),
+      });
     }
     return [...out, ...teams()];
   };
   const journal = () => parseJournal(oneHome.journal());
   /** This computer's bots moved: to My Cloud, or to a server of the person's own. */
   const moved = () => awayIn(journal()) || ownHome.away();
-  const settled = () => !ownHome.active() && (!journal() || journal().phase === "back");
+  const settled = () => !ownHome.active() && (!journal() || journal().phase === 'back');
   let label = null;
   const twoPlaces = createTwoPlaces({
-    local: async () => (moved() ? null : json(await localRequest("/api/cloud-send?move=1", { signal: AbortSignal.timeout(10_000) }))),
+    local: async () =>
+      moved()
+        ? null
+        : json(
+            await localRequest('/api/cloud-send?move=1', { signal: AbortSignal.timeout(10_000) }),
+          ),
     here: {
-      name: async () => (label ??= (await json(await localRequest("/.well-known/openmausbot/environment", { signal: AbortSignal.timeout(10_000) })))?.label ?? null),
-      tell: async (payload) => sent(await localRequest(ROUTE, { ...put(payload), headers: { "content-type": "application/json" } }), t("rail.thisComputer")),
+      name: async () =>
+        (label ??=
+          (
+            await json(
+              await localRequest('/.well-known/openmausbot/environment', {
+                signal: AbortSignal.timeout(10_000),
+              }),
+            )
+          )?.label ?? null),
+      tell: async (payload) =>
+        sent(
+          await localRequest(ROUTE, {
+            ...put(payload),
+            headers: { 'content-type': 'application/json' },
+          }),
+          t('rail.thisComputer'),
+        ),
     },
-    t, places, settled, quiet: () => !settled() && !moved(), dismissed, onChange: tell, log });
+    t,
+    places,
+    settled,
+    quiet: () => !settled() && !moved(),
+    dismissed,
+    onChange: tell,
+    log,
+  });
   installTwoPlaces({ ipcMain, guard, twoPlaces });
-  let watched = "";
+  let watched = '';
   const watch = setInterval(() => {
     ownHome.refresh();
-    const now = JSON.stringify([settled(), moved(), places().map((place) => [place.key, Boolean(place.bring)])]);
-    if (now !== watched) { watched = now; void twoPlaces.refresh({ force: true }); } else void twoPlaces.refresh();
+    const now = JSON.stringify([
+      settled(),
+      moved(),
+      places().map((place) => [place.key, Boolean(place.bring)]),
+    ]);
+    if (now !== watched) {
+      watched = now;
+      void twoPlaces.refresh({ force: true });
+    } else void twoPlaces.refresh();
   }, WATCH_MS);
   watch.unref?.();
   return { ...twoPlaces, close: () => clearInterval(watch) };

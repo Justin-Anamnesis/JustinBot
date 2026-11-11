@@ -1,17 +1,20 @@
 // agent-browser 0.37 answers a page's alert and beforeunload itself, but a confirm or prompt stays open and unseen in its
 // headless Chrome, which holds every input to that page until it is answered. A second DevTools client sees and answers
 // it; it must enable the Page domain before the dialog opens, since a page blocked by one answers nothing.
-import { connectCdp, type Cdp, type CdpListeners } from "./browser-sites.ts";
+import { connectCdp, type Cdp, type CdpListeners } from './browser-sites.ts';
 
 export interface PageDialog {
-  type: "confirm" | "prompt";
+  type: 'confirm' | 'prompt';
   message: string;
   defaultValue: string;
 }
 
 /** Only the engine's own Chrome on this machine is ever addressed. */
 export function localDevToolsUrl(value: unknown): string | null {
-  return typeof value === "string" && /^wss?:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):\d+\/devtools\/browser\/[\w-]+$/u.test(value) ? value : null;
+  return typeof value === 'string' &&
+    /^wss?:\/\/(?:127\.0\.0\.1|localhost|\[::1\]):\d+\/devtools\/browser\/[\w-]+$/u.test(value)
+    ? value
+    : null;
 }
 
 const MESSAGE_LIMIT = 2_000;
@@ -30,38 +33,72 @@ export class DialogWatch {
     this.#onChange = onChange;
   }
 
-  get dialog(): PageDialog | null { return this.#open?.dialog ?? null; }
-  get closed(): boolean { return this.#closed; }
+  get dialog(): PageDialog | null {
+    return this.#open?.dialog ?? null;
+  }
+  get closed(): boolean {
+    return this.#closed;
+  }
   /** How many dialogs have opened since the watch began. */
-  get opened(): number { return this.#opened; }
+  get opened(): number {
+    return this.#opened;
+  }
 
-  async start(url: string, connect: (url: string, timeoutMs: number, listeners: CdpListeners) => Promise<Cdp> = connectCdp): Promise<void> {
+  async start(
+    url: string,
+    connect: (url: string, timeoutMs: number, listeners: CdpListeners) => Promise<Cdp> = connectCdp,
+  ): Promise<void> {
     const cdp = await connect(url, 10_000, {
       event: ({ method, params, sessionId }) => {
-        if (method === "Target.attachedToTarget" && (params?.targetInfo as { type?: unknown } | undefined)?.type === "page" && typeof params?.sessionId === "string") {
-          void cdp.send("Page.enable", {}, params.sessionId).catch(() => undefined);
-        } else if (method === "Page.javascriptDialogOpening" && sessionId && (params?.type === "confirm" || params?.type === "prompt")) {
-          this.#set({ session: sessionId, dialog: {
-            type: params.type,
-            message: String(params.message ?? "").slice(0, MESSAGE_LIMIT),
-            defaultValue: String(params.defaultPrompt ?? "").slice(0, MESSAGE_LIMIT),
-          } });
-        } else if ((method === "Page.javascriptDialogClosed" || method === "Target.detachedFromTarget") && this.#open && (sessionId ?? params?.sessionId) === this.#open.session) {
+        if (
+          method === 'Target.attachedToTarget' &&
+          (params?.targetInfo as { type?: unknown } | undefined)?.type === 'page' &&
+          typeof params?.sessionId === 'string'
+        ) {
+          void cdp.send('Page.enable', {}, params.sessionId).catch(() => undefined);
+        } else if (
+          method === 'Page.javascriptDialogOpening' &&
+          sessionId &&
+          (params?.type === 'confirm' || params?.type === 'prompt')
+        ) {
+          this.#set({
+            session: sessionId,
+            dialog: {
+              type: params.type,
+              message: String(params.message ?? '').slice(0, MESSAGE_LIMIT),
+              defaultValue: String(params.defaultPrompt ?? '').slice(0, MESSAGE_LIMIT),
+            },
+          });
+        } else if (
+          (method === 'Page.javascriptDialogClosed' || method === 'Target.detachedFromTarget') &&
+          this.#open &&
+          (sessionId ?? params?.sessionId) === this.#open.session
+        ) {
           this.#set(null);
         }
       },
       closed: () => this.close(),
     });
-    if (this.#closed) { cdp.close(); return; }
+    if (this.#closed) {
+      cdp.close();
+      return;
+    }
     this.#cdp = cdp;
-    await cdp.send("Target.setAutoAttach", { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
+    await cdp.send('Target.setAutoAttach', {
+      autoAttach: true,
+      waitForDebuggerOnStart: false,
+      flatten: true,
+    });
   }
 
   #set(open: Open): void {
     if (open === null && this.#open === null) return;
     if (open) this.#opened += 1;
     this.#open = open;
-    if (!open) { for (const done of this.#waiters) done(); this.#waiters.clear(); }
+    if (!open) {
+      for (const done of this.#waiters) done();
+      this.#waiters.clear();
+    }
     this.#onChange(open?.dialog ?? null);
   }
 
@@ -70,8 +107,17 @@ export class DialogWatch {
     const open = this.#open;
     if (!open || !this.#cdp) return false;
     try {
-      await this.#cdp.send("Page.handleJavaScriptDialog", { accept, ...(promptText !== undefined && open.dialog.type === "prompt" ? { promptText } : {}) }, open.session);
-    } catch { return false; }
+      await this.#cdp.send(
+        'Page.handleJavaScriptDialog',
+        {
+          accept,
+          ...(promptText !== undefined && open.dialog.type === 'prompt' ? { promptText } : {}),
+        },
+        open.session,
+      );
+    } catch {
+      return false;
+    }
     if (this.#open === open) this.#set(null);
     return true;
   }
@@ -80,9 +126,13 @@ export class DialogWatch {
   settled(signal?: AbortSignal): Promise<void> {
     if (!this.#open || this.#closed || signal?.aborted) return Promise.resolve();
     return new Promise((resolve) => {
-      const done = () => { this.#waiters.delete(done); signal?.removeEventListener("abort", done); resolve(); };
+      const done = () => {
+        this.#waiters.delete(done);
+        signal?.removeEventListener('abort', done);
+        resolve();
+      };
       this.#waiters.add(done);
-      signal?.addEventListener("abort", done, { once: true });
+      signal?.addEventListener('abort', done, { once: true });
     });
   }
 

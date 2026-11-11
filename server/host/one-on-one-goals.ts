@@ -1,33 +1,46 @@
-import type { ServerText } from "../../shared/server-text.ts";
-import { noticeFailure } from "../chat-notices.ts";
-import { userErrorThrown } from "../user-errors.ts";
+import type { ServerText } from '../../shared/server-text.ts';
+import { noticeFailure } from '../chat-notices.ts';
+import { userErrorThrown } from '../user-errors.ts';
 // A goal in a one-on-one chat, run as a room of one: the bot leads and does the work itself, one turn at a time.
-import { randomUUID } from "node:crypto";
+import { randomUUID } from 'node:crypto';
 
-import { failedTurnTool } from "../../shared/failed-turn.ts";
-import type { HostTurnResult } from "../coordinator.ts";
-import { GROUP_GOAL_WAIT_MAX_MS, runGoalRun, type GoalRunEnd, type GoalStepOutcome, type GoalStepResult } from "../group-goal-run.ts";
-import { OUTSIDE, workOrigin, type WorkOrigin } from "../peer-provenance.ts";
-import type { BotRecord, Message, Store } from "../store.ts";
-import type { GoalCards, LiveGoalRun } from "./goal-cards.ts";
-import type { GoalTurns } from "./goal-turns.ts";
+import { failedTurnTool } from '../../shared/failed-turn.ts';
+import type { HostTurnResult } from '../coordinator.ts';
+import {
+  GROUP_GOAL_WAIT_MAX_MS,
+  runGoalRun,
+  type GoalRunEnd,
+  type GoalStepOutcome,
+  type GoalStepResult,
+} from '../group-goal-run.ts';
+import { OUTSIDE, workOrigin, type WorkOrigin } from '../peer-provenance.ts';
+import type { BotRecord, Message, Store } from '../store.ts';
+import type { GoalCards, LiveGoalRun } from './goal-cards.ts';
+import type { GoalTurns } from './goal-turns.ts';
 
 export interface OneOnOneGoalDeps {
-  store: Pick<Store, "appendMessage" | "bot" | "onChange" | "taskByThread" | "titleTaskFromFirstMessage">;
+  store: Pick<
+    Store,
+    'appendMessage' | 'bot' | 'onChange' | 'taskByThread' | 'titleTaskFromFirstMessage'
+  >;
   cards: GoalCards;
   turns: GoalTurns;
   /** startTurn would admit a turn in this conversation now, and no teammate it handed work to is still working on it. */
   canStart(botId: string, threadId: string): boolean;
-  startTurn(botId: string, text: string, opts: {
-    threadId: string;
-    cardContinuation: true;
-    requestMessageId: string;
-    origin: WorkOrigin;
-    unattended: boolean;
-    /** The goal run this step belongs to: the step is its own turn, so it can hand work to teammates. */
-    goalRunId: string;
-    onSettled: (outcome: HostTurnResult) => void;
-  }): Promise<unknown>;
+  startTurn(
+    botId: string,
+    text: string,
+    opts: {
+      threadId: string;
+      cardContinuation: true;
+      requestMessageId: string;
+      origin: WorkOrigin;
+      unattended: boolean;
+      /** The goal run this step belongs to: the step is its own turn, so it can hand work to teammates. */
+      goalRunId: string;
+      onSettled: (outcome: HostTurnResult) => void;
+    },
+  ): Promise<unknown>;
   isUnattended(botId: string, threadId: string): boolean;
 }
 
@@ -35,7 +48,7 @@ export interface OneOnOneGoalStart {
   /** The routine run this goal is; it names the run, and its work is never the person's own request. */
   runId?: string;
   sendId?: string;
-  sender?: Message["sender"];
+  sender?: Message['sender'];
 }
 
 type LiveGoal = {
@@ -45,7 +58,7 @@ type LiveGoal = {
   wake?: () => void;
 };
 
-type Availability = "ready" | "cancelled" | "unavailable" | "timed_out";
+type Availability = 'ready' | 'cancelled' | 'unavailable' | 'timed_out';
 
 const LOST_RACE_RETRY_MS = 250;
 
@@ -53,21 +66,39 @@ export function createOneOnOneGoals(deps: OneOnOneGoalDeps) {
   const { store } = deps;
   const live = new Map<string, LiveGoal>();
 
-  function finish(threadId: string, goal: LiveGoal, status: GoalRunEnd, detail: string, text?: ServerText): void {
-    deps.cards.finish(threadId, goal.run, status, detail, () => Boolean(store.taskByThread(goal.botId, threadId)), text);
+  function finish(
+    threadId: string,
+    goal: LiveGoal,
+    status: GoalRunEnd,
+    detail: string,
+    text?: ServerText,
+  ): void {
+    deps.cards.finish(
+      threadId,
+      goal.run,
+      status,
+      detail,
+      () => Boolean(store.taskByThread(goal.botId, threadId)),
+      text,
+    );
   }
 
   function availability(goal: LiveGoal, botId: string, threadId: string): Availability | null {
-    if (goal.cancelled) return "cancelled";
-    if (!store.bot(botId) || !store.taskByThread(botId, threadId)) return "unavailable";
-    return deps.canStart(botId, threadId) ? "ready" : null;
+    if (goal.cancelled) return 'cancelled';
+    if (!store.bot(botId) || !store.taskByThread(botId, threadId)) return 'unavailable';
+    return deps.canStart(botId, threadId) ? 'ready' : null;
   }
 
-  function waitUntilFree(goal: LiveGoal, bot: BotRecord, threadId: string, remainingMs: number): Promise<Availability> {
+  function waitUntilFree(
+    goal: LiveGoal,
+    bot: BotRecord,
+    threadId: string,
+    remainingMs: number,
+  ): Promise<Availability> {
     const now = availability(goal, bot.id, threadId);
     if (now) return Promise.resolve(now);
-    if (remainingMs <= 0) return Promise.resolve("timed_out");
-    const waiting = noticeFailure("chat.notice.goalWaiting", { name: bot.name });
+    if (remainingMs <= 0) return Promise.resolve('timed_out');
+    const waiting = noticeFailure('chat.notice.goalWaiting', { name: bot.name });
     deps.cards.progress(threadId, goal.run, waiting.message, waiting.text);
     return new Promise((resolve) => {
       let settled = false;
@@ -77,10 +108,11 @@ export function createOneOnOneGoals(deps: OneOnOneGoalDeps) {
       };
       const poll = setInterval(check, 1_000);
       poll.unref?.();
-      const cap = setTimeout(() => done("timed_out"), remainingMs);
+      const cap = setTimeout(() => done('timed_out'), remainingMs);
       cap.unref?.();
       const unsubscribe = store.onChange((change) => {
-        if ((change.type === "bot" || change.type === "bot.deleted") && change.botId === bot.id) check();
+        if ((change.type === 'bot' || change.type === 'bot.deleted') && change.botId === bot.id)
+          check();
       });
       function done(result: Availability) {
         if (settled) return;
@@ -95,23 +127,46 @@ export function createOneOnOneGoals(deps: OneOnOneGoalDeps) {
     });
   }
 
-  async function step(goal: LiveGoal, threadId: string, request: { id: string; origin: WorkOrigin }, bot: BotRecord, instructions: string): Promise<GoalStepResult> {
+  async function step(
+    goal: LiveGoal,
+    threadId: string,
+    request: { id: string; origin: WorkOrigin },
+    bot: BotRecord,
+    instructions: string,
+  ): Promise<GoalStepResult> {
     const { run } = goal;
     const stayedBusy = (): GoalStepResult => {
       const minutes = Math.max(1, Math.round(GROUP_GOAL_WAIT_MAX_MS / 60_000));
-      const busy = noticeFailure(minutes === 1 ? "chat.notice.goalBusyOne" : "chat.notice.goalBusyMany", { name: bot.name, minutes: String(minutes) });
-      return { ran: false, replyText: "", outcome: "busy", stopReason: busy.message, stopReasonText: busy.text };
+      const busy = noticeFailure(
+        minutes === 1 ? 'chat.notice.goalBusyOne' : 'chat.notice.goalBusyMany',
+        { name: bot.name, minutes: String(minutes) },
+      );
+      return {
+        ran: false,
+        replyText: '',
+        outcome: 'busy',
+        stopReason: busy.message,
+        stopReasonText: busy.text,
+      };
     };
     // One wait cap for the whole step: the busy wait and the lost-slot retries share it, so neither restarts the clock.
     const deadline = Date.now() + GROUP_GOAL_WAIT_MAX_MS;
     for (;;) {
-      if (goal.cancelled || run.turnCount >= run.maxTurns) return { ran: false, replyText: "" };
+      if (goal.cancelled || run.turnCount >= run.maxTurns) return { ran: false, replyText: '' };
       const free = await waitUntilFree(goal, bot, threadId, deadline - Date.now());
-      if (free === "cancelled") return { ran: false, replyText: "", outcome: "cancelled" };
-      if (free === "unavailable") return { ran: false, replyText: "", outcome: "unavailable", stopReason: `${bot.name} is no longer available` };
-      if (free === "timed_out") return stayedBusy();
+      if (free === 'cancelled') return { ran: false, replyText: '', outcome: 'cancelled' };
+      if (free === 'unavailable')
+        return {
+          ran: false,
+          replyText: '',
+          outcome: 'unavailable',
+          stopReason: `${bot.name} is no longer available`,
+        };
+      if (free === 'timed_out') return stayedBusy();
       let settle!: (outcome: HostTurnResult) => void;
-      const settled = new Promise<HostTurnResult>((resolve) => { settle = resolve; });
+      const settled = new Promise<HostTurnResult>((resolve) => {
+        settle = resolve;
+      });
       const lead = deps.turns.begin(threadId);
       let outcome: GoalStepOutcome | undefined;
       try {
@@ -128,33 +183,41 @@ export function createOneOnOneGoals(deps: OneOnOneGoalDeps) {
         } catch (error) {
           const code = (error as { code?: unknown } | null)?.code;
           const message = error instanceof Error ? error.message : String(error);
-          if (code === "thread_busy" || code === "thread_limit") {
-            outcome = "busy";
+          if (code === 'thread_busy' || code === 'thread_limit') {
+            outcome = 'busy';
             // The chat looked free but the turn kept losing its slot; past the wait cap the run ends blocked, as a busy wait does.
             if (Date.now() + LOST_RACE_RETRY_MS >= deadline) return stayedBusy();
             await new Promise((resolve) => setTimeout(resolve, LOST_RACE_RETRY_MS));
             continue;
           }
-          if (code === "spend_cap") {
-            store.appendMessage(threadId, { role: "bot", kind: "activity", tool: failedTurnTool(message) });
-            outcome = "spend_capped";
+          if (code === 'spend_cap') {
+            store.appendMessage(threadId, {
+              role: 'bot',
+              kind: 'activity',
+              tool: failedTurnTool(message),
+            });
+            outcome = 'spend_capped';
           } else {
-            outcome = "dispatch_failed";
+            outcome = 'dispatch_failed';
           }
-          return { ran: false, replyText: "", outcome, stopReason: message };
+          return { ran: false, replyText: '', outcome, stopReason: message };
         }
         run.turnCount += 1;
-        const working = noticeFailure("chat.notice.goalWorking", { name: bot.name, turn: String(run.turnCount), max: String(run.maxTurns) });
+        const working = noticeFailure('chat.notice.goalWorking', {
+          name: bot.name,
+          turn: String(run.turnCount),
+          max: String(run.maxTurns),
+        });
         deps.cards.progress(threadId, run, working.message, working.text);
         const result = await settled;
         if (goal.cancelled) {
-          outcome = "cancelled";
-          return { ran: false, replyText: "", outcome };
+          outcome = 'cancelled';
+          return { ran: false, replyText: '', outcome };
         }
-        outcome = result.stalled ? "stalled" : result.ok ? "settled" : "provider_failed";
+        outcome = result.stalled ? 'stalled' : result.ok ? 'settled' : 'provider_failed';
         return {
           ran: true,
-          replyText: result.ok ? lead.assistantItems.join("\n") : "",
+          replyText: result.ok ? lead.assistantItems.join('\n') : '',
           outcome,
           ...(result.ok ? {} : { stopReason: result.text }),
         };
@@ -165,23 +228,34 @@ export function createOneOnOneGoals(deps: OneOnOneGoalDeps) {
   }
 
   /** Appends the person's goal line and its run card, then works until the bot reports an outcome or the turns run out. */
-  function start(botId: string, threadId: string, text: string, options: OneOnOneGoalStart = {}): Message {
+  function start(
+    botId: string,
+    threadId: string,
+    text: string,
+    options: OneOnOneGoalStart = {},
+  ): Message {
     const bot = store.bot(botId);
-    if (!bot || !store.taskByThread(botId, threadId)) throw Object.assign(userErrorThrown("serverError.chat.missingConversation"), { status: 404 });
+    if (!bot || !store.taskByThread(botId, threadId))
+      throw Object.assign(userErrorThrown('serverError.chat.missingConversation'), { status: 404 });
     if (live.has(threadId)) {
-      throw Object.assign(userErrorThrown("serverError.goal.alreadyRunning"), { status: 409 });
+      throw Object.assign(userErrorThrown('serverError.goal.alreadyRunning'), { status: 409 });
     }
     const message = store.appendMessage(threadId, {
-      role: "user",
-      kind: "text",
+      role: 'user',
+      kind: 'text',
       text,
-      channelMode: "goal",
+      channelMode: 'goal',
       ...(options.sendId ? { sendId: options.sendId } : {}),
       ...(options.sender ? { sender: options.sender } : {}),
     });
     store.titleTaskFromFirstMessage(botId, text, threadId);
     const goal: LiveGoal = {
-      run: deps.cards.start(threadId, bot, text, options.runId ?? `goal-${Date.now().toString(36)}-${randomUUID()}`),
+      run: deps.cards.start(
+        threadId,
+        bot,
+        text,
+        options.runId ?? `goal-${Date.now().toString(36)}-${randomUUID()}`,
+      ),
       botId,
       cancelled: false,
     };
@@ -194,22 +268,36 @@ export function createOneOnOneGoals(deps: OneOnOneGoalDeps) {
       solo: true,
       cancelled: () => goal.cancelled,
       current: (id) => store.bot(id) ?? undefined,
-      step: (member, _coordinator, instructions) => step(goal, threadId, request, member, instructions),
+      step: (member, _coordinator, instructions) =>
+        step(goal, threadId, request, member, instructions),
       finish: (status, detail, text) => finish(threadId, goal, status, detail, text),
       progress: (detail, text) => deps.cards.progress(threadId, goal.run, detail, text),
-      note: (line) => store.appendMessage(threadId, { role: "bot", kind: "activity", tool: { name: line, ok: false } }),
+      note: (line) =>
+        store.appendMessage(threadId, {
+          role: 'bot',
+          kind: 'activity',
+          tool: { name: line, ok: false },
+        }),
     })
-      .catch((error: unknown) => finish(threadId, goal, "failed", error instanceof Error ? error.message : String(error)))
+      .catch((error: unknown) =>
+        finish(threadId, goal, 'failed', error instanceof Error ? error.message : String(error)),
+      )
       .finally(() => {
-        const ended = noticeFailure("chat.notice.goalEnded");
-        finish(threadId, goal, "failed", ended.message, ended.text);
+        const ended = noticeFailure('chat.notice.goalEnded');
+        finish(threadId, goal, 'failed', ended.message, ended.text);
         if (live.get(threadId) === goal) live.delete(threadId);
       });
     return message;
   }
 
   /** Ends the run on its card at once; the turn in flight is the caller's to interrupt. */
-  function stop(threadId: string, outcome: { status: "stopped" | "limit-reached"; detail: string } = { status: "stopped", detail: "Stopped by you." }): boolean {
+  function stop(
+    threadId: string,
+    outcome: { status: 'stopped' | 'limit-reached'; detail: string } = {
+      status: 'stopped',
+      detail: 'Stopped by you.',
+    },
+  ): boolean {
     const goal = live.get(threadId);
     if (!goal || goal.cancelled) return false;
     goal.cancelled = true;

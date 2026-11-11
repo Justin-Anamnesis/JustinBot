@@ -1,9 +1,9 @@
-export const FONT_IDS = ["skin", "system", "inter", "poppins", "serif"] as const;
+export const FONT_IDS = ['skin', 'system', 'inter', 'poppins', 'serif'] as const;
 export type FontId = (typeof FONT_IDS)[number];
 
-export const DEFAULT_FONT: FontId = "skin";
+export const DEFAULT_FONT: FontId = 'skin';
 
-export const FONT_KEY = "omb-font";
+export const FONT_KEY = 'omb-font';
 
 function isFontId(value: unknown): value is FontId {
   return FONT_IDS.includes(value as FontId);
@@ -11,7 +11,7 @@ function isFontId(value: unknown): value is FontId {
 
 function getStore(): Storage | undefined {
   try {
-    return typeof localStorage === "undefined" ? undefined : localStorage;
+    return typeof localStorage === 'undefined' ? undefined : localStorage;
   } catch {
     return undefined;
   }
@@ -31,6 +31,5 @@ export function applyFont(id: FontId): void {
   else document.documentElement.dataset.font = id;
   try {
     getStore()?.setItem(FONT_KEY, id);
-  } catch {
-  }
+  } catch {}
 }

@@ -1,6 +1,6 @@
 // A conversation message as the OpenMausBot MCP server shows it to an agent: its text plus the state of any card on it.
 export function isRecord(value: unknown): value is Record<string, any> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 export function projectMessage(message: Record<string, any>) {
@@ -15,7 +15,11 @@ export function projectMessage(message: Record<string, any>) {
       }
     : undefined;
   const tool = isRecord(message.tool)
-    ? { name: message.tool.name, ok: message.tool.ok, spoken: message.tool.spoken, setup: message.tool.setup,
+    ? {
+        name: message.tool.name,
+        ok: message.tool.ok,
+        spoken: message.tool.spoken,
+        setup: message.tool.setup,
         ...(message.tool.terminal === true ? { terminal: true } : {}),
       }
     : undefined;
@@ -70,7 +74,11 @@ export function projectMessage(message: Record<string, any>) {
     ...(card ? { card } : {}),
     ...(connector ? { connector } : {}),
     ...(secret ? { secret } : {}),
-    ...(signIn ? { signIn } : {}), ...(message.widget ? { widget: message.widget } : {}), ...(message.app ? { app: message.app } : {}), ...(message.fromApp ? { fromApp: message.fromApp } : {}), ...(message.wait ? { wait: message.wait } : {}),
-    ...(message.kind === "screen" ? { hasImage: Boolean(message.hasImage || message.png) } : {}),
+    ...(signIn ? { signIn } : {}),
+    ...(message.widget ? { widget: message.widget } : {}),
+    ...(message.app ? { app: message.app } : {}),
+    ...(message.fromApp ? { fromApp: message.fromApp } : {}),
+    ...(message.wait ? { wait: message.wait } : {}),
+    ...(message.kind === 'screen' ? { hasImage: Boolean(message.hasImage || message.png) } : {}),
   };
 }

@@ -1,8 +1,8 @@
-import type { CompanionAccountState } from "../types/ogb";
-import { t } from "./i18n";
-import type { CompanionEndpoint, CompanionPairingRouteMode } from "./companion-pairing";
+import type { CompanionAccountState } from '../types/ogb';
+import { t } from './i18n';
+import type { CompanionEndpoint, CompanionPairingRouteMode } from './companion-pairing';
 
-export type PhoneSetupPhase = "intro" | "sign-in" | "verifying" | "qr" | "success";
+export type PhoneSetupPhase = 'intro' | 'sign-in' | 'verifying' | 'qr' | 'success';
 
 export interface PhoneSetupFlowState {
   active: boolean;
@@ -14,13 +14,13 @@ export interface PhoneSetupFlowState {
 }
 
 export type PhoneSetupEvent =
-  | { type: "start"; deviceIds: string[] }
-  | { type: "resume"; deviceIds: string[] }
-  | { type: "use-local" }
-  | { type: "use-tailscale" }
-  | { type: "pairing-opened"; deviceIds: string[] }
-  | { type: "paired"; deviceName: string }
-  | { type: "reset" };
+  | { type: 'start'; deviceIds: string[] }
+  | { type: 'resume'; deviceIds: string[] }
+  | { type: 'use-local' }
+  | { type: 'use-tailscale' }
+  | { type: 'pairing-opened'; deviceIds: string[] }
+  | { type: 'paired'; deviceName: string }
+  | { type: 'reset' };
 
 export const initialPhoneSetupFlowState: PhoneSetupFlowState = {
   active: false,
@@ -37,8 +37,8 @@ export function phoneSetupReducer(
   event: PhoneSetupEvent,
 ): PhoneSetupFlowState {
   switch (event.type) {
-    case "start":
-    case "resume":
+    case 'start':
+    case 'resume':
       return {
         active: true,
         localFallback: false,
@@ -47,7 +47,7 @@ export function phoneSetupReducer(
         pairingAttempted: false,
         pairedDeviceName: null,
       };
-    case "use-local":
+    case 'use-local':
       return {
         ...state,
         active: true,
@@ -55,7 +55,7 @@ export function phoneSetupReducer(
         tailscaleFallback: false,
         pairingAttempted: false,
       };
-    case "use-tailscale":
+    case 'use-tailscale':
       return {
         ...state,
         active: true,
@@ -63,20 +63,20 @@ export function phoneSetupReducer(
         tailscaleFallback: true,
         pairingAttempted: false,
       };
-    case "pairing-opened":
+    case 'pairing-opened':
       return {
         ...state,
         baselineDeviceIds: [...event.deviceIds],
         pairingAttempted: true,
       };
-    case "paired":
+    case 'paired':
       return { ...state, active: true, pairedDeviceName: event.deviceName };
-    case "reset":
+    case 'reset':
       return initialPhoneSetupFlowState;
   }
 }
 
-export type PhoneSetupAccountStatus = CompanionAccountState["status"] | "unavailable";
+export type PhoneSetupAccountStatus = CompanionAccountState['status'] | 'unavailable';
 
 export interface PhoneSetupSnapshot {
   accountStatus: PhoneSetupAccountStatus;
@@ -92,24 +92,21 @@ export function derivePhoneSetupPhase(
   flow: PhoneSetupFlowState,
   snapshot: PhoneSetupSnapshot,
 ): PhoneSetupPhase {
-  if (flow.pairedDeviceName) return "success";
-  if (!flow.active) return "intro";
-  if (snapshot.pairingOpen || flow.pairingAttempted) return "qr";
-  if (snapshot.provisioningTimedOut) return "sign-in";
-  if (flow.localFallback || flow.tailscaleFallback) return "verifying";
-  if (snapshot.accountStatus === "signed-out" || snapshot.accountStatus === "unavailable") {
-    return "sign-in";
+  if (flow.pairedDeviceName) return 'success';
+  if (!flow.active) return 'intro';
+  if (snapshot.pairingOpen || flow.pairingAttempted) return 'qr';
+  if (snapshot.provisioningTimedOut) return 'sign-in';
+  if (flow.localFallback || flow.tailscaleFallback) return 'verifying';
+  if (snapshot.accountStatus === 'signed-out' || snapshot.accountStatus === 'unavailable') {
+    return 'sign-in';
   }
-  if (snapshot.accountStatus === "error") return "sign-in";
-  if (snapshot.accountBusy || snapshot.provisioning) return "verifying";
-  return "verifying";
+  if (snapshot.accountStatus === 'error') return 'sign-in';
+  if (snapshot.accountBusy || snapshot.provisioning) return 'verifying';
+  return 'verifying';
 }
 
 export type CompanionPairingMode =
-  | "local-only"
-  | "hosted-startable"
-  | "hosted-connecting"
-  | "hosted-ready";
+  'local-only' | 'hosted-startable' | 'hosted-connecting' | 'hosted-ready';
 
 export interface PhoneSetupCompanionSnapshot {
   enabled: boolean;
@@ -127,18 +124,14 @@ export async function preparePhonePairingRoute<State extends { enabled: boolean;
   },
 ): Promise<State> {
   let state = await (alreadyEnabled ? actions.read() : actions.start());
-  if (
-    alreadyEnabled
-    && !state.enabled
-    && (actions.shouldContinue?.() ?? true)
-  ) {
+  if (alreadyEnabled && !state.enabled && (actions.shouldContinue?.() ?? true)) {
     state = await actions.start();
   }
   if (
-    routeMode === "tailscale"
-    && state.enabled
-    && !state.error
-    && (actions.shouldContinue?.() ?? true)
+    routeMode === 'tailscale' &&
+    state.enabled &&
+    !state.error &&
+    (actions.shouldContinue?.() ?? true)
   ) {
     state = await actions.refreshTailscale();
   }
@@ -150,33 +143,33 @@ export const companionPairingMode = (
   account: CompanionAccountState | null,
   companion: PhoneSetupCompanionSnapshot | null,
 ): CompanionPairingMode => {
-  if (companion?.endpoints?.some((endpoint) => endpoint.kind === "hosted")) {
-    return "hosted-ready";
+  if (companion?.endpoints?.some((endpoint) => endpoint.kind === 'hosted')) {
+    return 'hosted-ready';
   }
-  if (!account?.available || account.status === "signed-out" || account.status === "error") {
-    return "local-only";
+  if (!account?.available || account.status === 'signed-out' || account.status === 'error') {
+    return 'local-only';
   }
-  if (account.status === "ready" && !companion?.enabled) return "hosted-startable";
-  return "hosted-connecting";
+  if (account.status === 'ready' && !companion?.enabled) return 'hosted-startable';
+  return 'hosted-connecting';
 };
 
-export type PhonePairingGate = "open" | "start" | "wait" | "account-required";
+export type PhonePairingGate = 'open' | 'start' | 'wait' | 'account-required';
 
 export function phonePairingGate(
   account: CompanionAccountState | null,
   companion: PhoneSetupCompanionSnapshot | null,
   explicitRoute: boolean,
 ): PhonePairingGate {
-  if (explicitRoute) return "open";
+  if (explicitRoute) return 'open';
   switch (companionPairingMode(account, companion)) {
-    case "hosted-ready":
-      return "open";
-    case "hosted-startable":
-      return "start";
-    case "hosted-connecting":
-      return "wait";
-    case "local-only":
-      return "account-required";
+    case 'hosted-ready':
+      return 'open';
+    case 'hosted-startable':
+      return 'start';
+    case 'hosted-connecting':
+      return 'wait';
+    case 'local-only':
+      return 'account-required';
   }
 }
 
@@ -185,21 +178,25 @@ export function shouldPrepareSecureAddress(
   gate: PhonePairingGate,
   account: CompanionAccountState | null,
 ): boolean {
-  if (routeMode !== "automatic") return false;
-  if (gate === "open") return true;
-  return gate === "wait"
-    && account?.available === true
-    && (account.status === "ready" || account.status === "connecting");
+  if (routeMode !== 'automatic') return false;
+  if (gate === 'open') return true;
+  return (
+    gate === 'wait' &&
+    account?.available === true &&
+    (account.status === 'ready' || account.status === 'connecting')
+  );
 }
 
 export function secureAddressRequestLapsed(
   account: CompanionAccountState | null,
   companion: PhoneSetupCompanionSnapshot | null,
 ): boolean {
-  return account?.available === true
-    && account.status === "ready"
-    && !account.endpoint
-    && phonePairingGate(account, companion, false) === "wait";
+  return (
+    account?.available === true &&
+    account.status === 'ready' &&
+    !account.endpoint &&
+    phonePairingGate(account, companion, false) === 'wait'
+  );
 }
 
 export function newlyPairedDevice<T extends { id: string; name: string }>(
@@ -211,7 +208,10 @@ export function newlyPairedDevice<T extends { id: string; name: string }>(
 }
 
 export function newlyPairedDeviceForFlow<T extends { id: string; name: string }>(
-  flow: Pick<PhoneSetupFlowState, "active" | "baselineDeviceIds" | "pairingAttempted" | "pairedDeviceName">,
+  flow: Pick<
+    PhoneSetupFlowState,
+    'active' | 'baselineDeviceIds' | 'pairingAttempted' | 'pairedDeviceName'
+  >,
   devices: T[],
 ): T | null {
   if (!flow.active || !flow.pairingAttempted || flow.pairedDeviceName) return null;
@@ -223,8 +223,8 @@ export function phoneSetupBaseline<T extends { id: string }>(devices: T[] | null
 }
 
 export function shouldArmPhoneSetupProvisioningTimeout(
-  flow: Pick<PhoneSetupFlowState, "active">,
-  snapshot: Pick<PhoneSetupSnapshot, "provisioning" | "provisioningTimedOut">,
+  flow: Pick<PhoneSetupFlowState, 'active'>,
+  snapshot: Pick<PhoneSetupSnapshot, 'provisioning' | 'provisioningTimedOut'>,
 ): boolean {
   return flow.active && snapshot.provisioning && !snapshot.provisioningTimedOut;
 }
@@ -260,21 +260,24 @@ export interface PhonePairingAttemptQueue<TRequest extends PhonePairingQueuedReq
   pending: TRequest | null;
 }
 
-export type PhonePairingQueueDecision = "start" | "queued" | "duplicate";
+export type PhonePairingQueueDecision = 'start' | 'queued' | 'duplicate';
 
 /** A newer request replaces the pending one, never the active one, so a late POST cannot replace a newer QR. */
 export function queuePhonePairingAttempt<TRequest extends PhonePairingQueuedRequest>(
   queue: PhonePairingAttemptQueue<TRequest>,
   request: TRequest,
 ): PhonePairingQueueDecision {
-  if (queue.active?.generation === request.generation
-    || queue.pending?.generation === request.generation) return "duplicate";
+  if (
+    queue.active?.generation === request.generation ||
+    queue.pending?.generation === request.generation
+  )
+    return 'duplicate';
   if (!queue.active) {
     queue.active = request;
-    return "start";
+    return 'start';
   }
   queue.pending = request;
-  return "queued";
+  return 'queued';
 }
 
 export function completePhonePairingAttempt<TRequest extends PhonePairingQueuedRequest>(
@@ -300,7 +303,7 @@ interface PhonePairingWindowSnapshot {
 }
 
 const pairingOpenFailureMessage = () =>
-  t("phone.setup.pairingOpenFailed", { advanced: t("remote.advanced"), remote: t("remote.title") });
+  t('phone.setup.pairingOpenFailed', { advanced: t('remote.advanced'), remote: t('remote.title') });
 
 export function companionPairingOpenFailure(
   companion: PhonePairingWindowSnapshot & { enabled: boolean; error?: string },
@@ -311,12 +314,12 @@ export function companionPairingOpenFailure(
   if (stateFailure) return stateFailure;
   const pairing = companion.pairing;
   if (
-    !pairing
-    || pairing.token === previousToken
-    || !/^omb_pair_[A-Za-z0-9_-]{43}$/.test(pairing.token)
-    || !/^\d{6}$/.test(pairing.code ?? "")
-    || !Number.isFinite(pairing.expiresAt)
-    || (pairing.expiresAt ?? 0) <= now
+    !pairing ||
+    pairing.token === previousToken ||
+    !/^omb_pair_[A-Za-z0-9_-]{43}$/.test(pairing.token) ||
+    !/^\d{6}$/.test(pairing.code ?? '') ||
+    !Number.isFinite(pairing.expiresAt) ||
+    (pairing.expiresAt ?? 0) <= now
   ) {
     return pairingOpenFailureMessage();
   }
@@ -390,10 +393,10 @@ export function startNonOverlappingPhoneSetupPoll<T>(
 }
 
 const startFailureMessage = () =>
-  t("phone.setup.startFailed", { advanced: t("remote.advanced"), remote: t("remote.title") });
+  t('phone.setup.startFailed', { advanced: t('remote.advanced'), remote: t('remote.title') });
 
 export function companionStartFailure(
-  companion: Pick<PhoneSetupCompanionSnapshot, "enabled"> & { error?: string },
+  companion: Pick<PhoneSetupCompanionSnapshot, 'enabled'> & { error?: string },
 ): string | null {
   if (companion.enabled && !companion.error) return null;
   return companion.error?.trim() || startFailureMessage();
@@ -401,8 +404,7 @@ export function companionStartFailure(
 
 const REQUEST_REFERENCE =
   /\bReference:\s*([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\.?/i;
-const IPC_REJECTION =
-  /^Error invoking remote method ['"][^'"\r\n]+['"]:\s*(?:Error:\s*)?/i;
+const IPC_REJECTION = /^Error invoking remote method ['"][^'"\r\n]+['"]:\s*(?:Error:\s*)?/i;
 const PUBLIC_ACCOUNT_MESSAGES = [
   /^Enter a valid email address\.$/,
   /^The secure connection request (?:was not accepted|was not allowed)\./,
@@ -422,16 +424,21 @@ const PUBLIC_ACCOUNT_MESSAGES = [
 
 /** Electron prefixes rejected IPC errors with its channel machinery; keep that out of product copy. */
 export function normalizePhoneSetupActionError(cause: unknown, fallback: string): string {
-  const raw = cause instanceof Error ? cause.message : "";
-  const unwrapped = raw.replace(IPC_REJECTION, "").replace(/^Error:\s*/i, "").trim();
-  const reference = unwrapped.match(REQUEST_REFERENCE)?.[1] ?? "";
-  const message = unwrapped.replace(REQUEST_REFERENCE, "").trim();
+  const raw = cause instanceof Error ? cause.message : '';
+  const unwrapped = raw
+    .replace(IPC_REJECTION, '')
+    .replace(/^Error:\s*/i, '')
+    .trim();
+  const reference = unwrapped.match(REQUEST_REFERENCE)?.[1] ?? '';
+  const message = unwrapped.replace(REQUEST_REFERENCE, '').trim();
   const forbiddenCodeRequest =
-    /remote method ['"]companion-account:request-code['"]/i.test(raw)
-    && message.startsWith("The secure connection request was not allowed.");
-  const publicMessage = !forbiddenCodeRequest
-    && PUBLIC_ACCOUNT_MESSAGES.some((pattern) => pattern.test(message))
-    ? message
-    : fallback;
-  return reference ? t("phone.error.reference", { message: publicMessage, reference }) : publicMessage;
+    /remote method ['"]companion-account:request-code['"]/i.test(raw) &&
+    message.startsWith('The secure connection request was not allowed.');
+  const publicMessage =
+    !forbiddenCodeRequest && PUBLIC_ACCOUNT_MESSAGES.some((pattern) => pattern.test(message))
+      ? message
+      : fallback;
+  return reference
+    ? t('phone.error.reference', { message: publicMessage, reference })
+    : publicMessage;
 }

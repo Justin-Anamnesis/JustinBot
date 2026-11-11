@@ -1,18 +1,23 @@
-import nativeText from "./native-text.cjs";
+import nativeText from './native-text.cjs';
 // Bots' changes to a lent folder, made on My Cloud while this computer was away (server/lent-copies.ts), applied here
 // once it is back, under the same rules as a live write (electron/shared-computer-access.mjs): only a folder lent with
 // editing, never through a link, never inside .git or a protected place. A file the person did not touch since takes
 // the bot's version, and the one it replaces goes to the Recycle Bin first; a file they changed or removed meanwhile
 // keeps theirs, and the bot's version lands beside it, "report (new from My Cloud, 27 Oct 2026).md". Nothing here is
 // ever deleted.
-import { createHash } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { clashPath, validWirePath, windowsProblem } from "./cloud-sync-rules.mjs";
-import { sha256File } from "./cloud-sync-scan.mjs";
-import { assertOutsideProtected, insideGitInternals, protectedIdentities, sharedPath } from "./shared-computer-access.mjs";
+import { createHash } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { clashPath, validWirePath, windowsProblem } from './cloud-sync-rules.mjs';
+import { sha256File } from './cloud-sync-scan.mjs';
+import {
+  assertOutsideProtected,
+  insideGitInternals,
+  protectedIdentities,
+  sharedPath,
+} from './shared-computer-access.mjs';
 
-export const BESIDE_LABEL = "new from My Cloud";
+export const BESIDE_LABEL = 'new from My Cloud';
 
 const same = (a, b) => a && b && a.size === b.size && a.mtimeMs === b.mtimeMs && a.ino === b.ino;
 
@@ -20,10 +25,17 @@ const same = (a, b) => a && b && a.size === b.size && a.mtimeMs === b.mtimeMs &&
  * EBUSY that would succeed shortly: those are tried again (about 155 ms at most, as server/atomic.ts does); anything else
  * throws. */
 const RENAME_RETRY_MS = [5, 10, 20, 40, 80];
-const TRANSIENT = new Set(["EPERM", "EACCES", "EBUSY"]);
-export function renameWithRetry(from, to, rename = fs.renameSync, wait = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)) {
+const TRANSIENT = new Set(['EPERM', 'EACCES', 'EBUSY']);
+export function renameWithRetry(
+  from,
+  to,
+  rename = fs.renameSync,
+  wait = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms),
+) {
   for (let attempt = 0; ; attempt++) {
-    try { return rename(from, to); } catch (error) {
+    try {
+      return rename(from, to);
+    } catch (error) {
       if (!TRANSIENT.has(error?.code) || attempt >= RENAME_RETRY_MS.length) throw error;
       wait(RENAME_RETRY_MS[attempt]);
     }
@@ -35,7 +47,9 @@ export function renameWithRetry(from, to, rename = fs.renameSync, wait = (ms) =>
  * (Windows can't remove a read-only file). Best effort: the change has landed either way. */
 function keepPermissions(file, before) {
   if (!before?.isFile()) return;
-  try { fs.chmodSync(file, before.mode & 0o777); } catch {}
+  try {
+    fs.chmodSync(file, before.mode & 0o777);
+  } catch {}
 }
 
 /**
@@ -44,14 +58,36 @@ function keepPermissions(file, before) {
  * offline), thrown on. Answers how many changes landed and, for each one kept beside the person's own version, both
  * names.
  */
-export async function applyStaged({ client, folderId, folder, protectedPaths = [], now = Date.now, trashItem, markDownloaded = async () => {}, platform = process.platform, stopper = () => false, t = nativeText.englishText.t }) {
+export async function applyStaged({
+  client,
+  folderId,
+  folder,
+  protectedPaths = [],
+  now = Date.now,
+  trashItem,
+  markDownloaded = async () => {},
+  platform = process.platform,
+  stopper = () => false,
+  t = nativeText.englishText.t,
+}) {
   const outcome = { applied: 0, kept: [], problem: null };
   if (folder.write !== true) return outcome;
   const changes = await client.staged(folderId);
   const protectedRoots = await protectedIdentities(protectedPaths);
   for (const change of changes) {
     try {
-      const landed = await applyOne({ client, folderId, folder, change, protectedRoots, now, trashItem, markDownloaded, platform, t });
+      const landed = await applyOne({
+        client,
+        folderId,
+        folder,
+        change,
+        protectedRoots,
+        now,
+        trashItem,
+        markDownloaded,
+        platform,
+        t,
+      });
       if (!landed) continue;
       await client.stagedDone(folderId, change.id, change.sha256);
       if (landed.beside) outcome.kept.push({ path: change.path, beside: landed.beside, at: now() });
@@ -64,18 +100,34 @@ export async function applyStaged({ client, folderId, folder, protectedPaths = [
   return outcome;
 }
 
-async function applyOne({ client, folderId, folder, change, protectedRoots, now, trashItem, markDownloaded, platform, t }) {
-  if (!validWirePath(change.path) || (platform === "win32" && windowsProblem(change.path))) throw new Error(t("native.files.nameNotSupported"));
-  if (insideGitInternals(folder.path, change.path)) throw new Error(t("native.files.gitProtected"));
+async function applyOne({
+  client,
+  folderId,
+  folder,
+  change,
+  protectedRoots,
+  now,
+  trashItem,
+  markDownloaded,
+  platform,
+  t,
+}) {
+  if (!validWirePath(change.path) || (platform === 'win32' && windowsProblem(change.path)))
+    throw new Error(t('native.files.nameNotSupported'));
+  if (insideGitInternals(folder.path, change.path)) throw new Error(t('native.files.gitProtected'));
   const target = await sharedPath(folder, change.path);
   await assertOutsideProtected(protectedRoots, target);
   fs.mkdirSync(path.dirname(target), { recursive: true });
   // Named like Files' own half-downloaded files, so a crash leaves nothing a scan would carry.
-  const tag = createHash("sha256").update(`${folderId}\n${change.id}`).digest("hex").slice(0, 8);
-  const temporary = path.join(path.dirname(target), `.${path.basename(target).slice(0, 180)}.omb-sync-${tag}`);
+  const tag = createHash('sha256').update(`${folderId}\n${change.id}`).digest('hex').slice(0, 8);
+  const temporary = path.join(
+    path.dirname(target),
+    `.${path.basename(target).slice(0, 180)}.omb-sync-${tag}`,
+  );
   try {
     await client.stagedFile(folderId, change.id, temporary);
-    if (await sha256File(temporary) !== change.sha256) throw new Error(t("native.files.changeDamaged"));
+    if ((await sha256File(temporary)) !== change.sha256)
+      throw new Error(t('native.files.changeDamaged'));
     await markDownloaded(temporary);
     const before = fs.lstatSync(target, { throwIfNoEntry: false });
     if (before?.isFile() && before.nlink === 1) {
@@ -95,7 +147,12 @@ async function applyOne({ client, folderId, folder, change, protectedRoots, now,
       return { applied: true };
     }
     // The person changed it, removed it, or something else is there now: theirs stays, the bot's lands beside it.
-    const beside = clashPath(change.path, now(), (candidate) => fs.existsSync(path.join(folder.path, ...candidate.split("/"))), t("native.files.newFromCloud"));
+    const beside = clashPath(
+      change.path,
+      now(),
+      (candidate) => fs.existsSync(path.join(folder.path, ...candidate.split('/'))),
+      t('native.files.newFromCloud'),
+    );
     const besideFile = await sharedPath(folder, beside);
     await assertOutsideProtected(protectedRoots, besideFile);
     renameWithRetry(temporary, besideFile);

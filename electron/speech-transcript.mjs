@@ -1,13 +1,13 @@
 export function createSpeechTranscript() {
-  let committed = "";
-  let current = "";
+  let committed = '';
+  let current = '';
   let boundary = false;
-  let boundaryText = "";
+  let boundaryText = '';
   let finalStart = null;
-  const join = (left, right) => left && right ? `${left} ${right}` : left || right;
+  const join = (left, right) => (left && right ? `${left} ${right}` : left || right);
 
-  return line => {
-    if (typeof line.text !== "string") return line;
+  return (line) => {
+    if (typeof line.text !== 'string') return line;
     let text = line.text.trim();
     if (!text) return { ...line, text: join(committed, current) };
     const hasFinalTiming = line.utteranceFinal === true && Number.isFinite(line.speechStart);
@@ -20,8 +20,10 @@ export function createSpeechTranscript() {
     if (!text) return { ...line, text: join(committed, current) };
 
     if (boundary) {
-      const sameFinalAudio = hasFinalTiming && nextStart === finalStart
-        && (text.startsWith(boundaryText) || boundaryText.startsWith(text));
+      const sameFinalAudio =
+        hasFinalTiming &&
+        nextStart === finalStart &&
+        (text.startsWith(boundaryText) || boundaryText.startsWith(text));
       if (!newUtterance && (text === boundaryText || sameFinalAudio)) {
         current = text;
         boundaryText = text;

@@ -1,8 +1,8 @@
 // How the server reaches a port an engine listens on inside a box with its own network, such as a sign-in's callback
 // listener: the box dials out to a host unix socket and keeps one connection waiting, and the server writes the port and
 // a newline on it before talking to that port. The server never connects to a path the box could have swapped.
-import { rmSync } from "node:fs";
-import { connect, createServer, type Socket } from "node:net";
+import { rmSync } from 'node:fs';
+import { connect, createServer, type Socket } from 'node:net';
 
 /** Connections the box may keep waiting; any more are closed. */
 const MAX_WAITING = 4;
@@ -22,38 +22,41 @@ export async function openBoxRelay(socketPath: string): Promise<BoxRelay> {
   const waiting: Socket[] = [];
   const takers: Array<(socket: Socket) => void> = [];
   const server = createServer((socket) => {
-    socket.on("error", () => {});
+    socket.on('error', () => {});
     const taker = takers.shift();
     if (taker) return taker(socket);
     if (waiting.length >= MAX_WAITING) return void socket.destroy();
     waiting.push(socket);
-    socket.once("close", () => {
+    socket.once('close', () => {
       const at = waiting.indexOf(socket);
       if (at >= 0) waiting.splice(at, 1);
     });
   });
   await new Promise<void>((resolve, reject) => {
-    server.once("error", reject);
+    server.once('error', reject);
     server.listen(socketPath, () => {
-      server.off("error", reject);
+      server.off('error', reject);
       resolve();
     });
   });
   return {
     socketPath,
     async connect(port, timeoutMs = RELAY_TIMEOUT_MS) {
-      if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Not a port: ${port}`);
-      const socket = waiting.shift() ?? await new Promise<Socket>((resolve, reject) => {
-        const take = (dialed: Socket) => {
-          clearTimeout(timer);
-          resolve(dialed);
-        };
-        const timer = setTimeout(() => {
-          takers.splice(takers.indexOf(take), 1);
-          reject(new Error("The sign-in's box did not answer."));
-        }, timeoutMs);
-        takers.push(take);
-      });
+      if (!Number.isInteger(port) || port < 1 || port > 65535)
+        throw new Error(`Not a port: ${port}`);
+      const socket =
+        waiting.shift() ??
+        (await new Promise<Socket>((resolve, reject) => {
+          const take = (dialed: Socket) => {
+            clearTimeout(timer);
+            resolve(dialed);
+          };
+          const timer = setTimeout(() => {
+            takers.splice(takers.indexOf(take), 1);
+            reject(new Error("The sign-in's box did not answer."));
+          }, timeoutMs);
+          takers.push(take);
+        }));
       socket.write(`${port}\n`);
       return socket;
     },
@@ -77,10 +80,10 @@ export function dialRelay(socketPath: string, retryMs = 1_000): { close(): void 
     const host = connect(socketPath);
     host.unref();
     waiting = host;
-    let head = "";
+    let head = '';
     let taken = false;
-    host.on("error", () => {});
-    host.once("close", () => {
+    host.on('error', () => {});
+    host.once('close', () => {
       if (taken || waiting !== host) return;
       waiting = null;
       if (closed) return;
@@ -88,13 +91,13 @@ export function dialRelay(socketPath: string, retryMs = 1_000): { close(): void 
       retry.unref();
     });
     const onData = (chunk: Buffer) => {
-      head += chunk.toString("latin1");
-      const newline = head.indexOf("\n");
+      head += chunk.toString('latin1');
+      const newline = head.indexOf('\n');
       if (newline < 0) {
         if (head.length > MAX_PORT_LINE) host.destroy();
         return;
       }
-      host.off("data", onData);
+      host.off('data', onData);
       host.pause();
       taken = true;
       waiting = null;
@@ -102,20 +105,20 @@ export function dialRelay(socketPath: string, retryMs = 1_000): { close(): void 
       const line = head.slice(0, newline);
       const port = Number(line);
       if (!/^[1-9]\d{0,4}$/.test(line) || port > 65535) return void host.destroy();
-      const rest = Buffer.from(head.slice(newline + 1), "latin1");
-      const local = connect({ host: "127.0.0.1", port });
+      const rest = Buffer.from(head.slice(newline + 1), 'latin1');
+      const local = connect({ host: '127.0.0.1', port });
       local.unref();
-      local.on("error", () => host.destroy());
-      host.on("error", () => local.destroy());
-      local.once("connect", () => {
+      local.on('error', () => host.destroy());
+      host.on('error', () => local.destroy());
+      local.once('connect', () => {
         if (rest.length) local.write(rest);
         host.pipe(local);
         local.pipe(host);
       });
-      local.once("close", () => host.destroy());
-      host.once("close", () => local.destroy());
+      local.once('close', () => host.destroy());
+      host.once('close', () => local.destroy());
     };
-    host.on("data", onData);
+    host.on('data', onData);
   };
   dial();
   return {

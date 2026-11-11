@@ -1,14 +1,14 @@
-import type { WebhookCredential } from "./webhooks.js";
+import type { WebhookCredential } from './webhooks.js';
 
-const KEY = "omb-webhook-credentials";
+const KEY = 'omb-webhook-credentials';
 
-type Store = Pick<Storage, "getItem" | "setItem"> | undefined;
+type Store = Pick<Storage, 'getItem' | 'setItem'> | undefined;
 
 function isCredential(value: unknown): value is WebhookCredential {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const candidate = value as Record<string, unknown>;
   return [candidate.endpointUrl, candidate.secret, candidate.url].every(
-    (part) => typeof part === "string" && part.length > 0,
+    (part) => typeof part === 'string' && part.length > 0,
   );
 }
 
@@ -17,22 +17,27 @@ export function loadWebhookCredentials(store: Store): Record<string, WebhookCred
   try {
     const raw = store?.getItem(KEY);
     const parsed = raw ? JSON.parse(raw) : null;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
     return Object.fromEntries(
-      Object.entries(parsed).filter((entry): entry is [string, WebhookCredential] => isCredential(entry[1])),
+      Object.entries(parsed).filter((entry): entry is [string, WebhookCredential] =>
+        isCredential(entry[1]),
+      ),
     );
   } catch {
     return {};
   }
 }
 
-export function saveWebhookCredential(store: Store, webhookId: string, credential: WebhookCredential): void {
+export function saveWebhookCredential(
+  store: Store,
+  webhookId: string,
+  credential: WebhookCredential,
+): void {
   const credentials = loadWebhookCredentials(store);
   credentials[webhookId] = credential;
   try {
     store?.setItem(KEY, JSON.stringify(credentials));
-  } catch {
-  }
+  } catch {}
 }
 
 export function removeWebhookCredential(store: Store, webhookId: string): void {
@@ -40,13 +45,12 @@ export function removeWebhookCredential(store: Store, webhookId: string): void {
   delete credentials[webhookId];
   try {
     store?.setItem(KEY, JSON.stringify(credentials));
-  } catch {
-  }
+  } catch {}
 }
 
 export function webhookCredentialStore(): Store {
   try {
-    return typeof localStorage === "undefined" ? undefined : localStorage;
+    return typeof localStorage === 'undefined' ? undefined : localStorage;
   } catch {
     return undefined;
   }

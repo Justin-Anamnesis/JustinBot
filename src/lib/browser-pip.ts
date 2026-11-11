@@ -1,9 +1,14 @@
 // Adapted from pingdotgg/t3code@00cdceb1 apps/web/src/browser/serverPictureInPicture.ts, MIT License, Copyright (c)
 // 2026 T3 Tools Inc. (full text in third_party/t3-code/LICENSE); modified: a bot's browser instead of a thread's tab,
 // reached with the app's own session.
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-import { browserStreamAccess, createPreviewFramePainter, createPreviewStreamClient, type PreviewStreamClient } from "./browser-stream-client";
+import {
+  browserStreamAccess,
+  createPreviewFramePainter,
+  createPreviewStreamClient,
+  type PreviewStreamClient,
+} from './browser-stream-client';
 
 interface WebKitVideo {
   webkitSetPresentationMode?: (mode: string) => void;
@@ -32,12 +37,12 @@ const subscribe = (listener: () => void) => {
 
 /** Chromium and Safari float a canvas-captured video; Firefox has no API for it. */
 export function supportsBrowserPictureInPicture(): boolean {
-  if (typeof document === "undefined") return false;
-  if (typeof HTMLCanvasElement.prototype.captureStream !== "function") return false;
+  if (typeof document === 'undefined') return false;
+  if (typeof HTMLCanvasElement.prototype.captureStream !== 'function') return false;
   const video = HTMLVideoElement.prototype as HTMLVideoElement & WebKitVideo;
   return (
-    (document.pictureInPictureEnabled && typeof video.requestPictureInPicture === "function") ||
-    typeof video.webkitSetPresentationMode === "function"
+    (document.pictureInPictureEnabled && typeof video.requestPictureInPicture === 'function') ||
+    typeof video.webkitSetPresentationMode === 'function'
   );
 }
 
@@ -58,10 +63,13 @@ export function closeBrowserPictureInPicture(): void {
 }
 
 /** Open during user activation, seeding the video with the currently visible frame. */
-export async function openBrowserPictureInPicture(input: { readonly botId: string; readonly seed: HTMLCanvasElement | null }): Promise<void> {
+export async function openBrowserPictureInPicture(input: {
+  readonly botId: string;
+  readonly seed: HTMLCanvasElement | null;
+}): Promise<void> {
   closeBrowserPictureInPicture();
-  const canvas = document.createElement("canvas");
-  const context = canvas.getContext("2d");
+  const canvas = document.createElement('canvas');
+  const context = canvas.getContext('2d');
   const seed = input.seed && input.seed.width > 0 && input.seed.height > 0 ? input.seed : null;
   canvas.width = seed?.width ?? 640;
   canvas.height = seed?.height ?? 400;
@@ -69,12 +77,13 @@ export async function openBrowserPictureInPicture(input: { readonly botId: strin
   const stream = canvas.captureStream();
   if (seed) context?.drawImage(seed, 0, 0);
   else context?.fillRect(0, 0, canvas.width, canvas.height);
-  const video = document.createElement("video") as HTMLVideoElement & WebKitVideo;
+  const video = document.createElement('video') as HTMLVideoElement & WebKitVideo;
   video.muted = true;
   video.playsInline = true;
   video.srcObject = stream;
   // Safari only floats a video that is in the document.
-  video.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none";
+  video.style.cssText =
+    'position:fixed;right:0;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none';
   document.body.append(video);
 
   const painter = createPreviewFramePainter(canvas);
@@ -88,7 +97,12 @@ export async function openBrowserPictureInPicture(input: { readonly botId: strin
   const connect = () => {
     if (stopped) return;
     client = createPreviewStreamClient(
-      { access: browserStreamAccess(input.botId), maxWidth: 1280, maxHeight: 1280, interactive: false },
+      {
+        access: browserStreamAccess(input.botId),
+        maxWidth: 1280,
+        maxHeight: 1280,
+        interactive: false,
+      },
       {
         onFrame: (jpeg) => {
           refusals = 0;
@@ -110,7 +124,7 @@ export async function openBrowserPictureInPicture(input: { readonly botId: strin
   };
 
   const onPresentationMode = () => {
-    if (video.webkitPresentationMode !== "picture-in-picture") onLeave();
+    if (video.webkitPresentationMode !== 'picture-in-picture') onLeave();
   };
   const current: ActivePictureInPicture = {
     key: input.botId,
@@ -119,12 +133,12 @@ export async function openBrowserPictureInPicture(input: { readonly botId: strin
       if (retryTimer !== null) clearTimeout(retryTimer);
       client?.stop();
       painter.stop();
-      video.removeEventListener("leavepictureinpicture", onLeave);
-      video.removeEventListener("webkitpresentationmodechanged", onPresentationMode);
+      video.removeEventListener('leavepictureinpicture', onLeave);
+      video.removeEventListener('webkitpresentationmodechanged', onPresentationMode);
       if (document.pictureInPictureElement === video) {
         void document.exitPictureInPicture().catch(() => undefined);
-      } else if (video.webkitPresentationMode === "picture-in-picture") {
-        video.webkitSetPresentationMode?.("inline");
+      } else if (video.webkitPresentationMode === 'picture-in-picture') {
+        video.webkitSetPresentationMode?.('inline');
       }
       for (const track of stream.getTracks()) track.stop();
       video.srcObject = null;
@@ -137,14 +151,16 @@ export async function openBrowserPictureInPicture(input: { readonly botId: strin
   try {
     await video.play();
     if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
-      await new Promise((resolve) => video.addEventListener("loadedmetadata", resolve, { once: true }));
+      await new Promise((resolve) =>
+        video.addEventListener('loadedmetadata', resolve, { once: true }),
+      );
     }
-    if (document.pictureInPictureEnabled && typeof video.requestPictureInPicture === "function") {
-      video.addEventListener("leavepictureinpicture", onLeave);
+    if (document.pictureInPictureEnabled && typeof video.requestPictureInPicture === 'function') {
+      video.addEventListener('leavepictureinpicture', onLeave);
       await video.requestPictureInPicture();
     } else {
-      video.addEventListener("webkitpresentationmodechanged", onPresentationMode);
-      video.webkitSetPresentationMode?.("picture-in-picture");
+      video.addEventListener('webkitpresentationmodechanged', onPresentationMode);
+      video.webkitSetPresentationMode?.('picture-in-picture');
     }
   } catch (error) {
     onLeave();

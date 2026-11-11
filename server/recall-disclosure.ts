@@ -1,4 +1,4 @@
-import { serverLine } from "./server-lines.ts";
+import { serverLine } from './server-lines.ts';
 // Each private thread a room answer recalled from is announced once per room thread; in memory, so a restart re-announces (the safe direction).
 
 const announced = new Map<string, Set<string>>();
@@ -8,7 +8,10 @@ export interface RecallCrossing {
   count: number;
 }
 
-export function claimRecallCrossings(roomThreadId: string, sources: readonly string[]): RecallCrossing {
+export function claimRecallCrossings(
+  roomThreadId: string,
+  sources: readonly string[],
+): RecallCrossing {
   const seen = announced.get(roomThreadId) ?? new Set<string>();
   const threadIds: string[] = [];
   let count = 0;
@@ -24,7 +27,11 @@ export function claimRecallCrossings(roomThreadId: string, sources: readonly str
 }
 
 export function recallCrossingLabel(botName: string, count: number, language?: string): string {
-  return serverLine(language, count === 1 ? "server.teammates.recalled.one" : "server.teammates.recalled.many", { bot: botName, count });
+  return serverLine(
+    language,
+    count === 1 ? 'server.teammates.recalled.one' : 'server.teammates.recalled.many',
+    { bot: botName, count },
+  );
 }
 
 export function forgetRecallCrossings(roomThreadId?: string): void {
@@ -33,5 +40,9 @@ export function forgetRecallCrossings(roomThreadId?: string): void {
 }
 
 export function briefCrossingLabel(botName: string, count: number, language?: string): string {
-  return serverLine(language, count === 1 ? "server.teammates.briefCovers.one" : "server.teammates.briefCovers.many", { bot: botName, count });
+  return serverLine(
+    language,
+    count === 1 ? 'server.teammates.briefCovers.one' : 'server.teammates.briefCovers.many',
+    { bot: botName, count },
+  );
 }

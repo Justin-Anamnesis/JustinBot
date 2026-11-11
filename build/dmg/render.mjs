@@ -1,6 +1,6 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { crc32, deflateSync } from "node:zlib";
-import { Resvg } from "@resvg/resvg-js";
+import { readFileSync, writeFileSync } from 'node:fs';
+import { crc32, deflateSync } from 'node:zlib';
+import { Resvg } from '@resvg/resvg-js';
 
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const RGB_BYTES = 3;
@@ -11,7 +11,7 @@ const PIXELS_PER_METRE_AT_72_DPI = 2835;
 function chunk(type, data) {
   const length = Buffer.alloc(4);
   length.writeUInt32BE(data.length);
-  const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+  const body = Buffer.concat([Buffer.from(type, 'latin1'), data]);
   const crc = Buffer.alloc(4);
   crc.writeUInt32BE(crc32(body));
   return Buffer.concat([length, body, crc]);
@@ -68,7 +68,8 @@ function encodeOpaquePng(width, height, rgba) {
     for (let x = 0; x < width; x++) {
       const source = (y * width + x) * 4;
       // Finder shows its own window colour through transparent pixels.
-      if (rgba[source + 3] !== 255) throw new Error(`background.svg leaves pixel ${x},${y} transparent`);
+      if (rgba[source + 3] !== 255)
+        throw new Error(`background.svg leaves pixel ${x},${y} transparent`);
       rgba.copy(row, x * RGB_BYTES, source, source + RGB_BYTES);
     }
     rows.push(filterRow(row, previous));
@@ -84,15 +85,24 @@ function encodeOpaquePng(width, height, rgba) {
   density.writeUInt32BE(PIXELS_PER_METRE_AT_72_DPI, 4);
   density[8] = 1;
   const pixels = deflateSync(Buffer.concat(rows), { level: 9, memLevel: 9 });
-  return Buffer.concat([PNG_SIGNATURE, chunk("IHDR", header), chunk("pHYs", density), chunk("IDAT", pixels), chunk("IEND", Buffer.alloc(0))]);
+  return Buffer.concat([
+    PNG_SIGNATURE,
+    chunk('IHDR', header),
+    chunk('pHYs', density),
+    chunk('IDAT', pixels),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
 }
 
-const svg = readFileSync(new URL("background.svg", import.meta.url), "utf8");
+const svg = readFileSync(new URL('background.svg', import.meta.url), 'utf8');
 for (const [scale, name] of [
-  [1, "background.png"],
-  [2, "background@2x.png"],
+  [1, 'background.png'],
+  [2, 'background@2x.png'],
 ]) {
-  const image = new Resvg(svg, { fitTo: { mode: "zoom", value: scale }, font: { loadSystemFonts: false } }).render();
+  const image = new Resvg(svg, {
+    fitTo: { mode: 'zoom', value: scale },
+    font: { loadSystemFonts: false },
+  }).render();
   const png = encodeOpaquePng(image.width, image.height, image.pixels);
   writeFileSync(new URL(`../${name}`, import.meta.url), png);
   console.log(`build/${name}: ${image.width}x${image.height}, ${png.length} bytes`);

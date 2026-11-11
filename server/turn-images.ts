@@ -1,12 +1,12 @@
-import { lstatSync, realpathSync, statSync } from "node:fs";
-import { dirname, extname, resolve } from "node:path";
+import { lstatSync, realpathSync, statSync } from 'node:fs';
+import { dirname, extname, resolve } from 'node:path';
 
-import { fromMarkdown } from "mdast-util-from-markdown";
+import { fromMarkdown } from 'mdast-util-from-markdown';
 
-import { ATTACHMENTS_DIR, FILE_MAX_BYTES, IMAGE_MAX_BYTES } from "./attachments.ts";
-import type { TurnImageInput, TurnVideoInput } from "./contracts.ts";
-import { decodeAttachmentAttribute } from "./message-file.ts";
-import { videoFrameImages } from "./turn-video.ts";
+import { ATTACHMENTS_DIR, FILE_MAX_BYTES, IMAGE_MAX_BYTES } from './attachments.ts';
+import type { TurnImageInput, TurnVideoInput } from './contracts.ts';
+import { decodeAttachmentAttribute } from './message-file.ts';
+import { videoFrameImages } from './turn-video.ts';
 
 export const TURN_IMAGE_MAX_COUNT = 10;
 /** Total image bytes one turn may carry: the 40 MB it was when a turn took four images, so engine requests don't grow. */
@@ -24,7 +24,7 @@ type MarkdownNode = {
   };
 };
 
-type TagCandidate = { start: number; end: number; kind: "image" | "file"; path: string };
+type TagCandidate = { start: number; end: number; kind: 'image' | 'file'; path: string };
 
 const OWNED_IMAGE_NAME =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(png|jpg|gif|webp)$/;
@@ -35,16 +35,16 @@ const OWNED_VIDEO_NAME =
 const ATTACHMENT_TAG =
   /^<attached-(image|file)[\t ]+path="([^"\r\n]*)"(?:[\t ]+name="([^"\r\n]*)")?[\t ]*\/>$/;
 
-const MIME_BY_EXTENSION: Readonly<Record<string, TurnImageInput["mime"]>> = {
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".gif": "image/gif",
-  ".webp": "image/webp",
+const MIME_BY_EXTENSION: Readonly<Record<string, TurnImageInput['mime']>> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
 };
-const VIDEO_MIME_BY_EXTENSION: Readonly<Record<string, TurnVideoInput["mime"]>> = {
-  ".mp4": "video/mp4",
-  ".webm": "video/webm",
-  ".mov": "video/quicktime",
+const VIDEO_MIME_BY_EXTENSION: Readonly<Record<string, TurnVideoInput['mime']>> = {
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
 };
 
 function statusError(status: number, message: string): Error & { status: number } {
@@ -65,17 +65,22 @@ function walk(node: MarkdownNode, visit: (node: MarkdownNode) => void): void {
 function attachmentTagCandidates(text: string): TagCandidate[] {
   const candidates: TagCandidate[] = [];
   walk(fromMarkdown(text) as MarkdownNode, (node) => {
-    if (node.type !== "html" || !node.value || !node.position) return;
+    if (node.type !== 'html' || !node.value || !node.position) return;
     const start = node.position.start.offset;
     const end = node.position.end.offset;
     if (start === undefined || end === undefined) return;
-    const lineStart = text.lastIndexOf("\n", start - 1) + 1;
-    const nextLine = text.indexOf("\n", end);
+    const lineStart = text.lastIndexOf('\n', start - 1) + 1;
+    const nextLine = text.indexOf('\n', end);
     const lineEnd = nextLine < 0 ? text.length : nextLine;
     if (text.slice(lineStart, start).trim() || text.slice(end, lineEnd).trim()) return;
     const match = ATTACHMENT_TAG.exec(node.value);
     if (!match) return;
-    candidates.push({ start, end, kind: match[1] === "file" ? "file" : "image", path: decodeAttachmentAttribute(match[2]!) });
+    candidates.push({
+      start,
+      end,
+      kind: match[1] === 'file' ? 'file' : 'image',
+      path: decodeAttachmentAttribute(match[2]!),
+    });
   });
   return candidates;
 }
@@ -87,8 +92,8 @@ function ownedAttachment<Mime extends string>(
   mimeByExtension: Readonly<Record<string, Mime>>,
   maxBytes: number,
 ): { path: string; mime: Mime; bytes: number } | null {
-  if (!path || path.includes("\0")) return null;
-  const name = path.split(/[\\/]/).at(-1) ?? "";
+  if (!path || path.includes('\0')) return null;
+  const name = path.split(/[\\/]/).at(-1) ?? '';
   if (!nameFormat.test(name)) return null;
 
   // A basename match alone would let any /tmp/<uuid>.ext pose as an app attachment: the path must point into this store.
@@ -97,7 +102,8 @@ function ownedAttachment<Mime extends string>(
 
   try {
     const entry = lstatSync(expected);
-    if (!entry.isFile() || entry.isSymbolicLink() || entry.size <= 0 || entry.size > maxBytes) return null;
+    if (!entry.isFile() || entry.isSymbolicLink() || entry.size <= 0 || entry.size > maxBytes)
+      return null;
     const canonicalRoot = realpathSync(attachmentsDir);
     const canonicalFile = realpathSync(expected);
     if (dirname(canonicalFile) !== canonicalRoot) return null;
@@ -130,7 +136,8 @@ export function extractTurnImages(
   text: string,
   options: ExtractTurnImagesOptions = {},
 ): { text: string; images: TurnImageInput[]; videos: TurnVideoInput[] } {
-  if (!text.includes("<attached-image") && !text.includes("<attached-file")) return { text, images: [], videos: [] };
+  if (!text.includes('<attached-image') && !text.includes('<attached-file'))
+    return { text, images: [], videos: [] };
 
   const attachmentsDir = options.attachmentsDir ?? ATTACHMENTS_DIR;
   const maxCount = options.maxCount ?? TURN_IMAGE_MAX_COUNT;
@@ -139,7 +146,7 @@ export function extractTurnImages(
   const candidates = attachmentTagCandidates(text);
 
   const admittedImages = candidates
-    .filter((tag) => tag.kind === "image")
+    .filter((tag) => tag.kind === 'image')
     .map((tag) => ({ tag, image: ownedImage(tag.path, attachmentsDir) }))
     .filter((item): item is { tag: TagCandidate; image: TurnImageInput } => item.image !== null);
   if (admittedImages.length > maxCount) {
@@ -147,24 +154,31 @@ export function extractTurnImages(
   }
   const aggregateBytes = admittedImages.reduce((total, item) => total + item.image.bytes, 0);
   if (aggregateBytes > maxBytes) {
-    throw statusError(413, `Attached images exceed ${Math.floor(maxBytes / (1024 * 1024))} MB total`);
+    throw statusError(
+      413,
+      `Attached images exceed ${Math.floor(maxBytes / (1024 * 1024))} MB total`,
+    );
   }
 
   const videos = candidates
-    .filter((tag) => tag.kind === "file")
+    .filter((tag) => tag.kind === 'file')
     .map((tag) => ownedVideo(tag.path, attachmentsDir))
     .filter((video): video is TurnVideoInput => video !== null)
     .slice(0, maxVideoCount);
 
   let providerText = text;
   const removedTags = admittedImages.map((item) => item.tag).sort((a, b) => b.start - a.start);
-  for (const tag of removedTags) providerText = providerText.slice(0, tag.start) + providerText.slice(tag.end);
+  for (const tag of removedTags)
+    providerText = providerText.slice(0, tag.start) + providerText.slice(tag.end);
 
   return { text: providerText, images: admittedImages.map((item) => item.image), videos };
 }
 
 /** Stills sampled from a message's video, never taking a turn that already carries `earlier` images past its image count. */
-export function videoFramesWithin(earlier: number, videos: readonly TurnVideoInput[]): Promise<TurnImageInput[]> {
+export function videoFramesWithin(
+  earlier: number,
+  videos: readonly TurnVideoInput[],
+): Promise<TurnImageInput[]> {
   return videoFrameImages(videos, TURN_IMAGE_MAX_COUNT - earlier);
 }
 
@@ -190,19 +204,25 @@ export function extractSteerImages(
   return { texts: resolved, images };
 }
 
-export function extractReplayImages<T extends { role: "user" | "assistant"; text: string }>(
+export function extractReplayImages<T extends { role: 'user' | 'assistant'; text: string }>(
   transcript: readonly T[],
   current: readonly TurnImageInput[],
   options: ExtractTurnImagesOptions = {},
 ): { transcript: T[]; images: TurnImageInput[] } {
   let maxCount = (options.maxCount ?? TURN_IMAGE_MAX_COUNT) - current.length;
-  let maxBytes = (options.maxBytes ?? TURN_IMAGE_MAX_BYTES) - current.reduce((total, image) => total + image.bytes, 0);
+  let maxBytes =
+    (options.maxBytes ?? TURN_IMAGE_MAX_BYTES) -
+    current.reduce((total, image) => total + image.bytes, 0);
   const replayed = [...transcript];
   const images: TurnImageInput[] = [];
   for (let index = replayed.length - 1; index >= 0 && maxCount > 0; index -= 1) {
     const entry = replayed[index]!;
-    if (entry.role !== "user") continue;
-    const item = extractTurnImages(entry.text, { ...options, maxCount: Infinity, maxBytes: Infinity });
+    if (entry.role !== 'user') continue;
+    const item = extractTurnImages(entry.text, {
+      ...options,
+      maxCount: Infinity,
+      maxBytes: Infinity,
+    });
     if (!item.images.length) continue;
     const bytes = item.images.reduce((total, image) => total + image.bytes, 0);
     if (item.images.length > maxCount || bytes > maxBytes) break;

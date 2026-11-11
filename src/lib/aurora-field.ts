@@ -18,7 +18,11 @@ const CURVE = { a: -0.087, b: 1.157, c: -0.262 } as const;
 const REFERENCE_HEIGHT = 1162;
 
 function mix(from: Rgb, to: Rgb, t: number): Rgb {
-  return [from[0] + (to[0] - from[0]) * t, from[1] + (to[1] - from[1]) * t, from[2] + (to[2] - from[2]) * t];
+  return [
+    from[0] + (to[0] - from[0]) * t,
+    from[1] + (to[1] - from[1]) * t,
+    from[2] + (to[2] - from[2]) * t,
+  ];
 }
 
 function scale(c: Rgb, k: number): Rgb {
@@ -42,21 +46,31 @@ export function bandLight(x: number, y: number, w: number, h: number): Rgb {
   const slope = (h / w) * (CURVE.b + 2 * CURVE.c * u);
   const d = (y - centre) / Math.sqrt(1 + slope * slope) / s;
   const along = 0.7 + 0.3 * Math.exp(-(((x / s - 820) / 800) ** 2));
-  const rays = 0.82 + 0.18 * Math.sin(d * 0.11 + Math.sin(x * 0.004) * 3) + 0.08 * Math.sin(d * 0.37 + x * 0.002);
+  const rays =
+    0.82 +
+    0.18 * Math.sin(d * 0.11 + Math.sin(x * 0.004) * 3) +
+    0.08 * Math.sin(d * 0.37 + x * 0.002);
   let light: Rgb;
   if (d < 0) {
     const t = Math.exp(d / 250);
     light = scale(mix(DEEP, mix(GREEN, TEAL, Math.exp(d / 80)), Math.min(1, t * 1.5)), t * 1.55);
   } else {
     const t = Math.exp(-d / 130);
-    light = scale(mix(PLUM, mix(VIOLET, LIME, Math.exp(-d / 14)), Math.min(1, Math.exp(-d / 40) * 1.1 + t * 0.5)), t * 1.5);
+    light = scale(
+      mix(
+        PLUM,
+        mix(VIOLET, LIME, Math.exp(-d / 14)),
+        Math.min(1, Math.exp(-d / 40) * 1.1 + t * 0.5),
+      ),
+      t * 1.5,
+    );
   }
   return scale(mix(light, CORE, Math.exp(-((d / 24) ** 2)) * 0.85), along * rays);
 }
 
 export function drawAuroraField(ctx: CanvasRenderingContext2D, w: number, h: number): void {
   const random = seeded(7);
-  ctx.fillStyle = "#080908";
+  ctx.fillStyle = '#080908';
   ctx.fillRect(0, 0, w, h);
   for (let y = 0, row = 0; y < h; y += PITCH, row++) {
     for (let x = 0, col = 0; x < w; x += PITCH, col++) {
@@ -69,23 +83,24 @@ export function drawAuroraField(ctx: CanvasRenderingContext2D, w: number, h: num
         b += base * (hue > 0.66 ? 1.2 : 0.7);
       }
       const threshold = BAYER[(row & 3) * 4 + (col & 3)]!;
-      const level = (v: number) => Math.round((Math.floor(Math.min(1, Math.max(0, v)) * LEVELS + threshold) / LEVELS) * 255);
+      const level = (v: number) =>
+        Math.round((Math.floor(Math.min(1, Math.max(0, v)) * LEVELS + threshold) / LEVELS) * 255);
       const q = [level(r), level(g), level(b)];
       if (q[0]! + q[1]! + q[2]! < 6) continue;
       ctx.fillStyle = `rgb(${q[0]},${q[1]},${q[2]})`;
       ctx.fillRect(x, y, DOT, DOT);
     }
   }
-  ctx.globalCompositeOperation = "lighter";
-  ctx.filter = "blur(36px)";
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.filter = 'blur(36px)';
   ctx.globalAlpha = 0.34;
   ctx.drawImage(ctx.canvas, 0, 0);
-  ctx.filter = "none";
+  ctx.filter = 'none';
   ctx.globalAlpha = 1;
-  ctx.globalCompositeOperation = "source-over";
+  ctx.globalCompositeOperation = 'source-over';
   const fade = ctx.createLinearGradient(0, h * 0.55, 0, h);
-  fade.addColorStop(0, "rgb(8 9 8 / 0)");
-  fade.addColorStop(1, "rgb(8 9 8 / 0.55)");
+  fade.addColorStop(0, 'rgb(8 9 8 / 0)');
+  fade.addColorStop(1, 'rgb(8 9 8 / 0.55)');
   ctx.fillStyle = fade;
   ctx.fillRect(0, 0, w, h);
 }
@@ -95,20 +110,20 @@ let painted = false;
 // shortcut: drawn once at the first screen's size; on a larger display the ground shows past its edge. Redraw on a
 // screen change if that is ever noticed.
 export function paintAuroraField(): void {
-  if (painted || typeof document === "undefined") return;
+  if (painted || typeof document === 'undefined') return;
   const w = Math.ceil(Math.max(window.screen?.width ?? 0, window.innerWidth));
   const h = Math.ceil(Math.max(window.screen?.height ?? 0, window.innerHeight));
-  const canvas = document.createElement("canvas");
+  const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
-  const ctx = canvas.getContext("2d");
+  const ctx = canvas.getContext('2d');
   if (!ctx || !w || !h) return;
   painted = true;
   drawAuroraField(ctx, w, h);
   canvas.toBlob((blob) => {
     if (!blob) return;
     const root = document.documentElement.style;
-    root.setProperty("--aurora-field", `url(${URL.createObjectURL(blob)})`);
-    root.setProperty("--aurora-field-size", `${w}px ${h}px`);
+    root.setProperty('--aurora-field', `url(${URL.createObjectURL(blob)})`);
+    root.setProperty('--aurora-field-size', `${w}px ${h}px`);
   });
 }

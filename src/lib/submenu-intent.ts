@@ -10,8 +10,11 @@ function side(p: Point, a: Point, b: Point): number {
 
 export function towardSubmenu(from: Point, point: Point, submenu: Box): boolean {
   const edge = from.x <= submenu.left ? submenu.left : submenu.right;
-  const top = { x: edge, y: submenu.top }, bottom = { x: edge, y: submenu.bottom };
-  const d1 = side(point, from, top), d2 = side(point, top, bottom), d3 = side(point, bottom, from);
+  const top = { x: edge, y: submenu.top },
+    bottom = { x: edge, y: submenu.bottom };
+  const d1 = side(point, from, top),
+    d2 = side(point, top, bottom),
+    d3 = side(point, bottom, from);
   const negative = d1 < 0 || d2 < 0 || d3 < 0;
   const positive = d1 > 0 || d2 > 0 || d3 > 0;
   return !(negative && positive);
@@ -29,13 +32,24 @@ export interface SubmenuIntent {
   readonly openKey: string | null;
 }
 
-const WINDOW_TIMERS = { set: (run: () => void, ms: number) => setTimeout(run, ms), clear: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle) };
+const WINDOW_TIMERS = {
+  set: (run: () => void, ms: number) => setTimeout(run, ms),
+  clear: (handle: ReturnType<typeof setTimeout>) => clearTimeout(handle),
+};
 
-export function submenuIntent({ open, close, submenuBox, timers = WINDOW_TIMERS }: {
+export function submenuIntent({
+  open,
+  close,
+  submenuBox,
+  timers = WINDOW_TIMERS,
+}: {
   open: (key: string) => void;
   close: () => void;
   submenuBox: () => Box | null;
-  timers?: { set: (run: () => void, ms: number) => ReturnType<typeof setTimeout>; clear: (handle: ReturnType<typeof setTimeout>) => void };
+  timers?: {
+    set: (run: () => void, ms: number) => ReturnType<typeof setTimeout>;
+    clear: (handle: ReturnType<typeof setTimeout>) => void;
+  };
 }): SubmenuIntent {
   let openKey: string | null = null;
   let dwell: { key: string; handle: ReturnType<typeof setTimeout> } | null = null;

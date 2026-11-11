@@ -1,6 +1,6 @@
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync } from 'node:sqlite';
 
-import { ensureSearchIndex } from "./cjk-search.ts";
+import { ensureSearchIndex } from './cjk-search.ts';
 
 export function ensureMemoryIndex(db: DatabaseSync): void {
   db.exec(`
@@ -13,5 +13,10 @@ export function ensureMemoryIndex(db: DatabaseSync): void {
       PRIMARY KEY (bot_id, path)
     );
   `);
-  ensureSearchIndex(db, { table: "memory_files", fts: "memory_fts", view: "memory_search", triggerPrefix: "memory_fts" });
+  ensureSearchIndex(db, {
+    table: 'memory_files',
+    fts: 'memory_fts',
+    view: 'memory_search',
+    triggerPrefix: 'memory_fts',
+  });
 }

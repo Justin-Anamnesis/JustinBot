@@ -1,4 +1,4 @@
-export const LAST_CONVERSATION_KEY = "openmausbot.lastConversation.v1";
+export const LAST_CONVERSATION_KEY = 'openmausbot.lastConversation.v1';
 
 export function readLastConversation(): string | null {
   try {
@@ -11,6 +11,5 @@ export function readLastConversation(): string | null {
 export function rememberConversation(id: string): void {
   try {
     globalThis.localStorage?.setItem(LAST_CONVERSATION_KEY, id);
-  } catch {
-  }
+  } catch {}
 }

@@ -5,11 +5,11 @@
 // transcript keeps the raw message, and only the text the engine reads names each
 // skill and its SKILL.md. Shared so the composer menu and the server agree on which
 // names are commands.
-import { isSkillName } from "./skill-md.ts";
+import { isSkillName } from './skill-md.ts';
 
 /** Commands the app already owns. A skill with one of these names keeps
  * working through the prompt index, but `/name` stays the built-in. */
-export const BUILT_IN_SLASH_COMMANDS: readonly string[] = ["goal", "learn", "setup"];
+export const BUILT_IN_SLASH_COMMANDS: readonly string[] = ['goal', 'learn', 'setup'];
 
 export interface SkillCommand {
   name: string;
@@ -35,7 +35,7 @@ export function offersSkillCommand(name: string): boolean {
   return isSkillName(name) && !BUILT_IN_SLASH_COMMANDS.includes(name);
 }
 
-const hideCode = (code: string): string => code.replace(/[^\n]/g, "\0");
+const hideCode = (code: string): string => code.replace(/[^\n]/g, '\0');
 const FENCE = /^ {0,3}(`{3,}|~{3,})([^\r]*)/;
 
 /** A backtick run closes at the next run of its own length in the same paragraph. Paired from the far end, so that a person's
@@ -46,12 +46,15 @@ function hideInlineCode(text: string): string {
   const nextOfLength = new Map<number, number>();
   for (let index = tokens.length - 1; index >= 0; index -= 1) {
     const token = tokens[index]![0];
-    if (token[0] !== "`") { nextOfLength.clear(); continue; }
+    if (token[0] !== '`') {
+      nextOfLength.clear();
+      continue;
+    }
     const closer = nextOfLength.get(token.length);
     if (closer !== undefined) closers.set(index, closer);
     nextOfLength.set(token.length, index);
   }
-  let out = "";
+  let out = '';
   let at = 0;
   for (let index = 0; index < tokens.length; index += 1) {
     const closer = closers.get(index);
@@ -68,17 +71,23 @@ function hideInlineCode(text: string): string {
 /** `text` with fenced blocks, indented blocks and inline code blanked out, every offset kept. An unclosed fence runs to
  * the end, as it renders, and inline code ends with its paragraph. */
 export function blankCode(text: string): string {
-  let fence = "";
-  return hideInlineCode(text.split("\n").map((line) => {
-    const [, run = "", rest = ""] = FENCE.exec(line) ?? [];
-    if (fence) {
-      if (run[0] === fence[0] && run.length >= fence.length && !rest.trim()) fence = "";
-      return hideCode(line);
-    }
-    if (!run || (run[0] === "`" && rest.includes("`"))) return /^(?: {4}|\t)/.test(line) ? hideCode(line) : line;
-    fence = run;
-    return hideCode(line);
-  }).join("\n"));
+  let fence = '';
+  return hideInlineCode(
+    text
+      .split('\n')
+      .map((line) => {
+        const [, run = '', rest = ''] = FENCE.exec(line) ?? [];
+        if (fence) {
+          if (run[0] === fence[0] && run.length >= fence.length && !rest.trim()) fence = '';
+          return hideCode(line);
+        }
+        if (!run || (run[0] === '`' && rest.includes('`')))
+          return /^(?: {4}|\t)/.test(line) ? hideCode(line) : line;
+        fence = run;
+        return hideCode(line);
+      })
+      .join('\n'),
+  );
 }
 
 /** Where a typed `/name` counts: the start of the text or after a space, ended by the end, a space, or punctuation with
@@ -103,22 +112,33 @@ export function skillMentions(text: string): string[] {
  */
 export function skillCalls(text: string, typed: string, ownStart = false): string[] {
   const leading = ownStart ? LEADING_COMMAND.exec(text.trimStart())?.[1] : undefined;
-  return [...new Set([...(leading && offersSkillCommand(leading) ? [leading] : []), ...skillMentions(typed)])];
+  return [
+    ...new Set([
+      ...(leading && offersSkillCommand(leading) ? [leading] : []),
+      ...skillMentions(typed),
+    ]),
+  ];
 }
 
 /** What the engine reads for a message that ran skills with `/name`: which SKILL.md to read and follow, then the
  * request. `files` maps each skill the bot has to its SKILL.md; any other `/word` stays plain text. */
-export function skillCommandTurnText(text: string, files: ReadonlyMap<string, string>, typed = "", ownStart = false): string {
+export function skillCommandTurnText(
+  text: string,
+  files: ReadonlyMap<string, string>,
+  typed = '',
+  ownStart = false,
+): string {
   const names = skillCalls(text, typed, ownStart).filter((name) => files.has(name));
   if (!names.length) return text;
   const read = (name: string) => JSON.stringify(files.get(name));
-  const lead = names.length === 1
-    ? `The user ran your ${names[0]} skill with /${names[0]}. Read ${read(names[0]!)} with your file tools and follow it for this turn.`
-    : `The user ran ${names.length} of your skills with ${names.map((name) => `/${name}`).join(", ")}. Read ` +
-      `${names.map((name) => `${read(name)} for /${name}`).join(", ")} with your file tools and follow each for this turn.`;
+  const lead =
+    names.length === 1
+      ? `The user ran your ${names[0]} skill with /${names[0]}. Read ${read(names[0]!)} with your file tools and follow it for this turn.`
+      : `The user ran ${names.length} of your skills with ${names.map((name) => `/${name}`).join(', ')}. Read ` +
+        `${names.map((name) => `${read(name)} for /${name}`).join(', ')} with your file tools and follow each for this turn.`;
   const leading = names.length === 1 ? parseSkillCommand(text, names) : null;
   const request = leading ? leading.request : text.trim();
   return request
-    ? `${lead} Where ${names.length === 1 ? "the" : "a"} skill says {input}, use the request.\n\nRequest: ${request}`
+    ? `${lead} Where ${names.length === 1 ? 'the' : 'a'} skill says {input}, use the request.\n\nRequest: ${request}`
     : `${lead} There is no further request, so run it as the skill describes.`;
 }

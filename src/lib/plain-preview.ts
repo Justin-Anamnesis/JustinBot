@@ -1,1 +1,1 @@
-export { plainPreviewText } from "../../shared/plain-preview";
+export { plainPreviewText } from '../../shared/plain-preview';

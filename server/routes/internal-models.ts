@@ -1,5 +1,5 @@
-import type { ModelSelection } from "../../shared/wire.ts";
-import { PASS, type RouteHandler } from "./table.ts";
+import type { ModelSelection } from '../../shared/wire.ts';
+import { PASS, type RouteHandler } from './table.ts';
 
 /** Per engine without `search`, as in t3code's orchestrator_capabilities: one call lands whole in the bot's context. */
 export const MENU_SHORT = 8;
@@ -16,7 +16,10 @@ export interface MenuEngine {
   instanceId: string;
   driverKind: string;
   displayName: string | undefined;
-  models: { default: string; options: ReadonlyArray<{ id: string; label: string; orgBlocked?: true }> };
+  models: {
+    default: string;
+    options: ReadonlyArray<{ id: string; label: string; orgBlocked?: true }>;
+  };
   adapter: { capabilities: { effortLevels?: readonly string[] } };
 }
 
@@ -41,7 +44,7 @@ export interface ModelMenu {
   unavailable?: string[];
 }
 
-const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 /** The engines and models a bot may open a thread of its own on. `refusal` is the check start_thread applies, so a listed
  * model always opens; the current model, then `pinned` ones, lead their engine's list. */
@@ -55,15 +58,37 @@ export function modelMenu(input: {
 }): ModelMenu {
   const terms = input.search?.toLowerCase().split(/\s+/).filter(Boolean) ?? [];
   let room = MENU_FOUND;
-  const engines: MenuRow[] = [], unavailable: string[] = [];
+  const engines: MenuRow[] = [],
+    unavailable: string[] = [];
   for (const engine of input.engines) {
     const { instanceId } = engine;
     const name = engine.displayName || engine.driverKind;
-    const labels = new Map(engine.models.options.filter((option) => !option.orgBlocked).map((option) => [option.id, option.label]));
-    const ids = [...new Set([...[input.current, ...input.pinned].filter((pin) => pin.instanceId === instanceId).map((pin) => pin.model), engine.models.default, ...labels.keys()])]
-      .filter(Boolean);
-    const matching = terms.length ? ids.filter((id) => terms.every((term) => `${name} ${id} ${labels.get(id) ?? ""}`.toLowerCase().includes(term))) : ids;
-    if (!matching.length && !(terms.length && terms.every((term) => name.toLowerCase().includes(term)))) continue;
+    const labels = new Map(
+      engine.models.options
+        .filter((option) => !option.orgBlocked)
+        .map((option) => [option.id, option.label]),
+    );
+    const ids = [
+      ...new Set([
+        ...[input.current, ...input.pinned]
+          .filter((pin) => pin.instanceId === instanceId)
+          .map((pin) => pin.model),
+        engine.models.default,
+        ...labels.keys(),
+      ]),
+    ].filter(Boolean);
+    const matching = terms.length
+      ? ids.filter((id) =>
+          terms.every((term) =>
+            `${name} ${id} ${labels.get(id) ?? ''}`.toLowerCase().includes(term),
+          ),
+        )
+      : ids;
+    if (
+      !matching.length &&
+      !(terms.length && terms.every((term) => name.toLowerCase().includes(term)))
+    )
+      continue;
     if (input.down(engine)) {
       unavailable.push(name);
       continue;
@@ -71,7 +96,9 @@ export function modelMenu(input: {
     if (!matching.length) continue;
     const cap = terms.length ? room : matching.length <= MENU_WHOLE ? matching.length : MENU_SHORT;
     const listed: string[] = [];
-    let examined = 0, refusedInRow = 0, why: string | null = null;
+    let examined = 0,
+      refusedInRow = 0,
+      why: string | null = null;
     for (const id of matching) {
       if (listed.length >= cap) break;
       examined += 1;
@@ -92,11 +119,16 @@ export function modelMenu(input: {
     room -= listed.length;
     const efforts = engine.adapter.capabilities.effortLevels ?? [];
     engines.push({
-      instanceId, name,
-      ...(listed.length ? { models: listed.map((id): MenuModel => {
-        const label = labels.get(id);
-        return label && !squash(id).includes(squash(label)) ? { id, label } : id;
-      }) } : {}),
+      instanceId,
+      name,
+      ...(listed.length
+        ? {
+            models: listed.map((id): MenuModel => {
+              const label = labels.get(id);
+              return label && !squash(id).includes(squash(label)) ? { id, label } : id;
+            }),
+          }
+        : {}),
       ...(more > 0 ? { more } : {}),
       ...(efforts.length ? { efforts } : {}),
     });
@@ -110,9 +142,11 @@ export function createInternalModelRoutes(deps: {
   menu(search: string | undefined): ModelMenu | null;
 }): RouteHandler {
   return async ({ res, url, path, method, json }) => {
-    if (method !== "GET" || path !== "/api/internal/models") return PASS;
+    if (method !== 'GET' || path !== '/api/internal/models') return PASS;
     deps.requireActive();
-    const menu = deps.menu(url.searchParams.get("search")?.trim().slice(0, SEARCH_MAX_CHARS) || undefined);
-    return menu ? json(res, 200, menu) : json(res, 404, { error: "This bot no longer exists." });
+    const menu = deps.menu(
+      url.searchParams.get('search')?.trim().slice(0, SEARCH_MAX_CHARS) || undefined,
+    );
+    return menu ? json(res, 200, menu) : json(res, 404, { error: 'This bot no longer exists.' });
   };
 }

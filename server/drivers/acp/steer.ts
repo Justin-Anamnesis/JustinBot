@@ -1,7 +1,7 @@
 // ACP has no steer method. An agent that takes a message into its running turn does it through a slash command it
 // advertises (`available_commands_update`), sent as a second session/prompt while the turn's own prompt is open, and
 // answers that prompt with a line of its own before its result.
-import type { SteerOutcome } from "../../contracts.ts";
+import type { SteerOutcome } from '../../contracts.ts';
 
 /** How an agent takes a person's message into its running turn. */
 export interface AcpSteerSupport {
@@ -9,7 +9,7 @@ export interface AcpSteerSupport {
   command: string;
   /** The agent's own answer to the command, one agent_message_chunk: "accepted" when it took the text, "refused" when
    * it provably did not, null for any other text. */
-  answer(chunk: string): "accepted" | "refused" | null;
+  answer(chunk: string): 'accepted' | 'refused' | null;
 }
 
 export interface AcpTurnSteering {
@@ -23,40 +23,62 @@ export interface AcpTurnSteering {
 
 /** The names an `available_commands_update` advertises, or null when it is not one. */
 export function advertisedCommands(update: unknown): Set<string> | null {
-  const commands = (update as { sessionUpdate?: unknown; availableCommands?: unknown } | null);
-  if (commands?.sessionUpdate !== "available_commands_update" || !Array.isArray(commands.availableCommands)) return null;
-  return new Set(commands.availableCommands.flatMap((command) => typeof command?.name === "string" ? [command.name] : []));
+  const commands = update as { sessionUpdate?: unknown; availableCommands?: unknown } | null;
+  if (
+    commands?.sessionUpdate !== 'available_commands_update' ||
+    !Array.isArray(commands.availableCommands)
+  )
+    return null;
+  return new Set(
+    commands.availableCommands.flatMap((command) =>
+      typeof command?.name === 'string' ? [command.name] : [],
+    ),
+  );
 }
 
 /** `running`: the turn's own prompt is out, nothing stopped it, and its session offers the command. `send` carries
  * one session/prompt text and settles when the agent answers it, fails, or the turn ends. */
-export function acpTurnSteering(support: AcpSteerSupport, running: () => boolean, send: (text: string) => Promise<unknown>): AcpTurnSteering {
+export function acpTurnSteering(
+  support: AcpSteerSupport,
+  running: () => boolean,
+  send: (text: string) => Promise<unknown>,
+): AcpTurnSteering {
   let answered = false;
   let markAnswered = () => {};
-  const answeredSignal = new Promise<void>((resolve) => { markAnswered = resolve; });
+  const answeredSignal = new Promise<void>((resolve) => {
+    markAnswered = resolve;
+  });
   const open = () => !answered && running();
-  let flight: { verdict: "accepted" | "refused" | null; decide: (outcome: SteerOutcome) => void } | null = null;
+  let flight: {
+    verdict: 'accepted' | 'refused' | null;
+    decide: (outcome: SteerOutcome) => void;
+  } | null = null;
   // One steer out at a time, so each answer belongs to the one steer that is out.
   let previous: Promise<void> = Promise.resolve();
   let out = 0;
 
   const start = (text: string): { outcome: Promise<SteerOutcome>; done: Promise<void> } => {
     const guidance = text.trim();
-    if (!guidance || !open()) return { outcome: Promise.resolve("refused"), done: Promise.resolve() };
+    if (!guidance || !open())
+      return { outcome: Promise.resolve('refused'), done: Promise.resolve() };
     let decide: (outcome: SteerOutcome) => void = () => {};
-    const outcome = new Promise<SteerOutcome>((resolve) => { decide = resolve; });
-    const own = { verdict: null as "accepted" | "refused" | null, decide };
+    const outcome = new Promise<SteerOutcome>((resolve) => {
+      decide = resolve;
+    });
+    const own = { verdict: null as 'accepted' | 'refused' | null, decide };
     flight = own;
     out += 1;
     // Answered first: the agent may run the words as its next prompt, which this turn now waits for.
-    void answeredSignal.then(() => decide("indeterminate"));
-    const done = send(`/${support.command} ${guidance}`).then(
-      () => decide("indeterminate"),
-      () => decide(own.verdict === null && open() ? "refused" : "indeterminate"),
-    ).finally(() => {
-      out -= 1;
-      if (flight === own) flight = null;
-    });
+    void answeredSignal.then(() => decide('indeterminate'));
+    const done = send(`/${support.command} ${guidance}`)
+      .then(
+        () => decide('indeterminate'),
+        () => decide(own.verdict === null && open() ? 'refused' : 'indeterminate'),
+      )
+      .finally(() => {
+        out -= 1;
+        if (flight === own) flight = null;
+      });
     return { outcome, done };
   };
 
@@ -67,7 +89,7 @@ export function acpTurnSteering(support: AcpSteerSupport, running: () => boolean
       if (!own || !verdict) return false;
       if (own.verdict === null) {
         own.verdict = verdict;
-        own.decide(verdict === "refused" ? "refused" : open() ? "steered" : "indeterminate");
+        own.decide(verdict === 'refused' ? 'refused' : open() ? 'steered' : 'indeterminate');
       }
       return true;
     },

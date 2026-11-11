@@ -1,6 +1,10 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { LAST_CONVERSATION_KEY, readLastConversation, rememberConversation } from "./last-conversation";
+import {
+  LAST_CONVERSATION_KEY,
+  readLastConversation,
+  rememberConversation,
+} from './last-conversation';
 
 const surface = (initial: Record<string, string> = {}) => {
   const stored = new Map<string, string>(Object.entries(initial));
@@ -11,39 +15,39 @@ const surface = (initial: Record<string, string> = {}) => {
   };
 };
 
-describe("last conversation", () => {
+describe('last conversation', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("readLastConversation returns null with nothing stored", () => {
-    vi.stubGlobal("localStorage", surface());
+  it('readLastConversation returns null with nothing stored', () => {
+    vi.stubGlobal('localStorage', surface());
     expect(readLastConversation()).toBeNull();
   });
 
-  it("readLastConversation ignores a corrupt value", () => {
-    vi.stubGlobal("localStorage", surface({ [LAST_CONVERSATION_KEY]: "   " }));
+  it('readLastConversation ignores a corrupt value', () => {
+    vi.stubGlobal('localStorage', surface({ [LAST_CONVERSATION_KEY]: '   ' }));
     expect(readLastConversation()).toBeNull();
-    vi.stubGlobal("localStorage", { getItem: () => 42, setItem: () => {} });
+    vi.stubGlobal('localStorage', { getItem: () => 42, setItem: () => {} });
     expect(readLastConversation()).toBeNull();
   });
 
-  it("rememberConversation round-trips through storage", () => {
+  it('rememberConversation round-trips through storage', () => {
     const store = surface();
-    vi.stubGlobal("localStorage", store);
-    rememberConversation("room-7");
-    expect(store.stored.get(LAST_CONVERSATION_KEY)).toBe("room-7");
-    expect(readLastConversation()).toBe("room-7");
+    vi.stubGlobal('localStorage', store);
+    rememberConversation('room-7');
+    expect(store.stored.get(LAST_CONVERSATION_KEY)).toBe('room-7');
+    expect(readLastConversation()).toBe('room-7');
   });
 
-  it("a throwing storage surface never breaks reads or writes", () => {
-    vi.stubGlobal("localStorage", {
+  it('a throwing storage surface never breaks reads or writes', () => {
+    vi.stubGlobal('localStorage', {
       getItem: () => {
-        throw new Error("blocked");
+        throw new Error('blocked');
       },
       setItem: () => {
-        throw new Error("blocked");
+        throw new Error('blocked');
       },
     });
     expect(readLastConversation()).toBeNull();
-    expect(() => rememberConversation("bot-1")).not.toThrow();
+    expect(() => rememberConversation('bot-1')).not.toThrow();
   });
 });

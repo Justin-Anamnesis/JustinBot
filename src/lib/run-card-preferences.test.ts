@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hook = vi.hoisted(() => ({
   subscribe: undefined as undefined | ((listener: () => void) => () => void),
@@ -6,7 +6,7 @@ const hook = vi.hoisted(() => ({
   serverSnapshot: undefined as undefined | (() => boolean),
 }));
 
-vi.mock("react", () => ({
+vi.mock('react', () => ({
   useSyncExternalStore: (
     subscribe: (listener: () => void) => () => void,
     snapshot: () => boolean,
@@ -31,27 +31,27 @@ let local: ReturnType<typeof memoryStorage>;
 let browser: EventTarget;
 
 function storageEvent(key: string | null, storageArea: unknown = local) {
-  browser.dispatchEvent(Object.assign(new Event("storage"), { key, storageArea }));
+  browser.dispatchEvent(Object.assign(new Event('storage'), { key, storageArea }));
 }
 
 beforeEach(() => {
   vi.resetModules();
   local = memoryStorage();
   browser = new EventTarget();
-  vi.stubGlobal("localStorage", local);
-  vi.stubGlobal("window", browser);
+  vi.stubGlobal('localStorage', local);
+  vi.stubGlobal('window', browser);
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("local run card visibility", () => {
-  it("defaults on and ignores malformed values without writing anything", async () => {
-    const preference = await import("./run-card-preferences");
+describe('local run card visibility', () => {
+  it('defaults on and ignores malformed values without writing anything', async () => {
+    const preference = await import('./run-card-preferences');
     expect(preference.useShowRunCard()).toBe(true);
     expect(hook.serverSnapshot!()).toBe(true);
-    for (const value of ["", "false", "broken", "1"]) {
+    for (const value of ['', 'false', 'broken', '1']) {
       local.setItem(preference.RUN_CARD_KEY, value);
       expect(preference.useShowRunCard()).toBe(true);
     }
@@ -60,24 +60,24 @@ describe("local run card visibility", () => {
     expect(local.setItem).not.toHaveBeenCalled();
   });
 
-  it("persists both choices through a renderer reload", async () => {
-    let preference = await import("./run-card-preferences");
+  it('persists both choices through a renderer reload', async () => {
+    let preference = await import('./run-card-preferences');
     preference.setShowRunCard(false);
-    expect(local.getItem(preference.RUN_CARD_KEY)).toBe("0");
+    expect(local.getItem(preference.RUN_CARD_KEY)).toBe('0');
     expect(preference.useShowRunCard()).toBe(false);
 
     vi.resetModules();
-    preference = await import("./run-card-preferences");
+    preference = await import('./run-card-preferences');
     expect(preference.useShowRunCard()).toBe(false);
     preference.setShowRunCard(true);
-    expect(local.getItem(preference.RUN_CARD_KEY)).toBe("1");
+    expect(local.getItem(preference.RUN_CARD_KEY)).toBe('1');
     vi.resetModules();
-    preference = await import("./run-card-preferences");
+    preference = await import('./run-card-preferences');
     expect(preference.useShowRunCard()).toBe(true);
   });
 
-  it("notifies mounted consumers immediately and unsubscribes cleanly", async () => {
-    const preference = await import("./run-card-preferences");
+  it('notifies mounted consumers immediately and unsubscribes cleanly', async () => {
+    const preference = await import('./run-card-preferences');
     preference.useShowRunCard();
     const first = vi.fn();
     const second = vi.fn();
@@ -97,17 +97,17 @@ describe("local run card visibility", () => {
     expect(second).toHaveBeenCalledTimes(2);
   });
 
-  it("follows cross-window changes and clear, ignoring other storage", async () => {
-    const preference = await import("./run-card-preferences");
+  it('follows cross-window changes and clear, ignoring other storage', async () => {
+    const preference = await import('./run-card-preferences');
     preference.useShowRunCard();
     const listener = vi.fn();
     const unsubscribe = hook.subscribe!(listener);
-    local.setItem(preference.RUN_CARD_KEY, "0");
+    local.setItem(preference.RUN_CARD_KEY, '0');
     storageEvent(preference.RUN_CARD_KEY);
     expect(listener).toHaveBeenCalledOnce();
     expect(hook.snapshot!()).toBe(false);
 
-    storageEvent("other-key");
+    storageEvent('other-key');
     storageEvent(preference.RUN_CARD_KEY, memoryStorage());
     expect(listener).toHaveBeenCalledOnce();
 
@@ -120,20 +120,34 @@ describe("local run card visibility", () => {
     expect(listener).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["getter", "read", "write", "missing"])("keeps the choice usable when storage fails at %s", async (failure) => {
-    if (failure === "getter") {
-      Object.defineProperty(globalThis, "localStorage", { configurable: true, get() { throw new Error("blocked"); } });
-    } else if (failure === "missing") {
-      vi.stubGlobal("localStorage", undefined);
-    } else {
-      if (failure === "write") local.setItem.mockImplementation(() => { throw new Error("blocked"); });
-      if (failure === "read") local.getItem.mockImplementation(() => { throw new Error("blocked"); });
-    }
-    const preference = await import("./run-card-preferences");
-    expect(preference.useShowRunCard()).toBe(true);
-    preference.setShowRunCard(false);
-    expect(preference.useShowRunCard()).toBe(false);
-    preference.setShowRunCard(true);
-    expect(preference.useShowRunCard()).toBe(true);
-  });
+  it.each(['getter', 'read', 'write', 'missing'])(
+    'keeps the choice usable when storage fails at %s',
+    async (failure) => {
+      if (failure === 'getter') {
+        Object.defineProperty(globalThis, 'localStorage', {
+          configurable: true,
+          get() {
+            throw new Error('blocked');
+          },
+        });
+      } else if (failure === 'missing') {
+        vi.stubGlobal('localStorage', undefined);
+      } else {
+        if (failure === 'write')
+          local.setItem.mockImplementation(() => {
+            throw new Error('blocked');
+          });
+        if (failure === 'read')
+          local.getItem.mockImplementation(() => {
+            throw new Error('blocked');
+          });
+      }
+      const preference = await import('./run-card-preferences');
+      expect(preference.useShowRunCard()).toBe(true);
+      preference.setShowRunCard(false);
+      expect(preference.useShowRunCard()).toBe(false);
+      preference.setShowRunCard(true);
+      expect(preference.useShowRunCard()).toBe(true);
+    },
+  );
 });

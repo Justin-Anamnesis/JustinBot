@@ -1,18 +1,36 @@
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronRight, Loader2, RefreshCw, Search, Server, TriangleAlert, X } from "lucide-react";
-import { api, useStore, type Bot, type InstanceInfo } from "@/state/store";
-import { cn } from "@/lib/cn";
-import { glassPopupFrameStyle } from "@/lib/glass-popup";
-import { activeLocale, intlLocale, t } from "@/lib/i18n";
-import type { LocaleKey } from "@/locales";
-import { readCachedInventory } from "@/lib/connected-apps-cache";
-import { connectorStatusMemory, preloadConnectedApps, rememberConnectorStatus } from "@/lib/connected-apps";
-import { reserveConnectionPage, reusableConnectionUrl, type PendingAuthorization } from "@/lib/connector-oauth";
-import { mcpSignInLink } from "@/lib/mcp-sign-in";
-import { pollConnector } from "@/lib/connector-poll";
-import { connectorConnect } from "@/lib/product-events";
-import { managedConnectorUnavailableReason } from "../../shared/connector-availability";
-import { isConnectorToolGrantShape } from "@/lib/connector-grants";
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
+  Search,
+  Server,
+  TriangleAlert,
+  X,
+} from 'lucide-react';
+import { api, useStore, type Bot, type InstanceInfo } from '@/state/store';
+import { cn } from '@/lib/cn';
+import { glassPopupFrameStyle } from '@/lib/glass-popup';
+import { activeLocale, intlLocale, t } from '@/lib/i18n';
+import type { LocaleKey } from '@/locales';
+import { readCachedInventory } from '@/lib/connected-apps-cache';
+import {
+  connectorStatusMemory,
+  preloadConnectedApps,
+  rememberConnectorStatus,
+} from '@/lib/connected-apps';
+import {
+  reserveConnectionPage,
+  reusableConnectionUrl,
+  type PendingAuthorization,
+} from '@/lib/connector-oauth';
+import { mcpSignInLink } from '@/lib/mcp-sign-in';
+import { pollConnector } from '@/lib/connector-poll';
+import { connectorConnect } from '@/lib/product-events';
+import { managedConnectorUnavailableReason } from '../../shared/connector-availability';
+import { isConnectorToolGrantShape } from '@/lib/connector-grants';
 import {
   accountAliasTaken,
   accountToReconnect,
@@ -24,72 +42,109 @@ import {
   type ConnectorAccount,
   type ConnectorInventoryPhase,
   type ConnectorStatus,
-} from "@/lib/connector-status";
-import { BotAvatar } from "./Avatar";
-import { SidebarPopoverMenu } from "./SidebarPopoverMenu";
-import { appCategoryLabel, CATEGORY_SECTION_SIZE, catalogSections, connectorDescription, inCategory, rankCategories } from "@/lib/app-catalog";
-import { McpServersPanel } from "./McpServersPanel";
-import { HOSTED_MCP_APPS, mcpServerConnected, ownMcpServer, type HostedApp, type HostedConnections } from "@/lib/hosted-mcp-apps";
-import { isRemoteMcpListing, type McpServerListing } from "./mcp-draft";
-import { useSuggestedApps } from "@/lib/app-suggestions";
-import { matchesCatalogSearch } from "../../shared/app-suggestions";
-import { EmailCard } from "./EmailCard";
-import { PostizCard } from "./PostizCard";
-import { POSTIZ_CATALOG_CARD, POSTIZ_SEARCH } from "@/lib/postiz";
-import { X_CARD_SEARCH, XCard } from "./XCard";
-import { mergeCompleteConnectorStatus, mergeCurrentConnectorStatus, onlyLatestConnectorResponses } from "@/lib/connector-status-merge";
-import { openBotSettings } from "./bot-panel/panel-link";
-import { openKeySettings } from "./keys/key-focus";
-import { lacksAdminScope } from "@/lib/admin-scope";
-import { SavedKeysReset } from "./SavedKeysReset";
-import { botAppScope } from "@/lib/bot-app-access";
-import { AppGrantPrompt, botsForApps, useAppGrants } from "./AppGrantPrompt";
-import { ServiceIcon, type ToolkitCard } from "./ServiceIcon"; import { AppsSection } from "./AppsSection";
-export { ServiceIcon, type ToolkitCard } from "./ServiceIcon";
+} from '@/lib/connector-status';
+import { BotAvatar } from './Avatar';
+import { SidebarPopoverMenu } from './SidebarPopoverMenu';
+import {
+  appCategoryLabel,
+  CATEGORY_SECTION_SIZE,
+  catalogSections,
+  connectorDescription,
+  inCategory,
+  rankCategories,
+} from '@/lib/app-catalog';
+import { McpServersPanel } from './McpServersPanel';
+import {
+  HOSTED_MCP_APPS,
+  mcpServerConnected,
+  ownMcpServer,
+  type HostedApp,
+  type HostedConnections,
+} from '@/lib/hosted-mcp-apps';
+import { isRemoteMcpListing, type McpServerListing } from './mcp-draft';
+import { useSuggestedApps } from '@/lib/app-suggestions';
+import { matchesCatalogSearch } from '../../shared/app-suggestions';
+import { EmailCard } from './EmailCard';
+import { PostizCard } from './PostizCard';
+import { POSTIZ_CATALOG_CARD, POSTIZ_SEARCH } from '@/lib/postiz';
+import { X_CARD_SEARCH, XCard } from './XCard';
+import {
+  mergeCompleteConnectorStatus,
+  mergeCurrentConnectorStatus,
+  onlyLatestConnectorResponses,
+} from '@/lib/connector-status-merge';
+import { openBotSettings } from './bot-panel/panel-link';
+import { openKeySettings } from './keys/key-focus';
+import { lacksAdminScope } from '@/lib/admin-scope';
+import { SavedKeysReset } from './SavedKeysReset';
+import { botAppScope } from '@/lib/bot-app-access';
+import { AppGrantPrompt, botsForApps, useAppGrants } from './AppGrantPrompt';
+import { ServiceIcon, type ToolkitCard } from './ServiceIcon';
+import { AppsSection } from './AppsSection';
+export { ServiceIcon, type ToolkitCard } from './ServiceIcon';
 
-export { preloadConnectedApps, type ConnectorInventory } from "@/lib/connected-apps";
+export { preloadConnectedApps, type ConnectorInventory } from '@/lib/connected-apps';
 
 export function disconnectAccountConfirmation(
   service: string,
   account: { id: string; alias?: string },
 ) {
   const identity = account.alias ? `“${account.alias}” (${account.id})` : `“${account.id}”`;
-  return t("connectors.disconnectConfirm", { identity, service });
+  return t('connectors.disconnectConfirm', { identity, service });
 }
 
-export function botsWithLimitedServiceTools(bots: Bot[], instances: InstanceInfo[], slug: string): Bot[] {
+export function botsWithLimitedServiceTools(
+  bots: Bot[],
+  instances: InstanceInfo[],
+  slug: string,
+): Bot[] {
   return bots.filter((bot) => {
     if (bot.hidden || bot.composio === false) return false;
-    if (!instances.find((instance) => instance.instanceId === bot.modelSelection.instanceId)
-      ?.capabilities?.composioMcp) return false;
+    if (
+      !instances.find((instance) => instance.instanceId === bot.modelSelection.instanceId)
+        ?.capabilities?.composioMcp
+    )
+      return false;
     const record: unknown = bot.connectorTools;
-    if (!record || typeof record !== "object" || Array.isArray(record)) return false;
+    if (!record || typeof record !== 'object' || Array.isArray(record)) return false;
     const grant = (record as Record<string, unknown>)[slug];
     if (grant === undefined) return true;
-    return !isConnectorToolGrantShape(grant) || grant.tools !== "*";
+    return !isConnectorToolGrantShape(grant) || grant.tools !== '*';
   });
 }
 
 /** Whether a hosted app's card shows: it matches the search, and the filter is All, or Connected and it isn't known to be
  * disconnected (unknown while its servers load). */
-export function hostedShown(app: HostedApp, search: string, filter: AppsFilter, connected: HostedConnections | null): boolean {
-  const matches = !search || `${app.label} ${app.keywords} ${t(app.description)}`.toLowerCase().includes(search.toLowerCase().trim());
-  return matches && (filter === "all" || (filter === "connected" && connected?.[app.id] !== false));
+export function hostedShown(
+  app: HostedApp,
+  search: string,
+  filter: AppsFilter,
+  connected: HostedConnections | null,
+): boolean {
+  const matches =
+    !search ||
+    `${app.label} ${app.keywords} ${t(app.description)}`
+      .toLowerCase()
+      .includes(search.toLowerCase().trim());
+  return matches && (filter === 'all' || (filter === 'connected' && connected?.[app.id] !== false));
 }
 
-export type ConnectorSetup = "ready" | "needs-setup" | "service-unavailable";
+export type ConnectorSetup = 'ready' | 'needs-setup' | 'service-unavailable';
 
 export function connectorSetupNotice(state: {
   configured: boolean;
   stale: boolean;
   setup: ConnectorSetup | undefined;
   remoteClient: boolean;
-}): { key: LocaleKey; tone: "info" | "warning" } | null {
+}): { key: LocaleKey; tone: 'info' | 'warning' } | null {
   if (state.configured || state.stale) return null;
-  if (state.setup === "needs-setup") {
-    return { key: state.remoteClient ? "connectors.setupNeededRemote" : "connectors.setupNeeded", tone: "info" };
+  if (state.setup === 'needs-setup') {
+    return {
+      key: state.remoteClient ? 'connectors.setupNeededRemote' : 'connectors.setupNeeded',
+      tone: 'info',
+    };
   }
-  return { key: "connectors.notConfigured", tone: "warning" };
+  return { key: 'connectors.notConfigured', tone: 'warning' };
 }
 
 export interface CatalogPagination {
@@ -99,7 +154,7 @@ export interface CatalogPagination {
   reason?: string;
 }
 
-export type AppsFilter = "all" | "connected" | "mcp";
+export type AppsFilter = 'all' | 'connected' | 'mcp';
 
 export const APPS_PREVIEW_COUNT = 48;
 
@@ -115,28 +170,26 @@ export function PluginsPanel() {
   const dialogRef = useRef<HTMLDivElement>(null);
   const surface = state.pluginsSurface;
   const [cards, setCards] = useState<ToolkitCard[] | null>(null);
-  const [source, setSource] = useState<"api" | "curated">("curated");
+  const [source, setSource] = useState<'api' | 'curated'>('curated');
   const [pagination, setPagination] = useState<CatalogPagination | null>(null);
   const [configured, setConfigured] = useState(false);
-  const [mode, setMode] = useState<"managed" | "self-hosted" | "unavailable">("unavailable");
+  const [mode, setMode] = useState<'managed' | 'self-hosted' | 'unavailable'>('unavailable');
   const [setup, setSetup] = useState<ConnectorSetup | undefined>(undefined);
   const [status, setStatus] = useState<Record<string, ConnectorStatus>>(
     () => connectorStatusMemory()?.services ?? readCachedInventory()?.services ?? {},
   );
-  const [stale, setStale] = useState(
-    connectorStatusMemory()?.authoritative === false,
-  );
+  const [stale, setStale] = useState(connectorStatusMemory()?.authoritative === false);
   const [pendingUrls, setPendingUrls] = useState<Record<string, PendingAuthorization>>({});
   const [aliasSlug, setAliasSlug] = useState<string | null>(null);
-  const [aliasDraft, setAliasDraft] = useState("");
+  const [aliasDraft, setAliasDraft] = useState('');
   const [busySlug, setBusySlug] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [inventoryPhase, setInventoryPhase] = useState<ConnectorInventoryPhase>(
-    connectorStatusMemory() === null ? "loading" : "ready",
+    connectorStatusMemory() === null ? 'loading' : 'ready',
   );
   const [error, setError] = useState<string | { key: LocaleKey } | null>(null);
-  const [search, setSearch] = useState("");
-  const [tab, setTab] = useState<"marketplace" | "connected">("marketplace");
+  const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<'marketplace' | 'connected'>('marketplace');
   const [showAllApps, setShowAllApps] = useState(false);
   const [hostedConnected, setHostedConnected] = useState<HostedConnections | null>(null);
   const [cardsRefresh, setCardsRefresh] = useState(0);
@@ -154,20 +207,37 @@ export function PluginsPanel() {
   const reconnecting = useRef(new Set<string>());
 
   /** A connection that finished or failed since a request no newer than this one no longer needs its sign-in page. */
-  const forgetSettledUrls = (services: Record<string, ConnectorStatus>, requestGenerations: ReadonlyMap<string, number>) => {
-    const settled = Object.entries(services).filter(([slug, state]) => (statusGenerations.current.get(slug) ?? 0) === (requestGenerations.get(slug) ?? 0)
-      && ((state.connected && !state.pending) || /^(expired|failed)$/i.test(state.status ?? ""))).map(([slug]) => slug);
-    if (settled.length) setPendingUrls((current) => settled.some((slug) => current[slug]) ? Object.fromEntries(Object.entries(current).filter(([slug]) => !settled.includes(slug))) : current);
+  const forgetSettledUrls = (
+    services: Record<string, ConnectorStatus>,
+    requestGenerations: ReadonlyMap<string, number>,
+  ) => {
+    const settled = Object.entries(services)
+      .filter(
+        ([slug, state]) =>
+          (statusGenerations.current.get(slug) ?? 0) === (requestGenerations.get(slug) ?? 0) &&
+          ((state.connected && !state.pending) || /^(expired|failed)$/i.test(state.status ?? '')),
+      )
+      .map(([slug]) => slug);
+    if (settled.length)
+      setPendingUrls((current) =>
+        settled.some((slug) => current[slug])
+          ? Object.fromEntries(Object.entries(current).filter(([slug]) => !settled.includes(slug)))
+          : current,
+      );
   };
   const refreshStatus = useCallback((slugs: string[]): Promise<Record<string, ConnectorStatus>> => {
     if (!slugs.length) return Promise.resolve({});
-    const requestGenerations = new Map(slugs.map((slug) => [slug, statusGenerations.current.get(slug) ?? 0]));
-    const requestIds = new Map(slugs.map((slug) => {
-      const requestId = (latestStatusRequests.current.get(slug) ?? 0) + 1;
-      latestStatusRequests.current.set(slug, requestId);
-      return [slug, requestId];
-    }));
-    return api(`/api/connectors?services=${slugs.join(",")}`)
+    const requestGenerations = new Map(
+      slugs.map((slug) => [slug, statusGenerations.current.get(slug) ?? 0]),
+    );
+    const requestIds = new Map(
+      slugs.map((slug) => {
+        const requestId = (latestStatusRequests.current.get(slug) ?? 0) + 1;
+        latestStatusRequests.current.set(slug, requestId);
+        return [slug, requestId];
+      }),
+    );
+    return api(`/api/connectors?services=${slugs.join(',')}`)
       .then((r) => {
         const services = onlyLatestConnectorResponses(
           r.services ?? {},
@@ -176,84 +246,101 @@ export function PluginsPanel() {
         );
         // A one-service poll must not erase other apps' state, and a request older than Connect must not erase the
         // newer INITIATED state.
-        setStatus((current) => mergeCurrentConnectorStatus(
-          current,
-          services,
-          statusGenerations.current,
-          requestGenerations,
-        ));
+        setStatus((current) =>
+          mergeCurrentConnectorStatus(
+            current,
+            services,
+            statusGenerations.current,
+            requestGenerations,
+          ),
+        );
         forgetSettledUrls(services, requestGenerations);
         return services;
       })
       .catch(() => ({}));
   }, []);
 
-  const refreshConnectedStatus = useCallback((force = false): Promise<Record<string, ConnectorStatus>> => {
-    const requestGenerations = new Map(statusGenerations.current);
-    setRefreshing(true);
-    return preloadConnectedApps(force)
-      .then(({ services, authoritative, refused }) => {
-        setStale(!authoritative);
-        if (refused) setError({ key: "connectors.adminOnly" });
-        setStatus((current) => mergeCompleteConnectorStatus(
-          current,
-          services,
-          statusGenerations.current,
-          requestGenerations,
-          authoritative,
-        ));
-        forgetSettledUrls(services, requestGenerations);
-        return services;
-      })
-      .finally(() => setRefreshing(false));
-  }, []);
+  const refreshConnectedStatus = useCallback(
+    (force = false): Promise<Record<string, ConnectorStatus>> => {
+      const requestGenerations = new Map(statusGenerations.current);
+      setRefreshing(true);
+      return preloadConnectedApps(force)
+        .then(({ services, authoritative, refused }) => {
+          setStale(!authoritative);
+          if (refused) setError({ key: 'connectors.adminOnly' });
+          setStatus((current) =>
+            mergeCompleteConnectorStatus(
+              current,
+              services,
+              statusGenerations.current,
+              requestGenerations,
+              authoritative,
+            ),
+          );
+          forgetSettledUrls(services, requestGenerations);
+          return services;
+        })
+        .finally(() => setRefreshing(false));
+    },
+    [],
+  );
 
-  const loadConnectionInventory = useCallback((force = false) => {
-    const hadCachedInventory = connectorStatusMemory() !== null;
-    if (!hadCachedInventory) setInventoryPhase("loading");
-    setError(null);
-    return refreshConnectedStatus(force)
-      .then((services) => {
-        setInventoryPhase("ready");
-        return services;
-      })
-      .catch((cause) => {
-        if (!hadCachedInventory) setInventoryPhase("error");
-        setError(cause instanceof Error ? cause.message : String(cause));
-        return {};
-      });
-  }, [refreshConnectedStatus]);
+  const loadConnectionInventory = useCallback(
+    (force = false) => {
+      const hadCachedInventory = connectorStatusMemory() !== null;
+      if (!hadCachedInventory) setInventoryPhase('loading');
+      setError(null);
+      return refreshConnectedStatus(force)
+        .then((services) => {
+          setInventoryPhase('ready');
+          return services;
+        })
+        .catch((cause) => {
+          if (!hadCachedInventory) setInventoryPhase('error');
+          setError(cause instanceof Error ? cause.message : String(cause));
+          return {};
+        });
+    },
+    [refreshConnectedStatus],
+  );
 
-  useEffect(() => () => {
-    opening.current?.cancel();
-    opening.current = null;
-    for (const stop of polls.current.values()) stop();
-    polls.current.clear();
-  }, []);
-  const appGrants = useAppGrants({ status, emailConnected, inventoryReady: inventoryPhase === "ready" && !stale });
+  useEffect(
+    () => () => {
+      opening.current?.cancel();
+      opening.current = null;
+      for (const stop of polls.current.values()) stop();
+      polls.current.clear();
+    },
+    [],
+  );
+  const appGrants = useAppGrants({
+    status,
+    emailConnected,
+    inventoryReady: inventoryPhase === 'ready' && !stale,
+  });
 
   useEffect(() => {
-    if (inventoryPhase !== "ready") return;
+    if (inventoryPhase !== 'ready') return;
     rememberConnectorStatus(status, !stale);
   }, [inventoryPhase, stale, status]);
 
   useEffect(() => {
     let alive = true;
     void loadConnectionInventory();
-    api("/api/connectors/catalog")
+    api('/api/connectors/catalog')
       .then((r) => {
         if (!alive) return;
         setCards(r.cards ?? []);
-        setSource(r.source ?? "curated");
+        setSource(r.source ?? 'curated');
         setPagination(r.pagination ?? null);
         setConfigured(Boolean(r.configured));
-        setMode(r.mode ?? "unavailable");
+        setMode(r.mode ?? 'unavailable');
         setSetup(r.setup);
       })
       .catch((e) => {
         if (!alive) return;
         setCards((current) => current ?? []);
-        setError(lacksAdminScope(e) ? { key: "connectors.adminOnly" } : e.message);
+        setError(lacksAdminScope(e) ? { key: 'connectors.adminOnly' } : e.message);
       });
     return () => {
       alive = false;
@@ -261,7 +348,8 @@ export function PluginsPanel() {
   }, [loadConnectionInventory]);
 
   useEffect(() => {
-    const returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const returnFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const dialog = dialogRef.current;
     const focusable = () =>
       Array.from(
@@ -271,14 +359,14 @@ export function PluginsPanel() {
       ).filter((element) => element.getClientRects().length > 0);
 
     const controls = focusable();
-    (controls.find((element) => element.matches("input")) ?? controls[0] ?? dialog)?.focus();
+    (controls.find((element) => element.matches('input')) ?? controls[0] ?? dialog)?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         event.preventDefault();
-        dispatch({ type: "togglePlugins", open: false });
+        dispatch({ type: 'togglePlugins', open: false });
         return;
       }
-      if (event.key !== "Tab" || !dialog) return;
+      if (event.key !== 'Tab' || !dialog) return;
       const items = focusable();
       if (items.length === 0) {
         event.preventDefault();
@@ -299,22 +387,28 @@ export function PluginsPanel() {
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener('keydown', onKeyDown);
       returnFocus?.focus();
     };
   }, [dispatch]);
 
-  const { suggestions, picking, pick } = useSuggestedApps(cards !== null && configured && inventoryPhase === "ready", `${cardsRefresh}:${Object.keys(status).filter((slug) => status[slug]?.connected).sort().join()}`);
+  const { suggestions, picking, pick } = useSuggestedApps(
+    cards !== null && configured && inventoryPhase === 'ready',
+    `${cardsRefresh}:${Object.keys(status)
+      .filter((slug) => status[slug]?.connected)
+      .sort()
+      .join()}`,
+  );
 
   const openConnectUrl = async (url: string) => {
     if (opening.current) return;
     const launch = reserveConnectionPage();
     opening.current = launch;
     try {
-      if (!await launch.open(url) && opening.current === launch) {
-        setError({ key: "connectors.popupBlockedContinue" });
+      if (!(await launch.open(url)) && opening.current === launch) {
+        setError({ key: 'connectors.popupBlockedContinue' });
       }
     } finally {
       launch.cancel();
@@ -322,13 +416,22 @@ export function PluginsPanel() {
     }
   };
 
-  const startPolling = (slug: string, before: ConnectorStatus | undefined, firstConnection: boolean) => {
+  const startPolling = (
+    slug: string,
+    before: ConnectorStatus | undefined,
+    firstConnection: boolean,
+  ) => {
     polls.current.get(slug)?.();
-    const stop = pollConnector(before, () => refreshStatus([slug]).then((services) => services[slug]), (result) => {
-      if (polls.current.get(slug) === stop) polls.current.delete(slug);
-      connectorConnect(slug, result);
-      if (result === "connected" && firstConnection) appGrants.appConnected(slug, cards?.find((card) => card.slug === slug)?.label ?? slug);
-    });
+    const stop = pollConnector(
+      before,
+      () => refreshStatus([slug]).then((services) => services[slug]),
+      (result) => {
+        if (polls.current.get(slug) === stop) polls.current.delete(slug);
+        connectorConnect(slug, result);
+        if (result === 'connected' && firstConnection)
+          appGrants.appConnected(slug, cards?.find((card) => card.slug === slug)?.label ?? slug);
+      },
+    );
     polls.current.set(slug, stop);
   };
 
@@ -343,13 +446,16 @@ export function PluginsPanel() {
     const firstConnection = !reconnecting.current.has(slug) && !hasActiveConnection(status[slug]);
     try {
       const createdAt = Date.now();
-      if (replacing) await api(`/api/connectors/${slug}/accounts/${encodeURIComponent(replacing.id)}`, { method: "DELETE" });
-      const request: RequestInit = { method: "POST" };
+      if (replacing)
+        await api(`/api/connectors/${slug}/accounts/${encodeURIComponent(replacing.id)}`, {
+          method: 'DELETE',
+        });
+      const request: RequestInit = { method: 'POST' };
       if (alias) request.body = JSON.stringify({ alias });
       const result = await api(`/api/connectors/${slug}/authorize`, request);
       if (opening.current !== launch) return;
-      const url = mcpSignInLink(typeof result.url === "string" ? result.url : null);
-      if (!url) throw new Error(t("connectors.invalidAuthorizationUrl"));
+      const url = mcpSignInLink(typeof result.url === 'string' ? result.url : null);
+      if (!url) throw new Error(t('connectors.invalidAuthorizationUrl'));
       setPendingUrls((current) => ({ ...current, [slug]: { url, createdAt } }));
       setStatus((current) => ({
         ...current,
@@ -357,25 +463,25 @@ export function PluginsPanel() {
           ...current[slug],
           connected: current[slug]?.connected ?? false,
           pending: true,
-          status: "INITIATED",
+          status: 'INITIATED',
         },
       }));
       setAliasSlug(null);
-      setAliasDraft("");
+      setAliasDraft('');
       startPolling(slug, status[slug], firstConnection);
-      if (!await launch.open(url) && opening.current === launch) {
-        setError({ key: "connectors.popupBlockedContinue" });
+      if (!(await launch.open(url)) && opening.current === launch) {
+        setError({ key: 'connectors.popupBlockedContinue' });
       }
     } catch (e) {
       if (opening.current !== launch) return;
       const message = e instanceof Error ? e.message : String(e);
       if (requiresAccountAlias(message)) {
         setAliasSlug(slug);
-        setAliasDraft("");
-        setError({ key: "connectors.aliasNeeded" });
+        setAliasDraft('');
+        setError({ key: 'connectors.aliasNeeded' });
         void refreshStatus([slug]);
       } else {
-        setError(accountAliasTaken(message) ? { key: "connectors.aliasTaken" } : message);
+        setError(accountAliasTaken(message) ? { key: 'connectors.aliasTaken' } : message);
       }
     } finally {
       launch.cancel();
@@ -388,192 +494,279 @@ export function PluginsPanel() {
 
   const disconnectAccount = (slug: string, accountId: string) => {
     setBusySlug(slug);
-    api(`/api/connectors/${slug}/accounts/${encodeURIComponent(accountId)}`, { method: "DELETE" })
+    api(`/api/connectors/${slug}/accounts/${encodeURIComponent(accountId)}`, { method: 'DELETE' })
       .then(() => refreshStatus([slug]))
       .catch((e) => setError(e.message))
       .finally(() => setBusySlug(null));
   };
 
-  const matching = (cards ?? []).filter((c) => (!managedConnectorUnavailableReason(mode, c.slug) || hasActiveConnection(status[c.slug]))
-    && matchesCatalogSearch(`${c.label} ${c.slug} ${connectorDescription(c)} ${(c.categories ?? []).join(" ")}`, search));
-  const isConnected = (slug: string) => Boolean(status[slug]?.connected || status[slug]?.accounts?.length);
-  const filter: AppsFilter = surface === "mcp" ? "mcp" : tab === "connected" ? "connected" : "all";
+  const matching = (cards ?? []).filter(
+    (c) =>
+      (!managedConnectorUnavailableReason(mode, c.slug) || hasActiveConnection(status[c.slug])) &&
+      matchesCatalogSearch(
+        `${c.label} ${c.slug} ${connectorDescription(c)} ${(c.categories ?? []).join(' ')}`,
+        search,
+      ),
+  );
+  const isConnected = (slug: string) =>
+    Boolean(status[slug]?.connected || status[slug]?.accounts?.length);
+  const filter: AppsFilter = surface === 'mcp' ? 'mcp' : tab === 'connected' ? 'connected' : 'all';
   const searching = search.trim().length > 0;
   /** A search covers the whole catalog, whichever view it was typed in. */
-  const listing: AppsFilter = searching && filter === "connected" ? "all" : filter;
-  const shownHosted = new Set(HOSTED_MCP_APPS.filter((app) => hostedShown(app, search, listing, hostedConnected)).map((app) => app.id));
-  const showEmail = (!search || `email mail imap smtp mailbox ${t("email.description")}`.toLowerCase().includes(search.toLowerCase().trim())) && (listing === "all" || (listing === "connected" && emailConnected !== false));
-  const showX = (!search || `${X_CARD_SEARCH} ${t("apps.x.description")}`.toLowerCase().includes(search.toLowerCase().trim())) && (listing === "all" || (listing === "connected" && xConnected !== false));
-  const showPostiz = (!search || `${POSTIZ_SEARCH} ${t("postiz.description")}`.toLowerCase().includes(search.toLowerCase().trim())) && (listing === "all" || (listing === "connected" && postizConnected !== false));
-  const visible = (listing === "connected" ? matching.filter((card) => isConnected(card.slug)) : matching)
+  const listing: AppsFilter = searching && filter === 'connected' ? 'all' : filter;
+  const shownHosted = new Set(
+    HOSTED_MCP_APPS.filter((app) => hostedShown(app, search, listing, hostedConnected)).map(
+      (app) => app.id,
+    ),
+  );
+  const showEmail =
+    (!search ||
+      `email mail imap smtp mailbox ${t('email.description')}`
+        .toLowerCase()
+        .includes(search.toLowerCase().trim())) &&
+    (listing === 'all' || (listing === 'connected' && emailConnected !== false));
+  const showX =
+    (!search ||
+      `${X_CARD_SEARCH} ${t('apps.x.description')}`
+        .toLowerCase()
+        .includes(search.toLowerCase().trim())) &&
+    (listing === 'all' || (listing === 'connected' && xConnected !== false));
+  const showPostiz =
+    (!search ||
+      `${POSTIZ_SEARCH} ${t('postiz.description')}`
+        .toLowerCase()
+        .includes(search.toLowerCase().trim())) &&
+    (listing === 'all' || (listing === 'connected' && postizConnected !== false));
+  const visible = (
+    listing === 'connected' ? matching.filter((card) => isConnected(card.slug)) : matching
+  )
     .map((card, index) => ({ card, index }))
-    .sort((a, b) => Number(isConnected(b.card.slug)) - Number(isConnected(a.card.slug)) || a.index - b.index)
+    .sort(
+      (a, b) =>
+        Number(isConnected(b.card.slug)) - Number(isConnected(a.card.slug)) || a.index - b.index,
+    )
     .map(({ card }) => card);
   const connectedHosted = HOSTED_MCP_APPS.filter((app) => hostedConnected?.[app.id]);
   const ownServers = mcpServers.filter((server) => ownMcpServer(server));
-  const ownServerShown = (server: McpServerListing) => matchesCatalogSearch(`${server.name} ${isRemoteMcpListing(server) ? server.url : [server.command, ...server.args].join(" ")}`, search);
-  const connectedCount = Object.values(status).filter(hasActiveConnection).length + connectedHosted.length + ownServers.filter(mcpServerConnected).length + Number(emailConnected === true) + Number(xConnected === true) + Number(postizConnected === true);
+  const ownServerShown = (server: McpServerListing) =>
+    matchesCatalogSearch(
+      `${server.name} ${isRemoteMcpListing(server) ? server.url : [server.command, ...server.args].join(' ')}`,
+      search,
+    );
+  const connectedCount =
+    Object.values(status).filter(hasActiveConnection).length +
+    connectedHosted.length +
+    ownServers.filter(mcpServerConnected).length +
+    Number(emailConnected === true) +
+    Number(xConnected === true) +
+    Number(postizConnected === true);
   const connectedEmptyCopy = connectedInventoryCopy(inventoryPhase);
-  const close = () => dispatch({ type: "togglePlugins", open: false });
+  const close = () => dispatch({ type: 'togglePlugins', open: false });
   const setupNotice = connectorSetupNotice({ configured, stale, setup, remoteClient });
   const chooseFilter = (next: AppsFilter) => {
     setCategory(null);
-    if (next === "mcp") {
-      dispatch({ type: "togglePlugins", open: true, surface: "mcp" });
+    if (next === 'mcp') {
+      dispatch({ type: 'togglePlugins', open: true, surface: 'mcp' });
       return;
     }
-    setTab(next === "connected" ? "connected" : "marketplace");
-    if (surface !== "apps") dispatch({ type: "togglePlugins", open: true, surface: "apps" });
+    setTab(next === 'connected' ? 'connected' : 'marketplace');
+    if (surface !== 'apps') dispatch({ type: 'togglePlugins', open: true, surface: 'apps' });
   };
 
-  const ranked = rankCategories([...(cards ?? []), POSTIZ_CATALOG_CARD], undefined, POSTIZ_CATALOG_CARD.categories);
+  const ranked = rankCategories(
+    [...(cards ?? []), POSTIZ_CATALOG_CARD],
+    undefined,
+    POSTIZ_CATALOG_CARD.categories,
+  );
   const moreCategories = ranked.more;
   const categoryInMore = category !== null && moreCategories.includes(category);
-  const inCategoryView = filter === "all" && category !== null && !searching;
+  const inCategoryView = filter === 'all' && category !== null && !searching;
   const postizHere = showPostiz && (!inCategoryView || inCategory(POSTIZ_CATALOG_CARD, category));
-  const nativeCardsShown = (!inCategoryView && (shownHosted.size > 0 || showEmail || showX)) || postizHere || (filter === "connected" && ownServers.some((server) => server.enabled && ownServerShown(server)));
-  const categoryCards = inCategoryView ? visible.filter((card) => inCategory(card, category)) : visible;
-  const sectioned = filter === "all" && !searching && category === null;
+  const nativeCardsShown =
+    (!inCategoryView && (shownHosted.size > 0 || showEmail || showX)) ||
+    postizHere ||
+    (filter === 'connected' &&
+      ownServers.some((server) => server.enabled && ownServerShown(server)));
+  const categoryCards = inCategoryView
+    ? visible.filter((card) => inCategory(card, category))
+    : visible;
+  const sectioned = filter === 'all' && !searching && category === null;
   const sections = sectioned ? catalogSections(visible, isConnected, ranked.inline) : [];
-  const allSection = sections.find((section) => section.kind === "all");
-  const allCards = sectioned ? allSection?.cards ?? [] : categoryCards;
+  const allSection = sections.find((section) => section.kind === 'all');
+  const allCards = sectioned ? (allSection?.cards ?? []) : categoryCards;
   const allCapped = sectioned && !showAllApps && allCards.length > APPS_PREVIEW_COUNT;
   const allShown = allCapped ? allCards.slice(0, APPS_PREVIEW_COUNT) : allCards;
   const connectedCards = (cards ?? []).filter((card) => hasActiveConnection(status[card.slug]));
   const pickCategory = (next: string | null) => {
     setCategory(next);
-    setTab("marketplace");
-    if (surface !== "apps") dispatch({ type: "togglePlugins", open: true, surface: "apps" });
+    setTab('marketplace');
+    if (surface !== 'apps') dispatch({ type: 'togglePlugins', open: true, surface: 'apps' });
   };
   const listTitle = searching
-    ? t("connectors.section.results")
-    : filter === "connected"
-      ? t("connectors.section.yours")
-      : category ? appCategoryLabel(category) : (sections.length > 1 ? t("apps.section.all") : t("connectors.section.available"));
-  const pill = "inline-flex h-7 shrink-0 items-center justify-center gap-2 rounded-full px-3 text-[13px] font-medium leading-5 transition-colors";
-  const pillTone = (selected: boolean) => selected
-    ? "bg-ink text-app"
-    : "bg-control/70 text-ink-secondary hover:bg-raised-hover hover:text-ink";
+    ? t('connectors.section.results')
+    : filter === 'connected'
+      ? t('connectors.section.yours')
+      : category
+        ? appCategoryLabel(category)
+        : sections.length > 1
+          ? t('apps.section.all')
+          : t('connectors.section.available');
+  const pill =
+    'inline-flex h-7 shrink-0 items-center justify-center gap-2 rounded-full px-3 text-[13px] font-medium leading-5 transition-colors';
+  const pillTone = (selected: boolean) =>
+    selected
+      ? 'bg-ink text-app'
+      : 'bg-control/70 text-ink-secondary hover:bg-raised-hover hover:text-ink';
 
   return (
     <div
-      className="glass-popup-frame"
+      className='glass-popup-frame'
       style={glassPopupFrameStyle()}
-      onMouseDown={(event) => event.target === event.currentTarget && close()}
-    >
+      onMouseDown={(event) => event.target === event.currentTarget && close()}>
       {/* A sibling, not the parent: a backdrop-filter on an ancestor would stop the pop-up's own glass from seeing the app behind it. */}
-      <div aria-hidden="true" className="glass-scrim pointer-events-none absolute inset-0" />
+      <div aria-hidden='true' className='glass-scrim pointer-events-none absolute inset-0' />
       <div
         ref={dialogRef}
-        data-tour="apps-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="plugins-title"
+        data-tour='apps-panel'
+        role='dialog'
+        aria-modal='true'
+        aria-labelledby='plugins-title'
         tabIndex={-1}
-        className="glass-surface glass-popup animate-pop-in relative flex max-w-[780px] flex-col overflow-hidden rounded-2xl"
-      >
-        <header className="flex flex-col gap-4 px-5 pb-4 pt-5 sm:px-7 sm:pt-6">
+        className='glass-surface glass-popup animate-pop-in relative flex max-w-[780px] flex-col overflow-hidden rounded-2xl'>
+        <header className='flex flex-col gap-4 px-5 pb-4 pt-5 sm:px-7 sm:pt-6'>
           <div>
-          <div className="flex items-center justify-between gap-3">
-            <h2 id="plugins-title" className="min-w-0 truncate text-[20px] font-semibold leading-7 tracking-[-0.01em] text-ink">{t("apps.title")}</h2>
-            <div className="flex shrink-0 items-center gap-1">
-              <button
-                type="button"
-                data-apps-filter="connected"
-                aria-pressed={filter === "connected"}
-                onClick={() => chooseFilter(filter === "connected" ? "all" : "connected")}
-                className={cn(
-                  "inline-flex h-8 items-center gap-2 rounded-full ps-1.5 pe-2 text-[13px] font-medium leading-5 transition-colors",
-                  filter === "connected" ? "bg-raised text-ink" : "text-ink-secondary hover:bg-raised/60 hover:text-ink",
-                )}
-              >
-                {connectedCards.length > 0 && (
-                  <span aria-hidden="true" className="flex -space-x-1.5 rtl:space-x-reverse">
-                    {connectedCards.slice(0, 4).map((card) => (
-                      <span key={card.slug} className="flex size-5 items-center justify-center overflow-hidden rounded-md bg-menu ring-2 ring-menu">
-                        <ServiceIcon card={card} className="size-5 rounded-md" />
-                      </span>
-                    ))}
+            <div className='flex items-center justify-between gap-3'>
+              <h2
+                id='plugins-title'
+                className='min-w-0 truncate text-[20px] font-semibold leading-7 tracking-[-0.01em] text-ink'>
+                {t('apps.title')}
+              </h2>
+              <div className='flex shrink-0 items-center gap-1'>
+                <button
+                  type='button'
+                  data-apps-filter='connected'
+                  aria-pressed={filter === 'connected'}
+                  onClick={() => chooseFilter(filter === 'connected' ? 'all' : 'connected')}
+                  className={cn(
+                    'inline-flex h-8 items-center gap-2 rounded-full ps-1.5 pe-2 text-[13px] font-medium leading-5 transition-colors',
+                    filter === 'connected'
+                      ? 'bg-raised text-ink'
+                      : 'text-ink-secondary hover:bg-raised/60 hover:text-ink',
+                  )}>
+                  {connectedCards.length > 0 && (
+                    <span aria-hidden='true' className='flex -space-x-1.5 rtl:space-x-reverse'>
+                      {connectedCards.slice(0, 4).map((card) => (
+                        <span
+                          key={card.slug}
+                          className='flex size-5 items-center justify-center overflow-hidden rounded-md bg-menu ring-2 ring-menu'>
+                          <ServiceIcon card={card} className='size-5 rounded-md' />
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                  <span className='whitespace-nowrap'>
+                    {connectedCount > 0
+                      ? t('apps.connectedCount', { count: connectedCount })
+                      : t('apps.filter.connected')}
                   </span>
-                )}
-                <span className="whitespace-nowrap">
-                  {connectedCount > 0 ? t("apps.connectedCount", { count: connectedCount }) : t("apps.filter.connected")}
-                </span>
-                <ChevronRight size={14} aria-hidden="true" className="shrink-0 rtl:-scale-x-100" />
-              </button>
-              <button
-                onClick={() => { setCardsRefresh((value) => value + 1); void loadConnectionInventory(true); }}
-                disabled={refreshing}
-                className="flex size-8 items-center justify-center rounded-full text-ink-secondary hover:bg-raised hover:text-ink disabled:opacity-50"
-                title={t("connectors.refreshTitle")}
-                aria-label={t("connectors.refreshTitle")}
-              >
-                <RefreshCw size={16} className={cn(refreshing && "animate-spin")} />
-              </button>
-              <button data-tour="apps-close"
-                onClick={close}
-                aria-label={t("connectors.closeAria")}
-                className="flex size-8 items-center justify-center rounded-full text-ink-secondary hover:bg-raised hover:text-ink"
-              >
-                <X size={18} />
-              </button>
+                  <ChevronRight
+                    size={14}
+                    aria-hidden='true'
+                    className='shrink-0 rtl:-scale-x-100'
+                  />
+                </button>
+                <button
+                  onClick={() => {
+                    setCardsRefresh((value) => value + 1);
+                    void loadConnectionInventory(true);
+                  }}
+                  disabled={refreshing}
+                  className='flex size-8 items-center justify-center rounded-full text-ink-secondary hover:bg-raised hover:text-ink disabled:opacity-50'
+                  title={t('connectors.refreshTitle')}
+                  aria-label={t('connectors.refreshTitle')}>
+                  <RefreshCw size={16} className={cn(refreshing && 'animate-spin')} />
+                </button>
+                <button
+                  data-tour='apps-close'
+                  onClick={close}
+                  aria-label={t('connectors.closeAria')}
+                  className='flex size-8 items-center justify-center rounded-full text-ink-secondary hover:bg-raised hover:text-ink'>
+                  <X size={18} />
+                </button>
+              </div>
             </div>
+            <p className='mt-0.5 text-[13px] leading-5 text-ink-secondary'>{t('apps.subtitle')}</p>
           </div>
-          <p className="mt-0.5 text-[13px] leading-5 text-ink-secondary">{t("apps.subtitle")}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-full bg-control/70 px-3.5 focus-within:ring-1 focus-within:ring-accent">
-              <Search size={15} className="shrink-0 text-ink-secondary" />
+          <div className='flex items-center gap-2'>
+            <label className='flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-full bg-control/70 px-3.5 focus-within:ring-1 focus-within:ring-accent'>
+              <Search size={15} className='shrink-0 text-ink-secondary' />
               <input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder={t("connectors.searchPlaceholder")}
-                aria-label={t("connectors.searchPlaceholder")}
-                className="min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-ink-secondary focus:outline-none"
+                placeholder={t('connectors.searchPlaceholder')}
+                aria-label={t('connectors.searchPlaceholder')}
+                className='min-w-0 flex-1 bg-transparent text-[14px] text-ink placeholder:text-ink-secondary focus:outline-none'
               />
             </label>
             <button
-              type="button"
-              data-apps-filter="mcp"
-              aria-pressed={filter === "mcp"}
-              onClick={() => chooseFilter(filter === "mcp" ? "all" : "mcp")}
-              className={cn(pill, "h-9 border border-hairline/40 px-3.5", filter === "mcp" ? "bg-ink text-app" : "text-ink hover:bg-raised")}
-            >
-              <Server size={14} aria-hidden="true" />
-              <span className="hidden sm:inline">{t("apps.filter.mcp")}</span>
-              <span className="sr-only sm:hidden">{t("apps.filter.mcp")}</span>
+              type='button'
+              data-apps-filter='mcp'
+              aria-pressed={filter === 'mcp'}
+              onClick={() => chooseFilter(filter === 'mcp' ? 'all' : 'mcp')}
+              className={cn(
+                pill,
+                'h-9 border border-hairline/40 px-3.5',
+                filter === 'mcp' ? 'bg-ink text-app' : 'text-ink hover:bg-raised',
+              )}>
+              <Server size={14} aria-hidden='true' />
+              <span className='hidden sm:inline'>{t('apps.filter.mcp')}</span>
+              <span className='sr-only sm:hidden'>{t('apps.filter.mcp')}</span>
             </button>
           </div>
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("apps.categoriesAria")}>
+          <div
+            className='flex flex-wrap items-center gap-2'
+            role='group'
+            aria-label={t('apps.categoriesAria')}>
             <button
-              type="button"
-              data-apps-filter="all"
-              aria-pressed={filter === "all" && category === null}
-              onClick={() => { chooseFilter("all"); setCategory(null); }}
-              className={cn(pill, pillTone(filter === "all" && category === null))}
-            >
-              {t("apps.filter.all")}
+              type='button'
+              data-apps-filter='all'
+              aria-pressed={filter === 'all' && category === null}
+              onClick={() => {
+                chooseFilter('all');
+                setCategory(null);
+              }}
+              className={cn(pill, pillTone(filter === 'all' && category === null))}>
+              {t('apps.filter.all')}
             </button>
             {ranked.inline.map((name) => (
               <button
                 key={name}
-                type="button"
+                type='button'
                 data-apps-category={name}
-                aria-pressed={filter === "all" && category === name}
+                aria-pressed={filter === 'all' && category === name}
                 onClick={() => pickCategory(category === name ? null : name)}
-                className={cn(pill, pillTone(filter === "all" && category === name))}
-              >
+                className={cn(pill, pillTone(filter === 'all' && category === name))}>
                 {appCategoryLabel(name)}
               </button>
             ))}
             {moreCategories.length > 0 && (
               <SidebarPopoverMenu
-                ariaLabel={t("apps.moreCategories")}
-                items={moreCategories.map((name) => ({ key: name, label: appCategoryLabel(name), active: category === name, onSelect: () => pickCategory(name) }))}
+                ariaLabel={t('apps.moreCategories')}
+                items={moreCategories.map((name) => ({
+                  key: name,
+                  label: appCategoryLabel(name),
+                  active: category === name,
+                  onSelect: () => pickCategory(name),
+                }))}
                 renderTrigger={({ open }) => (
-                  <span className={cn(pill, pillTone(filter === "all" && categoryInMore), open && !categoryInMore && "bg-raised-hover text-ink")}>
-                    {categoryInMore ? appCategoryLabel(category) : t("apps.more")}
-                    <ChevronDown size={14} aria-hidden="true" />
+                  <span
+                    className={cn(
+                      pill,
+                      pillTone(filter === 'all' && categoryInMore),
+                      open && !categoryInMore && 'bg-raised-hover text-ink',
+                    )}>
+                    {categoryInMore ? appCategoryLabel(category) : t('apps.more')}
+                    <ChevronDown size={14} aria-hidden='true' />
                   </span>
                 )}
               />
@@ -581,157 +774,241 @@ export function PluginsPanel() {
           </div>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-7 sm:px-7">
+        <div className='min-h-0 flex-1 overflow-y-auto px-5 pb-7 sm:px-7'>
           {stale ? (
-            <div className="mb-3 flex items-start gap-2 rounded-xl bg-warning/10 px-3 py-2 text-[13px] text-warning">
-              <TriangleAlert size={14} className="mt-px shrink-0" />
+            <div className='mb-3 flex items-start gap-2 rounded-xl bg-warning/10 px-3 py-2 text-[13px] text-warning'>
+              <TriangleAlert size={14} className='mt-px shrink-0' />
               <span>
-                {t("connectors.stale")}
+                {t('connectors.stale')}
                 <SavedKeysReset />
               </span>
             </div>
           ) : (
             <SavedKeysReset notice />
           )}
-          {setupNotice && filter !== "mcp" && (
+          {setupNotice && filter !== 'mcp' && (
             <div
               className={cn(
-                "mb-3 rounded-xl px-4 py-3 text-[13px]",
-                setupNotice.tone === "warning" ? "bg-warning/10 text-warning" : "bg-control/50 text-ink-secondary",
-              )}
-            >
+                'mb-3 rounded-xl px-4 py-3 text-[13px]',
+                setupNotice.tone === 'warning'
+                  ? 'bg-warning/10 text-warning'
+                  : 'bg-control/50 text-ink-secondary',
+              )}>
               {connectedHosted.length > 0
-                ? t("hostedMcp.otherAppsSetup", { services: new Intl.ListFormat(activeLocale(), { style: "long", type: "conjunction" }).format(connectedHosted.map((app) => app.label)) })
-                : t(setupNotice.key)}{" "}
+                ? t('hostedMcp.otherAppsSetup', {
+                    services: new Intl.ListFormat(activeLocale(), {
+                      style: 'long',
+                      type: 'conjunction',
+                    }).format(connectedHosted.map((app) => app.label)),
+                  })
+                : t(setupNotice.key)}{' '}
               <button
                 className={cn(
-                  "font-medium underline underline-offset-2",
-                  setupNotice.tone === "info" && "text-ink",
-                  remoteClient && "hidden",
+                  'font-medium underline underline-offset-2',
+                  setupNotice.tone === 'info' && 'text-ink',
+                  remoteClient && 'hidden',
                 )}
-                onClick={() => { close(); dispatch(openKeySettings("composio")); }}
-              >
-                {t("connectors.openSettings")}
+                onClick={() => {
+                  close();
+                  dispatch(openKeySettings('composio'));
+                }}>
+                {t('connectors.openSettings')}
               </button>
             </div>
           )}
-          {configured && !remoteClient && source === "curated" && mode === "self-hosted" && filter !== "mcp" && (
-            <div className="mb-3 text-[12px] text-ink-secondary">
-              {t("connectors.featuredBefore")}{" "}
-              <button
-                className="underline underline-offset-2 hover:text-ink"
-                onClick={() => {
-                  close();
-                  dispatch({ type: "toggleAppSettings", open: true });
-                }}
-              >
-                {t("connectors.updateKey")}
-              </button>{" "}
-              {t("connectors.featuredAfter")}
+          {configured &&
+            !remoteClient &&
+            source === 'curated' &&
+            mode === 'self-hosted' &&
+            filter !== 'mcp' && (
+              <div className='mb-3 text-[12px] text-ink-secondary'>
+                {t('connectors.featuredBefore')}{' '}
+                <button
+                  className='underline underline-offset-2 hover:text-ink'
+                  onClick={() => {
+                    close();
+                    dispatch({ type: 'toggleAppSettings', open: true });
+                  }}>
+                  {t('connectors.updateKey')}
+                </button>{' '}
+                {t('connectors.featuredAfter')}
+              </div>
+            )}
+          {error && (
+            <div
+              role='alert'
+              className='mb-3 rounded-xl bg-danger/10 px-3 py-2 text-[12px] text-danger'>
+              {typeof error === 'string' ? error : t(error.key)}
             </div>
           )}
-          {error && <div role="alert" className="mb-3 rounded-xl bg-danger/10 px-3 py-2 text-[12px] text-danger">{typeof error === "string" ? error : t(error.key)}</div>}
 
-          {filter !== "mcp" && (
-            <div data-apps-grid className="@container flex flex-col gap-7 pt-1">
-              {!sections.some((section) => section.kind === "connected") && renderSuggested()}
-              {sections.filter((section) => section.kind !== "all").map((section) => section.kind === "connected" ? (
-                <Fragment key="connected">
-                  <AppsSection
-                    id="apps-section-connected"
-                    title={t("apps.section.connected")}
-                    viewAll={section.cards.length > CATEGORY_SECTION_SIZE ? { label: t("apps.viewAll"), onClick: () => chooseFilter("connected") } : undefined}
-                  >
-                    {section.cards.slice(0, CATEGORY_SECTION_SIZE).map((card) => renderTile(card))}
-                  </AppsSection>
-                  {renderSuggested()}
-                </Fragment>
-              ) : (
-                <AppsSection
-                  key={section.category}
-                  id={`apps-section-${section.category}`}
-                  title={appCategoryLabel(section.category)}
-                  viewAll={section.more ? { label: t("apps.viewAll"), onClick: () => pickCategory(section.category) } : undefined}
-                >
-                  {section.cards.map((card) => renderTile(card))}
-                </AppsSection>
-              ))}
+          {filter !== 'mcp' && (
+            <div data-apps-grid className='@container flex flex-col gap-7 pt-1'>
+              {!sections.some((section) => section.kind === 'connected') && renderSuggested()}
+              {sections
+                .filter((section) => section.kind !== 'all')
+                .map((section) =>
+                  section.kind === 'connected' ? (
+                    <Fragment key='connected'>
+                      <AppsSection
+                        id='apps-section-connected'
+                        title={t('apps.section.connected')}
+                        viewAll={
+                          section.cards.length > CATEGORY_SECTION_SIZE
+                            ? { label: t('apps.viewAll'), onClick: () => chooseFilter('connected') }
+                            : undefined
+                        }>
+                        {section.cards
+                          .slice(0, CATEGORY_SECTION_SIZE)
+                          .map((card) => renderTile(card))}
+                      </AppsSection>
+                      {renderSuggested()}
+                    </Fragment>
+                  ) : (
+                    <AppsSection
+                      key={section.category}
+                      id={`apps-section-${section.category}`}
+                      title={appCategoryLabel(section.category)}
+                      viewAll={
+                        section.more
+                          ? {
+                              label: t('apps.viewAll'),
+                              onClick: () => pickCategory(section.category),
+                            }
+                          : undefined
+                      }>
+                      {section.cards.map((card) => renderTile(card))}
+                    </AppsSection>
+                  ),
+                )}
               <AppsSection
-                id="apps-grid-title"
+                id='apps-grid-title'
                 title={listTitle}
-                note={filter === "all" && !search && category === null && pagination
-                  && (pagination.stalled || (pagination.totalItems !== undefined && pagination.items < pagination.totalItems))
-                  ? `${pagination.totalItems !== undefined && pagination.items < pagination.totalItems
-                    ? t("connectors.marketplace.partialCount", {
-                      shown: pagination.items.toLocaleString(intlLocale()),
-                      total: pagination.totalItems.toLocaleString(intlLocale()),
-                    })
-                    : t("connectors.marketplace.partialStalled")}${pagination.reason
-                    ? ` — ${t("connectors.marketplace.partialReason", { reason: pagination.reason })}`
-                    : ""}`
-                  : undefined}
-                viewAll={allCapped ? { label: t("apps.viewAll"), onClick: () => setShowAllApps(true) } : undefined}
-                after={(
+                note={
+                  filter === 'all' &&
+                  !search &&
+                  category === null &&
+                  pagination &&
+                  (pagination.stalled ||
+                    (pagination.totalItems !== undefined &&
+                      pagination.items < pagination.totalItems))
+                    ? `${
+                        pagination.totalItems !== undefined &&
+                        pagination.items < pagination.totalItems
+                          ? t('connectors.marketplace.partialCount', {
+                              shown: pagination.items.toLocaleString(intlLocale()),
+                              total: pagination.totalItems.toLocaleString(intlLocale()),
+                            })
+                          : t('connectors.marketplace.partialStalled')
+                      }${
+                        pagination.reason
+                          ? ` — ${t('connectors.marketplace.partialReason', { reason: pagination.reason })}`
+                          : ''
+                      }`
+                    : undefined
+                }
+                viewAll={
+                  allCapped
+                    ? { label: t('apps.viewAll'), onClick: () => setShowAllApps(true) }
+                    : undefined
+                }
+                after={
                   <>
                     {cards === null && (
-                      <div className="flex items-center justify-center gap-2 py-24 text-[13px] text-ink-secondary">
-                        <Loader2 size={14} className="animate-spin" /> {t("connectors.loadingCatalog")}
+                      <div className='flex items-center justify-center gap-2 py-24 text-[13px] text-ink-secondary'>
+                        <Loader2 size={14} className='animate-spin' />{' '}
+                        {t('connectors.loadingCatalog')}
                       </div>
                     )}
                     {allCapped && (
-                      <div className="mt-4 flex justify-center">
+                      <div className='mt-4 flex justify-center'>
                         <button
-                          type="button"
+                          type='button'
                           onClick={() => setShowAllApps(true)}
-                          className={cn(pill, "bg-control/70 px-4 text-ink hover:bg-raised-hover")}
-                        >
-                          {t("apps.showAll", { count: allCards.length.toLocaleString(intlLocale()) })}
+                          className={cn(pill, 'bg-control/70 px-4 text-ink hover:bg-raised-hover')}>
+                          {t('apps.showAll', {
+                            count: allCards.length.toLocaleString(intlLocale()),
+                          })}
                         </button>
                       </div>
                     )}
-                    {cards !== null && allShown.length === 0 && !nativeCardsShown && sections.length <= 1 && (
-                      <div className="flex min-h-40 flex-col items-center justify-center text-center">
-                        <div className="text-[14px] font-medium text-ink">
-                          {listing === "connected" ? connectedEmptyCopy.title : t("connectors.noAppsFound")}
+                    {cards !== null &&
+                      allShown.length === 0 &&
+                      !nativeCardsShown &&
+                      sections.length <= 1 && (
+                        <div className='flex min-h-40 flex-col items-center justify-center text-center'>
+                          <div className='text-[14px] font-medium text-ink'>
+                            {listing === 'connected'
+                              ? connectedEmptyCopy.title
+                              : t('connectors.noAppsFound')}
+                          </div>
+                          <div className='mt-1 text-[13px] text-ink-secondary'>
+                            {listing === 'connected'
+                              ? connectedEmptyCopy.description
+                              : t('connectors.tryDifferentSearch')}
+                          </div>
+                          {filter === 'connected' && inventoryPhase === 'error' && (
+                            <button
+                              type='button'
+                              disabled={refreshing}
+                              onClick={() => void loadConnectionInventory(true)}
+                              className={cn(
+                                pill,
+                                'mt-4 bg-raised text-ink hover:bg-raised-hover disabled:opacity-50',
+                              )}>
+                              <RefreshCw size={14} className={cn(refreshing && 'animate-spin')} />
+                              {t('connectors.action.retry')}
+                            </button>
+                          )}
                         </div>
-                        <div className="mt-1 text-[13px] text-ink-secondary">
-                          {listing === "connected" ? connectedEmptyCopy.description : t("connectors.tryDifferentSearch")}
-                        </div>
-                        {filter === "connected" && inventoryPhase === "error" && (
-                          <button
-                            type="button"
-                            disabled={refreshing}
-                            onClick={() => void loadConnectionInventory(true)}
-                            className={cn(pill, "mt-4 bg-raised text-ink hover:bg-raised-hover disabled:opacity-50")}
-                          >
-                            <RefreshCw size={14} className={cn(refreshing && "animate-spin")} />
-                            {t("connectors.action.retry")}
-                          </button>
-                        )}
-                      </div>
-                    )}
+                      )}
                   </>
-                )}
-              >
-                <McpServersPanel hostedCards={{ shown: (id) => !inCategoryView && shownHosted.has(id), onConnections: setHostedConnected, onServers: setMcpServers, ...(filter === "connected" ? { ownServers: { shown: ownServerShown, manage: () => chooseFilter("mcp") } } : {}) }} refreshKey={cardsRefresh} />
-                <div data-native-card="x" className={showX && !inCategoryView ? "contents" : "hidden"}><XCard refreshKey={cardsRefresh} onConnection={setXConnected} /></div>
-                <div data-native-card="email" className={showEmail && !inCategoryView ? "contents" : "hidden"}><EmailCard refreshKey={cardsRefresh} onConnection={setEmailConnected} /></div>
-                <div data-native-card="postiz" className={postizHere ? "contents" : "hidden"}><PostizCard refreshKey={cardsRefresh} onConnection={setPostizConnected} /></div>
+                }>
+                <McpServersPanel
+                  hostedCards={{
+                    shown: (id) => !inCategoryView && shownHosted.has(id),
+                    onConnections: setHostedConnected,
+                    onServers: setMcpServers,
+                    ...(filter === 'connected'
+                      ? { ownServers: { shown: ownServerShown, manage: () => chooseFilter('mcp') } }
+                      : {}),
+                  }}
+                  refreshKey={cardsRefresh}
+                />
+                <div
+                  data-native-card='x'
+                  className={showX && !inCategoryView ? 'contents' : 'hidden'}>
+                  <XCard refreshKey={cardsRefresh} onConnection={setXConnected} />
+                </div>
+                <div
+                  data-native-card='email'
+                  className={showEmail && !inCategoryView ? 'contents' : 'hidden'}>
+                  <EmailCard refreshKey={cardsRefresh} onConnection={setEmailConnected} />
+                </div>
+                <div data-native-card='postiz' className={postizHere ? 'contents' : 'hidden'}>
+                  <PostizCard refreshKey={cardsRefresh} onConnection={setPostizConnected} />
+                </div>
                 {allShown.map((card) => renderTile(card))}
               </AppsSection>
             </div>
           )}
 
-          {filter !== "connected" && category === null && (
-            <div className={cn(filter === "all" && "mt-8 border-t border-hairline/30 pt-6", filter === "mcp" && "pt-1")}>
-              <McpServersPanel embedded hideHosted={filter === "all"} />
+          {filter !== 'connected' && category === null && (
+            <div
+              className={cn(
+                filter === 'all' && 'mt-8 border-t border-hairline/30 pt-6',
+                filter === 'mcp' && 'pt-1',
+              )}>
+              <McpServersPanel embedded hideHosted={filter === 'all'} />
             </div>
           )}
         </div>
         {appGrants.changing && (
           <AppGrantPrompt
             key={appGrants.changing}
-            app={cards?.find((card) => card.slug === appGrants.changing)?.label ?? appGrants.changing}
+            app={
+              cards?.find((card) => card.slug === appGrants.changing)?.label ?? appGrants.changing
+            }
             slug={appGrants.changing}
             bots={appGrants.bots}
             onDone={appGrants.done}
@@ -745,13 +1022,24 @@ export function PluginsPanel() {
   function renderSuggested() {
     const shown = suggestions.cards.filter((card) => !isConnected(card.slug));
     if (!sectioned || shown.length === 0) return null;
-    const action = suggestions.pick === "available"
-      ? { label: t(picking ? "apps.suggested.picking" : "apps.suggested.show"), onClick: pick }
-      : suggestions.pick === "needs-key" && !remoteClient
-        ? { label: t("apps.suggested.addKey"), onClick: () => { close(); dispatch(openKeySettings("jev")); } }
-        : undefined;
+    const action =
+      suggestions.pick === 'available'
+        ? { label: t(picking ? 'apps.suggested.picking' : 'apps.suggested.show'), onClick: pick }
+        : suggestions.pick === 'needs-key' && !remoteClient
+          ? {
+              label: t('apps.suggested.addKey'),
+              onClick: () => {
+                close();
+                dispatch(openKeySettings('jev'));
+              },
+            }
+          : undefined;
     return (
-      <AppsSection id="apps-section-suggested" title={t("apps.section.suggested")} note={suggestions.pick === "picked" ? t("apps.suggested.picked") : undefined} viewAll={action}>
+      <AppsSection
+        id='apps-section-suggested'
+        title={t('apps.section.suggested')}
+        note={suggestions.pick === 'picked' ? t('apps.suggested.picked') : undefined}
+        viewAll={action}>
         {shown.map((card) => renderTile(card))}
       </AppsSection>
     );
@@ -764,67 +1052,88 @@ export function PluginsPanel() {
     const pendingAuthorization = pending && !failed ? pendingUrls[card.slug] : undefined;
     const authorizationUrl = reusableConnectionUrl(pendingAuthorization);
     const accounts = serviceStatus?.accounts ?? [];
-    const included = card.noAuth === true
-      || (serviceStatus?.connected === true && !accounts.length && !pending && !failed);
+    const included =
+      card.noAuth === true ||
+      (serviceStatus?.connected === true && !accounts.length && !pending && !failed);
     const connected = hasActiveConnection(serviceStatus);
     const reconnect = pending ? undefined : accountToReconnect(serviceStatus);
     const addingAccount = aliasSlug === card.slug && !included;
     const busy = busySlug === card.slug;
-    const policy = state.config?.managedPolicy, unavailableReason = policy?.apps && !policy.apps.allowAll && !policy.apps.allowlist.includes(card.slug) ? t("policy.managedBy", { organization: policy.organizationName })
-      : managedConnectorUnavailableReason(mode, card.slug) ? t("connectors.selfHostOnlyReason") : null;
-    const usedBy = connected || included ? botsUsingService(state.bots, state.instances, card.slug) : [];
-    const usedByLabel = t("apps.usedBy", { names: usedBy.map((candidate) => candidate.name).join(", ") });
-    const description = unavailableReason ?? (
-      pending
+    const policy = state.config?.managedPolicy,
+      unavailableReason =
+        policy?.apps && !policy.apps.allowAll && !policy.apps.allowlist.includes(card.slug)
+          ? t('policy.managedBy', { organization: policy.organizationName })
+          : managedConnectorUnavailableReason(mode, card.slug)
+            ? t('connectors.selfHostOnlyReason')
+            : null;
+    const usedBy =
+      connected || included ? botsUsingService(state.bots, state.instances, card.slug) : [];
+    const usedByLabel = t('apps.usedBy', {
+      names: usedBy.map((candidate) => candidate.name).join(', '),
+    });
+    const description =
+      unavailableReason ??
+      (pending
         ? authorizationUrl
-          ? t("connectors.finishSetup")
-          : t("connectors.finishSetupOrDisconnect")
+          ? t('connectors.finishSetup')
+          : t('connectors.finishSetupOrDisconnect')
         : reconnect
-          ? t("connectors.signedOut")
+          ? t('connectors.signedOut')
           : failed && !accounts.length
-            ? t("connectors.authExpired")
-            : connectorDescription(card)
-    );
+            ? t('connectors.authExpired')
+            : connectorDescription(card));
     return (
       <div
         key={card.slug}
         data-app-tile={card.slug}
-        className="flex min-w-0 flex-col rounded-xl px-2 py-2 transition-colors hover:bg-raised/40"
-      >
-        <div className="flex items-center gap-3">
-          <ServiceIcon card={card} className="size-10 shrink-0 rounded-[8px]" />
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate text-[14px] font-semibold leading-5 text-ink">{card.label}</span>
+        className='flex min-w-0 flex-col rounded-xl px-2 py-2 transition-colors hover:bg-raised/40'>
+        <div className='flex items-center gap-3'>
+          <ServiceIcon card={card} className='size-10 shrink-0 rounded-[8px]' />
+          <div className='min-w-0 flex-1'>
+            <div className='flex min-w-0 items-center gap-1.5'>
+              <span className='truncate text-[14px] font-semibold leading-5 text-ink'>
+                {card.label}
+              </span>
               {connected && !pending && (
-                <Check size={13} strokeWidth={2.5} className="shrink-0 text-success" aria-label={t("apps.connected")} />
+                <Check
+                  size={13}
+                  strokeWidth={2.5}
+                  className='shrink-0 text-success'
+                  aria-label={t('apps.connected')}
+                />
               )}
               {usedBy.length > 0 && (
                 <span
-                  className="ms-1 flex shrink-0 -space-x-1.5 rtl:space-x-reverse"
+                  className='ms-1 flex shrink-0 -space-x-1.5 rtl:space-x-reverse'
                   title={usedByLabel}
                   aria-label={usedByLabel}
-                  role="img"
-                >
+                  role='img'>
                   {usedBy.slice(0, 3).map((candidate) => (
                     <span
                       key={candidate.id}
                       data-used-by-avatar={candidate.id}
-                      className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-menu ring-2 ring-menu"
-                    >
+                      className='flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-menu ring-2 ring-menu'>
                       <BotAvatar bot={candidate} size={USED_BY_AVATAR_SIZE} animated={false} />
                     </span>
                   ))}
                 </span>
               )}
             </div>
-            <div className="truncate text-[13px] leading-[18px] text-ink-secondary" title={description}>
+            <div
+              className='truncate text-[13px] leading-[18px] text-ink-secondary'
+              title={description}>
               {description}
             </div>
           </div>
           <button
-            type="button"
-            disabled={!configured || inventoryPhase !== "ready" || busy || included || Boolean(unavailableReason)}
+            type='button'
+            disabled={
+              !configured ||
+              inventoryPhase !== 'ready' ||
+              busy ||
+              included ||
+              Boolean(unavailableReason)
+            }
             title={unavailableReason ?? undefined}
             onClick={() => {
               if (pending && !failed) {
@@ -838,16 +1147,15 @@ export function PluginsPanel() {
               } else if (reconnect) {
                 void connect(card.slug, reconnect.alias, reconnect);
               } else {
-                setAliasSlug((current) => current === card.slug ? null : card.slug);
-                setAliasDraft("");
+                setAliasSlug((current) => (current === card.slug ? null : card.slug));
+                setAliasDraft('');
               }
             }}
-            className="inline-flex h-7 min-w-[64px] shrink-0 items-center justify-center gap-2 rounded-full bg-control/80 px-3 text-[13px] font-medium leading-5 text-ink transition-colors hover:bg-raised-hover disabled:opacity-40"
-          >
+            className='inline-flex h-7 min-w-[64px] shrink-0 items-center justify-center gap-2 rounded-full bg-control/80 px-3 text-[13px] font-medium leading-5 text-ink transition-colors hover:bg-raised-hover disabled:opacity-40'>
             {unavailableReason ? (
-              t("connectors.selfHostOnly")
+              t('connectors.selfHostOnly')
             ) : busy ? (
-              <Loader2 size={14} className="animate-spin" />
+              <Loader2 size={14} className='animate-spin' />
             ) : (
               connectorActionLabel(inventoryPhase, {
                 busy,
@@ -861,130 +1169,153 @@ export function PluginsPanel() {
             )}
           </button>
         </div>
-        <div className="ps-[52px]">
+        <div className='ps-[52px]'>
           {authorizationUrl && (
-            <a href={authorizationUrl} target="_blank" rel="noopener noreferrer" onClick={(event) => {
-              if (!reusableConnectionUrl(pendingAuthorization)) {
-                event.preventDefault();
-                void connect(card.slug);
-              }
-            }} className="mt-1.5 inline-block text-[12px] text-accent-text underline underline-offset-2">
-              {t("connectors.openAuthorizationPage")}
+            <a
+              href={authorizationUrl}
+              target='_blank'
+              rel='noopener noreferrer'
+              onClick={(event) => {
+                if (!reusableConnectionUrl(pendingAuthorization)) {
+                  event.preventDefault();
+                  void connect(card.slug);
+                }
+              }}
+              className='mt-1.5 inline-block text-[12px] text-accent-text underline underline-offset-2'>
+              {t('connectors.openAuthorizationPage')}
             </a>
           )}
           {connected && !pending && (
-            <div data-app-bots={card.slug} className="mt-1.5 flex min-w-0 items-center gap-2 text-[12px] leading-5 text-ink-secondary">
-              <span className="min-w-0 truncate" title={usedBy.length ? usedByLabel : undefined}>
-                {usedBy.length ? usedByLabel : t("apps.usedByNone")}
+            <div
+              data-app-bots={card.slug}
+              className='mt-1.5 flex min-w-0 items-center gap-2 text-[12px] leading-5 text-ink-secondary'>
+              <span className='min-w-0 truncate' title={usedBy.length ? usedByLabel : undefined}>
+                {usedBy.length ? usedByLabel : t('apps.usedByNone')}
               </span>
               {appGrants.canChange && (
                 <button
-                  type="button"
+                  type='button'
                   onClick={() => appGrants.change(card.slug)}
-                  aria-label={t("apps.whichBots", { app: card.label })}
-                  className="ms-auto shrink-0 rounded-full px-2 text-[12px] font-medium leading-5 text-accent-text transition-colors hover:bg-raised-hover"
-                >
-                  {t("apps.usedByChange")}
+                  aria-label={t('apps.whichBots', { app: card.label })}
+                  className='ms-auto shrink-0 rounded-full px-2 text-[12px] font-medium leading-5 text-accent-text transition-colors hover:bg-raised-hover'>
+                  {t('apps.usedByChange')}
                 </button>
               )}
             </div>
           )}
           {accounts.length > 0 && (
-            <div className="mt-1.5 space-y-0.5">
+            <div className='mt-1.5 space-y-0.5'>
               {accounts.map((account) => {
                 const active = /^active$/i.test(account.status);
                 const reconnectable = needsReconnect(account) && account.id !== reconnect?.id;
                 return (
-                  <div key={account.id} className="flex min-w-0 items-center gap-2 text-[12px] leading-5">
-                    {active ? <Check size={12} className="shrink-0 text-success" /> : <span className="size-3 shrink-0" />}
-                    <span className="min-w-0 truncate text-ink" title={`${account.alias ? `${account.id} · ` : ""}${account.status.toLowerCase()}`}>
+                  <div
+                    key={account.id}
+                    className='flex min-w-0 items-center gap-2 text-[12px] leading-5'>
+                    {active ? (
+                      <Check size={12} className='shrink-0 text-success' />
+                    ) : (
+                      <span className='size-3 shrink-0' />
+                    )}
+                    <span
+                      className='min-w-0 truncate text-ink'
+                      title={`${account.alias ? `${account.id} · ` : ''}${account.status.toLowerCase()}`}>
                       {account.alias || account.id}
-                      <span className="text-ink-secondary"> · {account.status.toLowerCase()}</span>
+                      <span className='text-ink-secondary'> · {account.status.toLowerCase()}</span>
                     </span>
                     {reconnectable && (
                       <button
-                        type="button"
+                        type='button'
                         disabled={busy}
                         onClick={() => void connect(card.slug, account.alias, account)}
-                        className="ms-auto shrink-0 rounded-full px-2 text-[12px] font-medium leading-5 text-accent-text transition-colors hover:bg-raised-hover disabled:opacity-40"
-                        aria-label={t("connectors.reconnectAria", { account: account.alias || account.id, service: card.label })}
-                      >
-                        {t("connectors.action.reconnect")}
+                        className='ms-auto shrink-0 rounded-full px-2 text-[12px] font-medium leading-5 text-accent-text transition-colors hover:bg-raised-hover disabled:opacity-40'
+                        aria-label={t('connectors.reconnectAria', {
+                          account: account.alias || account.id,
+                          service: card.label,
+                        })}>
+                        {t('connectors.action.reconnect')}
                       </button>
                     )}
                     <button
-                      type="button"
+                      type='button'
                       disabled={busy}
                       onClick={() => {
-                        if (!window.confirm(disconnectAccountConfirmation(card.label, account))) return;
+                        if (!window.confirm(disconnectAccountConfirmation(card.label, account)))
+                          return;
                         disconnectAccount(card.slug, account.id);
                       }}
-                      className={cn("shrink-0 rounded-full px-2 text-[12px] font-medium leading-5 text-ink-secondary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40", !reconnectable && "ms-auto")}
-                      aria-label={t("connectors.disconnectAria", {
+                      className={cn(
+                        'shrink-0 rounded-full px-2 text-[12px] font-medium leading-5 text-ink-secondary transition-colors hover:bg-danger/10 hover:text-danger disabled:opacity-40',
+                        !reconnectable && 'ms-auto',
+                      )}
+                      aria-label={t('connectors.disconnectAria', {
                         account: account.alias || account.id,
                         service: card.label,
-                      })}
-                    >
-                      {t("connectors.disconnect")}
+                      })}>
+                      {t('connectors.disconnect')}
                     </button>
                   </div>
                 );
               })}
             </div>
           )}
-          {(serviceStatus?.connected || included) && (() => {
-            const limited = botsWithLimitedServiceTools(state.bots, state.instances, card.slug);
-            if (!limited.length) return null;
-            const names = limited.slice(0, 4).map((candidate, index) => (
-              <span key={candidate.id}>
-                {index > 0 && ", "}
-                <button
-                  type="button"
-                  onClick={() => { close(); openBotSettings(dispatch, "access", { botId: candidate.id, page: "apps" }); }}
-                  className="font-medium text-ink underline underline-offset-2 hover:text-accent-text"
-                >
-                  {candidate.name}
-                </button>
-              </span>
-            ));
-            return (
-              <div className="mt-1.5 text-[12px] leading-relaxed text-ink-secondary">
-                <span>{t("connectors.grants.limited", { count: limited.length })}</span>{" "}
-                {names}
-                {limited.length > 4 && <span>{t("connectors.grants.more", { count: limited.length - 4 })}</span>}
-              </div>
-            );
-          })()}
+          {(serviceStatus?.connected || included) &&
+            (() => {
+              const limited = botsWithLimitedServiceTools(state.bots, state.instances, card.slug);
+              if (!limited.length) return null;
+              const names = limited.slice(0, 4).map((candidate, index) => (
+                <span key={candidate.id}>
+                  {index > 0 && ', '}
+                  <button
+                    type='button'
+                    onClick={() => {
+                      close();
+                      openBotSettings(dispatch, 'access', { botId: candidate.id, page: 'apps' });
+                    }}
+                    className='font-medium text-ink underline underline-offset-2 hover:text-accent-text'>
+                    {candidate.name}
+                  </button>
+                </span>
+              ));
+              return (
+                <div className='mt-1.5 text-[12px] leading-relaxed text-ink-secondary'>
+                  <span>{t('connectors.grants.limited', { count: limited.length })}</span> {names}
+                  {limited.length > 4 && (
+                    <span>{t('connectors.grants.more', { count: limited.length - 4 })}</span>
+                  )}
+                </div>
+              );
+            })()}
           {addingAccount && (
             <form
-              className="mt-2 flex items-center gap-2"
+              className='mt-2 flex items-center gap-2'
               onSubmit={(event) => {
                 event.preventDefault();
                 const alias = aliasDraft.trim();
                 if (!alias) {
-                  setError({ key: "connectors.aliasRequired" });
+                  setError({ key: 'connectors.aliasRequired' });
                   return;
                 }
                 void connect(card.slug, alias);
-              }}
-            >
+              }}>
               <input
                 autoFocus
                 value={aliasDraft}
                 maxLength={64}
                 onChange={(event) => setAliasDraft(event.target.value)}
-                placeholder={t("connectors.aliasPlaceholder")}
-                aria-label={accounts.length > 0
-                  ? t("connectors.aliasAriaAnother", { service: card.label })
-                  : t("connectors.aliasAriaNew", { service: card.label })}
-                className="h-8 min-w-0 flex-1 rounded-full bg-inset px-3 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-1 focus:ring-accent"
+                placeholder={t('connectors.aliasPlaceholder')}
+                aria-label={
+                  accounts.length > 0
+                    ? t('connectors.aliasAriaAnother', { service: card.label })
+                    : t('connectors.aliasAriaNew', { service: card.label })
+                }
+                className='h-8 min-w-0 flex-1 rounded-full bg-inset px-3 text-[13px] text-ink placeholder:text-ink-secondary focus:outline-none focus:ring-1 focus:ring-accent'
               />
               <button
-                type="submit"
+                type='submit'
                 disabled={busy || !aliasDraft.trim()}
-                className="inline-flex h-7 shrink-0 items-center rounded-full bg-accent px-3 text-[13px] font-medium leading-5 text-accent-ink disabled:opacity-40"
-              >
-                {t("connectors.action.continue")}
+                className='inline-flex h-7 shrink-0 items-center rounded-full bg-accent px-3 text-[13px] font-medium leading-5 text-accent-ink disabled:opacity-40'>
+                {t('connectors.action.continue')}
               </button>
             </form>
           )}

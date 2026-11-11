@@ -1,51 +1,78 @@
 /** The client-visible wire model for tasks, bots, messages and rooms. A field
  * here is one the server emits in every response and SSE frame that carries
  * the shape. */
-import type { PresenceFrame } from "./team-presence.ts";
-import type { DataBroadcast } from "./data-surface.ts";
-import type { ApprovalMode } from "./approval-mode.ts";
-import type { ToolScope } from "./tool-scope.ts";
-import type { CommandAllowlistCandidate } from "./command-allowlist.ts";
-import type { TurnDigest } from "./digest.ts";
-import type { BotAvatarCrop, MascotFaceColor } from "./bot-avatar.ts";
-import type { BotBodyId } from "./bot-body.ts";
-import type { ReplyStyle } from "./reply-style.ts";
-import type { CredentialTargetId, CUSTOM_SECRET_TARGET, SecretDelivery } from "./credential-request.ts"; import type { EmailOutgoingFields } from "./email.ts";
-import type { TeamSetupRequest } from "./team-setup.ts"; import type { DefaultBotFields, HelperIntroField } from "./default-bot.ts";
-import type { SetupCardFields } from "./setup-card.ts"; import type { BugReportField } from "./devs-report-status.ts"; import type { AccessRequestCardField, BotAccessFields } from "./bot-access.ts";
-import type { RoutineRequestCardData } from "./routine-request.ts"; import type { SavedStepsMark } from "./saved-steps.ts";
-import type { WebhookRequestCardData } from "./webhook-request.ts"; import type { WaitCardField, WaitLineField } from "./wait-request.ts"; import type { ComputerAskField } from "./computer-ask.ts";
-import type { AppEventAttempt, AppTrigger, AppTriggerRequestCardData, AppTriggerService } from "./app-triggers.ts";
-import type { ProfileRequestCardData } from "./profile-request.ts";
-import type { ServerTextLine, ServerTextParams } from "./server-text.ts";
-import type { WireTool } from "./wire-tool.ts";
-import type { ModelRequestCardData } from "./model-request.ts";
-import type { ConnectorCardData } from "./connector-card.ts"; import type { McpChangeRequest } from "./mcp-request.ts";
-import type { SkillRequestCardData } from "./skill-request.ts"; import type { OutsideWriteCardField } from "./outside-write.ts";
-import type { QuestionRequestCardData } from "./ask-question.ts";
-import type { AutomationLine, RoutineRunCardData } from "./routine-run.ts";
-import type { WidgetPayload } from "./widget.ts";
-import type { AppFromRef, AppPayload, AppPointedRef } from "./app.ts";
-import type { GroupGoalRunCardData } from "./group-goal-run.ts";
-import type { RuntimeEvent } from "./runtime-events.ts";
-import type { NotificationLogEntry } from "./notification.ts";
-import type { Routine, RoutineRun } from "./routines.ts";
-import type { WebhookAttempt, WebhookTrigger } from "./webhooks.ts";
-import type { PublishedPageCard } from "./published-page.ts";
-import type { InboxItem, InboxTask } from "./inbox.ts";
-import type { LiveCallRecord, LiveCallState } from "./live-call-wire.ts";
+import type { PresenceFrame } from './team-presence.ts';
+import type { DataBroadcast } from './data-surface.ts';
+import type { ApprovalMode } from './approval-mode.ts';
+import type { ToolScope } from './tool-scope.ts';
+import type { CommandAllowlistCandidate } from './command-allowlist.ts';
+import type { TurnDigest } from './digest.ts';
+import type { BotAvatarCrop, MascotFaceColor } from './bot-avatar.ts';
+import type { BotBodyId } from './bot-body.ts';
+import type { ReplyStyle } from './reply-style.ts';
+import type {
+  CredentialTargetId,
+  CUSTOM_SECRET_TARGET,
+  SecretDelivery,
+} from './credential-request.ts';
+import type { EmailOutgoingFields } from './email.ts';
+import type { TeamSetupRequest } from './team-setup.ts';
+import type { DefaultBotFields, HelperIntroField } from './default-bot.ts';
+import type { SetupCardFields } from './setup-card.ts';
+import type { BugReportField } from './devs-report-status.ts';
+import type { AccessRequestCardField, BotAccessFields } from './bot-access.ts';
+import type { RoutineRequestCardData } from './routine-request.ts';
+import type { SavedStepsMark } from './saved-steps.ts';
+import type { WebhookRequestCardData } from './webhook-request.ts';
+import type { WaitCardField, WaitLineField } from './wait-request.ts';
+import type { ComputerAskField } from './computer-ask.ts';
+import type {
+  AppEventAttempt,
+  AppTrigger,
+  AppTriggerRequestCardData,
+  AppTriggerService,
+} from './app-triggers.ts';
+import type { ProfileRequestCardData } from './profile-request.ts';
+import type { ServerTextLine, ServerTextParams } from './server-text.ts';
+import type { WireTool } from './wire-tool.ts';
+import type { ModelRequestCardData } from './model-request.ts';
+import type { ConnectorCardData } from './connector-card.ts';
+import type { McpChangeRequest } from './mcp-request.ts';
+import type { SkillRequestCardData } from './skill-request.ts';
+import type { OutsideWriteCardField } from './outside-write.ts';
+import type { QuestionRequestCardData } from './ask-question.ts';
+import type { AutomationLine, RoutineRunCardData } from './routine-run.ts';
+import type { WidgetPayload } from './widget.ts';
+import type { AppFromRef, AppPayload, AppPointedRef } from './app.ts';
+import type { GroupGoalRunCardData } from './group-goal-run.ts';
+import type { RuntimeEvent } from './runtime-events.ts';
+import type { NotificationLogEntry } from './notification.ts';
+import type { Routine, RoutineRun } from './routines.ts';
+import type { WebhookAttempt, WebhookTrigger } from './webhooks.ts';
+import type { PublishedPageCard } from './published-page.ts';
+import type { InboxItem, InboxTask } from './inbox.ts';
+import type { LiveCallRecord, LiveCallState } from './live-call-wire.ts';
 /** What a team bot's main chat is called, beside each person's own chats. */
-export const SHARED_CHAT_TITLE = "Shared chat";
+export const SHARED_CHAT_TITLE = 'Shared chat';
 
-export type { LiveCallRecord, LiveCallState, LiveCallStatus, LiveClient, LiveEndReason, LiveKeySource, LiveProvider, LiveSettings } from "./live-call-wire.ts";
+export type {
+  LiveCallRecord,
+  LiveCallState,
+  LiveCallStatus,
+  LiveClient,
+  LiveEndReason,
+  LiveKeySource,
+  LiveProvider,
+  LiveSettings,
+} from './live-call-wire.ts';
 
 /** Reasoning-effort levels, ascending: a union of what any engine accepts;
  * each driver declares the subset its CLI will take. */
-export const EFFORT_LEVELS = ["none", "low", "medium", "high", "xhigh", "max"] as const;
+export const EFFORT_LEVELS = ['none', 'low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type EffortLevel = (typeof EFFORT_LEVELS)[number];
 
 export function isEffortLevel(value: unknown): value is EffortLevel {
-  return typeof value === "string" && (EFFORT_LEVELS as readonly string[]).includes(value);
+  return typeof value === 'string' && (EFFORT_LEVELS as readonly string[]).includes(value);
 }
 
 /** instanceId is the routing key. */
@@ -59,19 +86,29 @@ export interface ModelSelection {
 }
 
 /** Which cloud computer backs computer: "cloud"; absent means Boat. */
-export type CloudBackend = "box" | "vps";
+export type CloudBackend = 'box' | 'vps';
 
 /** A place a bot can act. `cloud` covers both cloud backends. */
-export type Surface = "cloud" | "vm" | "local" | "browser";
+export type Surface = 'cloud' | 'vm' | 'local' | 'browser';
 
 export const MAUS_COLOR_NAMES = [
-  "green", "blue", "red", "orange", "purple", "cyan", "pink",
-  "yellow", "teal", "coral", "silver", "chrome",
+  'green',
+  'blue',
+  'red',
+  'orange',
+  'purple',
+  'cyan',
+  'pink',
+  'yellow',
+  'teal',
+  'coral',
+  'silver',
+  'chrome',
 ] as const;
 export type MausColor = (typeof MAUS_COLOR_NAMES)[number];
 
 export function isMausColor(value: unknown): value is MausColor {
-  return typeof value === "string" && (MAUS_COLOR_NAMES as readonly string[]).includes(value);
+  return typeof value === 'string' && (MAUS_COLOR_NAMES as readonly string[]).includes(value);
 }
 
 /** The face a bot rests on, as one of the engine's state names. */
@@ -81,7 +118,8 @@ export type MausExpression = string;
  * is task-level only: a turn that settled at the computer wait ceiling and
  * resumes when the seat frees. It never elevates the bot-level activity and
  * never counts as busy. */
-export type BotActivity = "working" | "waiting-on-you" | "idle" | "no-signal" | "dead" | "parked.computer";
+export type BotActivity =
+  'working' | 'waiting-on-you' | 'idle' | 'no-signal' | 'dead' | 'parked.computer';
 
 /** The bot that opened a thread on itself or a teammate. */
 export interface TaskOpenedBy {
@@ -91,13 +129,14 @@ export interface TaskOpenedBy {
   /** What kind of conversation the opener made this: "pair" is the one
    * durable conversation between two bots; "work" closes itself once its
    * result has been reported. */
-  kind?: "pair" | "work";
+  kind?: 'pair' | 'work';
   /** The opener's own conversation this "work" thread was opened from.
    * Everything that conversation later sends this bot continues here. */
   threadId?: string;
   /** A parallel room job's thread: `threadId` is the room thread it came from, and the member must stay in that room. */
   roomLane?: true;
-  /** Security invariant: harness-set only, when a turn that could itself use the owner's lent computer opened this thread (server/cloud-lending.ts); any other hand-in clears it for good. */ forOwner?: true; at: number;
+  /** Security invariant: harness-set only, when a turn that could itself use the owner's lent computer opened this thread (server/cloud-lending.ts); any other hand-in clears it for good. */ forOwner?: true;
+  at: number;
 }
 
 /** The bot that closed a thread it opened (or one of its own). */
@@ -129,7 +168,7 @@ export interface GroupThreadUsage extends TaskUsage {
 
 export interface BotMovedTo {
   team: { id: string; name: string };
-  state: "moving" | "moved";
+  state: 'moving' | 'moved';
   at: number;
 }
 
@@ -211,7 +250,7 @@ export interface WireTask extends InboxTask {
 
 /** One thread's keep-warm window as a client shows it. Times are epoch ms. */
 export interface CacheKeepWarmStatus {
-  state: "warm" | "stopped";
+  state: 'warm' | 'stopped';
   until?: number;
   nextPingAt?: number;
   last?: { at: number; read: number; write: number; costUsd: number | null };
@@ -243,7 +282,7 @@ export interface InstalledPackageMetadata {
   release: string;
   requiredApps: Array<{ slug: string; label: string; reason: string; optional?: boolean }>;
   /** Absent means "file". */
-  source?: "file" | "org";
+  source?: 'file' | 'org';
   /** file: a random id per import; org: derived from the organization and package. */
   installId?: string;
   /** This bot's key in the package, so a re-export keeps its identity. */
@@ -251,7 +290,7 @@ export interface InstalledPackageMetadata {
   /** Set when the bot was created from a package preset. */
   presetKey?: string;
   /** What the package suggested. Never applied: imported bots start at the default level. */
-  suggestedApproval?: "ask" | "auto";
+  suggestedApproval?: 'ask' | 'auto';
   /** org only */
   publisher?: { organizationId: string; slug: string; name: string };
   /** org only: "<publisher slug>/<package id>" */
@@ -263,7 +302,7 @@ export interface InstalledPackageMetadata {
 /** One service's connector tool grant: `"*"` widens to every tool on the
  * service, an explicit list names exact tools. */
 export interface ConnectorToolGrant {
-  tools: "*" | string[];
+  tools: '*' | string[];
 }
 
 /** Lowercased Composio service slug, e.g. `gmail`. */
@@ -272,7 +311,8 @@ export const CONNECTOR_SLUG_PATTERN = /^[a-z0-9][a-z0-9_-]{0,80}$/;
 export const CONNECTOR_TOOL_NAME_PATTERN = /^[A-Z][A-Z0-9_]{0,127}$/;
 
 /** Fails closed: only an absent switch or a strict true allows the helper model; a hand-edited "false" or 0 reads as never. */
-export const helperModelAllowed = (bot: { helperModel?: unknown }): boolean => bot.helperModel === undefined || bot.helperModel === true;
+export const helperModelAllowed = (bot: { helperModel?: unknown }): boolean =>
+  bot.helperModel === undefined || bot.helperModel === true;
 
 /** A bot as a client may see it. avatarUrl is always present (null when the
  * bot has none). */
@@ -319,7 +359,7 @@ export interface WireBot extends DefaultBotFields, BotAccessFields {
    * and moves with it. Navigating tasks never changes this value. */
   modelSelection: ModelSelection;
   /** where the bot works ("Works on"). Unset = auto. */
-  computer?: Surface | "off";
+  computer?: Surface | 'off';
   /** Which cloud computer backs computer: "cloud"; absent means Boat. */
   cloudBackend?: CloudBackend;
   /** Auto mode may prepare/start this bot's managed VPS container. */
@@ -343,7 +383,8 @@ export interface WireBot extends DefaultBotFields, BotAccessFields {
   voice?: string;
   /** Whether this bot may send voice notes. Absent/true = allowed; false
    * hides the tool and refuses the route even with a voice configured. */
-  voiceNotes?: boolean; /** The harness speaks each reply as a voice note; absent follows the installation's `tts.everyReply`. */ voiceNoteEveryReply?: boolean;
+  voiceNotes?: boolean;
+  /** The harness speaks each reply as a voice note; absent follows the installation's `tts.everyReply`. */ voiceNoteEveryReply?: boolean;
   /** Whether this bot may use the X research tools (x_search and its
    * actions), which spend the workspace's treg balance.
    * Absent/false = off: the person turns it on per bot. */
@@ -378,10 +419,10 @@ export interface WireBot extends DefaultBotFields, BotAccessFields {
    * defers to `composio` (unset/true = every tool, false = none); `{}` grants
    * none. Grants never travel in shareable exports. */
   connectorTools?: Record<string, ConnectorToolGrant>;
-  connectorScopes?: { apps: Record<string, "read" | "write"> };
-  outbound?: { policy: "ask" | "allow" };
+  connectorScopes?: { apps: Record<string, 'read' | 'write'> };
+  outbound?: { policy: 'ask' | 'allow' };
   /** Which of a paired phone's apps this bot may use; absent: every bot may use what the phone allows (shared/phone-apps.ts). */
-  phoneApps?: import("./phone-apps.ts").PhoneApps;
+  phoneApps?: import('./phone-apps.ts').PhoneApps;
   /** Ordered backups used only by opt-in, pre-prompt startup recovery. */
   fallback?: Array<{ instanceId: string; model: string }>;
   /** Whether this bot gets the app's built-in browser. */
@@ -418,7 +459,7 @@ export interface WireBot extends DefaultBotFields, BotAccessFields {
 
 /** Who may see a bot: every signed-in person, admins only, or the listed
  * addresses (and `@domain` entries) plus admins. */
-export type BotVisibility = "everyone" | "admins" | { people: string[] };
+export type BotVisibility = 'everyone' | 'admins' | { people: string[] };
 
 /** The person a user message is from, as the server resolved it from their
  * own session; no request body can supply it. `name` is attribution only:
@@ -433,42 +474,66 @@ export interface ResolvedSender {
 /** Who answered a card: a signed-in person (named as their messages are), the owner on this machine, a session-less
  * local caller on a shared server (`worker`: the Slack worker, or any other process on that machine), or at Full access
  * the bot that decides a teammate's question (`bot`: no `answeredText` yet while it decides; "" when it picks itself). */
-export type CardAnswerer = (
+export type CardAnswerer =
   /** `person`: the answering session's opaque person key, so the owner checks
    * can tell whose answer it was. */
-  | { kind: "session"; name: string; person?: string }
-  | { kind: "loopback" }
-  | { kind: "worker" } | { kind: "bot"; name: string }
-) & {
-  /** "call": decided by voice on a Live call; "reaction": by a 👍 or 👎 on the
-   * card. Absent: tapped. */
-  via?: "call" | "reaction";
-};
+  (
+    | { kind: 'session'; name: string; person?: string }
+    | { kind: 'loopback' }
+    | { kind: 'worker' }
+    | { kind: 'bot'; name: string }
+  ) & {
+    /** "call": decided by voice on a Live call; "reaction": by a 👍 or 👎 on the
+     * card. Absent: tapped. */
+    via?: 'call' | 'reaction';
+  };
 
 /** Opens every compaction summary written without a model (recent excerpts only); the chat labels stored records by it. */
-export const EXCERPT_SUMMARY_HEADER = "Historical excerpts in chronological order; newer corrections override older requests. These excerpts may omit earlier details.";
+export const EXCERPT_SUMMARY_HEADER =
+  'Historical excerpts in chronological order; newer corrections override older requests. These excerpts may omit earlier details.';
 
 /** One transcript line, serialized as stored. */
-export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCardFields, WaitLineField, BugReportField {
-  roomRequest?: { id: string; phase: "request" | "result" };
+export interface WireMessage
+  extends ServerTextLine, HelperIntroField, SetupCardFields, WaitLineField, BugReportField {
+  roomRequest?: { id: string; phase: 'request' | 'result' };
   id: string;
-  role: "bot" | "user";
-  kind: "text" | "options" | "activity" | "screen" | "connector" | "secret" | "signin" | "routine.run" | "goal.run" | "digest" | "compaction" | "call" | "widget" | "app";
+  role: 'bot' | 'user';
+  kind:
+    | 'text'
+    | 'options'
+    | 'activity'
+    | 'screen'
+    | 'connector'
+    | 'secret'
+    | 'signin'
+    | 'routine.run'
+    | 'goal.run'
+    | 'digest'
+    | 'compaction'
+    | 'call'
+    | 'widget'
+    | 'app';
   text?: string;
   digest?: TurnDigest;
   /** kind "compaction" with no `compaction` record: the engine condensed its own session. A marker for people, never context. */
   engineCompaction?: true;
-  compaction?: { summary: string; firstKeptId: string; foldedThroughId: string; tokensBefore: number; by: "person" | "harness";
-    /** The divider "Start fresh" leaves: no summary, and a provider reads nothing before it. */ fresh?: true };
+  compaction?: {
+    summary: string;
+    firstKeptId: string;
+    foldedThroughId: string;
+    tokensBefore: number;
+    by: 'person' | 'harness';
+    /** The divider "Start fresh" leaves: no summary, and a provider reads nothing before it. */ fresh?: true;
+  };
   /** Renderers receive only the allowlisted /api/attachments URL. `file` entries are opened through the message-scoped
    * file route, never by path. `source`: a bot attach-file copy's original path on the server, for Show in folder.
    * `fromTool`: an image a tool's result returned while the bot worked, which it did not make or send. */
   attachments?: Array<
-    | { kind: "image"; path: string; mime: string; name?: string; source?: string; fromTool?: true }
-    | { kind: "file"; path: string; mime: string; name: string; source?: string }
+    | { kind: 'image'; path: string; mime: string; name?: string; source?: string; fromTool?: true }
+    | { kind: 'file'; path: string; mime: string; name: string; source?: string }
     /** `text` is the words the note speaks (secret-redacted when stored): clients show it behind a
      * collapsed transcript, never as message body, and the model's replay folds it back after `text`. */
-    | { kind: "audio"; path: string; mime: string; durationMs?: number; text?: string }
+    | { kind: 'audio'; path: string; mime: string; durationMs?: number; text?: string }
   >;
   card?: OptionCardData;
   /** widget rows (kind "widget"): a bot-authored UI tree. `text` is its
@@ -479,7 +544,7 @@ export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCard
    * data, never as its own words, and never edited by a bot. */
   serverCard?: true;
   /** A setup suggestion the device renders in its own words (server/host/helper-suggestion.ts); `text` is the English. */
-  setupSuggestion?: { kind: "helperKey"; answer?: "notNow" };
+  setupSuggestion?: { kind: 'helperKey'; answer?: 'notNow' };
   /** A person's line Set me up turned into a setup request: the bot reads it as `/setup <text>`; the chat shows `text`. */
   setupRequest?: true;
   /** app rows (kind "app"): bot HTML or an MCP server's UI. `text` is always the readable fallback. */
@@ -519,7 +584,7 @@ export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCard
   aside?: boolean;
   /** A user-role message that arrived through the server's HTTP API
    * ("api"), or a request a person spoke on a Live call ("call"). */
-  via?: "api" | "call";
+  via?: 'api' | 'call';
   /** The Live call a "call" line was spoken on (LiveCallState.callId). Set
    * only on user messages with `via: "call"`; a turn's own messages point
    * at their request through `requestMessageId` instead. */
@@ -532,7 +597,8 @@ export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCard
    * one. Absent reads as the profile name. */
   sender?: ResolvedSender;
   /** Provider turn that produced this message. */
-  turnId?: string; /** A stopped row where several people use the server: who pressed Stop. */ stoppedBy?: ResolvedSender;
+  turnId?: string;
+  /** A stopped row where several people use the server: who pressed Stop. */ stoppedBy?: ResolvedSender;
   /** Server-proven originating user message, including supported harness
    * continuations. Absent means external clients must not infer ownership. */
   requestMessageId?: string;
@@ -545,7 +611,8 @@ export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCard
   requestPending?: boolean;
   /** The last assistant text item from a settled provider turn. */
   turnTerminal?: boolean;
-  turnCompletedAt?: number; savedSteps?: SavedStepsMark;
+  turnCompletedAt?: number;
+  savedSteps?: SavedStepsMark;
   /** screen messages: a frame of the bot's computer (base64 image) */
   png?: string;
   mime?: string;
@@ -557,7 +624,7 @@ export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCard
   /** Stable client identity for at-most-once chat POST retries. */
   sendId?: string;
   /** Per-send channel behavior. Absent is legacy quick chat. */
-  channelMode?: "chat" | "goal";
+  channelMode?: 'chat' | 'goal';
   /** group threads: which member said this (sender attribution). */
   from?: { botId: string; name: string; color: string };
   /** Set on a room message a bot pushed in with post_to_room. */
@@ -565,7 +632,7 @@ export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCard
   /** A room reply whose speaker the decision model picked (an Auto room),
    * with how sure it was. Absent on every other message; clients that do
    * not know it ignore it. */
-  routedBy?: { provider: "jev" | "workersai" | "openrouter"; probability: number };
+  routedBy?: { provider: 'jev' | 'workersai' | 'openrouter'; probability: number };
   /** On a conversational bot's user line: the picker label of the quick model its reply ran on. */
   quickModel?: string;
   /** On a "Sent to" hand-off row: the done_when the sender set, redacted, so the chip can show what counts as finished. */
@@ -574,7 +641,12 @@ export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCard
    * conversation (coordinate_bots, start_thread). `incident`: the line is a
    * Team incidents report about that bot's thread
    * in `threadId`, not its words; `notified`: the person was already buzzed. */
-  peerAsk?: { botId: string; name: string; unattended?: boolean; incident?: { threadId: string; notified?: boolean } };
+  peerAsk?: {
+    botId: string;
+    name: string;
+    unattended?: boolean;
+    incident?: { threadId: string; notified?: boolean };
+  };
   /** One reaction per person (shared/reactions.ts REACTIONS). `by` is "user"
    * on a workspace one person uses, otherwise that person's opaque key, the
    * one GET /api/auth/session returns as `reactor`. `name` is attribution
@@ -585,10 +657,16 @@ export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCard
    * and draw no bubble for this line. */
   reaction?: string;
   /** comm chips: "Messaged @X", linking to the bot-bot channel. */
-  comm?: { groupId: string; threadId?: string; withBotId: string; withName: string; withColor: string };
+  comm?: {
+    groupId: string;
+    threadId?: string;
+    withBotId: string;
+    withName: string;
+    withColor: string;
+  };
   /** On a Team Cloud, a message passed between people: "told" on the chip in the asking conversation names whose inbox
    * got it, "reply" on an answer that came back names who answered, "assistant" one their assistant answered for them. */
-  relay?: { kind: "told" | "reply" | "assistant"; email: string; name: string };
+  relay?: { kind: 'told' | 'reply' | 'assistant'; email: string; name: string };
   /** On a Team Cloud, a line in its person's inbox: who it is from and where it came from. */
   inbox?: InboxItem;
   /** thread chips: "Opened thread #Title on @X". */
@@ -599,7 +677,13 @@ export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCard
   /** A page the bot published to a public link (publish_page), or why it couldn't. `text` carries the link too. */
   publishedPage?: PublishedPageCard;
   /** A published Data result, linked to its bot's main viewer. */
-  dataResult?: { botId: string; cardId: string; title: string; kind: "table" | "chart" | "text"; sql?: string };
+  dataResult?: {
+    botId: string;
+    cardId: string;
+    title: string;
+    kind: 'table' | 'chart' | 'text';
+    sql?: string;
+  };
   /** user messages: the Data result the person was viewing when they sent
    * this. `text` stays exactly what they typed. */
   dataContext?: { cardId: string; draftSql?: string };
@@ -609,16 +693,24 @@ export interface WireMessage extends ServerTextLine, HelperIntroField, SetupCard
   queueId?: string;
 }
 
-export const movesThreadToTop = (message: Pick<WireMessage, "role" | "kind" | "peerAsk" | "turnId" | "turnTerminal">): boolean =>
-  message.role === "user" ? !message.peerAsk : message.kind === "text" && (message.turnTerminal === true || !message.turnId);
+export const movesThreadToTop = (
+  message: Pick<WireMessage, 'role' | 'kind' | 'peerAsk' | 'turnId' | 'turnTerminal'>,
+): boolean =>
+  message.role === 'user'
+    ? !message.peerAsk
+    : message.kind === 'text' && (message.turnTerminal === true || !message.turnId);
 
-export function orderedThreadList<T extends { pinned?: boolean; lastThreadOrderAt?: number; createdAt?: number }>(tasks: readonly T[]): T[] {
+export function orderedThreadList<
+  T extends { pinned?: boolean; lastThreadOrderAt?: number; createdAt?: number },
+>(tasks: readonly T[]): T[] {
   return tasks
     .map((task, index) => ({ task, index }))
     .sort((a, b) => {
       const pin = Number(b.task.pinned === true) - Number(a.task.pinned === true);
       if (pin) return pin;
-      const recency = (b.task.lastThreadOrderAt ?? b.task.createdAt ?? 0) - (a.task.lastThreadOrderAt ?? a.task.createdAt ?? 0);
+      const recency =
+        (b.task.lastThreadOrderAt ?? b.task.createdAt ?? 0) -
+        (a.task.lastThreadOrderAt ?? a.task.createdAt ?? 0);
       if (recency) return recency;
       return a.index - b.index;
     })
@@ -626,23 +718,51 @@ export function orderedThreadList<T extends { pinned?: boolean; lastThreadOrderA
 }
 
 /** 0 is the "until new activity" sentinel. The event stream never drops an expired snooze, so check the clock too. */
-export const isSnoozed = (task: Pick<WireTask, "snoozedUntil">, now = Date.now()): boolean =>
+export const isSnoozed = (task: Pick<WireTask, 'snoozedUntil'>, now = Date.now()): boolean =>
   task.snoozedUntil !== undefined && (task.snoozedUntil === 0 || task.snoozedUntil > now);
 
-type OpenThreadCandidate = Pick<WireTask, "routineRunId" | "archivedAt" | "closedBy" | "openedBy" | "snoozedUntil" | "pinned" | "lastThreadOrderAt" | "createdAt">;
+type OpenThreadCandidate = Pick<
+  WireTask,
+  | 'routineRunId'
+  | 'archivedAt'
+  | 'closedBy'
+  | 'openedBy'
+  | 'snoozedUntil'
+  | 'pinned'
+  | 'lastThreadOrderAt'
+  | 'createdAt'
+>;
 
 /** The top row of the bot's thread list, so deleting the open thread never pulls a hidden one into view. */
-export function nextOpenThread<T extends OpenThreadCandidate>(tasks: readonly T[], now = Date.now()): T | undefined {
+export function nextOpenThread<T extends OpenThreadCandidate>(
+  tasks: readonly T[],
+  now = Date.now(),
+): T | undefined {
   const own = tasks.filter((task) => !task.routineRunId);
   const open = own.filter((task) => task.archivedAt === undefined);
-  const listed = open.filter((task) => task.pinned === true || !(task.closedBy || task.openedBy || isSnoozed(task, now)));
-  return [listed, open, own].map((candidates) => orderedThreadList(candidates)[0]).find((task) => task !== undefined);
+  const listed = open.filter(
+    (task) => task.pinned === true || !(task.closedBy || task.openedBy || isSnoozed(task, now)),
+  );
+  return [listed, open, own]
+    .map((candidates) => orderedThreadList(candidates)[0])
+    .find((task) => task !== undefined);
 }
 
-export interface OptionCardData extends WaitCardField, ComputerAskField, AccessRequestCardField, OutsideWriteCardField {
-  /** The harness asks the owner to let this line of theirs use the lent computer (server/host/lending-lifts.ts). */ lendingLift?: { requestMessageId: string; memoryToken?: string; outside?: true; botOpened?: true; allowedAt?: number };
+export interface OptionCardData
+  extends WaitCardField, ComputerAskField, AccessRequestCardField, OutsideWriteCardField {
+  /** The harness asks the owner to let this line of theirs use the lent computer (server/host/lending-lifts.ts). */ lendingLift?: {
+    requestMessageId: string;
+    memoryToken?: string;
+    outside?: true;
+    botOpened?: true;
+    allowedAt?: number;
+  };
   /** calls: one per outbound call the card covers, in subtitle order. */
-  outboundRequest?: { tool: string; app: string | null; calls?: Array<{ app: string | null; label: string }> };
+  outboundRequest?: {
+    tool: string;
+    app: string | null;
+    calls?: Array<{ app: string | null; label: string }>;
+  };
   /** `revision`: the entry as it applied without a person, so Undo can tell it changed since. */
   teamMemoryRequest?: { section: string; entryId: string; kind: string; revision?: string };
   title: string;
@@ -652,7 +772,7 @@ export interface OptionCardData extends WaitCardField, ComputerAskField, AccessR
   summaryParams?: ServerTextParams;
   options: string[];
   /** Distinguishes a provider question from an approval after its live run ends. */
-  requestType?: "permission" | "question";
+  requestType?: 'permission' | 'question';
   answered?: string;
   /** What was actually answered, when the answer is words rather than a
    * verdict. */
@@ -680,7 +800,7 @@ export interface OptionCardData extends WaitCardField, ComputerAskField, AccessR
   /** Exact native command offered for an owner/admin to remember. */
   commandAllowlist?: CommandAllowlistCandidate;
   /** Local actions never share remembered grants with cloud/tool approvals. */
-  approvalScope?: "local-computer";
+  approvalScope?: 'local-computer';
   /** The bot's change applied without a person (a change to the bot itself,
    * or Full access): clients show a one-line receipt with Undo instead of
    * the approval box. */
@@ -726,13 +846,17 @@ export interface SecretRequestCardData {
   description: string;
   /** Optional named-key copy for client localization; `description` remains the complete fallback for English and older cards. */
   descriptionParts?: {
-    baseCode: "secretCard.greenference.description" | "secretCard.modelgo.description" | "secretCard.geminiTts.description";
+    baseCode:
+      | 'secretCard.greenference.description'
+      | 'secretCard.modelgo.description'
+      | 'secretCard.geminiTts.description';
     reason: string;
     bot: string;
   };
   placeholder: string;
   helpUrl: string;
-  /** A custom secret's use: "ref", OpenMausBot's own tools only; "file", the bot's commands; "email", the Email connector, never a bot. */ delivery?: SecretDelivery | "email";
+  /** A custom secret's use: "ref", OpenMausBot's own tools only; "file", the bot's commands; "email", the Email connector, never a bot. */ delivery?:
+    SecretDelivery | 'email';
   /** An email card: the mailbox it is for, when known; off a phone the person can change it on the card. */ address?: string;
   /** An email card: the incoming server that took the password, once it did, while sending is still being checked. */
   emailReading?: string;
@@ -804,10 +928,10 @@ export interface ComputerHelpRef {
  * whenever it is off or unsure. Readers must treat any kind they do not know
  * as the default lead. */
 export type GroupDefaultResponder =
-  | { kind: "member"; botId: string }
-  | { kind: "everyone" }
-  | { kind: "mentions" }
-  | { kind: "auto"; fallbackBotId?: string };
+  | { kind: 'member'; botId: string }
+  | { kind: 'everyone' }
+  | { kind: 'mentions' }
+  | { kind: 'auto'; fallbackBotId?: string };
 
 /** One independent conversation inside a user-created channel. */
 export interface GroupTask {
@@ -822,7 +946,7 @@ export interface GroupTask {
    * the global group turn limit. Direct chats do not use this limit. */
   turnTimeoutMinutes?: number;
   /** Epoch ms when the person archived this thread; absent while it is in the list. */ archivedAt?: number;
-  /** A card in this thread waits on the person, with no turn running. */ activity?: "waiting-on-you";
+  /** A card in this thread waits on the person, with no turn running. */ activity?: 'waiting-on-you';
   /** Epoch ms of the newest message, or createdAt when the thread has none. */
   updatedAt?: number;
   lastThreadOrderAt?: number;
@@ -838,11 +962,18 @@ export interface GroupTask {
 /** A room as a client may see it: the record plus the computed working flag. */
 export interface WireGroup {
   /** Computed from the usage ledger, not stored in groups.json. */
-  usage?: GroupThreadUsage | null; /** Transient: the department's Chief of Staff, when this room is without it. Null clears an earlier value. */ chiefAbsent?: { botId: string; name: string } | null;
+  usage?: GroupThreadUsage | null;
+  /** Transient: the department's Chief of Staff, when this room is without it. Null clears an earlier value. */ chiefAbsent?: {
+    botId: string;
+    name: string;
+  } | null;
   /** transient: each member's context in the active thread, from its last
    * turn there, and whether its next turn there was asked to start
    * compacted. */
-  memberContext?: Record<string, { tokens: number; window: number; compactRequested?: true }> | null;
+  memberContext?: Record<
+    string,
+    { tokens: number; window: number; compactRequested?: true }
+  > | null;
   id: string;
   /** The active task's thread. Direct-message channels stay single-threaded. */
   threadId: string;
@@ -899,7 +1030,7 @@ export interface WireGroup {
 export interface RoomQueueEntry {
   botId: string;
   threadId: string;
-  state: "running" | "queued";
+  state: 'running' | 'queued';
   /** 1-based place in that thread's line; `of` counts the whole line. */
   position: number;
   of: number;
@@ -923,11 +1054,19 @@ export interface RoomHeldMessage {
 
 /** Why a steer-queue entry waits: a shared thread slot, or the bot's room
  * turn (which runs one at a time per bot). */
-export type SteerQueueReason = "capacity" | "group-turn";
+export type SteerQueueReason = 'capacity' | 'group-turn';
 
 /** Pending steer-queue chips, as `queuedSteerSnapshot` emits them and the `bot.queued` frame carries them: threadId → queued items. */
-export type BotQueuedMessages = Record<string, Array<{ queueId: string; text: string; reason?: SteerQueueReason; /** The reason in plain words, shown as it is. */ why?: string;
-  /** Team Cloud, where several people write: whose line waits; only they remove it, and it runs after as their own turn. */ sender?: ResolvedSender }>>;
+export type BotQueuedMessages = Record<
+  string,
+  Array<{
+    queueId: string;
+    text: string;
+    reason?: SteerQueueReason;
+    /** The reason in plain words, shown as it is. */ why?: string;
+    /** Team Cloud, where several people write: whose line waits; only they remove it, and it runs after as their own turn. */ sender?: ResolvedSender;
+  }>
+>;
 
 /** Skills library browse surface: one row per library entry, with the bots
  * currently assigned to it. Version is null for locally imported skills. */
@@ -953,45 +1092,58 @@ export interface BotAssignedSkillsWire {
 }
 
 export type ServerFrame =
-  | { kind: "sections"; sections: string[] }
-  | { kind: "bot.queued"; queues: BotQueuedMessages }
-  | { kind: "message"; threadId: string; message: WireMessage }
-  | { kind: "message.patch"; threadId: string; message: WireMessage }
-  | { kind: "thread"; threadId: string; activeLeafId: string }
-  | { kind: "bot"; bot: WireBot }
-  | { kind: "group"; group: WireGroup }
-  | { kind: "notify"; notification: NotificationLogEntry }
-  | { kind: "notifications.read"; threadId: string; ids: string[] }
-  | { kind: "group.deleted"; groupId: string }
-  | { kind: "routine"; routine: Routine }
-  | { kind: "routine.deleted"; routineId: string }
-  | { kind: "routine.run"; run: RoutineRun }
-  | { kind: "webhook"; webhook: WebhookTrigger }
-  | { kind: "webhook.attempt"; attempt: WebhookAttempt }
-  | { kind: "webhook.deleted"; webhookId: string }
-  | { kind: "app-trigger"; botId: string; trigger: AppTrigger }
-  | { kind: "app-trigger.attempt"; botId: string; attempt: AppEventAttempt }
-  | { kind: "app-trigger.deleted"; triggerId: string }
-  | { kind: "app-trigger.service"; service: AppTriggerService }
-  | { kind: "runtime"; event: RuntimeEvent }
+  | { kind: 'sections'; sections: string[] }
+  | { kind: 'bot.queued'; queues: BotQueuedMessages }
+  | { kind: 'message'; threadId: string; message: WireMessage }
+  | { kind: 'message.patch'; threadId: string; message: WireMessage }
+  | { kind: 'thread'; threadId: string; activeLeafId: string }
+  | { kind: 'bot'; bot: WireBot }
+  | { kind: 'group'; group: WireGroup }
+  | { kind: 'notify'; notification: NotificationLogEntry }
+  | { kind: 'notifications.read'; threadId: string; ids: string[] }
+  | { kind: 'group.deleted'; groupId: string }
+  | { kind: 'routine'; routine: Routine }
+  | { kind: 'routine.deleted'; routineId: string }
+  | { kind: 'routine.run'; run: RoutineRun }
+  | { kind: 'webhook'; webhook: WebhookTrigger }
+  | { kind: 'webhook.attempt'; attempt: WebhookAttempt }
+  | { kind: 'webhook.deleted'; webhookId: string }
+  | { kind: 'app-trigger'; botId: string; trigger: AppTrigger }
+  | { kind: 'app-trigger.attempt'; botId: string; attempt: AppEventAttempt }
+  | { kind: 'app-trigger.deleted'; triggerId: string }
+  | { kind: 'app-trigger.service'; service: AppTriggerService }
+  | { kind: 'runtime'; event: RuntimeEvent }
   /** An MCP server was added, changed or removed: a list of them is stale. */
-  | { kind: "mcp.changed" }
+  | { kind: 'mcp.changed' }
   /** `surface` names what the frame shows: the bot's desktop (`computer`) or its built-in browser. */
-  | { kind: "screen"; botId: string; threadId: string; png: string; mime?: string; surface?: "browser" | "computer" }
+  | {
+      kind: 'screen';
+      botId: string;
+      threadId: string;
+      png: string;
+      mime?: string;
+      surface?: 'browser' | 'computer';
+    }
   /** A bot's computer is being set up or woken for a turn; the chat shows
    * one progress line until its first screen frame. `place` names a cloud
    * computer (absent: a Local VM). */
-  | { kind: "computer"; botId: string; state: "provisioning" | "waking"; place?: "cloud" }
-  | { kind: "computer-control"; botId: string; held: boolean; helpReason: string | null; help?: ComputerHelpRef | null }
+  | { kind: 'computer'; botId: string; state: 'provisioning' | 'waking'; place?: 'cloud' }
+  | {
+      kind: 'computer-control';
+      botId: string;
+      held: boolean;
+      helpReason: string | null;
+      help?: ComputerHelpRef | null;
+    }
   /** A bot's data sheet changed. Whole sheet each time. */
   | DataBroadcast
-  | { kind: "bot.deleted"; botId: string }
+  | { kind: 'bot.deleted'; botId: string }
   /** The whole fleet in its new order (PUT /api/bots/order); a member is sent only the bots they see. */
-  | { kind: "bots.order"; botIds: string[] }
-  | { kind: "live.call"; botId: string; threadId: string; call: LiveCallState | null }
+  | { kind: 'bots.order'; botIds: string[] }
+  | { kind: 'live.call'; botId: string; threadId: string; call: LiveCallState | null }
   /** A job is waiting for the phone whose registry key this is; it polls now. */
-  | { kind: "device.job"; phone: string; id: string }
+  | { kind: 'device.job'; phone: string; id: string }
   /** Who is here on a Team Cloud (shared/team-presence.ts). */
   | PresenceFrame
   /** The config status object spread flat into the frame. */
-  | ({ kind: "config" } & Record<string, unknown>);
+  | ({ kind: 'config' } & Record<string, unknown>);

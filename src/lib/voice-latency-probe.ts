@@ -1,15 +1,15 @@
 // Inert voice-latency recorder. Every exported function is a no-op unless the
 // measurement harness installed a sink array at `window.__ombVoiceProbe` — with
 // the probe off, the speak path runs exactly as it did before the probe existed.
-import type { RuntimeEvent, ThreadId } from "../../shared/runtime-events";
-import type { VoiceProbeSample } from "../../shared/voice-latency-probe";
+import type { RuntimeEvent, ThreadId } from '../../shared/runtime-events';
+import type { VoiceProbeSample } from '../../shared/voice-latency-probe';
 
-const PROBE_KEY = "__ombVoiceProbe";
+const PROBE_KEY = '__ombVoiceProbe';
 
 type ProbeWindow = Window & { [PROBE_KEY]?: VoiceProbeSample[] };
 
 const sink = (): VoiceProbeSample[] | null => {
-  if (typeof window === "undefined") return null;
+  if (typeof window === 'undefined') return null;
   const held = (window as ProbeWindow)[PROBE_KEY];
   return Array.isArray(held) ? held : null;
 };
@@ -31,15 +31,18 @@ const pendingFirstDeltaAt = new Map<ThreadId, number>();
 
 export function recordRuntimeEvent(event: RuntimeEvent): void {
   if (!sink()) return;
-  if (event.type === "turn.started") {
+  if (event.type === 'turn.started') {
     pendingFirstDeltaAt.delete(event.threadId);
     return;
   }
-  if (event.type !== "content.delta" || event.streamKind !== "assistant_text") return;
+  if (event.type !== 'content.delta' || event.streamKind !== 'assistant_text') return;
   if (!pendingFirstDeltaAt.has(event.threadId)) pendingFirstDeltaAt.set(event.threadId, now());
 }
 
-export function recordBotTextMessage(message: { id: string; text?: string | null }, threadId: ThreadId): void {
+export function recordBotTextMessage(
+  message: { id: string; text?: string | null },
+  threadId: ThreadId,
+): void {
   const probe = sink();
   if (!probe) return;
   const pending = pendingFirstDeltaAt.get(threadId);
@@ -49,7 +52,8 @@ export function recordBotTextMessage(message: { id: string; text?: string | null
   if (sample.firstDeltaAt === undefined && pending !== undefined) {
     sample.firstDeltaAt = pending;
   }
-  if (sample.textChars === undefined && typeof message.text === "string") sample.textChars = [...message.text].length;
+  if (sample.textChars === undefined && typeof message.text === 'string')
+    sample.textChars = [...message.text].length;
 }
 
 export function recordSpeakEnter(messageId: string | undefined): void {
@@ -70,7 +74,7 @@ export function recordPrepared(messageId: string | undefined, blockCount: number
 export function recordBlockTiming(
   messageId: string | undefined,
   block: number,
-  phase: "renderStart" | "renderDone" | "audioStart" | "audioEnd",
+  phase: 'renderStart' | 'renderDone' | 'audioStart' | 'audioEnd',
 ): void {
   const probe = sink();
   if (!probe || !messageId) return;
@@ -78,8 +82,8 @@ export function recordBlockTiming(
   while (sample.blocks.length <= block) sample.blocks.push({});
   const timing = sample.blocks[block]!;
   const at = now();
-  if (phase === "renderStart" && timing.renderStartAt === undefined) timing.renderStartAt = at;
-  else if (phase === "renderDone" && timing.renderDoneAt === undefined) timing.renderDoneAt = at;
-  else if (phase === "audioStart" && timing.startAt === undefined) timing.startAt = at;
-  else if (phase === "audioEnd" && timing.endAt === undefined) timing.endAt = at;
+  if (phase === 'renderStart' && timing.renderStartAt === undefined) timing.renderStartAt = at;
+  else if (phase === 'renderDone' && timing.renderDoneAt === undefined) timing.renderDoneAt = at;
+  else if (phase === 'audioStart' && timing.startAt === undefined) timing.startAt = at;
+  else if (phase === 'audioEnd' && timing.endAt === undefined) timing.endAt = at;
 }

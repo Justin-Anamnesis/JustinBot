@@ -9,7 +9,10 @@ if (!dataDir || dataDir !== process.env.HOME || process.env.OMB_TEST_POWER_CLOCK
 }
 const power = new URL('../cloud-power.ts', import.meta.url).href;
 const seams = [
-  ['export const CLOUD_IDLE_ACTIVITY_MS = 10 * 60_000;', 'export const CLOUD_IDLE_ACTIVITY_MS = 250;'],
+  [
+    'export const CLOUD_IDLE_ACTIVITY_MS = 10 * 60_000;',
+    'export const CLOUD_IDLE_ACTIVITY_MS = 250;',
+  ],
   ['export const CLOUD_IDLE_WORK_MS = 2 * 60_000;', 'export const CLOUD_IDLE_WORK_MS = 250;'],
   ['export const CLOUD_IDLE_AWAKE_MS = 2 * 60_000;', 'export const CLOUD_IDLE_AWAKE_MS = 250;'],
 ];

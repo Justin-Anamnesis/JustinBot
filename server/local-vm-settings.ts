@@ -1,7 +1,7 @@
 // The Local VM's settings, read from the config the server loaded.
-import { z } from "zod";
+import { z } from 'zod';
 
-import type { AppConfig } from "./config.ts";
+import type { AppConfig } from './config.ts';
 import {
   DEFAULT_DESKTOP_RESOURCES,
   MAX_DESKTOP_CPUS,
@@ -9,9 +9,9 @@ import {
   MIN_DESKTOP_CPUS,
   MIN_DESKTOP_MEMORY_GB,
   type DesktopResources,
-} from "./container-limits.ts";
+} from './container-limits.ts';
 
-export const DEFAULT_LOCAL_VM_MODE = "shared" as const;
+export const DEFAULT_LOCAL_VM_MODE = 'shared' as const;
 export const DEFAULT_LOCAL_VM_MAX_INSTANCES = 2;
 export const MIN_LOCAL_VM_MAX_INSTANCES = 1;
 export const MAX_LOCAL_VM_MAX_INSTANCES = 8;
@@ -21,7 +21,7 @@ export const MAX_LOCAL_VM_IDLE_TIMEOUT_MINUTES = 1_440;
 
 /** Bot desktop isolation, default "shared"; `maxInstances` caps per-bot desktops or pool seats. Switching modes cold-starts every desktop. */
 export const localVmConfigSchema = z.object({
-  mode: z.enum(["shared", "per-bot", "pool"]).optional(),
+  mode: z.enum(['shared', 'per-bot', 'pool']).optional(),
   maxInstances: z
     .number()
     .int()
@@ -41,7 +41,7 @@ export const localVmConfigSchema = z.object({
   cpus: z.number().int().min(MIN_DESKTOP_CPUS).max(MAX_DESKTOP_CPUS).optional(),
 });
 
-export function localVmMode(cfg: AppConfig): "shared" | "per-bot" | "pool" {
+export function localVmMode(cfg: AppConfig): 'shared' | 'per-bot' | 'pool' {
   return cfg.localVm?.mode ?? DEFAULT_LOCAL_VM_MODE;
 }
 

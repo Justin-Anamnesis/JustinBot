@@ -1,10 +1,10 @@
 // The server half of RFC 6455, enough for /v1/e2e: one unfragmented message per frame, masked client frames,
 // binary, text, ping, pong and close. No dependency: the sidecar builds and runs alone.
-import { createHash } from "node:crypto";
-import type { IncomingMessage } from "node:http";
-import type { Duplex } from "node:stream";
+import { createHash } from 'node:crypto';
+import type { IncomingMessage } from 'node:http';
+import type { Duplex } from 'node:stream';
 
-const ACCEPT_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+const ACCEPT_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 const OP = { continuation: 0x0, text: 0x1, binary: 0x2, close: 0x8, ping: 0x9, pong: 0xa } as const;
 const CLOSE_WAIT_MS = 1_000;
 /** RFC 6455 close codes this server sends on its own. */
@@ -37,7 +37,7 @@ const refuse = (socket: Duplex, status: string): null => {
 
 function header(req: IncomingMessage, name: string): string {
   const value = req.headers[name];
-  return Array.isArray(value) ? value.join(",") : value ?? "";
+  return Array.isArray(value) ? value.join(',') : (value ?? '');
 }
 
 /** Null when refused; the socket is already answered. A request with an `Origin` header is a browser and is
@@ -49,28 +49,40 @@ export function acceptWebSocket(
   options: UpgradeOptions,
   handlers: (connection: WsConnection) => WsHandlers,
 ): WsConnection | null {
-  if (req.headers.origin !== undefined) return refuse(socket, "403 Forbidden");
-  const key = header(req, "sec-websocket-key");
-  const upgrade = header(req, "upgrade").toLowerCase();
-  const connectionTokens = header(req, "connection").toLowerCase().split(",").map((token) => token.trim());
-  if (req.method !== "GET" || upgrade !== "websocket" || !connectionTokens.includes("upgrade")) return refuse(socket, "400 Bad Request");
-  if (header(req, "sec-websocket-version") !== "13") return refuse(socket, "426 Upgrade Required\r\nSec-WebSocket-Version: 13");
-  if (!/^[A-Za-z0-9+/]{22}==$/.test(key)) return refuse(socket, "400 Bad Request");
-  const offered = header(req, "sec-websocket-protocol").split(",").map((token) => token.trim()).filter(Boolean);
-  if (options.protocol !== null && !offered.includes(options.protocol)) return refuse(socket, "400 Bad Request");
-  const accept = createHash("sha1").update(key + ACCEPT_GUID).digest("base64");
+  if (req.headers.origin !== undefined) return refuse(socket, '403 Forbidden');
+  const key = header(req, 'sec-websocket-key');
+  const upgrade = header(req, 'upgrade').toLowerCase();
+  const connectionTokens = header(req, 'connection')
+    .toLowerCase()
+    .split(',')
+    .map((token) => token.trim());
+  if (req.method !== 'GET' || upgrade !== 'websocket' || !connectionTokens.includes('upgrade'))
+    return refuse(socket, '400 Bad Request');
+  if (header(req, 'sec-websocket-version') !== '13')
+    return refuse(socket, '426 Upgrade Required\r\nSec-WebSocket-Version: 13');
+  if (!/^[A-Za-z0-9+/]{22}==$/.test(key)) return refuse(socket, '400 Bad Request');
+  const offered = header(req, 'sec-websocket-protocol')
+    .split(',')
+    .map((token) => token.trim())
+    .filter(Boolean);
+  if (options.protocol !== null && !offered.includes(options.protocol))
+    return refuse(socket, '400 Bad Request');
+  const accept = createHash('sha1')
+    .update(key + ACCEPT_GUID)
+    .digest('base64');
   socket.write(
-    "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n" +
+    'HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n' +
       `Sec-WebSocket-Accept: ${accept}\r\n` +
-      (options.protocol !== null ? `Sec-WebSocket-Protocol: ${options.protocol}\r\n` : "") +
-      "\r\n",
+      (options.protocol !== null ? `Sec-WebSocket-Protocol: ${options.protocol}\r\n` : '') +
+      '\r\n',
   );
   return serveFrames(socket, head, options.maxPayload, handlers);
 }
 
 function frame(opcode: number, payload: Uint8Array): Buffer {
   const length = payload.length;
-  const head = length < 126 ? Buffer.alloc(2) : length < 65_536 ? Buffer.alloc(4) : Buffer.alloc(10);
+  const head =
+    length < 126 ? Buffer.alloc(2) : length < 65_536 ? Buffer.alloc(4) : Buffer.alloc(10);
   head[0] = 0x80 | opcode;
   if (length < 126) head[1] = length;
   else if (length < 65_536) {
@@ -83,14 +95,19 @@ function frame(opcode: number, payload: Uint8Array): Buffer {
   return Buffer.concat([head, payload]);
 }
 
-function closePayload(code: number, reason = ""): Buffer {
+function closePayload(code: number, reason = ''): Buffer {
   const out = Buffer.alloc(2 + Buffer.byteLength(reason));
   out.writeUInt16BE(code, 0);
   out.write(reason, 2);
   return out.subarray(0, Math.min(out.length, 125));
 }
 
-function serveFrames(socket: Duplex, head: Buffer, maxPayload: number, handlers: (connection: WsConnection) => WsHandlers): WsConnection {
+function serveFrames(
+  socket: Duplex,
+  head: Buffer,
+  maxPayload: number,
+  handlers: (connection: WsConnection) => WsHandlers,
+): WsConnection {
   let buffered: Buffer = head.length > 0 ? Buffer.from(head) : Buffer.alloc(0);
   let closing = false;
   let closed = false;
@@ -127,7 +144,7 @@ function serveFrames(socket: Duplex, head: Buffer, maxPayload: number, handlers:
     },
     onceDrained(listener) {
       if (socket.writableLength === 0 || closed) queueMicrotask(listener);
-      else socket.once("drain", listener);
+      else socket.once('drain', listener);
     },
     ping(data = Buffer.alloc(0)) {
       if (!closing && !closed) socket.write(frame(OP.ping, data));
@@ -188,12 +205,12 @@ function serveFrames(socket: Duplex, head: Buffer, maxPayload: number, handlers:
     }
   };
 
-  socket.on("data", (chunk: Buffer) => {
+  socket.on('data', (chunk: Buffer) => {
     buffered = buffered.length ? Buffer.concat([buffered, chunk]) : chunk;
     parse();
   });
-  socket.on("error", () => finish(1006));
-  socket.on("close", () => finish(1006));
+  socket.on('error', () => finish(1006));
+  socket.on('close', () => finish(1006));
   queueMicrotask(parse);
   return connection;
 }

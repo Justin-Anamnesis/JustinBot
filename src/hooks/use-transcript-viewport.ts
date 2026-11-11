@@ -9,9 +9,13 @@ import {
   type PointerEvent,
   type TouchEvent,
   type WheelEvent,
-} from "react";
-import { BOTTOM_FOLLOW_THRESHOLD, shouldResumeBottomFollow, useBottomFollowResize } from "@/lib/bottom-follow";
-import { useFocusMessage } from "@/lib/focus-message";
+} from 'react';
+import {
+  BOTTOM_FOLLOW_THRESHOLD,
+  shouldResumeBottomFollow,
+  useBottomFollowResize,
+} from '@/lib/bottom-follow';
+import { useFocusMessage } from '@/lib/focus-message';
 import {
   TRANSCRIPT_WINDOW_SIZE,
   expandWindowStart,
@@ -19,13 +23,14 @@ import {
   followWindowStart,
   resolveTranscriptWindow,
   tailWindowStart,
-} from "@/lib/transcript-window";
-import { reducedMotion } from "@/lib/onboarding";
-import { useStore } from "@/state/store";
+} from '@/lib/transcript-window';
+import { reducedMotion } from '@/lib/onboarding';
+import { useStore } from '@/state/store';
 
 export const AUTO_EXPAND_TOP_THRESHOLD = 250;
 
-const WIDGETS_WITH_OWN_ARROW_KEYS = '[role="menu"], [role="menubar"], [role="listbox"], [role="tree"], [role="grid"], [role="tablist"], [role="radiogroup"], [role="slider"], select, [contenteditable="true"]';
+const WIDGETS_WITH_OWN_ARROW_KEYS =
+  '[role="menu"], [role="menubar"], [role="listbox"], [role="tree"], [role="grid"], [role="tablist"], [role="radiogroup"], [role="slider"], select, [contenteditable="true"]';
 
 export function useTranscriptViewport<T extends { id: string; role?: string }>({
   ownerId,
@@ -80,7 +85,13 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
     startIndex,
     endIndex,
   } = useMemo(
-    () => resolveTranscriptWindow(messages, transcriptWindow.start, TRANSCRIPT_WINDOW_SIZE, transcriptWindow.end),
+    () =>
+      resolveTranscriptWindow(
+        messages,
+        transcriptWindow.start,
+        TRANSCRIPT_WINDOW_SIZE,
+        transcriptWindow.end,
+      ),
     [messages, transcriptWindow.start, transcriptWindow.end],
   );
 
@@ -88,14 +99,25 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
     followRef.current = next;
     setFollow(next);
   }, []);
-  useBottomFollowResize(scrollRef, transcriptRef, followRef, transcriptShown ? transcriptKey : null);
+  useBottomFollowResize(
+    scrollRef,
+    transcriptRef,
+    followRef,
+    transcriptShown ? transcriptKey : null,
+  );
 
   useEffect(() => setBottomFollow(true), [transcriptKey, setBottomFollow]);
 
   const appliedFocus = useRef<number | null>(null);
   useEffect(() => {
     const focus = state.focusMessage;
-    if (!focus || focus.consumed || focus.threadId !== threadId || appliedFocus.current === focus.nonce) return;
+    if (
+      !focus ||
+      focus.consumed ||
+      focus.threadId !== threadId ||
+      appliedFocus.current === focus.nonce
+    )
+      return;
     const targetIndex = messages.findIndex((message) => message.id === focus.messageId);
     if (targetIndex < 0) return;
     appliedFocus.current = focus.nonce;
@@ -111,6 +133,7 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
     if (!el || !followRef.current) return;
     el.scrollTo({ top: el.scrollHeight });
     previousScrollTop.current = el.scrollTop;
+    // prettier-ignore
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinOn is the caller's dependency list
   }, [transcriptKey, messages.length, ...pinOn]);
 
@@ -119,7 +142,9 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
   const expandingRef = useRef(false);
 
   const holdRowForPrepend = () => {
-    preExpandHeight.current = scrollRef.current ? { key: transcriptKey, height: scrollRef.current.scrollHeight } : null;
+    preExpandHeight.current = scrollRef.current
+      ? { key: transcriptKey, height: scrollRef.current.scrollHeight }
+      : null;
     setBottomFollow(false);
   };
   const oldestId = messages[0]?.id;
@@ -153,7 +178,7 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
   const olderPending = Boolean(state.loadingOlder[threadId]);
   const loadOlder = () => {
     holdRowForPrepend();
-    dispatch({ type: "loadOlderMessages", threadId });
+    dispatch({ type: 'loadOlderMessages', threadId });
   };
 
   useEffect(() => {
@@ -170,14 +195,14 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
     } else if (hasMore && !olderPending) {
       expandingRef.current = true;
       holdRowForPrepend();
-      dispatch({ type: "loadOlderMessages", threadId });
+      dispatch({ type: 'loadOlderMessages', threadId });
     }
   }, [hiddenCount, startIndex, hasMore, olderPending, threadId, dispatch, transcriptKey]);
 
   useEffect(() => {
     const sentinel = topSentinelRef.current;
     const root = scrollRef.current;
-    if (!sentinel || !root || typeof IntersectionObserver === "undefined") return;
+    if (!sentinel || !root || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
@@ -185,7 +210,7 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
           triggerAutoEarlier();
         }
       },
-      { root, rootMargin: "250px 0px 0px 0px" },
+      { root, rootMargin: '250px 0px 0px 0px' },
     );
     observer.observe(sentinel);
     return () => observer.disconnect();
@@ -193,16 +218,18 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const typing = e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement;
-      const ownKeys = typeof (e.target as Element | null)?.closest === "function" &&
+      const typing =
+        e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement;
+      const ownKeys =
+        typeof (e.target as Element | null)?.closest === 'function' &&
         Boolean((e.target as Element).closest(WIDGETS_WITH_OWN_ARROW_KEYS));
       if (ownKeys || !canScroll()) return;
-      if (e.key === "PageUp" || ((e.key === "Home" || e.key === "ArrowUp") && !typing)) {
+      if (e.key === 'PageUp' || ((e.key === 'Home' || e.key === 'ArrowUp') && !typing)) {
         setBottomFollow(false);
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [setBottomFollow]);
 
   const canScroll = () => {
@@ -219,7 +246,10 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
     setBottomFollow(true);
     setTranscriptWindow({ key: transcriptKey, start: tailStart, end: null });
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: reducedMotion() ? "auto" : "smooth" });
+      scrollRef.current?.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: reducedMotion() ? 'auto' : 'smooth',
+      });
     });
   };
 

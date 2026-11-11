@@ -25,7 +25,9 @@ let clock: ReturnType<typeof setInterval> | null = null;
 
 function watchClock(look: () => void): () => void {
   watchers.add(look);
-  clock ??= setInterval(() => { for (const watcher of watchers) watcher(); }, DUE_CLOCK_MS);
+  clock ??= setInterval(() => {
+    for (const watcher of watchers) watcher();
+  }, DUE_CLOCK_MS);
   clock.unref?.();
   return () => {
     watchers.delete(look);
@@ -66,10 +68,14 @@ export function startDueTimer(options: DueTimerOptions): DueTimer {
   };
   const poke = () => {
     if (stopped) return;
-    if (running) { pokedWhileRunning = true; return; }
+    if (running) {
+      pokedWhileRunning = true;
+      return;
+    }
     const wait = dueIn();
     // Past on the wall clock with the timer still pending: a wake moved the clock on and left the timer with its awake time to run.
-    if (wait !== null && wait <= DUE_CLOCK_MS && (now() + wait < firesAt || firesAt < now())) arm(wait);
+    if (wait !== null && wait <= DUE_CLOCK_MS && (now() + wait < firesAt || firesAt < now()))
+      arm(wait);
   };
   const fire = () => {
     disarm();
@@ -82,13 +88,15 @@ export function startDueTimer(options: DueTimerOptions): DueTimer {
     } catch (error) {
       done = Promise.reject(error);
     }
-    void Promise.resolve(done).catch((error) => options.onError?.(error)).finally(() => {
-      running = false;
-      if (stopped) return;
-      const wait = dueIn();
-      if (wait === 0) arm(pokedWhileRunning ? 0 : retryMs);
-      else if (wait !== null && wait <= DUE_CLOCK_MS) arm(wait);
-    });
+    void Promise.resolve(done)
+      .catch((error) => options.onError?.(error))
+      .finally(() => {
+        running = false;
+        if (stopped) return;
+        const wait = dueIn();
+        if (wait === 0) arm(pokedWhileRunning ? 0 : retryMs);
+        else if (wait !== null && wait <= DUE_CLOCK_MS) arm(wait);
+      });
   };
 
   const unwatch = watchClock(poke);

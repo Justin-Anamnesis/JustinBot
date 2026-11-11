@@ -7,13 +7,13 @@ import {
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
-} from "react";
-import { MAUS_COLORS, type MausColor, type MausMotion, type MausState } from "@/lib/mascot";
-import { CARVED_BODIES, type CarvedBody, type CarvedBodyId } from "../../shared/carved-bodies";
-import type { CursorAvatarHandle } from "./CursorAvatar";
-import { mascotClock, usePrefersReducedMotion } from "./mascot-clock";
-import { frameFloorMs, nextFrameAt } from "./mascot-motion";
-import { mascotFaceInk, type MascotFaceColor } from "../../shared/bot-avatar";
+} from 'react';
+import { MAUS_COLORS, type MausColor, type MausMotion, type MausState } from '@/lib/mascot';
+import { CARVED_BODIES, type CarvedBody, type CarvedBodyId } from '../../shared/carved-bodies';
+import type { CursorAvatarHandle } from './CursorAvatar';
+import { mascotClock, usePrefersReducedMotion } from './mascot-clock';
+import { frameFloorMs, nextFrameAt } from './mascot-motion';
+import { mascotFaceInk, type MascotFaceColor } from '../../shared/bot-avatar';
 
 /** Where the face looks and how it feels. */
 export type CarvedPose = {
@@ -64,7 +64,11 @@ export function carvedGeometry(body: CarvedBody, p: CarvedPose): CarvedGeometry 
     const eh = Math.max(h * k, 0.5);
     const x = cx + side * spread;
     return {
-      x: r2(x - ew / 2), y: r2(cy - eh / 2), width: r2(ew), height: r2(eh), rx: r2(Math.min(ew, eh) / 2),
+      x: r2(x - ew / 2),
+      y: r2(cy - eh / 2),
+      width: r2(ew),
+      height: r2(eh),
+      rx: r2(Math.min(ew, eh) / 2),
       transform: `rotate(${r2(tilt)} ${r2(x)} ${r2(cy)})`,
     };
   };
@@ -80,65 +84,125 @@ export function carvedGeometry(body: CarvedBody, p: CarvedPose): CarvedGeometry 
       transform: `rotate(${r2(tilt * 0.6)} ${r2(cx)} ${r2(my)})`,
       opacity: r2(1 - p.wide),
     },
-    open: { cx: r2(cx), cy: r2(my + mw * 0.1), rx: r2(mw * 0.5 * p.wide), ry: r2(mw * 0.62 * p.wide), opacity: r2(p.wide) },
+    open: {
+      cx: r2(cx),
+      cy: r2(my + mw * 0.1),
+      rx: r2(mw * 0.5 * p.wide),
+      ry: r2(mw * 0.62 * p.wide),
+      opacity: r2(p.wide),
+    },
   };
 }
 
-
 function moodFor(state: MausState): Partial<CarvedPose> & { glance?: number } {
   switch (state) {
-    case "surprised": case "alerting": case "scared": case "excited": case "celebrate": case "spawning": case "waking":
+    case 'surprised':
+    case 'alerting':
+    case 'scared':
+    case 'excited':
+    case 'celebrate':
+    case 'spawning':
+    case 'waking':
       return { wide: 1 };
-    case "sleeping": case "powering-down":
+    case 'sleeping':
+    case 'powering-down':
       return { shut: 0.92, smile: 0.4, glance: 0 };
-    case "drowsy": case "bored":
+    case 'drowsy':
+    case 'bored':
       return { shut: 0.55, smile: 0.6, glance: 0.3 };
-    case "happy": case "laughing": case "proud": case "playful":
+    case 'happy':
+    case 'laughing':
+    case 'proud':
+    case 'playful':
       return { smile: 1.5 };
-    case "sad":
+    case 'sad':
       return { smile: -0.8, gy: 0.6, glance: 0.3 };
-    case "thinking":
+    case 'thinking':
       return { gx: 0.6, gy: -0.6, glance: 0 };
-    case "searching": case "radar": case "orbit": case "curious":
+    case 'searching':
+    case 'radar':
+    case 'orbit':
+    case 'curious':
       return { glance: 2.2 };
-    case "working": case "writing": case "loading":
+    case 'working':
+    case 'writing':
+    case 'loading':
       return { gy: 0.5, glance: 0.6 };
     default:
       return {};
   }
 }
 
-const STARTLE: ReadonlySet<MausMotion> = new Set(["arrive", "switch", "customize", "alert", "launch", "success", "celebrate", "surprise"]);
-const GLANCES: ReadonlyArray<[number, number]> = [[0, 0], [0, 0], [-1, 0.25], [1, 0.25], [-0.8, 0.55], [0.8, 0.55], [-0.7, -0.4], [0.7, -0.4], [0, 0.5]];
+const STARTLE: ReadonlySet<MausMotion> = new Set([
+  'arrive',
+  'switch',
+  'customize',
+  'alert',
+  'launch',
+  'success',
+  'celebrate',
+  'surprise',
+]);
+const GLANCES: ReadonlyArray<[number, number]> = [
+  [0, 0],
+  [0, 0],
+  [-1, 0.25],
+  [1, 0.25],
+  [-0.8, 0.55],
+  [0.8, 0.55],
+  [-0.7, -0.4],
+  [0.7, -0.4],
+  [0, 0.5],
+];
 
 function mix(hex: string, toward: string, t: number): string {
   const a = Number.parseInt(hex.slice(1), 16);
   const b = Number.parseInt(toward.slice(1), 16);
-  const ch = (s: number) => Math.round(((a >> s) & 0xff) + ((((b >> s) & 0xff) - ((a >> s) & 0xff)) * t));
-  return `#${[ch(16), ch(8), ch(0)].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+  const ch = (s: number) =>
+    Math.round(((a >> s) & 0xff) + (((b >> s) & 0xff) - ((a >> s) & 0xff)) * t);
+  return `#${[ch(16), ch(8), ch(0)].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
 /** The flat style wants more punch than a gradient's mid tone: saturation lifted 15%. */
 export function vivid(hex: string): string {
   const n = Number.parseInt(hex.slice(1), 16);
-  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  const r = ((n >> 16) & 255) / 255,
+    g = ((n >> 8) & 255) / 255,
+    b = (n & 255) / 255;
+  const max = Math.max(r, g, b),
+    min = Math.min(r, g, b),
+    l = (max + min) / 2,
+    d = max - min;
   if (!d) return hex;
   const s = Math.min(1, (l > 0.5 ? d / (2 - max - min) : d / (max + min)) * 1.15);
-  const h = (max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4) / 6;
+  const h =
+    (max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4) / 6;
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
   const p = 2 * l - q;
   const ch = (x: number) => {
     const t = (x + 1) % 1;
-    return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p;
+    return t < 1 / 6
+      ? p + (q - p) * 6 * t
+      : t < 1 / 2
+        ? q
+        : t < 2 / 3
+          ? p + (q - p) * (2 / 3 - t) * 6
+          : p;
   };
-  return `#${[ch(h + 1 / 3), ch(h), ch(h - 1 / 3)].map((v) => Math.round(v * 255).toString(16).padStart(2, "0")).join("")}`;
+  return `#${[ch(h + 1 / 3), ch(h), ch(h - 1 / 3)]
+    .map((v) =>
+      Math.round(v * 255)
+        .toString(16)
+        .padStart(2, '0'),
+    )
+    .join('')}`;
 }
 
 export function carvedFills(body: CarvedBody, color: MausColor): { body: string; accent: string } {
   const accent = vivid(MAUS_COLORS[color] ?? MAUS_COLORS.green);
-  if (body.paint === "bone") return { body: body.bone ?? "#f1ede6", accent };
-  if (body.paint === "pale") return { body: mix(MAUS_COLORS[color] ?? MAUS_COLORS.green, "#ffffff", 0.86), accent };
+  if (body.paint === 'bone') return { body: body.bone ?? '#f1ede6', accent };
+  if (body.paint === 'pale')
+    return { body: mix(MAUS_COLORS[color] ?? MAUS_COLORS.green, '#ffffff', 0.86), accent };
   return { body: accent, accent };
 }
 
@@ -157,12 +221,24 @@ export type CarvedAvatarProps = {
 };
 
 function CarvedAvatarComponent(
-  { body: bodyId, color, faceColor, size = 44, state = "idle", motion = "none", motionKey = 0, gaze, trackPointer = true, animated = true, label }: CarvedAvatarProps,
+  {
+    body: bodyId,
+    color,
+    faceColor,
+    size = 44,
+    state = 'idle',
+    motion = 'none',
+    motionKey = 0,
+    gaze,
+    trackPointer = true,
+    animated = true,
+    label,
+  }: CarvedAvatarProps,
   ref: React.Ref<CursorAvatarHandle>,
 ) {
   const body = CARVED_BODIES[bodyId];
   const faceInk = mascotFaceInk(faceColor);
-  const uid = useId().replace(/:/g, "");
+  const uid = useId().replace(/:/g, '');
   const reduced = usePrefersReducedMotion();
   const live = animated && !reduced;
   const group = useRef<SVGGElement>(null);
@@ -170,7 +246,11 @@ function CarvedAvatarComponent(
   const smile = useRef<SVGPathElement>(null);
   const open = useRef<SVGEllipseElement>(null);
   const pose = useRef<CarvedPose>(moodPose(state));
-  const cue = useRef({ blinkAt: -1, startleUntil: 0, pointer: null as null | { x: number; y: number } });
+  const cue = useRef({
+    blinkAt: -1,
+    startleUntil: 0,
+    pointer: null as null | { x: number; y: number },
+  });
   const props = useRef({ state, gaze });
   props.current = { state, gaze };
   const [initial] = useState(() => carvedGeometry(body, pose.current));
@@ -180,31 +260,34 @@ function CarvedAvatarComponent(
     cue.current.blinkAt = performance.now();
   };
   useImperativeHandle(ref, () => ({
-    blink: () => { cue.current.blinkAt = performance.now(); },
+    blink: () => {
+      cue.current.blinkAt = performance.now();
+    },
     spin: () => startle(),
     setExpression: () => {},
   }));
 
   useEffect(() => {
-    if (!live || motion === "none") return;
-    if (motion === "blink") cue.current.blinkAt = performance.now();
+    if (!live || motion === 'none') return;
+    if (motion === 'blink') cue.current.blinkAt = performance.now();
     else if (STARTLE.has(motion)) startle();
   }, [motion, motionKey, live]);
 
   const paint = (p: CarvedPose) => {
     const g = carvedGeometry(body, p);
-    group.current?.setAttribute("transform", g.body);
+    group.current?.setAttribute('transform', g.body);
     g.eyes.forEach((rect, i) => {
       const el = eyes[i].current;
       if (!el) return;
       for (const [k, v] of Object.entries(rect)) el.setAttribute(k, String(v));
     });
     if (smile.current) {
-      smile.current.setAttribute("d", g.smile.d);
-      smile.current.setAttribute("transform", g.smile.transform);
-      smile.current.setAttribute("opacity", String(g.smile.opacity));
+      smile.current.setAttribute('d', g.smile.d);
+      smile.current.setAttribute('transform', g.smile.transform);
+      smile.current.setAttribute('opacity', String(g.smile.opacity));
     }
-    if (open.current) for (const [k, v] of Object.entries(g.open)) open.current.setAttribute(k, String(v));
+    if (open.current)
+      for (const [k, v] of Object.entries(g.open)) open.current.setAttribute(k, String(v));
   };
 
   useEffect(() => {
@@ -237,7 +320,7 @@ function CarvedAvatarComponent(
       const want: CarvedPose = {
         gx: pointer?.x ?? (mood.gx ?? (rate > 0 ? target[0] : 0)) + (outside?.x ?? 0),
         gy: pointer?.y ?? (mood.gy ?? (rate > 0 ? target[1] : 0)) + (outside?.y ?? 0),
-        wide: now < cue.current.startleUntil ? 1 : mood.wide ?? 0,
+        wide: now < cue.current.startleUntil ? 1 : (mood.wide ?? 0),
         shut: mood.shut ?? 0,
         smile: mood.smile ?? 1,
       };
@@ -264,38 +347,53 @@ function CarvedAvatarComponent(
       y: Math.max(-1, Math.min(1, ((event.clientY - rect.top) / rect.height) * 2 - 1)),
     };
   };
-  const onPointerLeave = () => { cue.current.pointer = null; };
+  const onPointerLeave = () => {
+    cue.current.pointer = null;
+  };
 
   const fills = carvedFills(body, color);
-  const resolve = (fill: string) => (fill === "body" ? fills.body : fill === "accent" ? fills.accent : fill);
+  const resolve = (fill: string) =>
+    fill === 'body' ? fills.body : fill === 'accent' ? fills.accent : fill;
   return (
     <span
-      className="inline-flex shrink-0"
+      className='inline-flex shrink-0'
       onPointerMove={trackPointer && live ? onPointerMove : undefined}
-      onPointerLeave={trackPointer && live ? onPointerLeave : undefined}
-    >
+      onPointerLeave={trackPointer && live ? onPointerLeave : undefined}>
       <svg
-        viewBox="-14 -14 268 268"
+        viewBox='-14 -14 268 268'
         width={size}
         height={size}
-        role={label ? "img" : undefined}
+        role={label ? 'img' : undefined}
         aria-label={label ?? undefined}
         aria-hidden={label ? undefined : true}
         data-carved-body={body.id}
-        style={{ overflow: "visible" }}
-      >
+        style={{ overflow: 'visible' }}>
         <defs>
-          <clipPath id={`carved-${uid}`}><path d={body.clip} /></clipPath>
+          <clipPath id={`carved-${uid}`}>
+            <path d={body.clip} />
+          </clipPath>
         </defs>
         <g ref={group} transform={initial.body}>
-          {body.parts.map((part, i) => <path key={i} d={part.d} fill={resolve(part.fill)} />)}
+          {body.parts.map((part, i) => (
+            <path key={i} d={part.d} fill={resolve(part.fill)} />
+          ))}
           <g clipPath={`url(#carved-${uid})`}>
-            {initial.eyes.map((rect, i) => <rect key={i} ref={eyes[i]} {...rect} fill={faceInk ?? body.eyes.ink} />)}
+            {initial.eyes.map((rect, i) => (
+              <rect key={i} ref={eyes[i]} {...rect} fill={faceInk ?? body.eyes.ink} />
+            ))}
           </g>
           {body.eyes.mouth && (
             <g>
-              <path ref={smile} d={initial.smile.d} transform={initial.smile.transform} opacity={initial.smile.opacity}
-                fill="none" stroke={faceInk ?? body.eyes.mouthInk} strokeWidth={body.eyes.w * 0.36} strokeLinecap="round" />
+              <path
+                ref={smile}
+                d={initial.smile.d}
+                transform={initial.smile.transform}
+                opacity={initial.smile.opacity}
+                fill='none'
+                stroke={faceInk ?? body.eyes.mouthInk}
+                strokeWidth={body.eyes.w * 0.36}
+                strokeLinecap='round'
+              />
               <ellipse ref={open} {...initial.open} fill={faceInk ?? body.eyes.mouthInk} />
             </g>
           )}
@@ -307,7 +405,13 @@ function CarvedAvatarComponent(
 
 function moodPose(state: MausState): CarvedPose {
   const m = moodFor(state);
-  return { gx: m.gx ?? 0, gy: m.gy ?? 0, wide: m.wide ?? 0, shut: m.shut ?? 0, smile: m.smile ?? 1 };
+  return {
+    gx: m.gx ?? 0,
+    gy: m.gy ?? 0,
+    wide: m.wide ?? 0,
+    shut: m.shut ?? 0,
+    smile: m.smile ?? 1,
+  };
 }
 
 export const CarvedAvatar = memo(forwardRef(CarvedAvatarComponent));

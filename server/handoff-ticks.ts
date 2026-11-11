@@ -1,8 +1,12 @@
-export type HandoffPace = "busy" | "parked" | "idle";
+export type HandoffPace = 'busy' | 'parked' | 'idle';
 
 /** Busy keeps the hand-off latency people see; parked work only needs its access and time limits rechecked; idle wakes
  * for the daily prune alone. */
-export const HANDOFF_TICK_MS: Record<HandoffPace, number> = { busy: 250, parked: 10_000, idle: 60 * 60_000 };
+export const HANDOFF_TICK_MS: Record<HandoffPace, number> = {
+  busy: 250,
+  parked: 10_000,
+  idle: 60 * 60_000,
+};
 
 export interface HandoffTicks {
   /** A write that may have made work due: tick now unless a tick is already near. No-op before start(). */
@@ -30,12 +34,12 @@ export function createHandoffTicks(): HandoffTicks {
     near = false;
     if (!options) return;
     ticking = true;
-    let pace: HandoffPace = "busy";
+    let pace: HandoffPace = 'busy';
     try {
       options.tick();
       pace = options.pace();
     } catch (error) {
-      console.error("coordinator:", error);
+      console.error('coordinator:', error);
     } finally {
       ticking = false;
     }

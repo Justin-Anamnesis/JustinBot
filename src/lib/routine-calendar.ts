@@ -1,7 +1,7 @@
-import type { CalendarCall } from "./calendar-calls";
-import type { Routine, RoutineRun, RoutineSchedule } from "./routines";
-import { nextCronRuns } from "../../shared/routine-schedule";
-import { intlLocale, t } from "@/lib/i18n";
+import type { CalendarCall } from './calendar-calls';
+import type { Routine, RoutineRun, RoutineSchedule } from './routines';
+import { nextCronRuns } from '../../shared/routine-schedule';
+import { intlLocale, t } from '@/lib/i18n';
 
 export const CALENDAR_SLOT_MINUTES = 5;
 const ROUTINE_MARKER_MINUTES = 30;
@@ -48,7 +48,7 @@ export function startOfWeek(at: number): number {
 }
 
 export function atLocalTime(day: number, time: string): number {
-  const [hour, minute] = time.split(":").map(Number);
+  const [hour, minute] = time.split(':').map(Number);
   const date = new Date(day);
   date.setHours(hour, minute, 0, 0);
   return date.getTime();
@@ -66,7 +66,12 @@ export function toLocalTimeInput(at: number): string {
 
 export function fromLocalDateAndTime(date: string, time: string, originalAt?: number): number {
   // Inputs show minutes but schedules carry seconds: a title-only save must not move the anchor, DST included.
-  if (originalAt != null && date === toLocalDateInput(originalAt) && time === toLocalTimeInput(originalAt)) return originalAt;
+  if (
+    originalAt != null &&
+    date === toLocalDateInput(originalAt) &&
+    time === toLocalTimeInput(originalAt)
+  )
+    return originalAt;
   return new Date(`${date}T${time}`).getTime();
 }
 
@@ -105,10 +110,9 @@ export function packCalendarCollisions(
   // Pack against the renderer's 16px minimum card height so short cards never overlap.
   const visualEnd = (item: CalendarCollisionItem) =>
     item.at + Math.max(15, item.durationMinutes) * 60_000;
-  const sorted = [...items].sort((left, right) =>
-    left.at - right.at
-    || visualEnd(left) - visualEnd(right)
-    || left.id.localeCompare(right.id),
+  const sorted = [...items].sort(
+    (left, right) =>
+      left.at - right.at || visualEnd(left) - visualEnd(right) || left.id.localeCompare(right.id),
   );
   const result = new Map<string, CalendarCollisionLayout>();
 
@@ -140,12 +144,12 @@ export function packCalendarCollisions(
 }
 
 export function formatGmtOffset(offsetMinutes: number): string {
-  if (offsetMinutes === 0) return "GMT+0";
-  const sign = offsetMinutes > 0 ? "+" : "-";
+  if (offsetMinutes === 0) return 'GMT+0';
+  const sign = offsetMinutes > 0 ? '+' : '-';
   const absolute = Math.abs(offsetMinutes);
   const hours = Math.floor(absolute / 60);
   const minutes = absolute % 60;
-  return `GMT${sign}${hours}${minutes ? `:${String(minutes).padStart(2, "0")}` : ""}`;
+  return `GMT${sign}${hours}${minutes ? `:${String(minutes).padStart(2, '0')}` : ''}`;
 }
 
 export function slotAt(day: number, clientY: number, top: number, hourHeight: number): number {
@@ -155,12 +159,25 @@ export function slotAt(day: number, clientY: number, top: number, hourHeight: nu
   return date.getTime();
 }
 
-export function scheduleAt(schedule: Exclude<RoutineSchedule, { type: "interval" | "cron" }>, occurrenceAt: number, nextAt: number): Exclude<RoutineSchedule, { type: "interval" | "cron" }>;
-export function scheduleAt(schedule: RoutineSchedule, occurrenceAt: number, nextAt: number): RoutineSchedule;
-export function scheduleAt(schedule: RoutineSchedule, occurrenceAt: number, nextAt: number): RoutineSchedule {
-  if (schedule.type === "cron") throw new Error(t("routines.cron.editToMove"));
-  if (schedule.type === "once" || schedule.type === "limit_reset") return { type: "once", at: nextAt };
-  if (schedule.type === "interval") {
+export function scheduleAt(
+  schedule: Exclude<RoutineSchedule, { type: 'interval' | 'cron' }>,
+  occurrenceAt: number,
+  nextAt: number,
+): Exclude<RoutineSchedule, { type: 'interval' | 'cron' }>;
+export function scheduleAt(
+  schedule: RoutineSchedule,
+  occurrenceAt: number,
+  nextAt: number,
+): RoutineSchedule;
+export function scheduleAt(
+  schedule: RoutineSchedule,
+  occurrenceAt: number,
+  nextAt: number,
+): RoutineSchedule {
+  if (schedule.type === 'cron') throw new Error(t('routines.cron.editToMove'));
+  if (schedule.type === 'once' || schedule.type === 'limit_reset')
+    return { type: 'once', at: nextAt };
+  if (schedule.type === 'interval') {
     return {
       ...schedule,
       anchorAt: schedule.anchorAt + (nextAt - occurrenceAt),
@@ -168,9 +185,9 @@ export function scheduleAt(schedule: RoutineSchedule, occurrenceAt: number, next
   }
   const dayDelta = Math.round((startOfDay(nextAt) - startOfDay(occurrenceAt)) / 86_400_000);
   return {
-    type: "daily",
+    type: 'daily',
     time: toLocalTimeInput(nextAt),
-    weekdays: schedule.weekdays.map((weekday) => ((weekday + dayDelta) % 7 + 7) % 7).sort(),
+    weekdays: schedule.weekdays.map((weekday) => (((weekday + dayDelta) % 7) + 7) % 7).sort(),
   };
 }
 
@@ -186,7 +203,7 @@ export function projectedRoutineItems(
     .filter((run) => run.scheduledFor >= from && run.scheduledFor < to)
     .sort((left, right) => right.scheduledFor - left.scheduledFor)
     .filter((run) => {
-      if (run.status === "queued" || run.status === "running" || run.status === "waiting") {
+      if (run.status === 'queued' || run.status === 'running' || run.status === 'waiting') {
         return true;
       }
       const count = receiptCounts.get(run.routineId) ?? 0;
@@ -194,24 +211,27 @@ export function projectedRoutineItems(
       receiptCounts.set(run.routineId, count + 1);
       return true;
     });
-  const items: RoutineCalendarItem[] = visibleRuns
-    .map((run) => ({
-      id: `run-${run.id}`,
-      at: run.scheduledFor,
-      durationMinutes: ROUTINE_MARKER_MINUTES,
-      routine: routineById.get(run.routineId) ?? null,
-      run,
-    }));
+  const items: RoutineCalendarItem[] = visibleRuns.map((run) => ({
+    id: `run-${run.id}`,
+    at: run.scheduledFor,
+    durationMinutes: ROUTINE_MARKER_MINUTES,
+    routine: routineById.get(run.routineId) ?? null,
+    run,
+  }));
 
   const hasReceipt = (routineId: string, at: number) =>
     runs.some((run) => run.routineId === routineId && Math.abs(run.scheduledFor - at) < 60_000);
 
   for (const routine of routines) {
     if (!routine.enabled) continue;
-    if (routine.schedule.type === "cron") {
+    if (routine.schedule.type === 'cron') {
       // Never reconstruct work before nextRunAt; bound dense schedules per day so daily routines fill the month.
       if (routine.nextRunAt == null) continue;
-      for (let day = startOfDay(Math.max(from, routine.nextRunAt)); day < to; day = addDays(day, 1)) {
+      for (
+        let day = startOfDay(Math.max(from, routine.nextRunAt));
+        day < to;
+        day = addDays(day, 1)
+      ) {
         const after = Math.max(day, from, routine.createdAt, routine.nextRunAt) - 1;
         const upcoming = nextCronRuns(routine.schedule, after, MAX_CRON_PROJECTIONS_PER_DAY);
         if (!upcoming.length || upcoming[0]! >= to) break;
@@ -219,14 +239,19 @@ export function projectedRoutineItems(
         const end = Math.min(to, addDays(day, 1));
         for (const at of upcoming) {
           if (at >= end) break;
-          if (!hasReceipt(routine.id, at)) items.push({
-            id: `next-${routine.id}-${at}`, at, durationMinutes: ROUTINE_MARKER_MINUTES, routine, run: null,
-          });
+          if (!hasReceipt(routine.id, at))
+            items.push({
+              id: `next-${routine.id}-${at}`,
+              at,
+              durationMinutes: ROUTINE_MARKER_MINUTES,
+              routine,
+              run: null,
+            });
         }
       }
       continue;
     }
-    if (routine.schedule.type === "once") {
+    if (routine.schedule.type === 'once') {
       const at = routine.schedule.at;
       if (at >= from && at < to && !hasReceipt(routine.id, at)) {
         items.push({
@@ -239,7 +264,7 @@ export function projectedRoutineItems(
       }
       continue;
     }
-    if (routine.schedule.type === "interval" || routine.schedule.type === "limit_reset") {
+    if (routine.schedule.type === 'interval' || routine.schedule.type === 'limit_reset') {
       // The scheduler skips overlapping and stale ticks: reconstructing an unreceipted one would resurrect skipped work.
       const at = routine.nextRunAt;
       if (at != null && at >= from && at < to && !hasReceipt(routine.id, at)) {
@@ -275,10 +300,18 @@ export function calendarRangeLabel(from: number, days: number): string {
   const start = new Date(from);
   const end = new Date(to);
   if (days === 1) {
-    return start.toLocaleDateString(intlLocale(), { month: "long", day: "numeric", year: "numeric" });
+    return start.toLocaleDateString(intlLocale(), {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
   }
-  const month = start.getMonth() === end.getMonth() ? "long" : "short";
-  return new Intl.DateTimeFormat(intlLocale(), { month, day: "numeric", year: "numeric" }).formatRange(start, end);
+  const month = start.getMonth() === end.getMonth() ? 'long' : 'short';
+  return new Intl.DateTimeFormat(intlLocale(), {
+    month,
+    day: 'numeric',
+    year: 'numeric',
+  }).formatRange(start, end);
 }
 
 export type CallOccurrence = {
@@ -291,9 +324,14 @@ export type CallOccurrence = {
 export function projectCalls(calls: CalendarCall[], from: number, to: number): CallOccurrence[] {
   const items: CallOccurrence[] = [];
   for (const call of calls) {
-    if (call.schedule.type === "once") {
+    if (call.schedule.type === 'once') {
       if (call.schedule.at >= from && call.schedule.at < to) {
-        items.push({ id: `call-${call.id}-${call.schedule.at}`, at: call.schedule.at, durationMinutes: call.durationMinutes, call });
+        items.push({
+          id: `call-${call.id}-${call.schedule.at}`,
+          at: call.schedule.at,
+          durationMinutes: call.durationMinutes,
+          call,
+        });
       }
       continue;
     }
@@ -301,7 +339,12 @@ export function projectCalls(calls: CalendarCall[], from: number, to: number): C
       if (!call.schedule.weekdays.includes(new Date(day).getDay())) continue;
       const at = atLocalTime(day, call.schedule.time);
       if (at >= from && at < to && at >= call.createdAt) {
-        items.push({ id: `call-${call.id}-${at}`, at, durationMinutes: call.durationMinutes, call });
+        items.push({
+          id: `call-${call.id}-${at}`,
+          at,
+          durationMinutes: call.durationMinutes,
+          call,
+        });
       }
     }
   }

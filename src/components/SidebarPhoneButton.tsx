@@ -1,29 +1,23 @@
-import { useEffect, useState } from "react";
-import { Plus, TabletSmartphone } from "lucide-react";
+import { useEffect, useState } from 'react';
+import { Plus, TabletSmartphone } from 'lucide-react';
 
-import { cn } from "@/lib/cn";
-import { t } from "@/lib/i18n";
-import { phonePairingSettingsAction } from "@/lib/phone-pairing";
-import type { SidebarDensity } from "@/lib/sidebar-preferences";
-import { companionBridge } from "@/lib/companion-bridge";
-import type { CompanionState } from "./PhoneSetupFlow";
+import { cn } from '@/lib/cn';
+import { t } from '@/lib/i18n';
+import { phonePairingSettingsAction } from '@/lib/phone-pairing';
+import type { SidebarDensity } from '@/lib/sidebar-preferences';
+import { companionBridge } from '@/lib/companion-bridge';
+import type { CompanionState } from './PhoneSetupFlow';
 
 export const SIDEBAR_PHONE_RECENT_MS = 2 * 60_000;
 const SIDEBAR_PHONE_POLL_MS = 15_000;
 
 type SidebarPhoneSnapshot = Pick<
   CompanionState,
-  "enabled" | "devices" | "connectedDeviceIds" | "error"
+  'enabled' | 'devices' | 'connectedDeviceIds' | 'error'
 >;
 
 export type SidebarPhoneStatusKind =
-  | "checking"
-  | "unavailable"
-  | "unpaired"
-  | "disconnected"
-  | "connected"
-  | "stale"
-  | "recent";
+  'checking' | 'unavailable' | 'unpaired' | 'disconnected' | 'connected' | 'stale' | 'recent';
 
 export interface SidebarPhoneStatus {
   kind: SidebarPhoneStatusKind;
@@ -37,50 +31,61 @@ export function deriveSidebarPhoneStatus(
   now: number,
 ): SidebarPhoneStatus {
   if (snapshot === undefined) {
-    return { kind: "checking", label: t("sidebar.phone.checking"), pairedCount: 0, connectedCount: 0 };
+    return {
+      kind: 'checking',
+      label: t('sidebar.phone.checking'),
+      pairedCount: 0,
+      connectedCount: 0,
+    };
   }
   if (snapshot === null) {
-    return { kind: "unavailable", label: t("sidebar.phone.unavailable"), pairedCount: 0, connectedCount: 0 };
+    return {
+      kind: 'unavailable',
+      label: t('sidebar.phone.unavailable'),
+      pairedCount: 0,
+      connectedCount: 0,
+    };
   }
 
   const pairedCount = snapshot.devices.length;
   if (snapshot.error) {
     return {
-      kind: "unavailable",
-      label: t("sidebar.phone.unavailable"),
+      kind: 'unavailable',
+      label: t('sidebar.phone.unavailable'),
       pairedCount,
       connectedCount: 0,
     };
   }
   if (!snapshot.enabled) {
     return {
-      kind: "unavailable",
-      label: t("sidebar.phone.off"),
+      kind: 'unavailable',
+      label: t('sidebar.phone.off'),
       pairedCount,
       connectedCount: 0,
     };
   }
   if (!pairedCount) {
-    return { kind: "unpaired", label: t("sidebar.phone.pair"), pairedCount: 0, connectedCount: 0 };
+    return { kind: 'unpaired', label: t('sidebar.phone.pair'), pairedCount: 0, connectedCount: 0 };
   }
 
   if (Array.isArray(snapshot.connectedDeviceIds)) {
     const live = new Set(snapshot.connectedDeviceIds);
     const connectedCount = snapshot.devices.filter((device) => live.has(device.id)).length;
     if (connectedCount) {
-      const label = pairedCount === 1
-        ? t("sidebar.phone.connectedOne")
-        : connectedCount === pairedCount
-          ? t("sidebar.phone.connectedAll", { count: pairedCount })
-          : t("sidebar.phone.connectedSome", { connected: connectedCount, count: pairedCount });
-      return { kind: "connected", label, pairedCount, connectedCount };
+      const label =
+        pairedCount === 1
+          ? t('sidebar.phone.connectedOne')
+          : connectedCount === pairedCount
+            ? t('sidebar.phone.connectedAll', { count: pairedCount })
+            : t('sidebar.phone.connectedSome', { connected: connectedCount, count: pairedCount });
+      return { kind: 'connected', label, pairedCount, connectedCount };
     }
     return {
-      kind: "disconnected",
+      kind: 'disconnected',
       label:
         pairedCount === 1
-          ? t("sidebar.phone.disconnectedOne")
-          : t("sidebar.phone.disconnectedMany", { count: pairedCount }),
+          ? t('sidebar.phone.disconnectedOne')
+          : t('sidebar.phone.disconnectedMany', { count: pairedCount }),
       pairedCount,
       connectedCount: 0,
     };
@@ -91,19 +96,21 @@ export function deriveSidebarPhoneStatus(
     return Number.isFinite(device.lastSeenAt) && age >= 0 && age <= SIDEBAR_PHONE_RECENT_MS;
   }).length;
   if (recentCount) {
-    const label = pairedCount === 1
-      ? t("sidebar.phone.recentOne")
-      : recentCount === pairedCount
-        ? t("sidebar.phone.recentAll", { count: pairedCount })
-        : t("sidebar.phone.recentSome", { recent: recentCount, count: pairedCount });
-    return { kind: "recent", label, pairedCount, connectedCount: 0 };
+    const label =
+      pairedCount === 1
+        ? t('sidebar.phone.recentOne')
+        : recentCount === pairedCount
+          ? t('sidebar.phone.recentAll', { count: pairedCount })
+          : t('sidebar.phone.recentSome', { recent: recentCount, count: pairedCount });
+    return { kind: 'recent', label, pairedCount, connectedCount: 0 };
   }
 
   return {
-    kind: "stale",
-    label: pairedCount === 1
-      ? t("sidebar.phone.staleOne")
-      : t("sidebar.phone.staleMany", { count: pairedCount }),
+    kind: 'stale',
+    label:
+      pairedCount === 1
+        ? t('sidebar.phone.staleOne')
+        : t('sidebar.phone.staleMany', { count: pairedCount }),
     pairedCount,
     connectedCount: 0,
   };
@@ -156,36 +163,34 @@ export function SidebarPhoneStatusButton({
   status: SidebarPhoneStatus;
   onOpen: () => void;
 }) {
-  const connected = status.kind === "connected";
+  const connected = status.kind === 'connected';
   return (
     <button
-      type="button"
+      type='button'
       onClick={onOpen}
       title={status.label}
       aria-label={status.label}
       data-phone-status={status.kind}
       data-sidebar-density={density}
       className={cn(
-        "relative flex size-[46px] shrink-0 items-center justify-center rounded-xl hover:bg-raised",
-        density === "icons" && "mx-auto",
-        connected ? "text-success" : "text-ink-secondary hover:text-ink",
-      )}
-    >
+        'relative flex size-[46px] shrink-0 items-center justify-center rounded-xl hover:bg-raised',
+        density === 'icons' && 'mx-auto',
+        connected ? 'text-success' : 'text-ink-secondary hover:text-ink',
+      )}>
       <TabletSmartphone size={18} strokeWidth={1.8} />
-      {status.kind === "unpaired" && (
+      {status.kind === 'unpaired' && (
         <span
-          aria-hidden="true"
+          aria-hidden='true'
           data-phone-plus
-          className="absolute bottom-1 right-1 flex size-3.5 items-center justify-center rounded-full border border-panel bg-panel"
-        >
+          className='absolute bottom-1 right-1 flex size-3.5 items-center justify-center rounded-full border border-panel bg-panel'>
           <Plus size={10} strokeWidth={2.8} />
         </span>
       )}
       {connected && (
         <span
-          aria-hidden="true"
+          aria-hidden='true'
           data-phone-connected
-          className="absolute bottom-1.5 right-1.5 size-1.5 rounded-full border border-panel bg-success"
+          className='absolute bottom-1.5 right-1.5 size-1.5 rounded-full border border-panel bg-success'
         />
       )}
     </button>

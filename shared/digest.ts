@@ -1,5 +1,5 @@
 // Observed per-turn evidence, shared by server and companion renderers.
-export type HookCoverage = "full" | "preview" | "none";
+export type HookCoverage = 'full' | 'preview' | 'none';
 
 export interface DigestFiles {
   changed: string[];
@@ -29,7 +29,7 @@ export interface TurnDigest {
   /** Tools beyond the busiest MAX_TOOLS, dropped from `tools`. */
   toolsDropped?: number;
   files?: DigestFiles;
-  memory: Array<{ path: string; kind: "created" | "updated" | "deleted" }>;
+  memory: Array<{ path: string; kind: 'created' | 'updated' | 'deleted' }>;
   memoryDropped?: number;
   /** First sentence of the terminal assistant text, at most REPLY_CHARS. */
   reply: string;

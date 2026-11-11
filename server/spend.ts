@@ -1,9 +1,9 @@
 // Monthly spend cap over the usage ledger; enforced only with the `budgets` entitlement.
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import type { AppConfig } from "./config.ts";
-import { entitled } from "./enterprise.ts";
-import { readUsage, usageRowKey } from "./usage-ledger.ts";
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import type { AppConfig } from './config.ts';
+import { entitled } from './enterprise.ts';
+import { readUsage, usageRowKey } from './usage-ledger.ts';
 
 export interface SpendState {
   month: string;
@@ -25,7 +25,8 @@ function monthOf(now: Date): string {
   return now.toISOString().slice(0, 7);
 }
 
-const costOf = (value: unknown): number => (typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0);
+const costOf = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0;
 
 export function monthToDateSpend(dataDir: string, now = new Date()): number {
   const month = monthOf(now);
@@ -33,7 +34,12 @@ export function monthToDateSpend(dataDir: string, now = new Date()): number {
   if (!read || read.month !== month || now.getTime() - read.at >= CACHE_MS) {
     const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const rows = readUsage(dataDir, { from, to: now });
-    read = { at: now.getTime(), month, fileUsd: rows.reduce((sum, row) => sum + costOf(row.costUsd), 0), keys: new Set(rows.map(usageRowKey)) };
+    read = {
+      at: now.getTime(),
+      month,
+      fileUsd: rows.reduce((sum, row) => sum + costOf(row.costUsd), 0),
+      keys: new Set(rows.map(usageRowKey)),
+    };
     cache.set(dataDir, read);
   }
   let pending = 0;
@@ -72,13 +78,19 @@ export function resetSpendCacheForTests(): void {
 }
 
 export function spendState(
-  cfg: Pick<AppConfig, "budgets">,
+  cfg: Pick<AppConfig, 'budgets'>,
   dataDir: string,
   now = new Date(),
   isEntitled: (feature: string) => boolean = entitled,
 ): SpendState | null {
   const monthlyUsd = cfg.budgets?.monthlyUsd;
-  if (!isEntitled("budgets") || typeof monthlyUsd !== "number" || !Number.isFinite(monthlyUsd) || monthlyUsd <= 0) return null;
+  if (
+    !isEntitled('budgets') ||
+    typeof monthlyUsd !== 'number' ||
+    !Number.isFinite(monthlyUsd) ||
+    monthlyUsd <= 0
+  )
+    return null;
   const spentUsd = monthToDateSpend(dataDir, now);
   const warnAtPercent = cfg.budgets?.warnAtPercent ?? DEFAULT_WARN_AT_PERCENT;
   const percent = Math.min(999, Math.round((spentUsd / monthlyUsd) * 100));
@@ -98,7 +110,7 @@ function usd(value: number): string {
 }
 
 export function assertWithinBudget(
-  cfg: Pick<AppConfig, "budgets">,
+  cfg: Pick<AppConfig, 'budgets'>,
   dataDir: string,
   now = new Date(),
   isEntitled: (feature: string) => boolean = entitled,
@@ -106,12 +118,14 @@ export function assertWithinBudget(
   const state = spendState(cfg, dataDir, now, isEntitled);
   if (!state?.exceeded) return;
   throw Object.assign(
-    new Error(`this workspace has reached its monthly spend limit of $${usd(state.monthlyUsd)} — an admin can raise it under Settings → Usage`),
-    { status: 409, code: "spend_cap" },
+    new Error(
+      `this workspace has reached its monthly spend limit of $${usd(state.monthlyUsd)} — an admin can raise it under Settings → Usage`,
+    ),
+    { status: 409, code: 'spend_cap' },
   );
 }
 
-export type SpendAlert = "warn" | "cap";
+export type SpendAlert = 'warn' | 'cap';
 
 interface AlertMarks {
   month: string;
@@ -120,14 +134,14 @@ interface AlertMarks {
   cap?: true;
 }
 
-const ALERTS_FILE = "alerts.json";
+const ALERTS_FILE = 'alerts.json';
 
 function readMarks(dataDir: string): AlertMarks | null {
   try {
-    const value: unknown = JSON.parse(readFileSync(join(dataDir, "usage", ALERTS_FILE), "utf8"));
-    if (typeof value !== "object" || value === null) return null;
+    const value: unknown = JSON.parse(readFileSync(join(dataDir, 'usage', ALERTS_FILE), 'utf8'));
+    if (typeof value !== 'object' || value === null) return null;
     const marks = value as AlertMarks;
-    return typeof marks.month === "string" && typeof marks.monthlyUsd === "number" ? marks : null;
+    return typeof marks.month === 'string' && typeof marks.monthlyUsd === 'number' ? marks : null;
   } catch {
     return null;
   }
@@ -136,18 +150,23 @@ function readMarks(dataDir: string): AlertMarks | null {
 export function takeSpendAlert(dataDir: string, state: SpendState | null): SpendAlert | null {
   if (!state || (!state.warn && !state.exceeded)) return null;
   const saved = readMarks(dataDir) ?? memoryMarks.get(dataDir) ?? null;
-  const marks: AlertMarks = saved && saved.month === state.month && saved.monthlyUsd === state.monthlyUsd
-    ? saved
-    : { month: state.month, monthlyUsd: state.monthlyUsd };
-  const alert: SpendAlert | null = state.exceeded && !marks.cap ? "cap" : state.warn && !marks.warn && !marks.cap ? "warn" : null;
+  const marks: AlertMarks =
+    saved && saved.month === state.month && saved.monthlyUsd === state.monthlyUsd
+      ? saved
+      : { month: state.month, monthlyUsd: state.monthlyUsd };
+  const alert: SpendAlert | null =
+    state.exceeded && !marks.cap ? 'cap' : state.warn && !marks.warn && !marks.cap ? 'warn' : null;
   if (!alert) return null;
-  const next: AlertMarks = { ...marks, warn: true, ...(alert === "cap" ? { cap: true as const } : {}) };
+  const next: AlertMarks = {
+    ...marks,
+    warn: true,
+    ...(alert === 'cap' ? { cap: true as const } : {}),
+  };
   memoryMarks.set(dataDir, next);
   try {
-    mkdirSync(join(dataDir, "usage"), { recursive: true, mode: 0o700 });
-    writeFileSync(join(dataDir, "usage", ALERTS_FILE), JSON.stringify(next), { mode: 0o600 });
-  } catch {
-  }
+    mkdirSync(join(dataDir, 'usage'), { recursive: true, mode: 0o700 });
+    writeFileSync(join(dataDir, 'usage', ALERTS_FILE), JSON.stringify(next), { mode: 0o600 });
+  } catch {}
   return alert;
 }
 const memoryMarks = new Map<string, AlertMarks>();
@@ -156,9 +175,18 @@ export function resetSpendAlertsForTests(): void {
   memoryMarks.clear();
 }
 
-export function spendAlertText(alert: SpendAlert, state: SpendState): { title: string; body: string } {
+export function spendAlertText(
+  alert: SpendAlert,
+  state: SpendState,
+): { title: string; body: string } {
   const spent = `$${state.spentUsd.toFixed(2)} of $${usd(state.monthlyUsd)} spent this month (${state.month})`;
-  return alert === "cap"
-    ? { title: "Monthly spend limit reached", body: `${spent}. New turns are refused until an admin raises the limit under Settings → Usage.` }
-    : { title: `Spend is at ${state.percent}% of the monthly limit`, body: `${spent}. New turns stop when the limit is reached.` };
+  return alert === 'cap'
+    ? {
+        title: 'Monthly spend limit reached',
+        body: `${spent}. New turns are refused until an admin raises the limit under Settings → Usage.`,
+      }
+    : {
+        title: `Spend is at ${state.percent}% of the monthly limit`,
+        body: `${spent}. New turns stop when the limit is reached.`,
+      };
 }

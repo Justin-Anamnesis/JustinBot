@@ -1,13 +1,13 @@
 // Who may act in a bot's browser. A person holding any tab holds the whole profile: every bot call, reads included,
 // is refused, because the person may be typing a password. Underneath, each tab keeps T3 Code's SessionControl, so a
 // takeover drains running work, interrupts queued bot work and revokes refs.
-import { BROWSER_CONTROL_REFUSAL } from "../browser-runtime.ts";
-import { BrowserControlInterrupted, type SessionControl } from "./session-control.ts";
+import { BROWSER_CONTROL_REFUSAL } from '../browser-runtime.ts';
+import { BrowserControlInterrupted, type SessionControl } from './session-control.ts';
 
 export { BROWSER_CONTROL_REFUSAL };
 
 /** The bots' single agent id: one conversation uses a browser at a time, so tabs belong to the profile. */
-export const AGENT = "bot";
+export const AGENT = 'bot';
 
 export interface ControlledTab {
   readonly control: SessionControl;
@@ -51,21 +51,24 @@ export class ProfileControl<T extends ControlledTab = ControlledTab> {
 
   changed(): void {
     for (const listener of this.#listeners) {
-      try { listener(); } catch {}
+      try {
+        listener();
+      } catch {}
     }
   }
 
   /** Bot work, on a tab or the whole browser. A person's takeover during it turns its answer into the refusal. */
   async agent<R>(tab: ControlledTab | null, run: () => Promise<R>): Promise<R> {
     if (this.owner !== null) throw new Error(BROWSER_CONTROL_REFUSAL);
-    if (this.closing) throw new Error("The browser is closing. Try again shortly.");
+    if (this.closing) throw new Error('The browser is closing. Try again shortly.');
     this.agents++;
     try {
       const result = tab ? await tab.control.agent(AGENT, run) : await run();
       if (this.owner !== null) throw new Error(BROWSER_CONTROL_REFUSAL);
       return result;
     } catch (error) {
-      if (error instanceof BrowserControlInterrupted && this.owner !== null) throw new Error(BROWSER_CONTROL_REFUSAL);
+      if (error instanceof BrowserControlInterrupted && this.owner !== null)
+        throw new Error(BROWSER_CONTROL_REFUSAL);
       throw error;
     } finally {
       this.agents--;
@@ -79,26 +82,34 @@ export class ProfileControl<T extends ControlledTab = ControlledTab> {
 
   /** Reserves the browser at once, then waits up to the drain for running bot work; past it, control is granted anyway. */
   async take(owner: string): Promise<TakeResult> {
-    if (!owner) throw new Error("Browser control requires an owner.");
-    if (this.closing || this.releasing) throw new Error("Browser control is changing. Try again shortly.");
-    if (this.owner !== null && this.owner !== owner) throw new Error("Another person controls this browser.");
+    if (!owner) throw new Error('Browser control requires an owner.');
+    if (this.closing || this.releasing)
+      throw new Error('Browser control is changing. Try again shortly.');
+    if (this.owner !== null && this.owner !== owner)
+      throw new Error('Another person controls this browser.');
     if (this.owner === owner && this.ready) return { waited: false, stale: this.stale };
     const waited = this.agents > 0;
     this.owner = owner;
     this.ready = false;
     this.changed();
-    const drained = Promise.all(this.#tabs().map((tab) => tab.control.take(owner).catch(() => undefined)));
+    const drained = Promise.all(
+      this.#tabs().map((tab) => tab.control.take(owner).catch(() => undefined)),
+    );
     const idle = this.#until(() => this.agents === 0);
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const late = new Promise<false>((resolve) => { timer = setTimeout(() => resolve(false), this.#takeoverMs); timer.unref?.(); });
+    const late = new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), this.#takeoverMs);
+      timer.unref?.();
+    });
     const done = await Promise.race([Promise.all([drained, idle]).then(() => true), late]);
     clearTimeout(timer);
-    if (this.owner !== owner || this.closing) throw new Error("Browser control request was cancelled.");
+    if (this.owner !== owner || this.closing)
+      throw new Error('Browser control request was cancelled.');
     if (!done) {
       this.stale = true;
       if (!this.uncertain) {
         this.uncertain = true;
-        this.lostCall = this.call ?? "browser";
+        this.lostCall = this.call ?? 'browser';
       }
     }
     this.ready = true;
@@ -124,7 +135,14 @@ export class ProfileControl<T extends ControlledTab = ControlledTab> {
     try {
       clean = await this.#drain((tab) => {
         let released = true;
-        return tab.control.disconnect(owner, async () => { released = await releaseInput(tab).catch(() => false); }).then(() => released, () => true);
+        return tab.control
+          .disconnect(owner, async () => {
+            released = await releaseInput(tab).catch(() => false);
+          })
+          .then(
+            () => released,
+            () => true,
+          );
       });
     } finally {
       if (this.owner === owner) {
@@ -146,7 +164,9 @@ export class ProfileControl<T extends ControlledTab = ControlledTab> {
    */
   async letGo(owner: string, releaseInput: (tab: T) => Promise<boolean>): Promise<void> {
     if (!owner || this.owner !== owner) return;
-    const clean = await this.#drain((tab) => tab.control.system(() => releaseInput(tab)).catch(() => true));
+    const clean = await this.#drain((tab) =>
+      tab.control.system(() => releaseInput(tab)).catch(() => true),
+    );
     if (clean || this.uncertain) return;
     this.uncertain = true;
     this.lostCall = null;
@@ -158,7 +178,10 @@ export class ProfileControl<T extends ControlledTab = ControlledTab> {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const drained = Promise.all(this.#tabs().map(work)).then((results) => results.every(Boolean));
-      const late = new Promise<false>((resolve) => { timer = setTimeout(() => resolve(false), this.#takeoverMs); timer.unref?.(); });
+      const late = new Promise<false>((resolve) => {
+        timer = setTimeout(() => resolve(false), this.#takeoverMs);
+        timer.unref?.();
+      });
       return await Promise.race([drained, late]);
     } finally {
       clearTimeout(timer);
@@ -166,7 +189,8 @@ export class ProfileControl<T extends ControlledTab = ControlledTab> {
   }
 
   async human<R>(owner: string, tab: ControlledTab, run: () => Promise<R>): Promise<R> {
-    if (!this.canControl(owner)) throw new Error("Take control of this browser before interacting.");
+    if (!this.canControl(owner))
+      throw new Error('Take control of this browser before interacting.');
     this.humans++;
     try {
       return await tab.control.human(owner, run);

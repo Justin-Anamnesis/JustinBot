@@ -1,9 +1,9 @@
-import fs from "node:fs";
-import type { Server } from "node:http";
-import path from "node:path";
+import fs from 'node:fs';
+import type { Server } from 'node:http';
+import path from 'node:path';
 
-const RUNTIME_PREFIX = "omb-companion-origin-";
-const SOCKET_NAME = "origin.sock";
+const RUNTIME_PREFIX = 'omb-companion-origin-';
+const SOCKET_NAME = 'origin.sock';
 
 /** Accept only the private endpoint shape allocated by Electron. A malformed
  * inherited environment value cannot turn this listener into another TCP
@@ -13,7 +13,7 @@ export function companionOriginSocket(
   platform = process.platform,
 ): string | null {
   if (!value) return null;
-  if (platform === "win32") {
+  if (platform === 'win32') {
     return /^\\\\\.\\pipe\\openmausbot-companion-origin-[1-9][0-9]*-[0-9a-f-]{36}$/i.test(value)
       ? value
       : null;
@@ -38,12 +38,12 @@ export function listenCompanionOrigin(
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const onError = (error: Error) => {
-      server.removeListener("listening", onListening);
+      server.removeListener('listening', onListening);
       reject(error);
     };
     const onListening = () => {
-      server.removeListener("error", onError);
-      if (platform !== "win32") {
+      server.removeListener('error', onError);
+      if (platform !== 'win32') {
         try {
           fileSystem.chmodSync(socketPath, 0o600);
         } catch (error) {
@@ -55,13 +55,13 @@ export function listenCompanionOrigin(
           return;
         }
       }
-      server.on("error", (error: Error) => {
+      server.on('error', (error: Error) => {
         console.warn(`companion: private origin error — ${error.message}`);
       });
       resolve();
     };
-    server.once("error", onError);
-    server.once("listening", onListening);
+    server.once('error', onError);
+    server.once('listening', onListening);
     server.listen(socketPath);
   });
 }

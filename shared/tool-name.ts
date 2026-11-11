@@ -3,7 +3,7 @@
 // tool calls needs the identity instead.
 
 /** The generic identity every command-titled chip counts under. */
-export const SHELL_TOOL = "shell";
+export const SHELL_TOOL = 'shell';
 
 /** A tool name that is itself a command line rather than a bare tool name
  * such as `Bash`. Whitespace or a slash: no provider names a tool that way,

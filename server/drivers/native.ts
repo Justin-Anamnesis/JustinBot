@@ -1,11 +1,11 @@
 // Tees every provider-native message beside the canonical stream, so protocol drift shows up in a diff. Lines are held
 // per thread and appended together every FLUSH_MS, when a caller flushes, and at exit.
-import { appendFileSync } from "node:fs";
-import { join } from "node:path";
+import { appendFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { NATIVE_DIR } from "../config.ts";
-import { redactSecrets } from "../redact.ts";
-import { capThreadLog, currentThreadLogCap } from "../thread-log-rotation.ts";
+import { NATIVE_DIR } from '../config.ts';
+import { redactSecrets } from '../redact.ts';
+import { capThreadLog, currentThreadLogCap } from '../thread-log-rotation.ts';
 
 const INLINE_DATA_CHARS = 1024;
 const DATA_URL = /^data:[^,;]{0,100};base64,/;
@@ -17,20 +17,22 @@ let heldChars = 0;
 let timer: ReturnType<typeof setTimeout> | null = null;
 
 function carriesBase64(record: Record<string, unknown>): boolean {
-  return record.type === "base64" || record.type === "image" || imageMedia(record);
+  return record.type === 'base64' || record.type === 'image' || imageMedia(record);
 }
 
 function imageMedia(record: Record<string, unknown>): boolean {
   const media = record.media_type ?? record.mimeType ?? record.mime_type;
-  return typeof media === "string" && media.startsWith("image/");
+  return typeof media === 'string' && media.startsWith('image/');
 }
 
 /** Screenshots and files inline as base64 carry no protocol shape, only their length. */
 function withoutInlineData(value: unknown, depth = 0): unknown {
-  if (typeof value === "string") {
-    return value.length > INLINE_DATA_CHARS && DATA_URL.test(value) ? `[data URL: ${value.length} chars]` : value;
+  if (typeof value === 'string') {
+    return value.length > INLINE_DATA_CHARS && DATA_URL.test(value)
+      ? `[data URL: ${value.length} chars]`
+      : value;
   }
-  if (depth > 12 || value === null || typeof value !== "object") return value;
+  if (depth > 12 || value === null || typeof value !== 'object') return value;
   if (Array.isArray(value)) {
     let changed = false;
     const items = value.map((item) => {
@@ -43,9 +45,13 @@ function withoutInlineData(value: unknown, depth = 0): unknown {
   const record = value as Record<string, unknown>;
   let copy: Record<string, unknown> | undefined;
   for (const [key, child] of Object.entries(record)) {
-    const next = key === "data" && typeof child === "string" && child.length > INLINE_DATA_CHARS && carriesBase64(record)
-      ? `[${record.type === "image" || imageMedia(record) ? "image" : "base64"} data: ${child.length} base64 chars]`
-      : withoutInlineData(child, depth + 1);
+    const next =
+      key === 'data' &&
+      typeof child === 'string' &&
+      child.length > INLINE_DATA_CHARS &&
+      carriesBase64(record)
+        ? `[${record.type === 'image' || imageMedia(record) ? 'image' : 'base64'} data: ${child.length} base64 chars]`
+        : withoutInlineData(child, depth + 1);
     if (next !== child) (copy ??= { ...record })[key] = next;
   }
   return copy ?? value;
@@ -55,21 +61,39 @@ function withoutInlineData(value: unknown, depth = 0): unknown {
  * the assistant message), Codex app-server item deltas (then item/completed), Pi's message and tool updates (then
  * message_end and tool_execution_end). */
 export function streamedFragment(source: string, msg: unknown): boolean {
-  if (msg === null || typeof msg !== "object") return false;
+  if (msg === null || typeof msg !== 'object') return false;
   const record = msg as Record<string, unknown>;
-  if (source === "claude.sdk.message") return record.type === "stream_event" && (record.event as { type?: unknown } | undefined)?.type === "content_block_delta";
-  if (source === "codex.app-server") return typeof record.method === "string" && record.method.startsWith("item/") && /delta$/i.test(record.method);
-  if (source === "pi.rpc") return record.type === "message_update" || record.type === "tool_execution_update";
+  if (source === 'claude.sdk.message')
+    return (
+      record.type === 'stream_event' &&
+      (record.event as { type?: unknown } | undefined)?.type === 'content_block_delta'
+    );
+  if (source === 'codex.app-server')
+    return (
+      typeof record.method === 'string' &&
+      record.method.startsWith('item/') &&
+      /delta$/i.test(record.method)
+    );
+  if (source === 'pi.rpc')
+    return record.type === 'message_update' || record.type === 'tool_execution_update';
   return false;
 }
 
-export function appendNative(threadId: string, entry: { dir: "in" | "out"; source: string; msg: unknown }) {
+export function appendNative(
+  threadId: string,
+  entry: { dir: 'in' | 'out'; source: string; msg: unknown },
+) {
   if (streamedFragment(entry.source, entry.msg)) return;
   let line: string;
   try {
     // Session setup carries agent credentials (boat/comms tokens, MCP headers) and
     // people paste these logs into bug reports, so values are masked.
-    line = JSON.stringify({ at: new Date().toISOString(), ...entry, msg: redactSecrets(withoutInlineData(entry.msg)) }) + "\n";
+    line =
+      JSON.stringify({
+        at: new Date().toISOString(),
+        ...entry,
+        msg: redactSecrets(withoutInlineData(entry.msg)),
+      }) + '\n';
   } catch {
     return;
   }
@@ -78,7 +102,7 @@ export function appendNative(threadId: string, entry: { dir: "in" | "out"; sourc
   else held.set(threadId, [line]);
   heldChars += line.length;
   // What OpenMausBot sent is a few lines a turn, and the line a bug report most needs: it lands at once.
-  if (entry.dir === "out") flushNativeLog(threadId);
+  if (entry.dir === 'out') flushNativeLog(threadId);
   else if (heldChars >= MAX_HELD_CHARS) flushNativeLogs();
   else if (!timer) {
     timer = setTimeout(flushNativeLogs, FLUSH_MS);
@@ -91,7 +115,7 @@ export function flushNativeLog(threadId: string): void {
   if (!lines) return;
   const file = join(NATIVE_DIR, `${threadId}.ndjson`);
   try {
-    appendFileSync(file, lines.join(""), { mode: 0o600 });
+    appendFileSync(file, lines.join(''), { mode: 0o600 });
     capThreadLog(file, currentThreadLogCap());
   } catch {}
 }
@@ -115,4 +139,4 @@ function take(threadId: string): string[] | undefined {
   return lines;
 }
 
-process.once("exit", flushNativeLogs);
+process.once('exit', flushNativeLogs);

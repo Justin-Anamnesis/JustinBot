@@ -1,21 +1,27 @@
-import { captureOutsideHumanControl, type PrivateScreenFrame } from "./private-screen-capture.ts";
+import { captureOutsideHumanControl, type PrivateScreenFrame } from './private-screen-capture.ts';
 
 export type ScreenCapture = () => Promise<{ png: string; format: string }>;
-type Surface = "browser" | "computer";
+type Surface = 'browser' | 'computer';
 
 const TURN_FRAME_LIMIT = 64;
 const turnFrames = new Map<string, { frame: PrivateScreenFrame; at: number }>();
 
 /** The newest desktop frame a turn captured, keyed by the computer resource it held (`computer:box:<id>`), so viewers
  * outside the turn, such as the Team map, reuse it instead of asking the machine again. */
-export function rememberTurnFrame(resource: string | undefined, frame: PrivateScreenFrame, at = Date.now()): void {
+export function rememberTurnFrame(
+  resource: string | undefined,
+  frame: PrivateScreenFrame,
+  at = Date.now(),
+): void {
   if (!resource) return;
   turnFrames.delete(resource);
   turnFrames.set(resource, { frame, at });
   if (turnFrames.size > TURN_FRAME_LIMIT) turnFrames.delete(turnFrames.keys().next().value!);
 }
 
-export function latestTurnFrame(resource: string): { frame: PrivateScreenFrame; at: number } | undefined {
+export function latestTurnFrame(
+  resource: string,
+): { frame: PrivateScreenFrame; at: number } | undefined {
   return turnFrames.get(resource);
 }
 
@@ -31,11 +37,14 @@ export function createScreenFrameSource(input: {
   let attemptedSurface: Surface | undefined;
   let last: PrivateScreenFrame | null = null;
   let lastSurface: Surface | undefined;
-  const selectedSurface = (): Surface => input.captures[source.surface]
-    ? source.surface
-    : input.captures.computer ? "computer" : "browser";
+  const selectedSurface = (): Surface =>
+    input.captures[source.surface]
+      ? source.surface
+      : input.captures.computer
+        ? 'computer'
+        : 'browser';
   const source = {
-    surface: (input.captures.computer ? "computer" : "browser") as Surface,
+    surface: (input.captures.computer ? 'computer' : 'browser') as Surface,
     get last(): PrivateScreenFrame | null {
       return lastSurface === selectedSurface() ? last : null;
     },

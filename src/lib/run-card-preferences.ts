@@ -1,6 +1,6 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-export const RUN_CARD_KEY = "omb-show-run-card";
+export const RUN_CARD_KEY = 'omb-show-run-card';
 
 let sessionChoice: boolean | undefined;
 const listeners = new Set<() => void>();
@@ -16,7 +16,7 @@ function storage(): Storage | undefined {
 function showRunCard(): boolean {
   if (sessionChoice !== undefined) return sessionChoice;
   try {
-    return storage()?.getItem(RUN_CARD_KEY) !== "0";
+    return storage()?.getItem(RUN_CARD_KEY) !== '0';
   } catch {
     return true;
   }
@@ -35,13 +35,13 @@ function onStorage(event: StorageEvent) {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (listeners.size === 1 && typeof window !== "undefined") {
-    window.addEventListener("storage", onStorage);
+  if (listeners.size === 1 && typeof window !== 'undefined') {
+    window.addEventListener('storage', onStorage);
   }
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && typeof window !== "undefined") {
-      window.removeEventListener("storage", onStorage);
+    if (listeners.size === 0 && typeof window !== 'undefined') {
+      window.removeEventListener('storage', onStorage);
     }
   };
 }
@@ -49,9 +49,8 @@ function subscribe(listener: () => void): () => void {
 export function setShowRunCard(enabled: boolean): void {
   sessionChoice = enabled;
   try {
-    storage()?.setItem(RUN_CARD_KEY, enabled ? "1" : "0");
-  } catch {
-  }
+    storage()?.setItem(RUN_CARD_KEY, enabled ? '1' : '0');
+  } catch {}
   notify();
 }
 

@@ -1,5 +1,10 @@
-import { companionE2EMessage, createE2EIdentity, readE2EIdentity, withE2EIdentity } from "./e2e-identity.mjs";
-import { createRelayTokenService } from "./relay-token.mjs";
+import {
+  companionE2EMessage,
+  createE2EIdentity,
+  readE2EIdentity,
+  withE2EIdentity,
+} from './e2e-identity.mjs';
+import { createRelayTokenService } from './relay-token.mjs';
 
 const RECHECK_MS = 30_000;
 /** A legacy phone (paired before the encrypted connection) still needs the tunnel while it was seen this recently. */
@@ -15,11 +20,11 @@ export function deviceCounts(state) {
 /** The relay is needed while the companion runs, the person has Anywhere, through MausBot on, and a phone could use it:
  * one not restricted to Wi-Fi and Tailscale, or a pairing window. Null when that can't be told. */
 export function relayNeed(state) {
-  if (!state || typeof state !== "object") return null;
+  if (!state || typeof state !== 'object') return null;
   if (state.enabled !== true || state.routes?.relay?.on !== true) return false;
   if (state.error) return null;
   if (state.devicesUnreadable === true || !Array.isArray(state.devices)) return null;
-  return Boolean(state.pairing) || state.devices.some((device) => device?.routes !== "local");
+  return Boolean(state.pairing) || state.devices.some((device) => device?.routes !== 'local');
 }
 
 /** The end-to-end connection for the desktop app: the transport key, the relay token, and what the sidecar is told.
@@ -51,7 +56,7 @@ export function createCompanionE2E({
     const created = createE2EIdentity();
     await updateCredentials((credentials) => withE2EIdentity(credentials, created));
     identity = created;
-    log("e2e: connection key created");
+    log('e2e: connection key created');
     return identity;
   }
 
@@ -59,7 +64,9 @@ export function createCompanionE2E({
     fetchGrant: () => fetchGrant(deviceCounts(lastState)),
     onGrant: (grant) => {
       if (!grant) return sync();
-      void ensureIdentity().then(sync, (error) => log(`e2e: connection key unavailable: ${error?.message ?? error}`));
+      void ensureIdentity().then(sync, (error) =>
+        log(`e2e: connection key unavailable: ${error?.message ?? error}`),
+      );
     },
     log,
   });
@@ -98,7 +105,7 @@ export function createCompanionE2E({
     tokenRejected: () => void tokens.refreshNow(),
     /** The computer woke: the sidecar redials now, and the token may have lapsed while asleep. */
     resumed() {
-      post({ type: "openmausbot:companion-e2e-redial" });
+      post({ type: 'openmausbot:companion-e2e-redial' });
       void tokens.refreshNow();
     },
   };

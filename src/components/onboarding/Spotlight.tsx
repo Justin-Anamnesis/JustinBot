@@ -1,9 +1,9 @@
-import { useEffect, useLayoutEffect, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { MausAvatar } from "@/components/Avatar";
-import { cn } from "@/lib/cn";
-import type { MausState } from "@/lib/mascot";
-import { reducedMotion } from "@/lib/onboarding";
+import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { MausAvatar } from '@/components/Avatar';
+import { cn } from '@/lib/cn';
+import type { MausState } from '@/lib/mascot';
+import { reducedMotion } from '@/lib/onboarding';
 
 const PAD = 8;
 const RADIUS = 14;
@@ -13,13 +13,21 @@ const GAP = 12;
 type Rect = { x: number; y: number; w: number; h: number };
 
 function measure(anchor: string): Rect | null {
-  const all = Array.from(
-    document.querySelectorAll<HTMLElement>(`[data-tour="${anchor}"]`),
-  ).filter((el) => el.getClientRects().length > 0);
+  const all = Array.from(document.querySelectorAll<HTMLElement>(`[data-tour="${anchor}"]`)).filter(
+    (el) => el.getClientRects().length > 0,
+  );
   const el = all[all.length - 1];
   if (!el) return null;
   const r = el.getBoundingClientRect();
-  if (r.width === 0 || r.height === 0 || r.right <= 0 || r.left >= window.innerWidth || r.bottom <= 0 || r.top >= window.innerHeight) return null;
+  if (
+    r.width === 0 ||
+    r.height === 0 ||
+    r.right <= 0 ||
+    r.left >= window.innerWidth ||
+    r.bottom <= 0 ||
+    r.top >= window.innerHeight
+  )
+    return null;
   return {
     x: r.left - PAD,
     y: r.top - PAD,
@@ -29,7 +37,7 @@ function measure(anchor: string): Rect | null {
 }
 
 function cutout(r: Rect | null): string {
-  if (!r) return "polygon(0 0, 100% 0, 100% 100%, 0 100%)";
+  if (!r) return 'polygon(0 0, 100% 0, 100% 100%, 0 100%)';
   const x1 = r.x,
     y1 = r.y,
     x2 = r.x + r.w,
@@ -45,7 +53,7 @@ interface Action {
 export function Spotlight({
   anchor,
   placement,
-  mascot = "curious",
+  mascot = 'curious',
   children,
   progress,
   primary,
@@ -53,7 +61,7 @@ export function Spotlight({
   onDone,
 }: {
   anchor: string | null;
-  placement: "above" | "below" | "right";
+  placement: 'above' | 'below' | 'right';
   mascot?: MausState;
   children: ReactNode;
   progress?: string;
@@ -72,9 +80,7 @@ export function Spotlight({
     let frame = 0;
     const update = () => {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() =>
-        setRect((prev) => measure(anchor) ?? prev),
-      );
+      frame = requestAnimationFrame(() => setRect((prev) => measure(anchor) ?? prev));
     };
     update();
     const el = document.querySelector<HTMLElement>(`[data-tour="${anchor}"]`);
@@ -85,16 +91,16 @@ export function Spotlight({
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["class", "style"],
+      attributeFilter: ['class', 'style'],
     });
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
     return () => {
       cancelAnimationFrame(frame);
       ro?.disconnect();
       mo.disconnect();
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
     };
   }, [anchor]);
 
@@ -109,10 +115,10 @@ export function Spotlight({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDone();
+      if (e.key === 'Escape') onDone();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [onDone]);
 
   if (anchor && !rect) return null;
@@ -123,11 +129,7 @@ export function Spotlight({
   let transform: string;
   let below = true;
   let beside = false;
-  if (
-    rect &&
-    placement === "right" &&
-    rect.x + rect.w + GAP + cardWidth <= viewportW - 12
-  ) {
+  if (rect && placement === 'right' && rect.x + rect.w + GAP + cardWidth <= viewportW - 12) {
     beside = true;
     transform = `translate3d(${rect.x + rect.w + GAP}px, ${Math.max(12, Math.min(rect.y + rect.h / 2 - 70, viewportH - 180))}px, 0)`;
   } else if (rect) {
@@ -135,7 +137,7 @@ export function Spotlight({
     const roomBelow = viewportH - (rect.y + rect.h) - GAP;
     const roomAbove = rect.y - GAP;
     below =
-      placement === "below"
+      placement === 'below'
         ? roomBelow >= 140 || roomAbove < roomBelow
         : roomAbove < 140 && roomBelow > roomAbove;
     if (roomBelow < 140 && roomAbove < 140) {
@@ -147,22 +149,19 @@ export function Spotlight({
         : `translate3d(${left}px, calc(${rect.y - GAP}px - 100%), 0)`;
     }
   } else {
-    transform = "translate3d(calc(50vw - 50%), calc(50vh - 50%), 0)";
+    transform = 'translate3d(calc(50vw - 50%), calc(50vh - 50%), 0)';
   }
 
   return createPortal(
-    <div
-      className="pointer-events-none fixed inset-0 z-[60]"
-      aria-live="polite"
-    >
+    <div className='pointer-events-none fixed inset-0 z-[60]' aria-live='polite'>
       <div
-        className="absolute inset-0 bg-black/55 transition-[clip-path] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+        className='absolute inset-0 bg-black/55 transition-[clip-path] duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none'
         style={{ clipPath: cutout(settled ? rect : null) }}
-        aria-hidden="true"
+        aria-hidden='true'
       />
       {rect && (
         <div
-          className="absolute ring-2 ring-accent transition-opacity duration-300"
+          className='absolute ring-2 ring-accent transition-opacity duration-300'
           style={{
             left: rect.x,
             top: rect.y,
@@ -171,68 +170,54 @@ export function Spotlight({
             opacity: settled ? 1 : 0,
             borderRadius: RADIUS,
             boxShadow:
-              "0 0 0 5px color-mix(in srgb, var(--color-accent) 28%, transparent), 0 0 36px 6px color-mix(in srgb, var(--color-accent) 30%, transparent)",
+              '0 0 0 5px color-mix(in srgb, var(--color-accent) 28%, transparent), 0 0 36px 6px color-mix(in srgb, var(--color-accent) 30%, transparent)',
           }}
-          aria-hidden="true"
+          aria-hidden='true'
         />
       )}
       {/* Outer layer positions (transition), inner layer enters (keyframes): the two never fight over transform. */}
       <div
         data-tour-card
-        className="pointer-events-auto absolute left-0 top-0 w-[320px] transition-transform duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
-        style={{ transform, width: cardWidth }}
-      >
+        className='pointer-events-auto absolute left-0 top-0 w-[320px] transition-transform duration-[320ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none'
+        style={{ transform, width: cardWidth }}>
         <div
-          role="dialog"
+          role='dialog'
           className={cn(
-            "flex items-start gap-3 rounded-2xl border border-hairline/50 bg-panel p-3.5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]",
+            'flex items-start gap-3 rounded-2xl border border-hairline/50 bg-panel p-3.5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.6)]',
             rect
               ? beside
-                ? "origin-left"
+                ? 'origin-left'
                 : below
-                  ? "origin-top-left"
-                  : "origin-bottom-left"
-              : "origin-center",
-            settled ? "animate-spot-in motion-reduce:animate-none" : "opacity-0",
-          )}
-        >
-          <div className="shrink-0 drop-shadow-[0_6px_14px_rgba(0,0,0,0.35)]">
-            <MausAvatar
-              color="green"
-              state={mascot}
-              size={38}
-              trackPointer={false}
-            />
+                  ? 'origin-top-left'
+                  : 'origin-bottom-left'
+              : 'origin-center',
+            settled ? 'animate-spot-in motion-reduce:animate-none' : 'opacity-0',
+          )}>
+          <div className='shrink-0 drop-shadow-[0_6px_14px_rgba(0,0,0,0.35)]'>
+            <MausAvatar color='green' state={mascot} size={38} trackPointer={false} />
           </div>
           <div
-            key={anchor ?? "centre"}
-            className="min-w-0 flex-1 animate-rise motion-reduce:animate-none"
-          >
-            <div className="text-[14px] leading-relaxed text-ink">
-              {children}
-            </div>
-            <div className="mt-2.5 flex items-center gap-3">
+            key={anchor ?? 'centre'}
+            className='min-w-0 flex-1 animate-rise motion-reduce:animate-none'>
+            <div className='text-[14px] leading-relaxed text-ink'>{children}</div>
+            <div className='mt-2.5 flex items-center gap-3'>
               {primary && (
                 <button
-                  type="button"
+                  type='button'
                   autoFocus
                   onClick={primary.onClick}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-transform duration-150 active:scale-[0.98]"
-                >
+                  className='rounded-lg bg-accent px-3 py-1.5 text-[13px] font-medium text-white transition-transform duration-150 active:scale-[0.98]'>
                   {primary.label}
                 </button>
               )}
               {progress && (
-                <span className="text-[12px] tabular-nums text-ink-secondary">
-                  {progress}
-                </span>
+                <span className='text-[12px] tabular-nums text-ink-secondary'>{progress}</span>
               )}
               {secondary && (
                 <button
-                  type="button"
+                  type='button'
                   onClick={secondary.onClick}
-                  className="ml-auto text-[12px] text-ink-secondary transition-colors hover:text-ink"
-                >
+                  className='ml-auto text-[12px] text-ink-secondary transition-colors hover:text-ink'>
                   {secondary.label}
                 </button>
               )}

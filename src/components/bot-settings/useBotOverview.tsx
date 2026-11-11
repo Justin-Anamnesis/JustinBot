@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 
-import { api, useStore, type Bot } from "@/state/store";
-import type { BotOverview } from "@/lib/bot-overview-types";
-import { ConfirmDialog } from "../ConfirmDialog";
-import type { HistoryRow } from "./HistorySection";
-import type { PromptPreviewData } from "./PromptPreview";
-import { t } from "@/lib/i18n";
+import { api, useStore, type Bot } from '@/state/store';
+import type { BotOverview } from '@/lib/bot-overview-types';
+import { ConfirmDialog } from '../ConfirmDialog';
+import type { HistoryRow } from './HistorySection';
+import type { PromptPreviewData } from './PromptPreview';
+import { t } from '@/lib/i18n';
 
 /**
  * Reads the bot's overview and prompt preview while `want` asks for them. By default every change to the bot's facts
@@ -13,7 +13,10 @@ import { t } from "@/lib/i18n";
  * (its Instructions field patches on every keystroke), and a read first flushes the patch queue, so following edits
  * there would save, record a history row and read once per keystroke.
  */
-export function useBotOverview(bot: Bot, want: { overview: boolean; prompt: boolean; followEdits?: boolean }) {
+export function useBotOverview(
+  bot: Bot,
+  want: { overview: boolean; prompt: boolean; followEdits?: boolean },
+) {
   const { state, flushBotPatches } = useStore();
   const [overview, setOverview] = useState<BotOverview | null>(null);
   const [overviewError, setOverviewError] = useState(false);
@@ -110,7 +113,10 @@ export function useBotHistory(bot: Bot, active: boolean) {
   const [revision, setRevision] = useState<string | null>(null);
   const request = useRef(0);
   const [rollingBack, setRollingBack] = useState(false);
-  const [rollbackTarget, setRollbackTarget] = useState<{ id: string; expectedRevision: string } | null>(null);
+  const [rollbackTarget, setRollbackTarget] = useState<{
+    id: string;
+    expectedRevision: string;
+  } | null>(null);
 
   const load = useCallback(() => {
     const current = ++request.current;
@@ -130,7 +136,9 @@ export function useBotHistory(bot: Bot, active: boolean) {
   useEffect(() => {
     if (!active) return;
     void load();
-    return () => { request.current++; };
+    return () => {
+      request.current++;
+    };
   }, [active, load]);
 
   const rollback = async (target: { id: string; expectedRevision: string }) => {
@@ -140,11 +148,14 @@ export function useBotHistory(bot: Bot, active: boolean) {
     try {
       await flushBotPatches(bot.id);
       await api(`/api/bots/${bot.id}/history/rollback`, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify(target),
       });
     } catch (e: unknown) {
-      dispatch({ type: "error", message: e instanceof Error ? e.message : t("botOverview.undoFailed") });
+      dispatch({
+        type: 'error',
+        message: e instanceof Error ? e.message : t('botOverview.undoFailed'),
+      });
     } finally {
       await load();
       setRollingBack(false);
@@ -155,10 +166,22 @@ export function useBotHistory(bot: Bot, active: boolean) {
     if (revision) setRollbackTarget({ id, expectedRevision: revision });
   };
 
-  return { rows, error, revision, rollingBack, rollbackTarget, setRollbackTarget, rollback, requestRollback };
+  return {
+    rows,
+    error,
+    revision,
+    rollingBack,
+    rollbackTarget,
+    setRollbackTarget,
+    rollback,
+    requestRollback,
+  };
 }
 
-export function HistoryRollbackDialog({ history, returnFocusRef }: {
+export function HistoryRollbackDialog({
+  history,
+  returnFocusRef,
+}: {
   history: ReturnType<typeof useBotHistory>;
   returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
@@ -166,13 +189,15 @@ export function HistoryRollbackDialog({ history, returnFocusRef }: {
   return (
     <ConfirmDialog
       open={rollbackTarget !== null}
-      title={t("botOverview.restoreSoul.title")}
-      body={t("botOverview.restoreSoul.body")}
-      confirmLabel={t("botOverview.restoreSoul.confirm")}
-      tone="neutral"
+      title={t('botOverview.restoreSoul.title')}
+      body={t('botOverview.restoreSoul.body')}
+      confirmLabel={t('botOverview.restoreSoul.confirm')}
+      tone='neutral'
       returnFocusRef={returnFocusRef}
       onCancel={() => setRollbackTarget(null)}
-      onConfirm={() => { if (rollbackTarget) void rollback(rollbackTarget); }}
+      onConfirm={() => {
+        if (rollbackTarget) void rollback(rollbackTarget);
+      }}
     />
   );
 }

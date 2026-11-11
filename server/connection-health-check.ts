@@ -32,11 +32,13 @@ export function jitteredWait(base: number, random: () => number): number {
 export function createBackgroundCheck<Ref, Outcome>(deps: BackgroundCheckDeps<Ref, Outcome>) {
   const now = deps.now ?? Date.now;
   const random = deps.random ?? Math.random;
-  const setTimer = deps.setTimer ?? ((run, ms) => {
-    const timer = setTimeout(run, ms);
-    timer.unref?.();
-    return { cancel: () => clearTimeout(timer) };
-  });
+  const setTimer =
+    deps.setTimer ??
+    ((run, ms) => {
+      const timer = setTimeout(run, ms);
+      timer.unref?.();
+      return { cancel: () => clearTimeout(timer) };
+    });
   let timer: { cancel(): void } | null = null;
   let running: AbortController | null = null;
   let stopped = true;
@@ -51,7 +53,13 @@ export function createBackgroundCheck<Ref, Outcome>(deps: BackgroundCheckDeps<Re
     try {
       const outcome = await deps.check(ref, running.signal).catch(() => null);
       const woke = deps.wokeAt();
-      if (outcome === null || deps.asleep() || (woke !== null && woke >= startedAt) || running.signal.aborted) return null;
+      if (
+        outcome === null ||
+        deps.asleep() ||
+        (woke !== null && woke >= startedAt) ||
+        running.signal.aborted
+      )
+        return null;
       deps.record(ref, outcome);
       return ref;
     } finally {
@@ -61,7 +69,9 @@ export function createBackgroundCheck<Ref, Outcome>(deps: BackgroundCheckDeps<Re
   const schedule = (ms: number) => {
     timer = setTimer(() => {
       if (stopped) return;
-      void tick().finally(() => { if (!stopped) schedule(jitteredWait(CHECK_EVERY_MS, random)); });
+      void tick().finally(() => {
+        if (!stopped) schedule(jitteredWait(CHECK_EVERY_MS, random));
+      });
     }, ms);
   };
 

@@ -1,7 +1,7 @@
 // A stand-in for the bot's browser in fill_login tests: one happy-dom page answering the engine commands
 // login-fill sends and taking typed text, keys and clicks like the input relay. It records every engine command, so a
 // test can prove no secret went through one.
-import { Window } from "happy-dom";
+import { Window } from 'happy-dom';
 
 /** What the site does with a sent form: show another page (a sign-in that worked, or a next step), or stay and say why. */
 export type SiteAnswer = { navigate: { url: string; html: string } } | { error: string } | null;
@@ -39,23 +39,34 @@ export class FakeLoginPage {
     const box = window.HTMLIFrameElement.prototype.getBoundingClientRect;
     window.HTMLIFrameElement.prototype.getBoundingClientRect = function (this: never) {
       const size = frameSize();
-      return size ? { x: 0, y: 0, top: 0, left: 0, right: size.width, bottom: size.height, ...size, toJSON: () => size } as never : box.call(this);
+      return size
+        ? ({
+            x: 0,
+            y: 0,
+            top: 0,
+            left: 0,
+            right: size.width,
+            bottom: size.height,
+            ...size,
+            toJSON: () => size,
+          } as never)
+        : box.call(this);
     };
     window.document.body.innerHTML = html;
     // After the page's own handlers: a form nobody's script kept goes to the site, never to happy-dom's own loader.
-    window.addEventListener("submit", (event) => {
+    window.addEventListener('submit', (event) => {
       if (!event.defaultPrevented) this.submitting = event.target;
       event.preventDefault();
     });
-    window.document.addEventListener("input", (event) => {
+    window.document.addEventListener('input', (event) => {
       const target = event.target as unknown as { name?: string; id?: string; value?: string };
-      this.state[target.name || target.id || "?"] = target.value ?? "";
+      this.state[target.name || target.id || '?'] = target.value ?? '';
     });
     return window;
   }
 
   navigate(url: string, html: string): void {
-    this.window.dispatchEvent(new this.window.Event("beforeunload"));
+    this.window.dispatchEvent(new this.window.Event('beforeunload'));
     void this.window.happyDOM.close();
     this.window = this.open(url, html);
   }
@@ -67,22 +78,33 @@ export class FakeLoginPage {
   /** What the engine answers: its `data`, or null for a stopped browser. */
   async engine(args: string[]): Promise<Record<string, unknown> | null> {
     this.engineCalls.push(args);
-    if (args[0] === "get" && args[1] === "url") return { url: this.window.location.href };
-    if (args[0] === "eval") return { result: this.window.eval(args[1]!) as unknown };
-    if (args[0] === "stream" && args[1] === "status") return this.streamEnabled ? { enabled: true, port: this.streamPort } : { enabled: false };
-    if (args[0] === "stream" && args[1] === "enable") { this.streamEnabled = true; return { enabled: true, port: this.streamPort }; }
+    if (args[0] === 'get' && args[1] === 'url') return { url: this.window.location.href };
+    if (args[0] === 'eval') return { result: this.window.eval(args[1]!) as unknown };
+    if (args[0] === 'stream' && args[1] === 'status')
+      return this.streamEnabled ? { enabled: true, port: this.streamPort } : { enabled: false };
+    if (args[0] === 'stream' && args[1] === 'enable') {
+      this.streamEnabled = true;
+      return { enabled: true, port: this.streamPort };
+    }
     throw new Error(`unexpected engine command: ${args[0]}`);
   }
 
   /** `keyboard insertText` over the relay: into the focused field at its caret, with beforeinput and input events. */
   async insertText(text: string): Promise<void> {
     this.typed.push(text);
-    const field = this.window.document.activeElement as unknown as { value: string; dispatchEvent(event: unknown): boolean } | null;
-    if (!field || typeof field.value !== "string") return;
+    const field = this.window.document.activeElement as unknown as {
+      value: string;
+      dispatchEvent(event: unknown): boolean;
+    } | null;
+    if (!field || typeof field.value !== 'string') return;
     const InputEvent = this.window.InputEvent;
-    field.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, data: text, inputType: "insertText" }));
+    field.dispatchEvent(
+      new InputEvent('beforeinput', { bubbles: true, data: text, inputType: 'insertText' }),
+    );
     field.value += text;
-    field.dispatchEvent(new InputEvent("input", { bubbles: true, data: text, inputType: "insertText" }));
+    field.dispatchEvent(
+      new InputEvent('input', { bubbles: true, data: text, inputType: 'insertText' }),
+    );
   }
 
   /** A key at the focused element. Enter in a form's field sends the form when a browser would: it has a submit button,
@@ -91,31 +113,49 @@ export class FakeLoginPage {
     this.pressed.push(key);
     this.onKey?.(key);
     const field = this.window.document.activeElement as unknown as { form?: unknown } | null;
-    const form = field?.form as unknown as { requestSubmit(): void; querySelectorAll(selector: string): ArrayLike<{ type?: string }> } | null | undefined;
-    if (key !== "Enter" || !form) return;
-    const buttons = Array.from(form.querySelectorAll("button, input[type=submit]")).filter((el) => el.type === "submit");
-    if (buttons.length || form.querySelectorAll("input:not([type=hidden])").length === 1) form.requestSubmit();
+    const form = field?.form as unknown as
+      | { requestSubmit(): void; querySelectorAll(selector: string): ArrayLike<{ type?: string }> }
+      | null
+      | undefined;
+    if (key !== 'Enter' || !form) return;
+    const buttons = Array.from(form.querySelectorAll('button, input[type=submit]')).filter(
+      (el) => el.type === 'submit',
+    );
+    if (buttons.length || form.querySelectorAll('input:not([type=hidden])').length === 1)
+      form.requestSubmit();
     this.deliver();
   }
 
   /** A real click: the page's handlers run, and a submit button then sends its form unless they kept it. */
   async click(selector: string): Promise<void> {
     this.clicked.push(selector);
-    const el = this.window.document.querySelector(selector) as unknown as { dispatchEvent(event: unknown): boolean } | null;
+    const el = this.window.document.querySelector(selector) as unknown as {
+      dispatchEvent(event: unknown): boolean;
+    } | null;
     if (!el) throw new Error(`Element not found: ${selector}`);
-    el.dispatchEvent(new this.window.MouseEvent("click", { bubbles: true, cancelable: true }));
+    el.dispatchEvent(new this.window.MouseEvent('click', { bubbles: true, cancelable: true }));
     this.deliver();
   }
 
   private deliver(): void {
-    const element = this.submitting as { querySelectorAll(selector: string): ArrayLike<{ name?: string; value?: string }> } | null;
+    const element = this.submitting as {
+      querySelectorAll(selector: string): ArrayLike<{ name?: string; value?: string }>;
+    } | null;
     this.submitting = null;
     if (!element) return;
-    const fields = Object.fromEntries(Array.from(element.querySelectorAll("input")).filter((el) => el.name).map((el) => [el.name!, el.value ?? ""]));
+    const fields = Object.fromEntries(
+      Array.from(element.querySelectorAll('input'))
+        .filter((el) => el.name)
+        .map((el) => [el.name!, el.value ?? '']),
+    );
     this.sent.push(fields);
     const answer = this.answer?.(fields) ?? null;
-    if (answer && "navigate" in answer) this.navigate(answer.navigate.url, answer.navigate.html);
-    else if (answer && "error" in answer) this.window.document.body.insertAdjacentHTML("afterbegin", `<p role="alert">${answer.error}</p>`);
+    if (answer && 'navigate' in answer) this.navigate(answer.navigate.url, answer.navigate.html);
+    else if (answer && 'error' in answer)
+      this.window.document.body.insertAdjacentHTML(
+        'afterbegin',
+        `<p role="alert">${answer.error}</p>`,
+      );
   }
 
   close(): void {

@@ -24,7 +24,7 @@ const markdownComponents: Components = {
   h1: ({ node: _node, ...props }) => <h3 {...props} />,
   h2: ({ node: _node, ...props }) => <h3 {...props} />,
   h3: ({ node: _node, ...props }) => <h4 {...props} />,
-  a: ({ node: _node, ...props }) => <a {...props} rel="noreferrer" target="_blank" />,
+  a: ({ node: _node, ...props }) => <a {...props} rel='noreferrer' target='_blank' />,
 };
 
 function displayVersion(release: GitHubRelease) {
@@ -87,7 +87,8 @@ async function fetchPublishedReleases(repository: string): Promise<GitHubRelease
       if (!Array.isArray(pageReleases)) throw new Error('GitHub returned an invalid release list');
       releases.push(...(pageReleases as GitHubRelease[]));
       if (pageReleases.length < RELEASES_PER_PAGE) break;
-      if (page === MAX_RELEASE_PAGES) throw new Error('release history exceeded the pagination limit');
+      if (page === MAX_RELEASE_PAGES)
+        throw new Error('release history exceeded the pagination limit');
     }
     return releases.filter(
       (release) => !release.draft && !release.prerelease && release.published_at,
@@ -129,25 +130,23 @@ export async function ReleaseChangelog() {
     return (
       <p>
         The live release history is temporarily unavailable.{' '}
-        <a href="https://github.com/milind-soni/OpenMausBot/releases">Browse releases on GitHub</a>.
+        <a href='https://github.com/milind-soni/OpenMausBot/releases'>Browse releases on GitHub</a>.
       </p>
     );
   }
 
   return (
-    <div className="mt-8">
+    <div className='mt-8'>
       {releases.map((release) => {
         const version = displayVersion(release);
         return (
-          <article className="mb-12" key={release.tag_name}>
+          <article className='mb-12' key={release.tag_name}>
             <h2>
               {version} — {displayDate(release.published_at!)}
             </h2>
-            <ReactMarkdown components={markdownComponents}>
-              {releaseNotes(release)}
-            </ReactMarkdown>
+            <ReactMarkdown components={markdownComponents}>{releaseNotes(release)}</ReactMarkdown>
             <p>
-              <a href={release.html_url} rel="noreferrer" target="_blank">
+              <a href={release.html_url} rel='noreferrer' target='_blank'>
                 Full {version} release notes
               </a>
             </p>

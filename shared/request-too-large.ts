@@ -5,7 +5,8 @@ export function requestTooLargeMessage(model: string): string {
   return `This message is too large for ${model}. Start a new chat or pick a model that accepts more.`;
 }
 
-const REFUSED = /^This message is too large for (.+)\. Start a new chat or pick a model that accepts more\.$/;
+const REFUSED =
+  /^This message is too large for (.+)\. Start a new chat or pick a model that accepts more\.$/;
 
 /** The model a failed turn's cause says refused the message's size, or null for any other failure. */
 export function requestTooLargeModel(cause: string): string | null {

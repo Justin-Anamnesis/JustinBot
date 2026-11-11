@@ -16,7 +16,9 @@ export function openPage(threadId: string, page: OpenPage): void {
 
 export function onPageOpened(listener: () => void): () => void {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 /** Only the page that opened clears itself, so closing an old pane never drops a newer one. */

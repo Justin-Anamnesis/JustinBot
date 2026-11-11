@@ -1,7 +1,7 @@
 /** The line a wait (wait_until) posted when it ended (`WireMessage.wait`). */
 export interface WaitLine {
   id: string;
-  status: "fired" | "expired" | "stopped";
+  status: 'fired' | 'expired' | 'stopped';
 }
 
 /** `WireMessage.wait`: set on the line a wait posted when it ended. */
@@ -14,7 +14,7 @@ export interface WaitCardData {
   waitId: string;
   label: string;
   followUp: string;
-  settled?: "fired" | "expired" | "cancelled";
+  settled?: 'fired' | 'expired' | 'cancelled';
 }
 
 /** `OptionCardData.waitRequest`: set on the card a wait with a follow-up showed. */

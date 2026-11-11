@@ -9,7 +9,8 @@ export const waitedLong = (since: number, now: number): boolean => now - since >
 /** "since yesterday", "for 3 days". */
 export function waitedWords(since: number, now: number): string {
   const days = Math.floor((now - since) / LONG_WAIT_MS);
-  return days <= 1 ? "since yesterday" : `for ${days} days`;
+  return days <= 1 ? 'since yesterday' : `for ${days} days`;
 }
 
-export const SAY_LONG_WAIT = "Unless you already said so in this conversation, say in one plain line of your reply which bot waits, on what, for how long and where they can answer. It is a sentence in your answer, not a card or a new question; then go on with what they asked.";
+export const SAY_LONG_WAIT =
+  'Unless you already said so in this conversation, say in one plain line of your reply which bot waits, on what, for how long and where they can answer. It is a sentence in your answer, not a card or a new question; then go on with what they asked.';

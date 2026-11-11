@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync } from 'node:fs';
 
 /**
  * A custom endpoint (Settings > Custom endpoint) gets its own Claude folder under providers/, but no sign-in that would
@@ -7,7 +7,9 @@ import { mkdirSync } from "node:fs";
  * `onFail` runs before a failed mkdir is rethrown, so the caller can drop per-turn state it already recorded.
  */
 export function withEndpointFolder<T extends Record<string, string | undefined>>(
-  env: T, config: { endpointModels?: unknown; configDir?: string }, onFail?: () => void,
+  env: T,
+  config: { endpointModels?: unknown; configDir?: string },
+  onFail?: () => void,
 ): T {
   if (!config.endpointModels || !config.configDir || !env.CLAUDE_CONFIG_DIR) return env;
   try {

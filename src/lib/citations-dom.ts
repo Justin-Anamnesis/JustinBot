@@ -1,8 +1,10 @@
-import { createCitationTextSelector, findCitationText, type CitationAttachment } from "./citations";
+import { createCitationTextSelector, findCitationText, type CitationAttachment } from './citations';
 
 type TextChunk = { node: Text; start: number; end: number };
-const EXCLUDED_SELECTOR = "button, input, textarea, select, [role=button], [contenteditable], [hidden], [aria-hidden=true], script, style, template, noscript, svg";
-const BLOCK_SELECTOR = "address, article, aside, blockquote, dd, div, dl, dt, figcaption, figure, footer, h1, h2, h3, h4, h5, h6, header, hr, li, main, nav, ol, p, pre, section, table, td, th, tr, ul";
+const EXCLUDED_SELECTOR =
+  'button, input, textarea, select, [role=button], [contenteditable], [hidden], [aria-hidden=true], script, style, template, noscript, svg';
+const BLOCK_SELECTOR =
+  'address, article, aside, blockquote, dd, div, dl, dt, figcaption, figure, footer, h1, h2, h3, h4, h5, h6, header, hr, li, main, nav, ol, p, pre, section, table, td, th, tr, ul';
 
 function readCitationText(root: HTMLElement) {
   const parts: string[] = [];
@@ -13,7 +15,10 @@ function readCitationText(root: HTMLElement) {
     if (node.nodeType === Node.TEXT_NODE) {
       const text = node as Text;
       if (!text.length) return;
-      if (separator && length > 0) { parts.push("\n"); length += 1; }
+      if (separator && length > 0) {
+        parts.push('\n');
+        length += 1;
+      }
       separator = false;
       chunks.push({ node: text, start: length, end: length + text.length });
       parts.push(text.data);
@@ -24,16 +29,20 @@ function readCitationText(root: HTMLElement) {
     const element = node as Element;
     if (element.matches(EXCLUDED_SELECTOR)) return;
     const block = element.matches(BLOCK_SELECTOR);
-    if (block || element.tagName === "BR") separator = true;
+    if (block || element.tagName === 'BR') separator = true;
     for (const child of element.childNodes) visit(child);
     if (block) separator = true;
   };
   visit(root);
-  return { text: parts.join(""), chunks };
+  return { text: parts.join(''), chunks };
 }
 
 function excludedAncestor(node: Node): Element | null {
-  return (node.nodeType === Node.ELEMENT_NODE ? node as Element : node.parentElement)?.closest(EXCLUDED_SELECTOR) ?? null;
+  return (
+    (node.nodeType === Node.ELEMENT_NODE ? (node as Element) : node.parentElement)?.closest(
+      EXCLUDED_SELECTOR,
+    ) ?? null
+  );
 }
 
 function selectedTextBoundary(range: Range, node: Node, last: boolean): Text | null {
@@ -44,7 +53,11 @@ function selectedTextBoundary(range: Range, node: Node, last: boolean): Text | n
     const end = node === range.endContainer ? range.endOffset : text.length;
     return start < end ? text : null;
   }
-  for (let child = last ? node.lastChild : node.firstChild; child; child = last ? child.previousSibling : child.nextSibling) {
+  for (
+    let child = last ? node.lastChild : node.firstChild;
+    child;
+    child = last ? child.previousSibling : child.nextSibling
+  ) {
     const boundary = selectedTextBoundary(range, child, last);
     if (boundary) return boundary;
   }
@@ -57,11 +70,17 @@ export function captureCitationSelection(viewport: HTMLElement, selection: Selec
   const first = selectedTextBoundary(range, range.commonAncestorContainer, false);
   const last = selectedTextBoundary(range, range.commonAncestorContainer, true);
   if (!first || !last) return null;
-  const source = first.parentElement?.closest<HTMLElement>("[data-citation-source]");
+  const source = first.parentElement?.closest<HTMLElement>('[data-citation-source]');
   if (!source || !viewport.contains(source)) return null;
   range.setStart(first, first === range.startContainer ? range.startOffset : 0);
   range.setEnd(last, last === range.endContainer ? range.endOffset : last.length);
-  if (range.collapsed || !source.contains(range.endContainer) || excludedAncestor(range.startContainer) || excludedAncestor(range.endContainer)) return null;
+  if (
+    range.collapsed ||
+    !source.contains(range.endContainer) ||
+    excludedAncestor(range.startContainer) ||
+    excludedAncestor(range.endContainer)
+  )
+    return null;
   const stream = readCitationText(source);
   let rawStart: number | null = null;
   let rawEnd = 0;
@@ -83,13 +102,20 @@ function rawTextOffset(text: string, normalizedOffset: number): number {
   for (const match of text.matchAll(/\s+|\S+/g)) {
     const whitespace = /\s/.test(match[0][0]!);
     const length = whitespace ? 1 : match[0].length;
-    if (normalizedOffset <= offset + length) return match.index + (whitespace && normalizedOffset > offset ? match[0].length : normalizedOffset - offset);
+    if (normalizedOffset <= offset + length)
+      return (
+        match.index +
+        (whitespace && normalizedOffset > offset ? match[0].length : normalizedOffset - offset)
+      );
     offset += length;
   }
   return text.length;
 }
 
-export function resolveCitationRange(root: HTMLElement, citation: CitationAttachment): Range | null {
+export function resolveCitationRange(
+  root: HTMLElement,
+  citation: CitationAttachment,
+): Range | null {
   const stream = readCitationText(root);
   const match = findCitationText(stream.text, { text: citation.quote, ...citation.source });
   if (!match) return null;
@@ -104,17 +130,28 @@ export function resolveCitationRange(root: HTMLElement, citation: CitationAttach
   return range;
 }
 
-export function findCitationSource(document: Document, citation: CitationAttachment): HTMLElement | null {
-  return [...document.querySelectorAll<HTMLElement>("[data-citation-source]")].find((element) =>
-    element.dataset.citationSource === citation.source.messageId &&
-    element.dataset.citationOwnerType === citation.source.ownerType,
-  ) ?? null;
+export function findCitationSource(
+  document: Document,
+  citation: CitationAttachment,
+): HTMLElement | null {
+  return (
+    [...document.querySelectorAll<HTMLElement>('[data-citation-source]')].find(
+      (element) =>
+        element.dataset.citationSource === citation.source.messageId &&
+        element.dataset.citationOwnerType === citation.source.ownerType,
+    ) ?? null
+  );
 }
 
 let highlightCleanup: number | undefined;
 
 function sameRange(a: Range, b: Range): boolean {
-  return a.startContainer === b.startContainer && a.startOffset === b.startOffset && a.endContainer === b.endContainer && a.endOffset === b.endOffset;
+  return (
+    a.startContainer === b.startContainer &&
+    a.startOffset === b.startOffset &&
+    a.endContainer === b.endContainer &&
+    a.endOffset === b.endOffset
+  );
 }
 
 export async function highlightCitationSource(citation: CitationAttachment): Promise<boolean> {
@@ -122,19 +159,26 @@ export async function highlightCitationSource(citation: CitationAttachment): Pro
     const source = findCitationSource(document, citation);
     const range = source ? resolveCitationRange(source, citation) : null;
     if (source && range) {
-      source.scrollIntoView({ block: "center", behavior: "smooth" });
-      const highlights = (CSS as unknown as { highlights?: { set(name: string, value: unknown): void; delete(name: string): void } }).highlights;
-      const HighlightConstructor = (globalThis as unknown as { Highlight?: new (range: Range) => unknown }).Highlight;
+      source.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      const highlights = (
+        CSS as unknown as {
+          highlights?: { set(name: string, value: unknown): void; delete(name: string): void };
+        }
+      ).highlights;
+      const HighlightConstructor = (
+        globalThis as unknown as { Highlight?: new (range: Range) => unknown }
+      ).Highlight;
       window.clearTimeout(highlightCleanup);
       if (highlights && HighlightConstructor) {
-        highlights.set("omb-citation-source", new HighlightConstructor(range));
-        highlightCleanup = window.setTimeout(() => highlights.delete("omb-citation-source"), 2_500);
+        highlights.set('omb-citation-source', new HighlightConstructor(range));
+        highlightCleanup = window.setTimeout(() => highlights.delete('omb-citation-source'), 2_500);
       } else {
         const selection = window.getSelection();
         selection?.removeAllRanges();
         selection?.addRange(range);
         highlightCleanup = window.setTimeout(() => {
-          if (selection?.rangeCount === 1 && sameRange(selection.getRangeAt(0), range)) selection.removeAllRanges();
+          if (selection?.rangeCount === 1 && sameRange(selection.getRangeAt(0), range))
+            selection.removeAllRanges();
         }, 2_500);
       }
       return true;
@@ -147,9 +191,14 @@ export async function highlightCitationSource(citation: CitationAttachment): Pro
 export function citationTabShortcut() {
   let used = false;
   return {
-    reset() { used = false; },
-    handle(event: Pick<KeyboardEvent, "key" | "shiftKey" | "preventDefault">, action: HTMLButtonElement | null): boolean {
-      if (used || event.key !== "Tab" || event.shiftKey || !action || action.disabled) return false;
+    reset() {
+      used = false;
+    },
+    handle(
+      event: Pick<KeyboardEvent, 'key' | 'shiftKey' | 'preventDefault'>,
+      action: HTMLButtonElement | null,
+    ): boolean {
+      if (used || event.key !== 'Tab' || event.shiftKey || !action || action.disabled) return false;
       event.preventDefault();
       action.focus({ preventScroll: true });
       used = true;
@@ -158,15 +207,18 @@ export function citationTabShortcut() {
   };
 }
 
-type CitationShortcutEvent = Pick<KeyboardEvent, "key" | "metaKey" | "ctrlKey" | "altKey" | "shiftKey" | "isComposing" | "defaultPrevented">;
+type CitationShortcutEvent = Pick<
+  KeyboardEvent,
+  'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey' | 'isComposing' | 'defaultPrevented'
+>;
 
 /** Cmd+L on Mac, Ctrl+L elsewhere: opens the cite card for the selected chat text. */
 export function isCitationShortcut(event: CitationShortcutEvent, isMac: boolean): boolean {
   if (event.defaultPrevented || event.isComposing || event.altKey || event.shiftKey) return false;
   if (isMac ? !event.metaKey || event.ctrlKey : !event.ctrlKey || event.metaKey) return false;
-  return event.key.toLowerCase() === "l";
+  return event.key.toLowerCase() === 'l';
 }
 
 export function citationShortcutHint(isMac: boolean): string {
-  return isMac ? "⌘L" : "Ctrl+L";
+  return isMac ? '⌘L' : 'Ctrl+L';
 }

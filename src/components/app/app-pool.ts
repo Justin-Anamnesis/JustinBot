@@ -1,6 +1,6 @@
 // When the pool is full, the frame seen least recently is torn down first and only then does the new one
 // mount, so the count of live frames never goes over.
-import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 export const APP_POOL_LIMITS = {
   live: 3,
@@ -33,7 +33,8 @@ export function createAppPool(options: { limit?: number; now?: () => number } = 
   const limit = Math.max(1, options.limit ?? APP_POOL_LIMITS.live);
   const now = options.now ?? (() => Date.now());
   const slots = new Map<string, Slot>();
-  const waiting: Array<{ key: string; member: AppPoolMember; resolve(granted: boolean): void }> = [];
+  const waiting: Array<{ key: string; member: AppPoolMember; resolve(granted: boolean): void }> =
+    [];
   /** Keys being torn down to make room: they still count. */
   const leaving = new Set<string>();
   const visibility = new Map<string, { visible: boolean; at: number }>();
@@ -46,7 +47,10 @@ export function createAppPool(options: { limit?: number; now?: () => number } = 
     for (const [key, slot] of slots) {
       if (except.has(key) || leaving.has(key)) continue;
       const score = (slot.visible ? 1e15 : 0) + slot.seenAt;
-      if (score < bestScore) { best = key; bestScore = score; }
+      if (score < bestScore) {
+        best = key;
+        bestScore = score;
+      }
     }
     return best;
   };
@@ -56,7 +60,11 @@ export function createAppPool(options: { limit?: number; now?: () => number } = 
     while (waiting.length && slots.size < limit) {
       const next = waiting.shift()!;
       const seen = visibility.get(next.key);
-      slots.set(next.key, { member: next.member, visible: seen?.visible ?? true, seenAt: seen?.at ?? now() });
+      slots.set(next.key, {
+        member: next.member,
+        visible: seen?.visible ?? true,
+        seenAt: seen?.at ?? now(),
+      });
       next.resolve(true);
     }
     // Make room: one teardown per waiting request not already covered by one.
@@ -65,11 +73,15 @@ export function createAppPool(options: { limit?: number; now?: () => number } = 
       const key = victim(asking);
       if (!key) break;
       leaving.add(key);
-      void slots.get(key)!.member.evict().catch(() => {}).finally(() => {
-        leaving.delete(key);
-        slots.delete(key);
-        pump();
-      });
+      void slots
+        .get(key)!
+        .member.evict()
+        .catch(() => {})
+        .finally(() => {
+          leaving.delete(key);
+          slots.delete(key);
+          pump();
+        });
     }
   };
 
@@ -90,7 +102,10 @@ export function createAppPool(options: { limit?: number; now?: () => number } = 
       const at = now();
       visibility.set(key, { visible, at });
       const slot = slots.get(key);
-      if (slot) { slot.visible = visible; slot.seenAt = at; }
+      if (slot) {
+        slot.visible = visible;
+        slot.seenAt = at;
+      }
     },
     release(key) {
       const index = waiting.findIndex((entry) => entry.key === key);
@@ -149,21 +164,24 @@ export function useAppPoolSlot(args: {
     const element = target.current;
     if (!element) return;
     // Without IntersectionObserver the row counts as in view.
-    if (typeof IntersectionObserver === "undefined") {
+    if (typeof IntersectionObserver === 'undefined') {
       pool.seen(key, true);
       if (auto) open();
       return;
     }
     let wasVisible = false;
-    const observer = new IntersectionObserver((entries) => {
-      const visible = entries.some((entry) => entry.isIntersecting);
-      inView.current = visible;
-      pool.seen(key, visible || heldRef.current);
-      // Ask on the way in only: a frame torn down while in view (the pool
-      // needed its slot) waits for the next time it is scrolled to.
-      if (visible && !wasVisible && auto) open();
-      wasVisible = visible;
-    }, { rootMargin: `${APP_POOL_LIMITS.marginPx}px 0px` });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.some((entry) => entry.isIntersecting);
+        inView.current = visible;
+        pool.seen(key, visible || heldRef.current);
+        // Ask on the way in only: a frame torn down while in view (the pool
+        // needed its slot) waits for the next time it is scrolled to.
+        if (visible && !wasVisible && auto) open();
+        wasVisible = visible;
+      },
+      { rootMargin: `${APP_POOL_LIMITS.marginPx}px 0px` },
+    );
     observer.observe(element);
     return () => observer.disconnect();
   }, [pool, key, target, auto, open]);
@@ -176,10 +194,13 @@ export function useAppPoolSlot(args: {
     wasHeld.current = held;
   }, [pool, key, held]);
 
-  useEffect(() => () => {
-    request.current += 1;
-    pool.release(key);
-  }, [pool, key]);
+  useEffect(
+    () => () => {
+      request.current += 1;
+      pool.release(key);
+    },
+    [pool, key],
+  );
 
   return { live, open, close };
 }

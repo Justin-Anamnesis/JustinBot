@@ -1,15 +1,22 @@
 // Stuck means the same shell command failing the same way, back to back; a success ends the streak, since a poll is work.
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 
-import { previewIsPartial } from "./tool-summary.ts";
+import { previewIsPartial } from './tool-summary.ts';
 
 /** Muse Code cuts tool output at 4,000 characters without a marker, so an output this long may be a prefix. */
 export const OUTCOME_TEXT_MAX = 4_000;
 
 /** Only a digest of the output is kept, never the text. Null for a success and for output that may be cut or masked. */
 export function failureDigest(ok: boolean, output: string | undefined): string | null {
-  if (ok || output === undefined || !output.trim() || output.length >= OUTCOME_TEXT_MAX || previewIsPartial(output)) return null;
-  return createHash("sha256").update(output).digest("base64");
+  if (
+    ok ||
+    output === undefined ||
+    !output.trim() ||
+    output.length >= OUTCOME_TEXT_MAX ||
+    previewIsPartial(output)
+  )
+    return null;
+  return createHash('sha256').update(output).digest('base64');
 }
 
 interface Turn<C> {
@@ -25,7 +32,7 @@ export class RepeatStreak<C extends { readonly key: string }> {
   constructor(opts: { maxPending?: number } = {}) {
     this.maxPending = opts.maxPending ?? 256;
     if (!Number.isInteger(this.maxPending) || this.maxPending < 1) {
-      throw new Error("maxPending must be a positive integer");
+      throw new Error('maxPending must be a positive integer');
     }
   }
 
@@ -35,12 +42,17 @@ export class RepeatStreak<C extends { readonly key: string }> {
     if (!turn) this.turns.set(threadId, (turn = { pending: new Map() }));
     if (itemId === undefined) return void delete turn.last;
     turn.pending.delete(itemId);
-    if (turn.pending.size >= this.maxPending) turn.pending.delete(turn.pending.keys().next().value!);
+    if (turn.pending.size >= this.maxPending)
+      turn.pending.delete(turn.pending.keys().next().value!);
     turn.pending.set(itemId, call);
   }
 
   /** An item this did not track (a read or an edit between two runs) leaves the streak alone. */
-  completed(threadId: string, itemId: string | undefined, failure: string | null): { call: C; streak: number } | null {
+  completed(
+    threadId: string,
+    itemId: string | undefined,
+    failure: string | null,
+  ): { call: C; streak: number } | null {
     const turn = this.turns.get(threadId);
     if (!turn || itemId === undefined || !turn.pending.has(itemId)) return null;
     const call = turn.pending.get(itemId) ?? null;
@@ -49,7 +61,8 @@ export class RepeatStreak<C extends { readonly key: string }> {
       delete turn.last;
       return null;
     }
-    const streak = turn.last?.key === call.key && turn.last.failure === failure ? turn.last.streak + 1 : 1;
+    const streak =
+      turn.last?.key === call.key && turn.last.failure === failure ? turn.last.streak + 1 : 1;
     turn.last = { key: call.key, failure, streak };
     return { call, streak };
   }

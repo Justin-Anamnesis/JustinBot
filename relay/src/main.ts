@@ -1,6 +1,6 @@
-import { loadConfig } from "./config.ts";
-import { jsonLogger } from "./log.ts";
-import { startRelay } from "./server.ts";
+import { loadConfig } from './config.ts';
+import { jsonLogger } from './log.ts';
+import { startRelay } from './server.ts';
 
 let config;
 try {
@@ -21,9 +21,9 @@ const stop = () => {
     .drain()
     .then(() => relay.close())
     .finally(() => {
-      log({ ev: "stop" });
+      log({ ev: 'stop' });
       process.exit(0);
     });
 };
-process.on("SIGTERM", stop);
-process.on("SIGINT", stop);
+process.on('SIGTERM', stop);
+process.on('SIGINT', stop);

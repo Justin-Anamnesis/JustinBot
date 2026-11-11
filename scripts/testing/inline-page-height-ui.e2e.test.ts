@@ -1,29 +1,32 @@
 // Bot pages in the real <App/> through `control-omb ui`: a page drawn to its window keeps a page's height in the chat,
 // and a page that flows keeps sizing to its content. Needs the pinned agent-browser binary: runs when one resolves or
 // OMB_UI_E2E=1 asks for the verified download; otherwise skipped.
-import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { afterAll, expect, it } from "vitest";
+import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { afterAll, expect, it } from 'vitest';
 
-import { resolveAgentBrowserBinary } from "../../server/browser-engine.ts";
-import { removeTempDir, waitForExit } from "../../server/testing/cleanup.ts";
-import { runControlOmb } from "../control-omb.ts";
-import { UI_TOOLS_DIR, agentBrowser, sessionEnv, type UiHandle } from "./control-omb-ui.ts";
+import { resolveAgentBrowserBinary } from '../../server/browser-engine.ts';
+import { removeTempDir, waitForExit } from '../../server/testing/cleanup.ts';
+import { runControlOmb } from '../control-omb.ts';
+import { UI_TOOLS_DIR, agentBrowser, sessionEnv, type UiHandle } from './control-omb-ui.ts';
 
-const ROOT = fileURLToPath(new URL("../..", import.meta.url));
-const forced = process.env.OMB_UI_E2E === "1";
-const enabled = forced || Boolean(resolveAgentBrowserBinary({ dataDir: UI_TOOLS_DIR, env: process.env }));
-if (!enabled) console.log("skipping inline page height UI e2e: set OMB_UI_E2E=1 to install the pinned browser");
+const ROOT = fileURLToPath(new URL('../..', import.meta.url));
+const forced = process.env.OMB_UI_E2E === '1';
+const enabled =
+  forced || Boolean(resolveAgentBrowserBinary({ dataDir: UI_TOOLS_DIR, env: process.env }));
+if (!enabled)
+  console.log('skipping inline page height UI e2e: set OMB_UI_E2E=1 to install the pinned browser');
 const LAUNCH_TIMEOUT_MS = forced ? 600_000 : 180_000;
 const evidenceDir = process.env.OMB_UI_EVIDENCE_DIR
-  ? join(resolve(ROOT, process.env.OMB_UI_EVIDENCE_DIR), "inline-page-height")
-  : mkdtempSync(join(tmpdir(), "omb-page-height-"));
+  ? join(resolve(ROOT, process.env.OMB_UI_EVIDENCE_DIR), 'inline-page-height')
+  : mkdtempSync(join(tmpdir(), 'omb-page-height-'));
 const ownsEvidenceDir = !process.env.OMB_UI_EVIDENCE_DIR;
 
-const SIZE_LABEL = "c.fillStyle='#1d3557';c.font='bold 13px sans-serif';c.fillText('frame '+w+' x '+h,w-150,22);";
+const SIZE_LABEL =
+  "c.fillStyle='#1d3557';c.font='bold 13px sans-serif';c.fillText('frame '+w+' x '+h,w-150,22);";
 
 const MAP_LAYER = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 html,body{height:100%;margin:0;overflow:hidden;font-family:var(--font-sans)}
@@ -63,39 +66,74 @@ const FLOWING_HEIGHT = 16 + 40 + 4 * 56 + 16;
 const PREVIEW_HEIGHT = 220;
 
 const PAGES = [
-  { key: "map-layer", input: { title: "Ferry map", html: MAP_LAYER } },
-  { key: "map-layer-400", input: { title: "Ferry map at 400", html: MAP_LAYER, height: 400 } },
-  { key: "map-percent", input: { title: "Percent map", html: MAP_PERCENT } },
-  { key: "flowing", input: { title: "This week", html: FLOWING } },
+  { key: 'map-layer', input: { title: 'Ferry map', html: MAP_LAYER } },
+  { key: 'map-layer-400', input: { title: 'Ferry map at 400', html: MAP_LAYER, height: 400 } },
+  { key: 'map-percent', input: { title: 'Percent map', html: MAP_PERCENT } },
+  { key: 'flowing', input: { title: 'This week', html: FLOWING } },
 ] as const;
 
 const ui = (verb: string, handle: string, ...args: string[]) =>
-  runControlOmb(["ui", verb, "--ui", handle, ...args]) as Promise<Record<string, any>>;
+  runControlOmb(['ui', verb, '--ui', handle, ...args]) as Promise<Record<string, any>>;
 
 let child: ReturnType<typeof spawn> | undefined;
 afterAll(async () => {
-  if (child && child.exitCode === null && child.signalCode === null) await waitForExit(child, { signal: "SIGINT", graceMs: 30_000 });
+  if (child && child.exitCode === null && child.signalCode === null)
+    await waitForExit(child, { signal: 'SIGINT', graceMs: 30_000 });
   if (ownsEvidenceDir) await removeTempDir(evidenceDir);
 });
 
-(enabled ? it : it.skip)("shows every page in a fixed preview card, the page inside at its own height", async () => {
-  mkdirSync(evidenceDir, { recursive: true });
-  const calls = join(evidenceDir, "tool-calls.json");
-  child = spawn(process.execPath, ["--experimental-strip-types", join(ROOT, "scripts/control-omb.ts"), "ui", "launch"], {
-    cwd: ROOT, env: { ...process.env, FAKE_CLAUDE_TOOL_CALLS_FILE: calls }, stdio: ["ignore", "pipe", "pipe"],
-  });
-  let stdout = "", stderr = "";
-  child.stdout!.on("data", (chunk: Buffer) => { stdout += String(chunk); });
-  child.stderr!.on("data", (chunk: Buffer) => { stderr += String(chunk); });
-  let info: { ui: string; url: string; botId: string } | undefined;
-  await expect.poll(() => {
-    if (child!.exitCode !== null) throw new Error(`ui launch exited: ${stderr}`);
-    try { info = JSON.parse(stdout.slice(stdout.indexOf("{"))); return Boolean(info?.ui); } catch { return false; }
-  }, { timeout: LAUNCH_TIMEOUT_MS, interval: 250 }).toBe(true);
-  const { ui: handle, url, botId } = info!;
-  const browser = JSON.parse(readFileSync(handle, "utf8")) as UiHandle;
-  await agentBrowser(browser.binary, sessionEnv(browser), ["set", "viewport", "1280", "900"], 60_000);
-  const newest = async () => (await ui("eval", handle, "--js", `(() => {
+(enabled ? it : it.skip)(
+  'shows every page in a fixed preview card, the page inside at its own height',
+  async () => {
+    mkdirSync(evidenceDir, { recursive: true });
+    const calls = join(evidenceDir, 'tool-calls.json');
+    child = spawn(
+      process.execPath,
+      ['--experimental-strip-types', join(ROOT, 'scripts/control-omb.ts'), 'ui', 'launch'],
+      {
+        cwd: ROOT,
+        env: { ...process.env, FAKE_CLAUDE_TOOL_CALLS_FILE: calls },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    let stdout = '',
+      stderr = '';
+    child.stdout!.on('data', (chunk: Buffer) => {
+      stdout += String(chunk);
+    });
+    child.stderr!.on('data', (chunk: Buffer) => {
+      stderr += String(chunk);
+    });
+    let info: { ui: string; url: string; botId: string } | undefined;
+    await expect
+      .poll(
+        () => {
+          if (child!.exitCode !== null) throw new Error(`ui launch exited: ${stderr}`);
+          try {
+            info = JSON.parse(stdout.slice(stdout.indexOf('{')));
+            return Boolean(info?.ui);
+          } catch {
+            return false;
+          }
+        },
+        { timeout: LAUNCH_TIMEOUT_MS, interval: 250 },
+      )
+      .toBe(true);
+    const { ui: handle, url, botId } = info!;
+    const browser = JSON.parse(readFileSync(handle, 'utf8')) as UiHandle;
+    await agentBrowser(
+      browser.binary,
+      sessionEnv(browser),
+      ['set', 'viewport', '1280', '900'],
+      60_000,
+    );
+    const newest = async () =>
+      (
+        await ui(
+          'eval',
+          handle,
+          '--js',
+          `(() => {
     const rows = document.querySelectorAll('[data-app]');
     const row = rows[rows.length - 1];
     if (!row) return null;
@@ -107,31 +145,62 @@ afterAll(async () => {
       box: Math.round(row.querySelector('[data-app-box]')?.getBoundingClientRect().height ?? 0),
       frame: Math.round(row.querySelector('iframe[data-app-frame]')?.getBoundingClientRect().height ?? 0),
     };
-  })()`)).result as { rows: number; title: string; state: string; box: number; frame: number } | null;
+  })()`,
+        )
+      ).result as { rows: number; title: string; state: string; box: number; frame: number } | null;
 
-  const measured: Record<string, { box: number; frame: number }> = {};
-  for (const [index, page] of PAGES.entries()) {
-    writeFileSync(calls, JSON.stringify([{ name: "show_html", server: "agents", input: page.input }]));
-    await runControlOmb(["send", "--bot", botId, "--text", `Show ${page.input.title}.`, "--url", url]);
-    expect((await runControlOmb(["wait", "--bot", botId, "--timeout", "60", "--url", url]) as { status: string }).status).toBe("settled");
-    // A page drawn to its window never changes the frame's height: steady means the same for three seconds.
-    const seen: string[] = [];
-    await expect.poll(async () => {
-      seen.push(JSON.stringify(await newest()));
-      const last = seen.slice(-4);
-      const latest = JSON.parse(last[0]!) as Awaited<ReturnType<typeof newest>>;
-      return last.length === 4 && new Set(last).size === 1 && latest?.rows === index + 1 && latest.state === "live";
-    }, { timeout: 30_000, interval: 1_000 }).toBe(true);
-    const { box, frame } = (await newest())!;
-    measured[page.key] = { box, frame };
-    await ui("screenshot", handle, "--out", join(evidenceDir, `${page.key}.png`));
-  }
-  writeFileSync(join(evidenceDir, "heights.json"), `${JSON.stringify(measured, null, 2)}\n`);
+    const measured: Record<string, { box: number; frame: number }> = {};
+    for (const [index, page] of PAGES.entries()) {
+      writeFileSync(
+        calls,
+        JSON.stringify([{ name: 'show_html', server: 'agents', input: page.input }]),
+      );
+      await runControlOmb([
+        'send',
+        '--bot',
+        botId,
+        '--text',
+        `Show ${page.input.title}.`,
+        '--url',
+        url,
+      ]);
+      expect(
+        (
+          (await runControlOmb(['wait', '--bot', botId, '--timeout', '60', '--url', url])) as {
+            status: string;
+          }
+        ).status,
+      ).toBe('settled');
+      // A page drawn to its window never changes the frame's height: steady means the same for three seconds.
+      const seen: string[] = [];
+      await expect
+        .poll(
+          async () => {
+            seen.push(JSON.stringify(await newest()));
+            const last = seen.slice(-4);
+            const latest = JSON.parse(last[0]!) as Awaited<ReturnType<typeof newest>>;
+            return (
+              last.length === 4 &&
+              new Set(last).size === 1 &&
+              latest?.rows === index + 1 &&
+              latest.state === 'live'
+            );
+          },
+          { timeout: 30_000, interval: 1_000 },
+        )
+        .toBe(true);
+      const { box, frame } = (await newest())!;
+      measured[page.key] = { box, frame };
+      await ui('screenshot', handle, '--out', join(evidenceDir, `${page.key}.png`));
+    }
+    writeFileSync(join(evidenceDir, 'heights.json'), `${JSON.stringify(measured, null, 2)}\n`);
 
-  expect(measured).toEqual({
-    "map-layer": { box: PREVIEW_HEIGHT, frame: 520 },
-    "map-layer-400": { box: PREVIEW_HEIGHT, frame: 400 },
-    "map-percent": { box: PREVIEW_HEIGHT, frame: 520 },
-    flowing: { box: PREVIEW_HEIGHT, frame: FLOWING_HEIGHT },
-  });
-}, LAUNCH_TIMEOUT_MS + 240_000);
+    expect(measured).toEqual({
+      'map-layer': { box: PREVIEW_HEIGHT, frame: 520 },
+      'map-layer-400': { box: PREVIEW_HEIGHT, frame: 400 },
+      'map-percent': { box: PREVIEW_HEIGHT, frame: 520 },
+      flowing: { box: PREVIEW_HEIGHT, frame: FLOWING_HEIGHT },
+    });
+  },
+  LAUNCH_TIMEOUT_MS + 240_000,
+);

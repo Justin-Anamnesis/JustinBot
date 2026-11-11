@@ -10,12 +10,17 @@ const profilesMock = new URL('./group-local-vm-profiles-mock.mjs', import.meta.u
 registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier.endsWith('/container-computer.ts')) return { url: mock, shortCircuit: true };
-    if (specifier.endsWith('/local-vm-profiles.ts')) return { url: profilesMock, shortCircuit: true };
+    if (specifier.endsWith('/local-vm-profiles.ts'))
+      return { url: profilesMock, shortCircuit: true };
     return nextResolve(specifier, context);
   },
   load(url, context, nextLoad) {
     // Sign-in rescue: recorded in the state file, in order with the container actions, instead of running docker cp.
-    if (url === profilesMock) return { format: 'module', shortCircuit: true, source: `
+    if (url === profilesMock)
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: `
       import { readFileSync } from 'node:fs';
       import { writeFileAtomic } from ${JSON.stringify(atomic)};
       const file = ${JSON.stringify(state)};
@@ -39,8 +44,13 @@ registerHooks({
         writeFileAtomic(file, JSON.stringify(state), { durable: false });
         return 'rescued';
       }
-    ` };
-    if (url === mock) return { format: 'module', shortCircuit: true, source: `
+    `,
+      };
+    if (url === mock)
+      return {
+        format: 'module',
+        shortCircuit: true,
+        source: `
       export * from ${JSON.stringify(actual)};
       import { SHARED_LOCAL_VM_TARGET } from ${JSON.stringify(actual)};
       import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -100,36 +110,77 @@ registerHooks({
         writeFileAtomic(file, JSON.stringify(state), { durable: false });
         return containerComputerStatus(_run, _platform, target);
       }
-    ` };
+    `,
+      };
     const result = nextLoad(url, context);
     if (url.endsWith('/computer-idle.ts')) {
-      return { ...result, source: `import { readFileSync as readVmIdle } from 'node:fs';\n` +
-        String(result.source).replaceAll('checkedIdleMs(idleMs)', `(JSON.parse(readVmIdle(${JSON.stringify(state)}, 'utf8')).idleMs ?? checkedIdleMs(idleMs))`) };
+      return {
+        ...result,
+        source:
+          `import { readFileSync as readVmIdle } from 'node:fs';\n` +
+          String(result.source).replaceAll(
+            'checkedIdleMs(idleMs)',
+            `(JSON.parse(readVmIdle(${JSON.stringify(state)}, 'utf8')).idleMs ?? checkedIdleMs(idleMs))`,
+          ),
+      };
     }
     if (url.endsWith('/local-vm-lease.ts')) {
-      return { ...result, source: `import { readFileSync as readVmClock } from 'node:fs';\n` +
-        String(result.source).replaceAll('Date.now()', `(Date.now() + (JSON.parse(readVmClock(${JSON.stringify(state)}, 'utf8')).clockOffset || 0))`) };
+      return {
+        ...result,
+        source:
+          `import { readFileSync as readVmClock } from 'node:fs';\n` +
+          String(result.source).replaceAll(
+            'Date.now()',
+            `(Date.now() + (JSON.parse(readVmClock(${JSON.stringify(state)}, 'utf8')).clockOffset || 0))`,
+          ),
+      };
     }
     if (url.endsWith('/drivers/claude.ts')) {
-      return { ...result, source: `import { existsSync as existsVmRelease, readFileSync as readVmEvents, writeFileSync as writeVmEvent } from 'node:fs';\n` +
-        String(result.source).replace('for (const l of Array.from(listeners)) l(event);',
-          `if (event.type === 'turn.completed') {\n        const fixture = JSON.parse(readVmEvents(${JSON.stringify(state)}, 'utf8'));\n        if (fixture.dropCompletion) return;\n        if (fixture.holdCompletion) { writeVmEvent(${JSON.stringify(state)} + '.completionheld', event.turnId ?? ''); const timer = setInterval(() => { if (!existsVmRelease(${JSON.stringify(state)} + '.releasecompletion')) return; clearInterval(timer); writeVmEvent(${JSON.stringify(state)} + '.latecompleted', event.turnId ?? ''); for (const l of Array.from(listeners)) l(event); }, 10); return; }\n      }\n      for (const l of Array.from(listeners)) l(event);`) };
+      return {
+        ...result,
+        source:
+          `import { existsSync as existsVmRelease, readFileSync as readVmEvents, writeFileSync as writeVmEvent } from 'node:fs';\n` +
+          String(result.source).replace(
+            'for (const l of Array.from(listeners)) l(event);',
+            `if (event.type === 'turn.completed') {\n        const fixture = JSON.parse(readVmEvents(${JSON.stringify(state)}, 'utf8'));\n        if (fixture.dropCompletion) return;\n        if (fixture.holdCompletion) { writeVmEvent(${JSON.stringify(state)} + '.completionheld', event.turnId ?? ''); const timer = setInterval(() => { if (!existsVmRelease(${JSON.stringify(state)} + '.releasecompletion')) return; clearInterval(timer); writeVmEvent(${JSON.stringify(state)} + '.latecompleted', event.turnId ?? ''); for (const l of Array.from(listeners)) l(event); }, 10); return; }\n      }\n      for (const l of Array.from(listeners)) l(event);`,
+          ),
+      };
     }
     if (url.endsWith('/turn-watchdog.ts')) {
-      return { ...result, source: `import { readFileSync as readVmWatch } from 'node:fs';\n` +
-        String(result.source).replace('this.opts = opts;', 'this.opts = { ...opts, checkMs: 30 };')
-          .replace('at - turn.lastEventAt < silentMs', `at - turn.lastEventAt < (JSON.parse(readVmWatch(${JSON.stringify(state)}, 'utf8')).stall ? 0 : JSON.parse(readVmWatch(${JSON.stringify(state)}, 'utf8')).stallThread === turn.threadId ? 100 : silentMs)`) };
+      return {
+        ...result,
+        source:
+          `import { readFileSync as readVmWatch } from 'node:fs';\n` +
+          String(result.source)
+            .replace('this.opts = opts;', 'this.opts = { ...opts, checkMs: 30 };')
+            .replace(
+              'at - turn.lastEventAt < silentMs',
+              `at - turn.lastEventAt < (JSON.parse(readVmWatch(${JSON.stringify(state)}, 'utf8')).stall ? 0 : JSON.parse(readVmWatch(${JSON.stringify(state)}, 'utf8')).stallThread === turn.threadId ? 100 : silentMs)`,
+            ),
+      };
     }
     if (url.endsWith('/turn-dispatch-guard.ts')) {
       // wedgeClear parks a room turn inside waitForClear; the clearwait marker proves it got there.
-      return { ...result, source: `import { readFileSync as readVmClear, writeFileSync as writeVmClear } from 'node:fs';\n` +
-        String(result.source).replace('async waitForClear(threadId: string): Promise<void> {',
-          `async waitForClear(threadId: string): Promise<void> {\n      writeVmClear(${JSON.stringify(state)} + '.clearwait', '1');\n      while (JSON.parse(readVmClear(${JSON.stringify(state)}, 'utf8')).wedgeClear) await new Promise((resolve) => setTimeout(resolve, 20));`) };
+      return {
+        ...result,
+        source:
+          `import { readFileSync as readVmClear, writeFileSync as writeVmClear } from 'node:fs';\n` +
+          String(result.source).replace(
+            'async waitForClear(threadId: string): Promise<void> {',
+            `async waitForClear(threadId: string): Promise<void> {\n      writeVmClear(${JSON.stringify(state)} + '.clearwait', '1');\n      while (JSON.parse(readVmClear(${JSON.stringify(state)}, 'utf8')).wedgeClear) await new Promise((resolve) => setTimeout(resolve, 20));`,
+          ),
+      };
     }
     if (url.endsWith('/room-turn-timeout.ts')) {
-      return { ...result, source: `import { readFileSync as readVmDeadline } from 'node:fs';\n` +
-        String(result.source).replace('this.limitMs = roomTurnTimeoutMs(minutes);',
-          `this.limitMs = JSON.parse(readVmDeadline(${JSON.stringify(state)}, 'utf8')).timeout ? 5000 : roomTurnTimeoutMs(minutes);`) };
+      return {
+        ...result,
+        source:
+          `import { readFileSync as readVmDeadline } from 'node:fs';\n` +
+          String(result.source).replace(
+            'this.limitMs = roomTurnTimeoutMs(minutes);',
+            `this.limitMs = JSON.parse(readVmDeadline(${JSON.stringify(state)}, 'utf8')).timeout ? 5000 : roomTurnTimeoutMs(minutes);`,
+          ),
+      };
     }
     return result;
   },

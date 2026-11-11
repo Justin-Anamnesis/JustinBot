@@ -9,18 +9,20 @@
 //   and nothing about the person or their work;
 // - what it says never reaches the person's other conversations, and its problems are no report to a Chief, whose turn has
 //   tools and would read its words.
-export const BOT_API_TOOLS: ReadonlySet<string> = new Set(["hooks"]);
-export const BOT_API_PARTS: ReadonlySet<string> = new Set(["memory", "webhook", "coordination"]);
+export const BOT_API_TOOLS: ReadonlySet<string> = new Set(['hooks']);
+export const BOT_API_PARTS: ReadonlySet<string> = new Set(['memory', 'webhook', 'coordination']);
 const ROUTES: ReadonlySet<string> = new Set([
-  "GET /api/internal/tool-result",
-  "POST /api/internal/tool-result",
-  "POST /api/internal/hook",
+  'GET /api/internal/tool-result',
+  'POST /api/internal/tool-result',
+  'POST /api/internal/hook',
 ]);
 
-export const BOT_API_REFUSAL = "This call came in through the Bot API, so it can only answer from what this bot already knows.";
+export const BOT_API_REFUSAL =
+  'This call came in through the Bot API, so it can only answer from what this bot already knows.';
 
 /** What a person hears on typing into an API thread whose engine can't be confined: the thread is why, not their Cloud. */
-export const BOT_API_ENGINE_REFUSAL = "This thread came in through the Bot API, and this bot's AI can't work in it. Start a new conversation.";
+export const BOT_API_ENGINE_REFUSAL =
+  "This thread came in through the Bot API, and this bot's AI can't work in it. Start a new conversation.";
 
 export function botApiRouteRefused(method: string, path: string): boolean {
   return !ROUTES.has(`${method.toUpperCase()} ${path}`);

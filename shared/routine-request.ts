@@ -4,10 +4,10 @@
  * text), so a confirmation survives a restart without asking the model again.
  */
 
-import type { LimitResetRepeat } from "./limit-reset.ts";
-import type { RoutineCronSchedule } from "./routine-schedule.ts";
+import type { LimitResetRepeat } from './limit-reset.ts';
+import type { RoutineCronSchedule } from './routine-schedule.ts';
 
-export type RoutineRequestRunOn = "maus" | "cloud";
+export type RoutineRequestRunOn = 'maus' | 'cloud';
 
 export interface RoutineRequestIntervalWindow {
   start: string;
@@ -15,36 +15,36 @@ export interface RoutineRequestIntervalWindow {
 }
 
 export type RoutineRequestSchedule =
-  | { type: "once"; at: number }
+  | { type: 'once'; at: number }
   /** The time is the engine's, derived when the routine is saved. */
-  | { type: "limit_reset"; engine: string; repeat: LimitResetRepeat }
-  | { type: "daily"; time: string; weekdays: number[] }
+  | { type: 'limit_reset'; engine: string; repeat: LimitResetRepeat }
+  | { type: 'daily'; time: string; weekdays: number[] }
   | RoutineCronSchedule
   | {
-    type: "interval";
-    everyMinutes: number;
-    anchorAt?: number;
-    /** Local weekdays (Sunday = 0). Missing means every day. */
-    weekdays?: number[];
-    /** Local wall-clock window. Missing means all day. */
-    window?: RoutineRequestIntervalWindow;
-    /** Inclusive epoch-millisecond cutoff. Missing means never. */
-    endsAt?: number;
-  };
+      type: 'interval';
+      everyMinutes: number;
+      anchorAt?: number;
+      /** Local weekdays (Sunday = 0). Missing means every day. */
+      weekdays?: number[];
+      /** Local wall-clock window. Missing means all day. */
+      window?: RoutineRequestIntervalWindow;
+      /** Inclusive epoch-millisecond cutoff. Missing means never. */
+      endsAt?: number;
+    };
 
 export type RoutineRequestScheduleChanges =
-  | Exclude<RoutineRequestSchedule, { type: "interval" }>
+  | Exclude<RoutineRequestSchedule, { type: 'interval' }>
   | {
-    type: "interval";
-    everyMinutes: number;
-    anchorAt?: number;
-    /** `null` explicitly restores the every-day default. */
-    weekdays?: number[] | null;
-    /** `null` explicitly restores the all-day default. */
-    window?: RoutineRequestIntervalWindow | null;
-    /** `null` explicitly removes an existing end date. */
-    endsAt?: number | null;
-  };
+      type: 'interval';
+      everyMinutes: number;
+      anchorAt?: number;
+      /** `null` explicitly restores the every-day default. */
+      weekdays?: number[] | null;
+      /** `null` explicitly restores the all-day default. */
+      window?: RoutineRequestIntervalWindow | null;
+      /** `null` explicitly removes an existing end date. */
+      endsAt?: number | null;
+    };
 
 export interface RoutineRequestDefinition {
   name: string;
@@ -58,18 +58,19 @@ export interface RoutineRequestDefinition {
   /** Carry the previous run's report into the next run. */
   continuity?: boolean;
   /** Skip by default, or keep at most one scheduled run waiting. */
-  overlap?: "skip" | "queue";
+  overlap?: 'skip' | 'queue';
   /** Also run once each time OpenMausBot starts. Repeating routines only. */
   runOnStartup?: boolean;
 }
 
-export type RoutineRequestChanges =
-  & Omit<Partial<RoutineRequestDefinition>, "schedule" | "timeoutMinutes">
-  & {
-    schedule?: RoutineRequestScheduleChanges;
-    /** `null` removes an existing safety cap. */
-    timeoutMinutes?: number | null;
-  };
+export type RoutineRequestChanges = Omit<
+  Partial<RoutineRequestDefinition>,
+  'schedule' | 'timeoutMinutes'
+> & {
+  schedule?: RoutineRequestScheduleChanges;
+  /** `null` removes an existing safety cap. */
+  timeoutMinutes?: number | null;
+};
 
 /** Another bot in the proposer's section that this proposal targets: a
  * routine scheduled for it, or one of its routines being changed. Captured
@@ -82,19 +83,45 @@ export interface RoutineRequestTargetBot {
 }
 
 export type RoutineRequestOperation =
-  | { action: "create"; routine: RoutineRequestDefinition; forBot?: RoutineRequestTargetBot }
-  | { action: "update"; routineId: string; expectedUpdatedAt: number; changes: RoutineRequestChanges; forBot?: RoutineRequestTargetBot }
-  | { action: "pause"; routineId: string; expectedUpdatedAt: number; forBot?: RoutineRequestTargetBot }
-  | { action: "resume"; routineId: string; expectedUpdatedAt: number; forBot?: RoutineRequestTargetBot }
-  | { action: "run_now"; routineId: string; expectedUpdatedAt: number; forBot?: RoutineRequestTargetBot }
-  | { action: "delete"; routineId: string; expectedUpdatedAt: number; forBot?: RoutineRequestTargetBot };
+  | { action: 'create'; routine: RoutineRequestDefinition; forBot?: RoutineRequestTargetBot }
+  | {
+      action: 'update';
+      routineId: string;
+      expectedUpdatedAt: number;
+      changes: RoutineRequestChanges;
+      forBot?: RoutineRequestTargetBot;
+    }
+  | {
+      action: 'pause';
+      routineId: string;
+      expectedUpdatedAt: number;
+      forBot?: RoutineRequestTargetBot;
+    }
+  | {
+      action: 'resume';
+      routineId: string;
+      expectedUpdatedAt: number;
+      forBot?: RoutineRequestTargetBot;
+    }
+  | {
+      action: 'run_now';
+      routineId: string;
+      expectedUpdatedAt: number;
+      forBot?: RoutineRequestTargetBot;
+    }
+  | {
+      action: 'delete';
+      routineId: string;
+      expectedUpdatedAt: number;
+      forBot?: RoutineRequestTargetBot;
+    };
 
 /** A routine as it stood before a change applied without a person, so Undo
  * can put it back. Room goals keep their room; attachments are not kept, so
  * a routine that has any is not offered an Undo for its update or delete. */
 export interface RoutineRequestSnapshot extends RoutineRequestDefinition {
   enabled: boolean;
-  target?: "room-goal";
+  target?: 'room-goal';
   groupId?: string;
   resultsThreadId?: string;
 }

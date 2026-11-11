@@ -30,9 +30,14 @@ export const SKILL_TAGS_MAX = 8;
 
 export function parseSkillTags(raw: string | undefined): string[] | undefined {
   if (!raw) return undefined;
-  const tags = [...new Set(
-    raw.split(",").map((tag) => tag.trim().toLowerCase()).filter((tag) => TAG_PATTERN.test(tag)),
-  )].slice(0, SKILL_TAGS_MAX);
+  const tags = [
+    ...new Set(
+      raw
+        .split(',')
+        .map((tag) => tag.trim().toLowerCase())
+        .filter((tag) => TAG_PATTERN.test(tag)),
+    ),
+  ].slice(0, SKILL_TAGS_MAX);
   return tags.length > 0 ? tags : undefined;
 }
 
@@ -42,13 +47,13 @@ function unquoteScalar(raw: string): string {
   if (value.length >= 2) {
     const last = value.length - 1;
     if (value[0] === '"' && value[last] === '"') {
-      let out = "";
+      let out = '';
       for (let i = 1; i < last; i += 1) {
         const c = value[i]!;
-        if (c === "\\" && i + 1 < last) {
+        if (c === '\\' && i + 1 < last) {
           const next = value[i + 1]!;
-          if (next === '"' || next === "\\" || next === "n") {
-            out += next === "n" ? "\n" : next;
+          if (next === '"' || next === '\\' || next === 'n') {
+            out += next === 'n' ? '\n' : next;
             i += 1;
             continue;
           }
@@ -74,11 +79,11 @@ export function yamlFrontmatterValue(value: string): string {
     !/^["'&*!|>%@`]/.test(value) &&
     !/^[-?:](\s|$)/.test(value) &&
     !/^[[\]{}#,]/.test(value) &&
-    !value.includes(": ") &&
-    !value.endsWith(":") &&
-    !value.includes(" #") &&
+    !value.includes(': ') &&
+    !value.endsWith(':') &&
+    !value.includes(' #') &&
     !/["']$/.test(value);
-  return plain ? value : `"${value.replace(/(["\\\n])/g, (c) => (c === "\n" ? "\\n" : `\\${c}`))}"`;
+  return plain ? value : `"${value.replace(/(["\\\n])/g, (c) => (c === '\n' ? '\\n' : `\\${c}`))}"`;
 }
 
 /** Minimal frontmatter reader for the two required keys plus the two we
@@ -87,15 +92,19 @@ export function yamlFrontmatterValue(value: string): string {
  * evaluate anchors or tags cannot be surprised by them. */
 export function parseSkillMd(raw: string): ParsedSkill | { error: string } {
   const frontmatter = readSkillFrontmatter(raw);
-  if (!frontmatter) return { error: "SKILL.md has no YAML frontmatter (--- block) at the top" };
+  if (!frontmatter) return { error: 'SKILL.md has no YAML frontmatter (--- block) at the top' };
   const { fields } = frontmatter;
-  const name = fields.name ?? "";
-  const description = fields.description ?? "";
+  const name = fields.name ?? '';
+  const description = fields.description ?? '';
   if (!isSkillName(name)) {
-    return { error: `frontmatter name ${JSON.stringify(name)} is not a valid skill name (lowercase, hyphens, max ${SKILL_NAME_MAX})` };
+    return {
+      error: `frontmatter name ${JSON.stringify(name)} is not a valid skill name (lowercase, hyphens, max ${SKILL_NAME_MAX})`,
+    };
   }
   if (!description || description.length > DESCRIPTION_MAX) {
-    return { error: `frontmatter description is required and must be at most ${DESCRIPTION_MAX} characters` };
+    return {
+      error: `frontmatter description is required and must be at most ${DESCRIPTION_MAX} characters`,
+    };
   }
   return {
     name,
@@ -108,7 +117,9 @@ export function parseSkillMd(raw: string): ParsedSkill | { error: string } {
 }
 
 /** The single-line `key: value` fields of a SKILL.md's frontmatter, keys lowercased; null without a frontmatter block. */
-export function readSkillFrontmatter(raw: string): { fields: Record<string, string>; body: string } | null {
+export function readSkillFrontmatter(
+  raw: string,
+): { fields: Record<string, string>; body: string } | null {
   // A byte order mark (Notepad, PowerShell) would hide the opening ---.
   if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
@@ -119,7 +130,7 @@ export function readSkillFrontmatter(raw: string): { fields: Record<string, stri
     if (!kv) continue;
     fields[kv[1]!.toLowerCase()] = unquoteScalar(kv[2]!);
   }
-  return { fields, body: match[2] ?? "" };
+  return { fields, body: match[2] ?? '' };
 }
 
 /** Static red flags before a human review. Presence is a warning shown in
@@ -128,15 +139,21 @@ export function readSkillFrontmatter(raw: string): { fields: Record<string, stri
 export function scanSkillText(raw: string): string[] {
   const warnings: string[] = [];
   if (/[A-Za-z0-9+/]{120,}={0,2}/.test(raw)) {
-    warnings.push("contains a long base64-looking blob — a common wrapper for hidden instructions or payloads");
+    warnings.push(
+      'contains a long base64-looking blob — a common wrapper for hidden instructions or payloads',
+    );
   }
   if (/\b(curl|wget)\b[^\n]{0,200}\|\s*(ba|z|da)?sh\b/.test(raw)) {
-    warnings.push("pipes a download straight into a shell (curl|sh) — never enable without understanding why");
+    warnings.push(
+      'pipes a download straight into a shell (curl|sh) — never enable without understanding why',
+    );
   }
   // zero-width and bidi-control characters hide text from the reviewer while
   // the model still reads it — the invisible-instruction trick
   if (/[​-‏‪-‮⁠-⁤﻿]/.test(raw)) {
-    warnings.push("contains invisible Unicode characters (zero-width or bidi controls) — text you cannot see");
+    warnings.push(
+      'contains invisible Unicode characters (zero-width or bidi controls) — text you cannot see',
+    );
   }
   return warnings;
 }

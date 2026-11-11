@@ -1,15 +1,34 @@
-import { describe, expect, it, vi } from "vitest";
-import { createDesktopIncludedX, createIncludedXSync } from "./included-x.mjs";
+import { describe, expect, it, vi } from 'vitest';
+import { createDesktopIncludedX, createIncludedXSync } from './included-x.mjs';
 
-const access = { url: "https://cloud.openmausbot.com/api/cloud/services/x", token: `omb_xd_${"a".repeat(43)}` };
-const paid = (deviceId = "device-1") => ({ status: "connected", deviceId, entitlement: { plan: "pro", status: "active", tier: "pro" } });
+const access = {
+  url: 'https://cloud.openmausbot.com/api/cloud/services/x',
+  token: `omb_xd_${'a'.repeat(43)}`,
+};
+const paid = (deviceId = 'device-1') => ({
+  status: 'connected',
+  deviceId,
+  entitlement: { plan: 'pro', status: 'active', tier: 'pro' },
+});
 
 function sync(fetchAccess = vi.fn(async () => access)) {
-  const sent = [], notes = [];
-  return { sent, notes, fetchAccess, x: createIncludedXSync({ fetchAccess, send: (value, note) => { sent.push(value); notes.push(note ?? null); } }) };
+  const sent = [],
+    notes = [];
+  return {
+    sent,
+    notes,
+    fetchAccess,
+    x: createIncludedXSync({
+      fetchAccess,
+      send: (value, note) => {
+        sent.push(value);
+        notes.push(note ?? null);
+      },
+    }),
+  };
 }
 
-describe("included X research access on the desktop", () => {
+describe('included X research access on the desktop', () => {
   it("fetches this sign-in's token once the plan is paid, and hands it to the server", async () => {
     const { x, sent, fetchAccess } = sync();
     await x.onState(paid());
@@ -17,7 +36,7 @@ describe("included X research access on the desktop", () => {
     expect(sent).toEqual([access]);
   });
 
-  it("does not fetch again on every refresh of the same paid sign-in (a new token would replace the one in use)", async () => {
+  it('does not fetch again on every refresh of the same paid sign-in (a new token would replace the one in use)', async () => {
     const { x, sent, fetchAccess } = sync();
     await x.onState(paid());
     await x.onState(paid());
@@ -27,8 +46,16 @@ describe("included X research access on the desktop", () => {
   });
 
   it("clears the server's token when the plan stops being active, the app signs out or must sign in again", async () => {
-    for (const next of [{ ...paid(), entitlement: { plan: "pro", status: "inactive", tier: "pro" } }, { status: "signed-out" }, { status: "reauth-required", message: "expired" },
-      { status: "connected", deviceId: "device-1", entitlement: { plan: "free", status: "inactive", tier: null } }]) {
+    for (const next of [
+      { ...paid(), entitlement: { plan: 'pro', status: 'inactive', tier: 'pro' } },
+      { status: 'signed-out' },
+      { status: 'reauth-required', message: 'expired' },
+      {
+        status: 'connected',
+        deviceId: 'device-1',
+        entitlement: { plan: 'free', status: 'inactive', tier: null },
+      },
+    ]) {
       const { x, sent } = sync();
       await x.onState(paid());
       await x.onState(next);
@@ -36,10 +63,10 @@ describe("included X research access on the desktop", () => {
     }
   });
 
-  it("fetches a new token for a new sign-in on this computer", async () => {
+  it('fetches a new token for a new sign-in on this computer', async () => {
     const { x, sent, fetchAccess } = sync();
-    await x.onState(paid("device-1"));
-    await x.onState(paid("device-2"));
+    await x.onState(paid('device-1'));
+    await x.onState(paid('device-2'));
     expect(fetchAccess).toHaveBeenCalledTimes(2);
     expect(sent).toEqual([access, access]);
   });
@@ -47,17 +74,21 @@ describe("included X research access on the desktop", () => {
   it("a change of account with the Admin down: the account before's token doesn't stay with the server", async () => {
     const fetchAccess = vi.fn(async () => access);
     const { x, sent } = sync(fetchAccess);
-    await x.onState(paid("device-a"));
-    fetchAccess.mockRejectedValueOnce(new Error("offline"));
-    await x.onState(paid("device-b"));
+    await x.onState(paid('device-a'));
+    fetchAccess.mockRejectedValueOnce(new Error('offline'));
+    await x.onState(paid('device-b'));
     expect(sent).toEqual([access, null]);
-    await x.onState(paid("device-b"));
+    await x.onState(paid('device-b'));
     expect(sent).toEqual([access, null, access]);
   });
 
-  it("sends nothing for a free account, and null when the Admin says the plan is not active", async () => {
+  it('sends nothing for a free account, and null when the Admin says the plan is not active', async () => {
     const free = sync();
-    await free.x.onState({ status: "connected", deviceId: "d", entitlement: { plan: "free", status: "inactive", tier: null } });
+    await free.x.onState({
+      status: 'connected',
+      deviceId: 'd',
+      entitlement: { plan: 'free', status: 'inactive', tier: null },
+    });
     expect(free.sent).toEqual([]);
     expect(free.fetchAccess).not.toHaveBeenCalled();
     const refused = sync(vi.fn(async () => null));
@@ -66,8 +97,11 @@ describe("included X research access on the desktop", () => {
     expect(refused.notes).toEqual([{ offered: false }]);
   });
 
-  it("keeps trying on later state changes after a failed fetch, without sending anything for it", async () => {
-    const fetchAccess = vi.fn().mockRejectedValueOnce(new Error("offline")).mockResolvedValueOnce(access);
+  it('keeps trying on later state changes after a failed fetch, without sending anything for it', async () => {
+    const fetchAccess = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValueOnce(access);
     const { x, sent } = sync(fetchAccess);
     await x.onState(paid());
     expect(sent).toEqual([]);
@@ -75,7 +109,7 @@ describe("included X research access on the desktop", () => {
     expect(sent).toEqual([access]);
   });
 
-  it("re-sends the token it holds when the server starts again, and nothing when it holds none", async () => {
+  it('re-sends the token it holds when the server starts again, and nothing when it holds none', async () => {
     const { x, sent } = sync();
     x.serverStarted();
     expect(sent).toEqual([]);
@@ -84,11 +118,17 @@ describe("included X research access on the desktop", () => {
     expect(sent).toEqual([access, access]);
   });
 
-  it("asks once while a fetch is already under way", async () => {
+  it('asks once while a fetch is already under way', async () => {
     let finish;
-    const fetchAccess = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+    const fetchAccess = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     const { x, sent } = sync(fetchAccess);
-    const first = x.onState(paid()), second = x.onState(paid());
+    const first = x.onState(paid()),
+      second = x.onState(paid());
     finish(access);
     await Promise.all([first, second]);
     expect(fetchAccess).toHaveBeenCalledTimes(1);
@@ -96,10 +136,13 @@ describe("included X research access on the desktop", () => {
   });
 });
 
-describe("when the Admin says no to a paid sign-in", () => {
-  const versioned = (version) => ({ ...paid(), entitlement: { plan: "pro", status: "active", tier: "pro", version } });
+describe('when the Admin says no to a paid sign-in', () => {
+  const versioned = (version) => ({
+    ...paid(),
+    entitlement: { plan: 'pro', status: 'active', tier: 'pro', version },
+  });
 
-  it("asks once for that sign-in and plan version, not on every refresh, and asks again when the plan changes", async () => {
+  it('asks once for that sign-in and plan version, not on every refresh, and asks again when the plan changes', async () => {
     const { x, sent, fetchAccess } = sync(vi.fn(async () => null));
     await x.onState(versioned(1));
     await x.onState(versioned(1));
@@ -115,23 +158,38 @@ describe("when the Admin says no to a paid sign-in", () => {
   it("clears the server's not-offered note once the plan stops or the app signs out, so the card offers the way back", async () => {
     const { x, sent, notes } = sync(vi.fn(async () => null));
     await x.onState(versioned(1));
-    await x.onState({ status: "signed-out" });
+    await x.onState({ status: 'signed-out' });
     expect(sent).toEqual([null, null]);
     expect(notes).toEqual([{ offered: false }, null]);
   });
 
-  it("sends nothing for a fetch that ends after the plan stopped, or after another sign-in took over", async () => {
+  it('sends nothing for a fetch that ends after the plan stopped, or after another sign-in took over', async () => {
     let finish;
-    const fetchAccess = vi.fn(() => new Promise((resolve) => { finish = resolve; }));
+    const fetchAccess = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
     const lapsed = sync(fetchAccess);
     const asking = lapsed.x.onState(paid());
-    await lapsed.x.onState({ status: "signed-out" });
+    await lapsed.x.onState({ status: 'signed-out' });
     finish(access);
     await asking;
     expect(lapsed.sent).toEqual([]);
-    const other = sync(vi.fn().mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; })).mockResolvedValueOnce(access));
-    const first = other.x.onState(paid("device-1"));
-    void other.x.onState(paid("device-2"));
+    const other = sync(
+      vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              finish = resolve;
+            }),
+        )
+        .mockResolvedValueOnce(access),
+    );
+    const first = other.x.onState(paid('device-1'));
+    void other.x.onState(paid('device-2'));
     finish(access);
     await first;
     await vi.waitFor(() => expect(other.fetchAccess).toHaveBeenCalledTimes(2));
@@ -140,23 +198,36 @@ describe("when the Admin says no to a paid sign-in", () => {
 });
 
 describe("main.mjs's wiring of included X research access", () => {
-  it("asks the current sign-in and posts its answer to whichever server is running, re-sending to a restarted one", async () => {
-    const posted = [], logged = [];
-    let account = null, proc = null;
-    const x = createDesktopIncludedX({ account: () => account, server: () => proc, log: (line) => logged.push(line) });
+  it('asks the current sign-in and posts its answer to whichever server is running, re-sending to a restarted one', async () => {
+    const posted = [],
+      logged = [];
+    let account = null,
+      proc = null;
+    const x = createDesktopIncludedX({
+      account: () => account,
+      server: () => proc,
+      log: (line) => logged.push(line),
+    });
     await x.onState(paid());
     expect(posted).toEqual([]);
     account = { xResearchAccess: vi.fn(async () => null) };
     proc = { postMessage: (message) => posted.push(message) };
-    await x.onState(paid("device-2"));
-    expect(posted).toEqual([{ type: "openmausbot:included-x", access: null, offered: false }]);
+    await x.onState(paid('device-2'));
+    expect(posted).toEqual([{ type: 'openmausbot:included-x', access: null, offered: false }]);
     account.xResearchAccess.mockResolvedValue(access);
-    await x.onState(paid("device-3"));
+    await x.onState(paid('device-3'));
     proc = { postMessage: (message) => posted.push({ restarted: message }) };
     x.serverStarted();
-    expect(posted.slice(1)).toEqual([{ type: "openmausbot:included-x", access }, { restarted: { type: "openmausbot:included-x", access } }]);
-    proc = { postMessage: () => { throw new Error("port closed"); } };
+    expect(posted.slice(1)).toEqual([
+      { type: 'openmausbot:included-x', access },
+      { restarted: { type: 'openmausbot:included-x', access } },
+    ]);
+    proc = {
+      postMessage: () => {
+        throw new Error('port closed');
+      },
+    };
     x.serverStarted();
-    expect(logged).toEqual(["X research access sync failed: port closed"]);
+    expect(logged).toEqual(['X research access sync failed: port closed']);
   });
 });

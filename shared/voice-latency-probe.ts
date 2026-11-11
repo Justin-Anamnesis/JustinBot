@@ -46,7 +46,7 @@ export interface VoiceGapSummary {
 }
 
 const finiteOrUndefined = (value: number | undefined): number | undefined =>
-  typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 
 /** Accounting for one reply. First audio needs only a playback start; a
  * silence needs both bounds on the page clock: a block the probe never saw
@@ -58,9 +58,14 @@ export function summarizeVoiceReply(sample: VoiceProbeSample): VoiceGapSummary {
     .filter((value): value is number => value !== undefined);
   const firstAudio = starts.length ? Math.min(...starts) : undefined;
   const played = sample.blocks
-    .map((block) => ({ startAt: finiteOrUndefined(block.startAt), endAt: finiteOrUndefined(block.endAt) }))
-    .filter((block): block is { startAt: number; endAt: number } =>
-      block.startAt !== undefined && block.endAt !== undefined && block.endAt >= block.startAt)
+    .map((block) => ({
+      startAt: finiteOrUndefined(block.startAt),
+      endAt: finiteOrUndefined(block.endAt),
+    }))
+    .filter(
+      (block): block is { startAt: number; endAt: number } =>
+        block.startAt !== undefined && block.endAt !== undefined && block.endAt >= block.startAt,
+    )
     .sort((a, b) => a.startAt - b.startAt);
   const gaps: number[] = [];
   for (let i = 1; i < played.length; i += 1) {
@@ -68,7 +73,8 @@ export function summarizeVoiceReply(sample: VoiceProbeSample): VoiceGapSummary {
     if (silence > VOICE_LATENCY_GAP_THRESHOLD_MS) gaps.push(silence);
   }
   return {
-    t0ToFirstAudioMs: firstDeltaAt !== undefined && firstAudio !== undefined ? firstAudio - firstDeltaAt : null,
+    t0ToFirstAudioMs:
+      firstDeltaAt !== undefined && firstAudio !== undefined ? firstAudio - firstDeltaAt : null,
     gapCount: gaps.length,
     totalGapMs: gaps.reduce((sum, gap) => sum + gap, 0),
     longestGapMs: gaps.length ? Math.max(...gaps) : 0,
@@ -86,20 +92,29 @@ export interface VoiceTurnSummary extends VoiceGapSummary {
  * `audioFrame`. t0 is the first delta across the whole turn; audio, the
  * message frame, and gaps come from `audioFrame`. First audio needs only a
  * playback start; gaps still require both bounds. */
-export function summarizeVoiceTurn(frames: readonly VoiceProbeSample[], audioFrame: VoiceProbeSample): VoiceTurnSummary {
-  const t0 = Math.min(...frames.map((frame) => finiteOrUndefined(frame.firstDeltaAt) ?? Number.POSITIVE_INFINITY));
+export function summarizeVoiceTurn(
+  frames: readonly VoiceProbeSample[],
+  audioFrame: VoiceProbeSample,
+): VoiceTurnSummary {
+  const t0 = Math.min(
+    ...frames.map((frame) => finiteOrUndefined(frame.firstDeltaAt) ?? Number.POSITIVE_INFINITY),
+  );
   const summary = summarizeVoiceReply(audioFrame);
   const messageFrameAt = finiteOrUndefined(audioFrame.messageFrameAt);
-  const starts = audioFrame.blocks.map((block) => finiteOrUndefined(block.startAt)).filter((value): value is number => value !== undefined);
+  const starts = audioFrame.blocks
+    .map((block) => finiteOrUndefined(block.startAt))
+    .filter((value): value is number => value !== undefined);
   const firstAudio = starts.length ? Math.min(...starts) : undefined;
   return {
     t0ToFirstAudioMs: Number.isFinite(t0) && firstAudio !== undefined ? firstAudio - t0 : null,
-    t0ToMessageFrameMs: Number.isFinite(t0) && messageFrameAt !== undefined ? messageFrameAt - t0 : null,
-    messageFrameToFirstAudioMs: messageFrameAt !== undefined && firstAudio !== undefined ? firstAudio - messageFrameAt : null,
+    t0ToMessageFrameMs:
+      Number.isFinite(t0) && messageFrameAt !== undefined ? messageFrameAt - t0 : null,
+    messageFrameToFirstAudioMs:
+      messageFrameAt !== undefined && firstAudio !== undefined ? firstAudio - messageFrameAt : null,
     gapCount: summary.gapCount,
     totalGapMs: summary.totalGapMs,
     longestGapMs: summary.longestGapMs,
-    blocksMeasured: typeof audioFrame.blockCount === "number" ? audioFrame.blockCount : null,
+    blocksMeasured: typeof audioFrame.blockCount === 'number' ? audioFrame.blockCount : null,
   };
 }
 
@@ -112,7 +127,9 @@ export interface VoiceRunTotals {
 }
 
 export function summarizeVoiceRun(replies: readonly VoiceGapSummary[]): VoiceRunTotals {
-  const firstAudio = replies.map((reply) => reply.t0ToFirstAudioMs).filter((value): value is number => value !== null);
+  const firstAudio = replies
+    .map((reply) => reply.t0ToFirstAudioMs)
+    .filter((value): value is number => value !== null);
   return {
     worstFirstAudioMs: firstAudio.length ? Math.max(...firstAudio) : null,
     totalGaps: replies.reduce((sum, reply) => sum + reply.gapCount, 0),

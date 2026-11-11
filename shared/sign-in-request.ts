@@ -3,7 +3,7 @@
  * bot works. OpenMausBot never receives a website password: the person types it
  * into the page, and the bot uses the session the page keeps.
  */
-import type { Surface } from "./wire.ts";
+import type { Surface } from './wire.ts';
 
 /** Where the login has to happen: the place the asking turn worked in.
  * The built-in browser keeps its own sign-ins, apart from any computer's
@@ -15,8 +15,9 @@ export type SignInPlace = Surface;
  * address — a script URL, a file, an address carrying a username or
  * password — is refused, so the card can never open more than a page. */
 export function normalizeSignInSite(raw: unknown): { url: string; site: string } | null {
-  if (typeof raw !== "string") return null;
+  if (typeof raw !== 'string') return null;
   const text = raw.trim();
+  // prettier-ignore
   // eslint-disable-next-line no-control-regex -- Reject control characters and spaces before URL parsing normalizes them.
   if (!text || text.length > 2048 || /[\u0000- \u007f\\]/u.test(text)) return null;
   let url: URL;
@@ -25,11 +26,18 @@ export function normalizeSignInSite(raw: unknown): { url: string; site: string }
   } catch {
     return null;
   }
-  if ((url.protocol !== "https:" && url.protocol !== "http:") || !url.hostname || url.username || url.password) return null;
+  if (
+    (url.protocol !== 'https:' && url.protocol !== 'http:') ||
+    !url.hostname ||
+    url.username ||
+    url.password
+  )
+    return null;
   // A bare word is no site ("example" would parse as a host); localhost and
   // addresses are the exceptions a developer's own app needs.
-  if (!url.hostname.includes(".") && url.hostname !== "localhost" && !url.hostname.startsWith("[")) return null;
-  return { url: url.href, site: url.hostname.replace(/^www\./, "") };
+  if (!url.hostname.includes('.') && url.hostname !== 'localhost' && !url.hostname.startsWith('['))
+    return null;
+  return { url: url.href, site: url.hostname.replace(/^www\./, '') };
 }
 
 /** A still-open sign-in card for this site — the set a newer request
@@ -39,7 +47,13 @@ export function normalizeSignInSite(raw: unknown): { url: string; site: string }
 export function isPendingSignInRequest(
   message: {
     kind?: unknown;
-    signIn?: { site?: unknown; done?: unknown; cancelled?: unknown; superseded?: unknown; answeredInChat?: unknown };
+    signIn?: {
+      site?: unknown;
+      done?: unknown;
+      cancelled?: unknown;
+      superseded?: unknown;
+      answeredInChat?: unknown;
+    };
     from?: { botId?: unknown };
   },
   site: string,
@@ -47,7 +61,7 @@ export function isPendingSignInRequest(
   roomThread: boolean,
 ): boolean {
   return (
-    message.kind === "signin" &&
+    message.kind === 'signin' &&
     message.signIn?.site === site &&
     signInWaits(message.signIn) &&
     (!roomThread || message.from?.botId === requestingBotId)
@@ -55,21 +69,34 @@ export function isPendingSignInRequest(
 }
 
 /** Whether the card still waits on the person: not done, cancelled, superseded or answered in the chat. */
-export function signInWaits(card: { done?: unknown; cancelled?: unknown; superseded?: unknown; answeredInChat?: unknown }): boolean {
-  return card.done !== true && card.cancelled !== true && card.superseded !== true && card.answeredInChat !== true;
+export function signInWaits(card: {
+  done?: unknown;
+  cancelled?: unknown;
+  superseded?: unknown;
+  answeredInChat?: unknown;
+}): boolean {
+  return (
+    card.done !== true &&
+    card.cancelled !== true &&
+    card.superseded !== true &&
+    card.answeredInChat !== true
+  );
 }
 
 /** How a card ended, or null while it is open. */
-export function signInOutcome(state: { done?: unknown; cancelled?: unknown }): "done" | "cancelled" | null {
-  if (state.done === true) return "done";
-  if (state.cancelled === true) return "cancelled";
+export function signInOutcome(state: {
+  done?: unknown;
+  cancelled?: unknown;
+}): 'done' | 'cancelled' | null {
+  if (state.done === true) return 'done';
+  if (state.cancelled === true) return 'cancelled';
   return null;
 }
 
 /** The line that resumes the bot, through the same continuation the
  * credential card uses. */
-export function signInResumePrompt(site: string, outcome: "done" | "cancelled"): string {
-  return outcome === "done"
+export function signInResumePrompt(site: string, outcome: 'done' | 'cancelled'): string {
+  return outcome === 'done'
     ? `OpenMausBot sign-in update: the person finished signing in to ${site}. Check you are signed in, then continue the task that paused for it. Never ask them for a password or a one-time code in chat.`
     : `OpenMausBot sign-in update: the person declined to sign in to ${site}. Continue without it if you can, or briefly explain what you could not do. Never ask them for a password or a one-time code in chat.`;
 }

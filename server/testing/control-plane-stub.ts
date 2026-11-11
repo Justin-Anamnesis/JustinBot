@@ -1,7 +1,7 @@
 // A stand-in for cloudflare/control-plane for `openmausbot login` and `serve --tunnel` tests: the routes
 // the desktop's client uses, accepting only credentials it issued, recording every call.
-import { randomBytes, randomUUID } from "node:crypto";
-import { createServer, type IncomingMessage } from "node:http";
+import { randomBytes, randomUUID } from 'node:crypto';
+import { createServer, type IncomingMessage } from 'node:http';
 
 interface StubInstallation {
   id: string;
@@ -31,19 +31,24 @@ export interface ControlPlaneStub {
 
 const NINETY_DAYS = 90 * 24 * 60 * 60 * 1000;
 
-const newCredential = () => `omb_install_${randomBytes(16).toString("base64url")}.${randomBytes(32).toString("base64url")}`;
+const newCredential = () =>
+  `omb_install_${randomBytes(16).toString('base64url')}.${randomBytes(32).toString('base64url')}`;
 
 async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
-  let raw = "";
+  let raw = '';
   for await (const chunk of req) raw += chunk;
   const parsed: unknown = raw ? JSON.parse(raw) : {};
-  return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) ? Object.fromEntries(Object.entries(parsed)) : {};
+  return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+    ? Object.fromEntries(Object.entries(parsed))
+    : {};
 }
 
-export async function startControlPlaneStub(options: { otp?: string; endpointUrl?: string } = {}): Promise<ControlPlaneStub> {
-  const otp = options.otp ?? "24681357";
-  const endpointUrl = options.endpointUrl ?? "https://c-stub.openmausbot.invalid";
-  const connectorToken = `stub-connector-${randomBytes(48).toString("base64url")}`;
+export async function startControlPlaneStub(
+  options: { otp?: string; endpointUrl?: string } = {},
+): Promise<ControlPlaneStub> {
+  const otp = options.otp ?? '24681357';
+  const endpointUrl = options.endpointUrl ?? 'https://c-stub.openmausbot.invalid';
+  const connectorToken = `stub-connector-${randomBytes(48).toString('base64url')}`;
   let issuedConnectorToken = connectorToken;
   let reclaimedUntilProvision: string | null = null;
   const accountTokens = new Set<string>();
@@ -62,7 +67,7 @@ export async function startControlPlaneStub(options: { otp?: string; endpointUrl
   const endpoint = () => ({
     url: endpointUrl,
     hostname: new URL(endpointUrl).hostname,
-    status: "active",
+    status: 'active',
     generation: 1,
     updatedAt: 1,
     lastReconciledAt: 1,
@@ -70,89 +75,123 @@ export async function startControlPlaneStub(options: { otp?: string; endpointUrl
   });
 
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url ?? "/", "http://stub");
-    const method = req.method ?? "GET";
+    const url = new URL(req.url ?? '/', 'http://stub');
+    const method = req.method ?? 'GET';
     const path = url.pathname;
     calls.push(`${method} ${path}`);
-    const bearer = /^Bearer (.+)$/.exec(req.headers.authorization ?? "")?.[1] ?? "";
+    const bearer = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1] ?? '';
     const send = (status: number, body?: unknown, headers: Record<string, string> = {}) => {
-      res.writeHead(status, { "content-type": "application/json", ...headers });
-      res.end(body === undefined ? "" : JSON.stringify(body));
+      res.writeHead(status, { 'content-type': 'application/json', ...headers });
+      res.end(body === undefined ? '' : JSON.stringify(body));
     };
-    const byCredential = () => [...installations.values()].find((inst) => inst.credential === bearer) ?? null;
+    const byCredential = () =>
+      [...installations.values()].find((inst) => inst.credential === bearer) ?? null;
     const account = accountTokens.has(bearer);
 
-    if (method === "GET" && path === "/healthz") return send(200, { ok: true, service: "openmausbot-control-plane" });
-    if (method === "POST" && path === "/api/auth/email-otp/send-verification-otp") {
+    if (method === 'GET' && path === '/healthz')
+      return send(200, { ok: true, service: 'openmausbot-control-plane' });
+    if (method === 'POST' && path === '/api/auth/email-otp/send-verification-otp') {
       await readJson(req);
       return send(200, { success: true });
     }
-    if (method === "POST" && path === "/api/auth/sign-in/email-otp") {
+    if (method === 'POST' && path === '/api/auth/sign-in/email-otp') {
       const body = await readJson(req);
-      if (body.otp !== otp) return send(401, { error: "invalid_otp", message: "Invalid code" });
-      const token = `acct_${randomBytes(24).toString("base64url")}`;
+      if (body.otp !== otp) return send(401, { error: 'invalid_otp', message: 'Invalid code' });
+      const token = `acct_${randomBytes(24).toString('base64url')}`;
       accountTokens.add(token);
-      return send(200, { token: "db-token-never-used", user: { id: "user_stub", email: body.email, name: "stub", emailVerified: true } }, { "set-auth-token": token });
+      return send(
+        200,
+        {
+          token: 'db-token-never-used',
+          user: { id: 'user_stub', email: body.email, name: 'stub', emailVerified: true },
+        },
+        { 'set-auth-token': token },
+      );
     }
-    if (method === "POST" && path === "/api/auth/sign-out") return send(200, { success: true });
-    if (method === "GET" && path === "/v1/me") {
-      return account ? send(200, { user: { id: "user_stub", email: "stub@example.test", name: "stub", emailVerified: true } }) : send(401, { error: "unauthorized" });
+    if (method === 'POST' && path === '/api/auth/sign-out') return send(200, { success: true });
+    if (method === 'GET' && path === '/v1/me') {
+      return account
+        ? send(200, {
+            user: {
+              id: 'user_stub',
+              email: 'stub@example.test',
+              name: 'stub',
+              emailVerified: true,
+            },
+          })
+        : send(401, { error: 'unauthorized' });
     }
-    if (path === "/v1/installations" && method === "GET") {
-      return account ? send(200, { installations: [...installations.values()].map(publicView) }) : send(401, { error: "unauthorized" });
+    if (path === '/v1/installations' && method === 'GET') {
+      return account
+        ? send(200, { installations: [...installations.values()].map(publicView) })
+        : send(401, { error: 'unauthorized' });
     }
-    if (path === "/v1/installations" && method === "POST") {
-      if (!account) return send(401, { error: "unauthorized" });
+    if (path === '/v1/installations' && method === 'POST') {
+      if (!account) return send(401, { error: 'unauthorized' });
       const body = await readJson(req);
       const inst: StubInstallation = {
         id: randomUUID(),
-        clientInstanceId: String(body.clientInstanceId ?? ""),
-        name: String(body.name ?? "This computer"),
-        platform: String(body.platform ?? "linux"),
-        appVersion: typeof body.appVersion === "string" ? body.appVersion : null,
+        clientInstanceId: String(body.clientInstanceId ?? ''),
+        name: String(body.name ?? 'This computer'),
+        platform: String(body.platform ?? 'linux'),
+        appVersion: typeof body.appVersion === 'string' ? body.appVersion : null,
         credential: newCredential(),
-        ...(typeof body.kind === "string" ? { kind: body.kind } : {}),
+        ...(typeof body.kind === 'string' ? { kind: body.kind } : {}),
       };
       installations.set(inst.id, inst);
-      return send(201, { installation: publicView(inst), credential: inst.credential, credentialExpiresAt: Date.now() + NINETY_DAYS });
+      return send(201, {
+        installation: publicView(inst),
+        credential: inst.credential,
+        credentialExpiresAt: Date.now() + NINETY_DAYS,
+      });
     }
     const rotate = /^\/v1\/installations\/([^/]+)\/credentials\/rotate$/.exec(path);
-    if (rotate && method === "POST") {
-      if (!account) return send(401, { error: "unauthorized" });
+    if (rotate && method === 'POST') {
+      if (!account) return send(401, { error: 'unauthorized' });
       const inst = installations.get(decodeURIComponent(rotate[1]));
-      if (!inst) return send(404, { error: "not_found" });
+      if (!inst) return send(404, { error: 'not_found' });
       inst.credential = newCredential();
-      return send(201, { credential: inst.credential, createdAt: Date.now(), credentialExpiresAt: Date.now() + NINETY_DAYS });
+      return send(201, {
+        credential: inst.credential,
+        createdAt: Date.now(),
+        credentialExpiresAt: Date.now() + NINETY_DAYS,
+      });
     }
-    if (path === "/v1/installations/self" && method === "GET") {
+    if (path === '/v1/installations/self' && method === 'GET') {
       const inst = byCredential();
-      return inst ? send(200, { installation: publicView(inst), credentialExpiresAt: Date.now() + NINETY_DAYS }) : send(401, { error: "unauthorized" });
+      return inst
+        ? send(200, {
+            installation: publicView(inst),
+            credentialExpiresAt: Date.now() + NINETY_DAYS,
+          })
+        : send(401, { error: 'unauthorized' });
     }
-    if (path === "/v1/installations/self/endpoint") {
+    if (path === '/v1/installations/self/endpoint') {
       const inst = byCredential();
-      if (!inst) return send(401, { error: "unauthorized" });
-      if (method === "GET") return send(200, { endpoint: reclaimedUntilProvision ? null : endpoint() });
-      if (method === "POST") {
+      if (!inst) return send(401, { error: 'unauthorized' });
+      if (method === 'GET')
+        return send(200, { endpoint: reclaimedUntilProvision ? null : endpoint() });
+      if (method === 'POST') {
         const body = await readJson(req);
-        if (typeof body.appVersion === "string") inst.appVersion = body.appVersion;
-        if (typeof body.kind === "string") inst.kind = body.kind;
+        if (typeof body.appVersion === 'string') inst.appVersion = body.appVersion;
+        if (typeof body.kind === 'string') inst.kind = body.kind;
         if (reclaimedUntilProvision) issuedConnectorToken = reclaimedUntilProvision;
         reclaimedUntilProvision = null;
         return send(200, { endpoint: endpoint(), connectorToken: issuedConnectorToken });
       }
-      if (method === "DELETE") return send(204);
+      if (method === 'DELETE') return send(204);
     }
     const one = /^\/v1\/installations\/([^/]+)$/.exec(path);
-    if (one && method === "DELETE") {
-      if (!account) return send(401, { error: "unauthorized" });
+    if (one && method === 'DELETE') {
+      if (!account) return send(401, { error: 'unauthorized' });
       installations.delete(decodeURIComponent(one[1]));
       return send(204);
     }
-    return send(404, { error: "not_found" });
+    return send(404, { error: 'not_found' });
   });
-  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+  await new Promise<void>((done) => server.listen(0, '127.0.0.1', done));
   const address = server.address();
-  const port = typeof address === "object" && address ? address.port : 0;
+  const port = typeof address === 'object' && address ? address.port : 0;
   return {
     url: `http://127.0.0.1:${port}`,
     otp,
@@ -160,13 +199,20 @@ export async function startControlPlaneStub(options: { otp?: string; endpointUrl
     connectorToken,
     calls,
     installations,
-    seedInstallation: (name = "fleet box") => {
-      const inst: StubInstallation = { id: randomUUID(), clientInstanceId: randomUUID(), name, platform: "linux", appVersion: null, credential: newCredential() };
+    seedInstallation: (name = 'fleet box') => {
+      const inst: StubInstallation = {
+        id: randomUUID(),
+        clientInstanceId: randomUUID(),
+        name,
+        platform: 'linux',
+        appVersion: null,
+        credential: newCredential(),
+      };
       installations.set(inst.id, inst);
       return inst.credential;
     },
     reclaim: () => {
-      reclaimedUntilProvision = `stub-connector-${randomBytes(48).toString("base64url")}`;
+      reclaimedUntilProvision = `stub-connector-${randomBytes(48).toString('base64url')}`;
       return reclaimedUntilProvision;
     },
     close: () => new Promise<void>((done) => server.close(() => done())),

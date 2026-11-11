@@ -1,12 +1,12 @@
-import { createHash, randomUUID } from "node:crypto";
-import { linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { createHash, randomUUID } from 'node:crypto';
+import { linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-import { writeFileAtomic } from "./atomic.ts";
-import { DATA_DIR } from "./config.ts";
+import { writeFileAtomic } from './atomic.ts';
+import { DATA_DIR } from './config.ts';
 
-const FILE = join(DATA_DIR, "box-create-requests.json");
-const LOCK_FILE = join(DATA_DIR, "box-create-requests.lock");
+const FILE = join(DATA_DIR, 'box-create-requests.json');
+const LOCK_FILE = join(DATA_DIR, 'box-create-requests.lock');
 const KEY_RETENTION_MS = 24 * 60 * 60 * 1_000;
 const MAX_REQUESTS = 4_096;
 const LOCK_WAIT_MS = 2_000;
@@ -57,29 +57,31 @@ interface LegacyJournalReaperOwner {
 const lockWait = new Int32Array(new SharedArrayBuffer(4));
 
 function isRequest(value: unknown): value is BoatCreateRequest {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const request = value as Record<string, unknown>;
   return (
-    typeof request.botId === "string"
-    && BOT_ID.test(request.botId)
-    && typeof request.requestBody === "string"
-    && request.requestBody.length > 0
-    && request.requestBody.length <= 1_024
-    && typeof request.idempotencyKey === "string"
-    && UUID.test(request.idempotencyKey)
-    && typeof request.createdAt === "number"
-    && Number.isFinite(request.createdAt)
-    && request.createdAt > 0
-    && (request.boxId === undefined || (typeof request.boxId === "string" && BOAT_ID.test(request.boxId)))
-    && (request.resolved === undefined || (request.resolved === true && typeof request.boxId === "string"))
+    typeof request.botId === 'string' &&
+    BOT_ID.test(request.botId) &&
+    typeof request.requestBody === 'string' &&
+    request.requestBody.length > 0 &&
+    request.requestBody.length <= 1_024 &&
+    typeof request.idempotencyKey === 'string' &&
+    UUID.test(request.idempotencyKey) &&
+    typeof request.createdAt === 'number' &&
+    Number.isFinite(request.createdAt) &&
+    request.createdAt > 0 &&
+    (request.boxId === undefined ||
+      (typeof request.boxId === 'string' && BOAT_ID.test(request.boxId))) &&
+    (request.resolved === undefined ||
+      (request.resolved === true && typeof request.boxId === 'string'))
   );
 }
 
 function recoveryStateError(detail: string, cause?: unknown): Error & { status: number } {
   return Object.assign(
     new Error(
-      `Cloud computer creation is paused because its recovery state is ${detail}. `
-      + "Check boat.dev for an unnamed Boat before repairing OpenMausBot's local state.",
+      `Cloud computer creation is paused because its recovery state is ${detail}. ` +
+        "Check boat.dev for an unnamed Boat before repairing OpenMausBot's local state.",
     ),
     { status: 503, cause },
   );
@@ -88,30 +90,31 @@ function recoveryStateError(detail: string, cause?: unknown): Error & { status: 
 function loadFresh(): BoatCreateRequest[] {
   let raw: unknown;
   try {
-    raw = JSON.parse(readFileSync(FILE, "utf8"));
+    raw = JSON.parse(readFileSync(FILE, 'utf8'));
   } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return [];
-    throw recoveryStateError("unreadable", error);
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return [];
+    throw recoveryStateError('unreadable', error);
   }
   const file = raw as { version?: unknown; requests?: unknown };
   if (
-    !file
-    || typeof file !== "object"
-    || Array.isArray(file)
-    || file.version !== 1
-    || !Array.isArray(file.requests)
-    || file.requests.length > MAX_REQUESTS
-    || !file.requests.every(isRequest)
+    !file ||
+    typeof file !== 'object' ||
+    Array.isArray(file) ||
+    file.version !== 1 ||
+    !Array.isArray(file.requests) ||
+    file.requests.length > MAX_REQUESTS ||
+    !file.requests.every(isRequest)
   ) {
-    throw recoveryStateError("invalid");
+    throw recoveryStateError('invalid');
   }
   const identities = new Set<string>();
   const keys = new Set<string>();
   const botsWithKnownBoats = new Set<string>();
   for (const request of file.requests) {
     const identity = `${request.botId}\0${request.requestBody}`;
-    if (identities.has(identity) || keys.has(request.idempotencyKey)) throw recoveryStateError("invalid");
-    if (request.boxId && botsWithKnownBoats.has(request.botId)) throw recoveryStateError("invalid");
+    if (identities.has(identity) || keys.has(request.idempotencyKey))
+      throw recoveryStateError('invalid');
+    if (request.boxId && botsWithKnownBoats.has(request.botId)) throw recoveryStateError('invalid');
     identities.add(identity);
     keys.add(request.idempotencyKey);
     if (request.boxId) botsWithKnownBoats.add(request.botId);
@@ -122,41 +125,45 @@ function loadFresh(): BoatCreateRequest[] {
 function save(next: BoatCreateRequest[]): void {
   mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
   try {
-    writeFileAtomic(FILE, `${JSON.stringify({ version: 1, requests: next }, null, 2)}\n`, { mode: 0o600 });
+    writeFileAtomic(FILE, `${JSON.stringify({ version: 1, requests: next }, null, 2)}\n`, {
+      mode: 0o600,
+    });
   } catch (error) {
-    throw recoveryStateError("unavailable", error);
+    throw recoveryStateError('unavailable', error);
   }
 }
 
 function isLockOwner(value: unknown): value is JournalLockOwner {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const owner = value as Record<string, unknown>;
-  return owner.version === 1
-    && Number.isInteger(owner.pid)
-    && Number(owner.pid) > 0
-    && Number(owner.pid) <= 0x7fffffff
-    && typeof owner.token === "string"
-    && UUID.test(owner.token)
-    && typeof owner.createdAt === "number"
-    && Number.isFinite(owner.createdAt)
-    && owner.createdAt > 0;
+  return (
+    owner.version === 1 &&
+    Number.isInteger(owner.pid) &&
+    Number(owner.pid) > 0 &&
+    Number(owner.pid) <= 0x7fffffff &&
+    typeof owner.token === 'string' &&
+    UUID.test(owner.token) &&
+    typeof owner.createdAt === 'number' &&
+    Number.isFinite(owner.createdAt) &&
+    owner.createdAt > 0
+  );
 }
 
 function readLockOwner(): JournalLockOwner | null {
   let raw: string;
   try {
-    raw = readFileSync(LOCK_FILE, "utf8");
+    raw = readFileSync(LOCK_FILE, 'utf8');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return null;
-    throw recoveryStateError("lock is unreadable", error);
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
+    throw recoveryStateError('lock is unreadable', error);
   }
   let owner: unknown;
   try {
     owner = JSON.parse(raw);
   } catch (error) {
-    throw recoveryStateError("lock is invalid", error);
+    throw recoveryStateError('lock is invalid', error);
   }
-  if (!isLockOwner(owner)) throw recoveryStateError("lock is invalid");
+  if (!isLockOwner(owner)) throw recoveryStateError('lock is invalid');
   return owner;
 }
 
@@ -166,10 +173,10 @@ function readReaperOwner(
 ): JournalReaperOwner | LegacyJournalReaperOwner | null {
   let raw: string;
   try {
-    raw = readFileSync(path, "utf8");
+    raw = readFileSync(path, 'utf8');
   } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code === "ENOENT") return null;
-    throw recoveryStateError("stale-lock recovery record is unreadable", error);
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
+    throw recoveryStateError('stale-lock recovery record is unreadable', error);
   }
 
   if (/^[1-9][0-9]*\n?$/.test(raw)) {
@@ -181,10 +188,10 @@ function readReaperOwner(
   try {
     owner = JSON.parse(raw);
   } catch (error) {
-    throw recoveryStateError("stale-lock recovery record is invalid", error);
+    throw recoveryStateError('stale-lock recovery record is invalid', error);
   }
-  if (!isLockOwner(owner) || !("targetToken" in owner) || owner.targetToken !== targetToken) {
-    throw recoveryStateError("stale-lock recovery record is invalid");
+  if (!isLockOwner(owner) || !('targetToken' in owner) || owner.targetToken !== targetToken) {
+    throw recoveryStateError('stale-lock recovery record is invalid');
   }
   return owner as JournalReaperOwner;
 }
@@ -195,11 +202,11 @@ function processIsAlive(pid: number): boolean {
     return true;
   } catch (error) {
     const code = (error as NodeJS.ErrnoException)?.code;
-    if (code === "ESRCH") return false;
+    if (code === 'ESRCH') return false;
     // EPERM proves a process owns the pid even though this account cannot
     // signal it. Every other answer is ambiguous and must keep the lock.
-    if (code === "EPERM") return true;
-    throw recoveryStateError("lock owner could not be verified", error);
+    if (code === 'EPERM') return true;
+    throw recoveryStateError('lock owner could not be verified', error);
   }
 }
 
@@ -207,8 +214,8 @@ function unlinkCandidate(path: string): void {
   try {
     unlinkSync(path);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
-      throw recoveryStateError("lock cleanup failed", error);
+    if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+      throw recoveryStateError('lock cleanup failed', error);
     }
   }
 }
@@ -216,17 +223,21 @@ function unlinkCandidate(path: string): void {
 function publishReaper(path: string, owner: JournalReaperOwner): boolean {
   const candidate = `${path}.candidate-${owner.pid}-${owner.token}`;
   try {
-    writeFileSync(candidate, `${JSON.stringify(owner)}\n`, { flag: "wx", mode: 0o600, flush: true });
+    writeFileSync(candidate, `${JSON.stringify(owner)}\n`, {
+      flag: 'wx',
+      mode: 0o600,
+      flush: true,
+    });
   } catch (error) {
-    throw recoveryStateError("stale-lock recovery candidate is unavailable", error);
+    throw recoveryStateError('stale-lock recovery candidate is unavailable', error);
   }
   try {
     try {
       linkSync(candidate, path);
       return true;
     } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code === "EEXIST") return false;
-      throw recoveryStateError("stale-lock recovery is unavailable", error);
+      if ((error as NodeJS.ErrnoException)?.code === 'EEXIST') return false;
+      throw recoveryStateError('stale-lock recovery is unavailable', error);
     }
   } finally {
     unlinkCandidate(candidate);
@@ -234,7 +245,7 @@ function publishReaper(path: string, owner: JournalReaperOwner): boolean {
 }
 
 function successorReaperPath(targetToken: string, reaperIdentity: string): string {
-  const digest = createHash("sha256").update(reaperIdentity).digest("hex").slice(0, 32);
+  const digest = createHash('sha256').update(reaperIdentity).digest('hex').slice(0, 32);
   return `${LOCK_FILE}.reap-${targetToken}-${digest}`;
 }
 
@@ -254,10 +265,10 @@ function claimReaperAuthority(expected: JournalLockOwner): boolean {
     const current = readReaperOwner(reaperPath, expected.token);
     if (!current) continue;
     if (processIsAlive(current.pid)) return false;
-    const identity = "legacy" in current ? `legacy:${current.pid}` : current.token;
+    const identity = 'legacy' in current ? `legacy:${current.pid}` : current.token;
     reaperPath = successorReaperPath(expected.token, identity);
   }
-  throw recoveryStateError("stale lock could not be recovered after repeated interrupted attempts");
+  throw recoveryStateError('stale lock could not be recovered after repeated interrupted attempts');
 }
 
 function reapDeadLock(expected: JournalLockOwner): boolean {
@@ -268,8 +279,8 @@ function reapDeadLock(expected: JournalLockOwner): boolean {
   try {
     unlinkSync(LOCK_FILE);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
-      throw recoveryStateError("stale lock could not be retired", error);
+    if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
+      throw recoveryStateError('stale lock could not be retired', error);
     }
   }
   return true;
@@ -279,7 +290,7 @@ function acquireJournalLock(): JournalLockOwner {
   try {
     mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
   } catch (error) {
-    throw recoveryStateError("lock directory is unavailable", error);
+    throw recoveryStateError('lock directory is unavailable', error);
   }
   const owner: JournalLockOwner = {
     version: 1,
@@ -290,9 +301,13 @@ function acquireJournalLock(): JournalLockOwner {
   // Fully written before link(2) publishes it, so a crash never leaves an ownerless lock (unlike open-then-write).
   const candidate = `${LOCK_FILE}.candidate-${owner.pid}-${owner.token}`;
   try {
-    writeFileSync(candidate, `${JSON.stringify(owner)}\n`, { flag: "wx", mode: 0o600, flush: true });
+    writeFileSync(candidate, `${JSON.stringify(owner)}\n`, {
+      flag: 'wx',
+      mode: 0o600,
+      flush: true,
+    });
   } catch (error) {
-    throw recoveryStateError("lock candidate is unavailable", error);
+    throw recoveryStateError('lock candidate is unavailable', error);
   }
 
   const deadline = performance.now() + LOCK_WAIT_MS;
@@ -302,8 +317,8 @@ function acquireJournalLock(): JournalLockOwner {
         linkSync(candidate, LOCK_FILE);
         return owner;
       } catch (error) {
-        if ((error as NodeJS.ErrnoException)?.code !== "EEXIST") {
-          throw recoveryStateError("lock could not be acquired", error);
+        if ((error as NodeJS.ErrnoException)?.code !== 'EEXIST') {
+          throw recoveryStateError('lock could not be acquired', error);
         }
       }
 
@@ -311,7 +326,7 @@ function acquireJournalLock(): JournalLockOwner {
       const reaped = current !== null && !processIsAlive(current.pid) && reapDeadLock(current);
       // Every retry path is bounded: an adversarially changing lock can vanish or be replaced between steps.
       if (performance.now() >= deadline) {
-        throw recoveryStateError("locked by another OpenMausBot process");
+        throw recoveryStateError('locked by another OpenMausBot process');
       }
       if (reaped) continue;
       Atomics.wait(lockWait, 0, 0, LOCK_RETRY_MS);
@@ -324,12 +339,12 @@ function acquireJournalLock(): JournalLockOwner {
 function releaseJournalLock(owner: JournalLockOwner): void {
   const current = readLockOwner();
   if (!current || current.token !== owner.token || current.pid !== owner.pid) {
-    throw recoveryStateError("lock ownership changed unexpectedly");
+    throw recoveryStateError('lock ownership changed unexpectedly');
   }
   try {
     unlinkSync(LOCK_FILE);
   } catch (error) {
-    throw recoveryStateError("lock could not be released", error);
+    throw recoveryStateError('lock could not be released', error);
   }
 }
 
@@ -344,8 +359,9 @@ function withJournalLock<T>(operation: (requests: BoatCreateRequest[]) => T): T 
 
 /** Recorded before the request leaves the process; a known Boat wins over a changed body, never a second create. */
 export function beginBoatCreate(botId: string, requestBody: string): BoatCreateAttempt {
-  if (!BOT_ID.test(botId)) throw new Error("invalid bot id for cloud computer creation");
-  if (!requestBody || requestBody.length > 1_024) throw new Error("invalid cloud computer create request");
+  if (!BOT_ID.test(botId)) throw new Error('invalid bot id for cloud computer creation');
+  if (!requestBody || requestBody.length > 1_024)
+    throw new Error('invalid cloud computer create request');
   return withJournalLock((requests) => {
     const known = requests.find((request) => request.botId === botId && request.boxId);
     if (known) return { request: { ...known }, startedNow: false };
@@ -354,7 +370,7 @@ export function beginBoatCreate(botId: string, requestBody: string): BoatCreateA
     const pending = requests.find((request) => request.botId === botId);
     if (pending) {
       if (pending.requestBody !== requestBody) {
-        throw recoveryStateError("waiting for an earlier cloud computer request to be reconciled");
+        throw recoveryStateError('waiting for an earlier cloud computer request to be reconciled');
       }
       if (now - pending.createdAt >= KEY_RETENTION_MS) {
         // Past boat.dev's 24-hour idempotency window a retry or new key may create a second billable Boat; stop for manual reconciliation.
@@ -369,7 +385,7 @@ export function beginBoatCreate(botId: string, requestBody: string): BoatCreateA
       idempotencyKey: randomUUID(),
       createdAt: now,
     };
-    if (requests.length >= MAX_REQUESTS) throw recoveryStateError("full");
+    if (requests.length >= MAX_REQUESTS) throw recoveryStateError('full');
     save([...requests, request]);
     return { request: { ...request }, startedNow: true };
   });
@@ -377,15 +393,16 @@ export function beginBoatCreate(botId: string, requestBody: string): BoatCreateA
 
 /** Persist the returned identity before the caller attempts to rename it. */
 export function rememberCreatedBoat(request: BoatCreateRequest, boxId: string): BoatCreateRequest {
-  if (!BOAT_ID.test(boxId)) throw new Error("boat.dev returned an invalid cloud computer id");
+  if (!BOAT_ID.test(boxId)) throw new Error('boat.dev returned an invalid cloud computer id');
   return withJournalLock((requests) => {
-    const current = requests.find((candidate) => (
-      candidate.botId === request.botId
-      && candidate.requestBody === request.requestBody
-      && candidate.idempotencyKey === request.idempotencyKey
-    ));
+    const current = requests.find(
+      (candidate) =>
+        candidate.botId === request.botId &&
+        candidate.requestBody === request.requestBody &&
+        candidate.idempotencyKey === request.idempotencyKey,
+    );
     if (!current || (current.boxId !== undefined && current.boxId !== boxId)) {
-      throw recoveryStateError("out of date");
+      throw recoveryStateError('out of date');
     }
     const completed = { ...current, boxId };
     save([...requests.filter((candidate) => candidate.botId !== request.botId), completed]);
@@ -396,32 +413,39 @@ export function rememberCreatedBoat(request: BoatCreateRequest, boxId: string): 
 /** Only after the deterministic rename succeeds. */
 export function resolveBoatCreate(request: BoatCreateRequest): BoatCreateRequest {
   return withJournalLock((requests) => {
-    const current = requests.find((candidate) => (
-      candidate.botId === request.botId
-      && candidate.requestBody === request.requestBody
-      && candidate.idempotencyKey === request.idempotencyKey
-      && candidate.boxId === request.boxId
-    ));
-    if (!current?.boxId) throw recoveryStateError("out of date");
+    const current = requests.find(
+      (candidate) =>
+        candidate.botId === request.botId &&
+        candidate.requestBody === request.requestBody &&
+        candidate.idempotencyKey === request.idempotencyKey &&
+        candidate.boxId === request.boxId,
+    );
+    if (!current?.boxId) throw recoveryStateError('out of date');
     const resolved: BoatCreateRequest = { ...current, resolved: true };
-    save(requests.map((candidate) => candidate.idempotencyKey === current.idempotencyKey ? resolved : candidate));
+    save(
+      requests.map((candidate) =>
+        candidate.idempotencyKey === current.idempotencyKey ? resolved : candidate,
+      ),
+    );
     return { ...resolved };
   });
 }
 
 /** Provider request bodies and idempotency keys never cross this boundary. */
 export function boatCreateRecoverySnapshot(): BoatCreateRecoverySnapshot[] {
-  return withJournalLock((requests) => requests.map((request) => ({
-    botId: request.botId,
-    ...(request.boxId ? { boxId: request.boxId } : {}),
-    resolved: request.resolved === true,
-  })));
+  return withJournalLock((requests) =>
+    requests.map((request) => ({
+      botId: request.botId,
+      ...(request.boxId ? { boxId: request.boxId } : {}),
+      resolved: request.resolved === true,
+    })),
+  );
 }
 
 /** Never steals an identity remembered for another bot; fails closed on a cross-bot conflict. */
 export function adoptResolvedBoat(botId: string, boxId: string): void {
-  if (!BOT_ID.test(botId)) throw new Error("invalid bot id for cloud computer ownership");
-  if (!BOAT_ID.test(boxId)) throw new Error("invalid cloud computer id for ownership");
+  if (!BOT_ID.test(botId)) throw new Error('invalid bot id for cloud computer ownership');
+  if (!BOAT_ID.test(boxId)) throw new Error('invalid cloud computer id for ownership');
   withJournalLock((requests) => {
     const sameBoat = requests.find((request) => request.boxId === boxId);
     if (sameBoat && sameBoat.botId !== botId) {
@@ -431,26 +455,27 @@ export function adoptResolvedBoat(botId: string, boxId: string): void {
       ? { ...sameBoat, resolved: true }
       : {
           botId,
-          requestBody: JSON.stringify({ adopted: "legacy-name", boxId }),
+          requestBody: JSON.stringify({ adopted: 'legacy-name', boxId }),
           idempotencyKey: randomUUID(),
           createdAt: Date.now(),
           boxId,
           resolved: true,
         };
     const retained = requests.filter((request) => request.botId !== botId);
-    if (retained.length >= MAX_REQUESTS) throw recoveryStateError("full");
+    if (retained.length >= MAX_REQUESTS) throw recoveryStateError('full');
     if (
-      requests.filter((request) => request.botId === botId).length === 1
-      && sameBoat?.resolved === true
-      && sameBoat.botId === botId
-    ) return;
+      requests.filter((request) => request.botId === botId).length === 1 &&
+      sameBoat?.resolved === true &&
+      sameBoat.botId === botId
+    )
+      return;
     save([...retained, adopted]);
   });
 }
 
 /** Only for a Boat the provider confirmed deleted, never a failed or ambiguous deletion. */
 export function retireDeletedBoatCreate(boxId: string): void {
-  if (!BOAT_ID.test(boxId)) throw new Error("invalid deleted cloud computer id");
+  if (!BOAT_ID.test(boxId)) throw new Error('invalid deleted cloud computer id');
   withJournalLock((requests) => {
     const next = requests.filter((request) => request.boxId !== boxId);
     if (next.length !== requests.length) save(next);
@@ -459,7 +484,9 @@ export function retireDeletedBoatCreate(boxId: string): void {
 
 export function discardBoatCreate(request: BoatCreateRequest): void {
   withJournalLock((requests) => {
-    const next = requests.filter((candidate) => candidate.idempotencyKey !== request.idempotencyKey);
+    const next = requests.filter(
+      (candidate) => candidate.idempotencyKey !== request.idempotencyKey,
+    );
     if (next.length !== requests.length) save(next);
   });
 }

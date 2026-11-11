@@ -1,26 +1,36 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 /** `companion-settings.json` in the app's user data: each way into this computer and whether the person turned it on.
  * `wifi` is Same Wi-Fi (the device port on the LAN, and Bonjour), `relay` is Anywhere, through MausBot, `tailscale`
  * the tailnet address, `https` the HTTPS address (the managed tunnel). `notices` lists routes kept on by the update
  * that the person has not seen yet. */
 export const COMPANION_SETTINGS_VERSION = 2;
-export const ROUTES = Object.freeze(["wifi", "relay", "tailscale", "https"]);
+export const ROUTES = Object.freeze(['wifi', 'relay', 'tailscale', 'https']);
 /** A device seen this recently counts as using its routes. */
 export const RECENT_DEVICE_MS = 30 * 24 * 60 * 60 * 1_000;
 
 const off = () => ({ on: false, since: null });
 
 export function defaultCompanionSettings() {
-  return { version: COMPANION_SETTINGS_VERSION, keepAwake: false, routes: Object.fromEntries(ROUTES.map((route) => [route, off()])), notices: [] };
+  return {
+    version: COMPANION_SETTINGS_VERSION,
+    keepAwake: false,
+    routes: Object.fromEntries(ROUTES.map((route) => [route, off()])),
+    notices: [],
+  };
 }
 
 function readRoute(value, route) {
-  if (!value || typeof value !== "object" || value.on !== true) return off();
+  if (!value || typeof value !== 'object' || value.on !== true) return off();
   const since = Number.isSafeInteger(value.since) ? value.since : null;
-  if (route === "tailscale") return { on: true, since, name: typeof value.name === "string" && /\.ts\.net$/i.test(value.name) ? value.name : null };
+  if (route === 'tailscale')
+    return {
+      on: true,
+      since,
+      name: typeof value.name === 'string' && /\.ts\.net$/i.test(value.name) ? value.name : null,
+    };
   return { on: true, since };
 }
 
@@ -33,40 +43,65 @@ function readRoute(value, route) {
  * Anything unreadable is "off": these flags open network listeners.
  */
 export function readCompanionSettings(raw, facts = {}) {
-  const parsed = raw && typeof raw === "object" ? raw : {};
+  const parsed = raw && typeof raw === 'object' ? raw : {};
   const keepAwake = parsed.keepAwake === true;
   if (parsed.version === COMPANION_SETTINGS_VERSION) {
-    const routes = Object.fromEntries(ROUTES.map((route) => [route, readRoute(parsed.routes?.[route], route)]));
-    const notices = Array.isArray(parsed.notices) ? ROUTES.filter((route) => parsed.notices.includes(route) && routes[route].on) : [];
+    const routes = Object.fromEntries(
+      ROUTES.map((route) => [route, readRoute(parsed.routes?.[route], route)]),
+    );
+    const notices = Array.isArray(parsed.notices)
+      ? ROUTES.filter((route) => parsed.notices.includes(route) && routes[route].on)
+      : [];
     return { version: COMPANION_SETTINGS_VERSION, keepAwake, routes, notices };
   }
   const settings = { ...defaultCompanionSettings(), keepAwake };
   if (parsed.enabled !== true) return settings;
   const now = facts.now ?? Date.now();
-  const recent = (Array.isArray(facts.devices) ? facts.devices : []).filter((device) => Number.isFinite(device?.lastSeenAt) && now - device.lastSeenAt <= RECENT_DEVICE_MS);
+  const recent = (Array.isArray(facts.devices) ? facts.devices : []).filter(
+    (device) => Number.isFinite(device?.lastSeenAt) && now - device.lastSeenAt <= RECENT_DEVICE_MS,
+  );
   if (recent.length === 0) return settings;
-  const away = recent.filter((device) => device.routes !== "local");
+  const away = recent.filter((device) => device.routes !== 'local');
   const kept = {
     wifi: true,
     relay: away.some((device) => Number.isSafeInteger(device.e2eAt)),
     tailscale: facts.tailnetAddress === true,
     https: away.length > 0 && facts.managedAddress === true,
   };
-  for (const route of ROUTES) if (kept[route]) settings.routes[route] = route === "tailscale" ? { on: true, since: now, name: null } : { on: true, since: now };
+  for (const route of ROUTES)
+    if (kept[route])
+      settings.routes[route] =
+        route === 'tailscale' ? { on: true, since: now, name: null } : { on: true, since: now };
   settings.notices = ROUTES.filter((route) => kept[route]);
   return settings;
 }
 
-export const anyRouteOn = (settings) => ROUTES.some((route) => settings?.routes?.[route]?.on === true);
+export const anyRouteOn = (settings) =>
+  ROUTES.some((route) => settings?.routes?.[route]?.on === true);
 
 /** Same Wi-Fi and Tailscale are what the sidecar itself listens for; the relay and the HTTPS address reach it otherwise. */
-export const directRoutesOn = (settings) => ({ wifi: settings?.routes?.wifi?.on === true, tailscale: settings?.routes?.tailscale?.on === true });
+export const directRoutesOn = (settings) => ({
+  wifi: settings?.routes?.wifi?.on === true,
+  tailscale: settings?.routes?.tailscale?.on === true,
+});
 
 export function setRoute(settings, route, on, { now = Date.now(), name } = {}) {
   if (!ROUTES.includes(route)) return settings;
   const current = settings.routes[route];
-  const next = on ? { on: true, since: current.on ? current.since : now, ...(route === "tailscale" ? { name: name !== undefined ? name : current.name ?? null } : {}) } : off();
-  return { ...settings, routes: { ...settings.routes, [route]: next }, notices: on ? settings.notices : settings.notices.filter((notice) => notice !== route) };
+  const next = on
+    ? {
+        on: true,
+        since: current.on ? current.since : now,
+        ...(route === 'tailscale'
+          ? { name: name !== undefined ? name : (current.name ?? null) }
+          : {}),
+      }
+    : off();
+  return {
+    ...settings,
+    routes: { ...settings.routes, [route]: next },
+    notices: on ? settings.notices : settings.notices.filter((notice) => notice !== route),
+  };
 }
 
 /**
@@ -80,18 +115,23 @@ export function phoneLinkStartsAtLaunch({ remoteClient, serverReady, settings, p
 
 /** A running sidecar with nothing paired and no code open goes back to sleep; its routes stay as set. */
 export const phoneLinkShouldSleep = (state) =>
-  state?.enabled === true && !state.error && state.devicesUnreadable !== true && Array.isArray(state.devices) && state.devices.length === 0 && !state.pairing;
+  state?.enabled === true &&
+  !state.error &&
+  state.devicesUnreadable !== true &&
+  Array.isArray(state.devices) &&
+  state.devices.length === 0 &&
+  !state.pairing;
 
 export const companionDevicesFile = (env = process.env, home = os.homedir()) =>
-  path.join(env.OMB_COMPANION_DIR ?? path.join(home, ".openmausbot-companion"), "devices.json");
+  path.join(env.OMB_COMPANION_DIR ?? path.join(home, '.openmausbot-companion'), 'devices.json');
 
 /** Paired devices in the companion's own store; null when the file exists but cannot be read. */
 export function readPairedDevices(file = companionDevicesFile()) {
   let text;
   try {
-    text = fs.readFileSync(file, "utf8");
+    text = fs.readFileSync(file, 'utf8');
   } catch (error) {
-    return error?.code === "ENOENT" ? [] : null;
+    return error?.code === 'ENOENT' ? [] : null;
   }
   try {
     const devices = JSON.parse(text)?.devices;
@@ -106,6 +146,10 @@ export const countPairedPhones = (file) => readPairedDevices(file)?.length ?? nu
 /** Looks at this computer's interfaces only: Tailscale's own interface (`tailscale0`, "Tailscale", or the utun that
  * carries a fd7a:115c:a1e0::/48 address). A 100.64/10 address alone is not Tailscale: carrier NAT and other VPNs use it. */
 export function hasTailnetAddress(interfaces = os.networkInterfaces()) {
-  return Object.entries(interfaces).some(([name, entries]) =>
-    (entries ?? []).length > 0 && (/^tailscale/i.test(name) || (entries ?? []).some((entry) => /^fd7a:115c:a1e0:/i.test(entry?.address ?? ""))));
+  return Object.entries(interfaces).some(
+    ([name, entries]) =>
+      (entries ?? []).length > 0 &&
+      (/^tailscale/i.test(name) ||
+        (entries ?? []).some((entry) => /^fd7a:115c:a1e0:/i.test(entry?.address ?? ''))),
+  );
 }

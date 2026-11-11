@@ -1,7 +1,7 @@
 // Boat answers about 1,000 API requests a minute per IP and one screen costs two (a command, then reading the file),
 // so the Team map shares a small global frame budget and leaves the rest to the bots' own computer calls.
-import type { MapComputerState } from "../shared/map-computer.ts";
-import { SLEEPING_BOAT_STATES } from "./boat.ts";
+import type { MapComputerState } from '../shared/map-computer.ts';
+import { SLEEPING_BOAT_STATES } from './boat.ts';
 
 /** A cloud computer this installation manages, keyed by its owner: a bot id, or a team computer's owner key. */
 export interface FrameMachine {
@@ -15,7 +15,7 @@ export interface MapFrame {
   mime: string;
   at: number;
   /** `turn`: captured by the bot's own turn, full size. `map`: a small capture made for map watchers. */
-  source: "turn" | "map";
+  source: 'turn' | 'map';
   version: string;
 }
 
@@ -46,18 +46,21 @@ export interface ComputerFramesOptions {
   captureTimeoutMs?: number;
 }
 
-const RUNNING = new Set(["idle", "ready", "running"]);
-const STARTING = new Set(["init", "provisioning", "provisioned", "cloning"]);
-const FAILED = new Set(["error", "cancelled"]);
+const RUNNING = new Set(['idle', 'ready', 'running']);
+const STARTING = new Set(['init', 'provisioning', 'provisioned', 'cloning']);
+const FAILED = new Set(['error', 'cancelled']);
 const MAX_BACKOFF_MS = 120_000;
 
-export function mapComputerState(machine: FrameMachine | undefined, working: boolean): MapComputerState {
-  if (!machine) return "off";
-  if (RUNNING.has(machine.state)) return working ? "working" : "idle";
-  if (STARTING.has(machine.state)) return "starting";
-  if (SLEEPING_BOAT_STATES.has(machine.state)) return "asleep";
-  if (FAILED.has(machine.state)) return "problem";
-  return "off";
+export function mapComputerState(
+  machine: FrameMachine | undefined,
+  working: boolean,
+): MapComputerState {
+  if (!machine) return 'off';
+  if (RUNNING.has(machine.state)) return working ? 'working' : 'idle';
+  if (STARTING.has(machine.state)) return 'starting';
+  if (SLEEPING_BOAT_STATES.has(machine.state)) return 'asleep';
+  if (FAILED.has(machine.state)) return 'problem';
+  return 'off';
 }
 
 /** A token bucket: `perSecond` captures a second on average, never more than one second's worth at once. */
@@ -126,14 +129,21 @@ export function createComputerFrames(options: ComputerFramesOptions) {
     const own = mapFrames.get(boxId);
     const turn = options.turnFrame(boxId);
     if (turn && (!own || turn.at > own.at)) {
-      return { data: turn.data, mime: turn.mime, at: turn.at, source: "turn", version: `turn-${turn.at}` };
+      return {
+        data: turn.data,
+        mime: turn.mime,
+        at: turn.at,
+        source: 'turn',
+        version: `turn-${turn.at}`,
+      };
     }
     return own;
   }
 
   /** When this machine's screen should next be captured for the map, or null when it must not be. */
   function dueAt(machine: FrameMachine, at: number): number | null {
-    if (!RUNNING.has(machine.state) || options.held(machine.owner) || inFlight.has(machine.boxId)) return null;
+    if (!RUNNING.has(machine.state) || options.held(machine.owner) || inFlight.has(machine.boxId))
+      return null;
     const failure = failures.get(machine.boxId);
     if (failure && at < failure.until) return null;
     const own = mapFrames.get(machine.boxId);
@@ -141,7 +151,11 @@ export function createComputerFrames(options: ComputerFramesOptions) {
     const last = Math.max(own?.at ?? -Infinity, turn?.at ?? -Infinity);
     if (last === -Infinity) return 0;
     const fed = turn !== undefined && at - turn.at < turnFeedMs;
-    const interval = fed ? turnStaleMs : options.working(machine.owner) ? workingIntervalMs : idleIntervalMs;
+    const interval = fed
+      ? turnStaleMs
+      : options.working(machine.owner)
+        ? workingIntervalMs
+        : idleIntervalMs;
     return last + interval;
   }
 
@@ -149,15 +163,27 @@ export function createComputerFrames(options: ComputerFramesOptions) {
     inFlight.add(machine.boxId);
     captures += 1;
     try {
-      const shot = await options.capture(machine.boxId, AbortSignal.any([closing.signal, AbortSignal.timeout(captureTimeoutMs)]));
+      const shot = await options.capture(
+        machine.boxId,
+        AbortSignal.any([closing.signal, AbortSignal.timeout(captureTimeoutMs)]),
+      );
       // The person may have taken control while the frame was on its way.
       if (options.held(machine.owner)) return;
       const at = now();
-      mapFrames.set(machine.boxId, { data: shot.data, mime: shot.mime, at, source: "map", version: `map-${at}` });
+      mapFrames.set(machine.boxId, {
+        data: shot.data,
+        mime: shot.mime,
+        at,
+        source: 'map',
+        version: `map-${at}`,
+      });
       failures.delete(machine.boxId);
     } catch {
       const count = (failures.get(machine.boxId)?.count ?? 0) + 1;
-      failures.set(machine.boxId, { count, until: now() + Math.min(MAX_BACKOFF_MS, 5_000 * 2 ** (count - 1)) });
+      failures.set(machine.boxId, {
+        count,
+        until: now() + Math.min(MAX_BACKOFF_MS, 5_000 * 2 ** (count - 1)),
+      });
     } finally {
       inFlight.delete(machine.boxId);
     }
@@ -173,8 +199,15 @@ export function createComputerFrames(options: ComputerFramesOptions) {
     if (at - listedAt >= inventoryMs) void refresh();
     const due = [...machines.values()]
       .map((machine) => ({ machine, due: dueAt(machine, at) }))
-      .filter((entry): entry is { machine: FrameMachine; due: number } => entry.due !== null && entry.due <= at)
-      .sort((a, b) => a.due - b.due || Number(options.working(b.machine.owner)) - Number(options.working(a.machine.owner)));
+      .filter(
+        (entry): entry is { machine: FrameMachine; due: number } =>
+          entry.due !== null && entry.due <= at,
+      )
+      .sort(
+        (a, b) =>
+          a.due - b.due ||
+          Number(options.working(b.machine.owner)) - Number(options.working(a.machine.owner)),
+      );
     for (const { machine } of due) {
       if (inFlight.size >= concurrency || !budget.take()) break;
       void capture(machine);

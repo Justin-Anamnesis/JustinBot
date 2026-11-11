@@ -1,45 +1,49 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-import { schemaIssue, type JsonValue } from "./schema.ts";
-import type { MausColor } from "./store.ts";
-import { botBodyId, type BotBodyId } from "../shared/bot-body.ts";
-import { takeImportName } from "../shared/import-name.ts";
-import { MAUS_COLOR_NAMES } from "../shared/wire.ts";
-import { BOT_PROFILE_LIMITS } from "../shared/bot-profile.ts";
-import { optionalText, requiredText } from "../shared/package-format.ts";
+import { schemaIssue, type JsonValue } from './schema.ts';
+import type { MausColor } from './store.ts';
+import { botBodyId, type BotBodyId } from '../shared/bot-body.ts';
+import { takeImportName } from '../shared/import-name.ts';
+import { MAUS_COLOR_NAMES } from '../shared/wire.ts';
+import { BOT_PROFILE_LIMITS } from '../shared/bot-profile.ts';
+import { optionalText, requiredText } from '../shared/package-format.ts';
 
-export const TEAM_MANIFEST_FORMAT = "openmaus.team" as const;
+export const TEAM_MANIFEST_FORMAT = 'openmaus.team' as const;
 export const TEAM_MANIFEST_VERSION = 2 as const;
 export const LEGACY_TEAM_MANIFEST_VERSION = 1 as const;
 export const MAX_TEAM_MEMBERS = 200;
 
-const RESPONDER_KINDS = new Set(["member", "everyone", "mentions", "auto"]);
+const RESPONDER_KINDS = new Set(['member', 'everyone', 'mentions', 'auto']);
 /** A responder kind from a newer release reads as "no responder": the room gets the default lead, never a refusal. */
 const responderSchema = z.preprocess(
   (value) => {
-    const kind = value && typeof value === "object" ? (value as { kind?: unknown }).kind : undefined;
-    return typeof kind === "string" && !RESPONDER_KINDS.has(kind) ? { kind: "mentions" } : value;
+    const kind =
+      value && typeof value === 'object' ? (value as { kind?: unknown }).kind : undefined;
+    return typeof kind === 'string' && !RESPONDER_KINDS.has(kind) ? { kind: 'mentions' } : value;
   },
-  z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("member"), member: requiredText(64) }),
-    z.object({ kind: z.literal("everyone") }),
-    z.object({ kind: z.literal("mentions") }),
-    z.object({ kind: z.literal("auto"), member: requiredText(64).optional() }),
+  z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('member'), member: requiredText(64) }),
+    z.object({ kind: z.literal('everyone') }),
+    z.object({ kind: z.literal('mentions') }),
+    z.object({ kind: z.literal('auto'), member: requiredText(64).optional() }),
   ]),
 );
 
 const memberSchema = z.object({
   key: requiredText(64).regex(/^[a-z0-9][a-z0-9_-]*$/, {
-    message: "may only contain lowercase letters, numbers, - and _",
+    message: 'may only contain lowercase letters, numbers, - and _',
   }),
   name: requiredText(100),
   title: optionalText(200),
   description: optionalText(4_000),
-  soul: z.string().refine((value) => Buffer.byteLength(value, "utf8") <= BOT_PROFILE_LIMITS.soul, {
-    error: "standing instructions must be at most 24000 bytes",
-  }).optional(),
+  soul: z
+    .string()
+    .refine((value) => Buffer.byteLength(value, 'utf8') <= BOT_PROFILE_LIMITS.soul, {
+      error: 'standing instructions must be at most 24000 bytes',
+    })
+    .optional(),
   appearance: z.object({
-    color: z.enum(MAUS_COLOR_NAMES, { error: "is not supported" }),
+    color: z.enum(MAUS_COLOR_NAMES, { error: 'is not supported' }),
     mascotExpression: optionalText(80),
     mascotBody: optionalText(40),
   }),
@@ -47,12 +51,12 @@ const memberSchema = z.object({
 
 const membersSchema = z
   .array(memberSchema)
-  .min(1, { message: "A team needs at least one member" })
+  .min(1, { message: 'A team needs at least one member' })
   .max(MAX_TEAM_MEMBERS, { message: `A team can have at most ${MAX_TEAM_MEMBERS} members` });
 
-const manifestSchema = z.discriminatedUnion("version", [
+const manifestSchema = z.discriminatedUnion('version', [
   z.object({
-    format: z.literal(TEAM_MANIFEST_FORMAT, { error: "This is not an OpenMaus team file" }),
+    format: z.literal(TEAM_MANIFEST_FORMAT, { error: 'This is not an OpenMaus team file' }),
     version: z.literal(LEGACY_TEAM_MANIFEST_VERSION),
     team: z.object({
       name: requiredText(100),
@@ -66,7 +70,7 @@ const manifestSchema = z.discriminatedUnion("version", [
     }),
   }),
   z.object({
-    format: z.literal(TEAM_MANIFEST_FORMAT, { error: "This is not an OpenMaus team file" }),
+    format: z.literal(TEAM_MANIFEST_FORMAT, { error: 'This is not an OpenMaus team file' }),
     version: z.literal(TEAM_MANIFEST_VERSION),
     team: z.object({
       name: requiredText(100),
@@ -90,10 +94,10 @@ export interface TeamManifestMember {
 }
 
 export type TeamManifestResponder =
-  | { kind: "member"; member: string }
-  | { kind: "everyone" }
-  | { kind: "mentions" }
-  | { kind: "auto"; member?: string };
+  | { kind: 'member'; member: string }
+  | { kind: 'everyone' }
+  | { kind: 'mentions' }
+  | { kind: 'auto'; member?: string };
 
 export interface TeamManifestRoom {
   name: string;
@@ -145,25 +149,26 @@ export function parseTeamManifest(value: TeamManifestInput): ParsedTeamManifest;
 export function parseTeamManifest(value: TeamManifestInput): ParsedTeamManifest {
   const parsed = manifestSchema.safeParse(value);
   if (!parsed.success) {
-    const formatIssue = parsed.error.issues.find((issue) => issue.path[0] === "format");
+    const formatIssue = parsed.error.issues.find((issue) => issue.path[0] === 'format');
     if (formatIssue) throw new Error(formatIssue.message);
-    const versionIssue = parsed.error.issues.find((issue) => issue.path[0] === "version");
-    if (versionIssue) throw new Error("Team file version is not supported");
-    throw new Error(schemaIssue(parsed.error, "This is not a team file"));
+    const versionIssue = parsed.error.issues.find((issue) => issue.path[0] === 'version');
+    if (versionIssue) throw new Error('Team file version is not supported');
+    throw new Error(schemaIssue(parsed.error, 'This is not a team file'));
   }
 
   const seenKeys = new Set<string>();
   const members = parsed.data.team.members.map((member): TeamManifestMember => {
     if (seenKeys.has(member.key)) throw new Error(`Duplicate member key: ${member.key}`);
     seenKeys.add(member.key);
-    const appearance: TeamManifestMember["appearance"] = { color: member.appearance.color };
-    if (member.appearance.mascotExpression) appearance.mascotExpression = member.appearance.mascotExpression;
+    const appearance: TeamManifestMember['appearance'] = { color: member.appearance.color };
+    if (member.appearance.mascotExpression)
+      appearance.mascotExpression = member.appearance.mascotExpression;
     if (member.appearance.mascotBody) appearance.mascotBody = member.appearance.mascotBody;
     return {
       key: member.key,
       name: member.name,
-      title: member.title ?? "",
-      description: member.description ?? "",
+      title: member.title ?? '',
+      description: member.description ?? '',
       ...(member.soul !== undefined ? { soul: member.soul } : {}),
       appearance,
     };
@@ -181,13 +186,16 @@ export function parseTeamManifest(value: TeamManifestInput): ParsedTeamManifest 
 
   if (parsed.data.version === LEGACY_TEAM_MANIFEST_VERSION) {
     const defaultResponder = parsed.data.team.room.defaultResponder;
-    if ((defaultResponder.kind === "member" || defaultResponder.kind === "auto") && defaultResponder.member !== undefined &&
-      !seenKeys.has(defaultResponder.member)) {
+    if (
+      (defaultResponder.kind === 'member' || defaultResponder.kind === 'auto') &&
+      defaultResponder.member !== undefined &&
+      !seenKeys.has(defaultResponder.member)
+    ) {
       throw new Error(`Unknown default responder: ${defaultResponder.member}`);
     }
     result.team.room = {
       name: parsed.data.team.room.name,
-      bulletin: parsed.data.team.room.bulletin ?? "",
+      bulletin: parsed.data.team.room.bulletin ?? '',
       defaultResponder,
     };
   }
@@ -222,7 +230,8 @@ export function importedMemberProfile(
     ...(member.soul !== undefined ? { soul: member.soul } : {}),
     color: member.appearance.color,
   };
-  if (member.appearance.mascotExpression) profile.mascotExpression = member.appearance.mascotExpression;
+  if (member.appearance.mascotExpression)
+    profile.mascotExpression = member.appearance.mascotExpression;
   // Free text in the manifest: safe-parsed so an untrusted value never reaches a BotRecord unvalidated.
   if (member.appearance.mascotBody) profile.mascotBody = botBodyId(member.appearance.mascotBody);
   return profile;
@@ -231,11 +240,11 @@ export function importedMemberProfile(
 function memberKey(name: string, index: number, used: Set<string>): string {
   const stem =
     name
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "")
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
       .slice(0, 48) || `member-${index + 1}`;
   let key = stem;
   let suffix = 2;
@@ -252,7 +261,7 @@ export function createTeamManifest(team: ExportableTeam, bots: ExportableBot[]):
     const bot = byId.get(id);
     if (!bot) throw new Error(`Team member ${id} no longer exists`);
     const key = memberKey(bot.name, index, usedKeys);
-    const appearance: TeamManifestMember["appearance"] = { color: bot.color };
+    const appearance: TeamManifestMember['appearance'] = { color: bot.color };
     if (bot.mascotExpression) appearance.mascotExpression = bot.mascotExpression;
     if (bot.mascotBody) appearance.mascotBody = bot.mascotBody;
     return {

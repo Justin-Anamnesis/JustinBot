@@ -7,8 +7,8 @@
 // five minutes by default, so pinging it costs more than the re-write it avoids. Nothing is persisted: after a restart the
 // CLI relaunches with a fresh system prompt that misses the cache anyway.
 
-import type { CacheWarmPingResult } from "./contracts.ts";
-import type { CacheKeepWarmStatus } from "../shared/wire.ts";
+import type { CacheWarmPingResult } from './contracts.ts';
+import type { CacheKeepWarmStatus } from '../shared/wire.ts';
 
 export const CACHE_TTL_MS = 60 * 60_000;
 export const PING_AFTER_MS = 50 * 60_000;
@@ -63,7 +63,7 @@ export function pingWasWarm(read: number, write: number): boolean {
 
 export function createCacheKeepWarm(deps: KeepWarmDeps) {
   const windows = new Map<string, Window>();
-  const lastPing = new Map<string, NonNullable<KeepWarmStatus["last"]>>();
+  const lastPing = new Map<string, NonNullable<KeepWarmStatus['last']>>();
   const stoppedWhy = new Map<string, string>();
   let disposed = false;
 
@@ -94,7 +94,9 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
     const due = Math.max(1000, w.lastRequestAt + PING_AFTER_MS - now);
     const delay = Math.min(w.deadline - now, untilCold, due);
     w.nextPingAt = now + due < w.deadline && due < untilCold ? now + due : null;
-    w.pending = deps.after(delay, () => { void ping(w); });
+    w.pending = deps.after(delay, () => {
+      void ping(w);
+    });
     deps.changed(w.target);
   };
 
@@ -115,12 +117,17 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
     try {
       result = await deps.ping(w.target, controller.signal);
     } catch (error) {
-      result = { ok: false, reason: `the ping failed: ${error instanceof Error ? error.message : String(error)}` };
+      result = {
+        ok: false,
+        reason: `the ping failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
     }
     if (w.inflight === controller) w.inflight = null;
     // Whatever happened to the window meanwhile, a ping that ran is booked.
     if (result.ok) {
-      try { deps.book(w.target, result); } catch {}
+      try {
+        deps.book(w.target, result);
+      } catch {}
     }
     if (disposed || windows.get(w.target.threadId) !== w || controller.signal.aborted) return;
     if (!result.ok) {
@@ -128,9 +135,17 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
       return end(w, result.reason);
     }
     const warm = pingWasWarm(result.cacheRead, result.cacheWrite);
-    lastPing.set(w.target.threadId, { at: now, read: result.cacheRead, write: result.cacheWrite, costUsd: result.costUsd });
+    lastPing.set(w.target.threadId, {
+      at: now,
+      read: result.cacheRead,
+      write: result.cacheWrite,
+      costUsd: result.costUsd,
+    });
     if (!warm) {
-      return end(w, `the ping read ${fmtTokens(result.cacheRead)} and wrote ${fmtTokens(result.cacheWrite)} tokens: the cache was already gone`);
+      return end(
+        w,
+        `the ping read ${fmtTokens(result.cacheRead)} and wrote ${fmtTokens(result.cacheWrite)} tokens: the cache was already gone`,
+      );
     }
     w.lastRequestAt = now;
     arm(w);
@@ -141,7 +156,9 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
     const untilCold = w.lastRequestAt + CACHE_TTL_MS - now;
     if (untilCold <= BUSY_RETRY_MS || now + BUSY_RETRY_MS >= w.deadline) return end(w, null);
     w.nextPingAt = now + BUSY_RETRY_MS;
-    w.pending = deps.after(BUSY_RETRY_MS, () => { void ping(w); });
+    w.pending = deps.after(BUSY_RETRY_MS, () => {
+      void ping(w);
+    });
     deps.changed(w.target);
   };
 
@@ -156,7 +173,10 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
       deps.changed(w.target);
     },
 
-    noteTurnCompleted(target: KeepWarmTarget, turn: { ok: boolean; stopReason?: string | null; contextTokens?: number }): void {
+    noteTurnCompleted(
+      target: KeepWarmTarget,
+      turn: { ok: boolean; stopReason?: string | null; contextTokens?: number },
+    ): void {
       if (disposed) return;
       const existing = windows.get(target.threadId);
       const hadStopped = stoppedWhy.delete(target.threadId);
@@ -170,7 +190,15 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
       if ((turn.contextTokens ?? 0) < MIN_CONTEXT_TOKENS) return quiet(existing);
       if (deps.ineligible(target)) return quiet(existing);
       const now = deps.now();
-      const w: Window = existing ?? { target, deadline: 0, lastRequestAt: now, pending: null, nextPingAt: null, inflight: null, paused: false };
+      const w: Window = existing ?? {
+        target,
+        deadline: 0,
+        lastRequestAt: now,
+        pending: null,
+        nextPingAt: null,
+        inflight: null,
+        paused: false,
+      };
       w.target = target;
       w.deadline = now + windowMs;
       w.lastRequestAt = now;
@@ -200,14 +228,14 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
       const last = lastPing.get(threadId);
       if (w) {
         return {
-          state: "warm",
+          state: 'warm',
           until: w.deadline,
           ...(w.nextPingAt !== null && !w.paused ? { nextPingAt: w.nextPingAt } : {}),
           ...(last ? { last } : {}),
         };
       }
       const why = stoppedWhy.get(threadId);
-      return why ? { state: "stopped", stopped: why, ...(last ? { last } : {}) } : undefined;
+      return why ? { state: 'stopped', stopped: why, ...(last ? { last } : {}) } : undefined;
     },
 
     dispose(): void {

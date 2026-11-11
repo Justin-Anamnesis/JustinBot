@@ -1,5 +1,5 @@
-import { createContext, type Dispatch } from "react";
-import type { Action, AppState } from "./store";
+import { createContext, type Dispatch } from 'react';
+import type { Action, AppState } from './store';
 
 /** The app store's dispatch and a reader of its newest state: this value never changes. Read it with useStoreRef. */
 export interface StoreRef {

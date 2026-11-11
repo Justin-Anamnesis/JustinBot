@@ -61,7 +61,7 @@ export interface IdentityProbe {
 }
 
 export function headedUserAgent(userAgent: string): string {
-  return userAgent.replace("HeadlessChrome/", "Chrome/");
+  return userAgent.replace('HeadlessChrome/', 'Chrome/');
 }
 
 export function identityFromProbe(probe: IdentityProbe, product: string): Identity {
@@ -71,21 +71,24 @@ export function identityFromProbe(probe: IdentityProbe, product: string): Identi
     userAgentMetadata: {
       brands: high.brands ?? [],
       fullVersionList: high.fullVersionList ?? [],
-      fullVersion: high.uaFullVersion ?? "",
-      platform: high.platform ?? "",
-      platformVersion: high.platformVersion ?? "",
-      architecture: high.architecture ?? "",
-      model: high.model ?? "",
+      fullVersion: high.uaFullVersion ?? '',
+      platform: high.platform ?? '',
+      platformVersion: high.platformVersion ?? '',
+      architecture: high.architecture ?? '',
+      model: high.model ?? '',
       mobile: high.mobile ?? false,
-      bitness: high.bitness ?? "",
+      bitness: high.bitness ?? '',
       wow64: high.wow64 ?? false,
       formFactors: high.formFactors ?? [],
     },
-    product: product.replace("HeadlessChrome/", "Chrome/"),
+    product: product.replace('HeadlessChrome/', 'Chrome/'),
   };
 }
 
-export function identityOverride(identity: Pick<Identity, "userAgent" | "userAgentMetadata">, acceptLanguage?: string): IdentityOverride {
+export function identityOverride(
+  identity: Pick<Identity, 'userAgent' | 'userAgentMetadata'>,
+  acceptLanguage?: string,
+): IdentityOverride {
   return {
     userAgent: identity.userAgent,
     userAgentMetadata: identity.userAgentMetadata,
@@ -94,11 +97,15 @@ export function identityOverride(identity: Pick<Identity, "userAgent" | "userAge
 }
 
 /** Fields where two identities differ; empty when a page could not tell them apart. */
-export function identityDifferences(a: Pick<Identity, "userAgent" | "userAgentMetadata">, b: Pick<Identity, "userAgent" | "userAgentMetadata">): string[] {
+export function identityDifferences(
+  a: Pick<Identity, 'userAgent' | 'userAgentMetadata'>,
+  b: Pick<Identity, 'userAgent' | 'userAgentMetadata'>,
+): string[] {
   const differences: string[] = [];
-  if (a.userAgent !== b.userAgent) differences.push("userAgent");
+  if (a.userAgent !== b.userAgent) differences.push('userAgent');
   for (const key of Object.keys(a.userAgentMetadata) as Array<keyof UserAgentMetadata>) {
-    if (JSON.stringify(a.userAgentMetadata[key]) !== JSON.stringify(b.userAgentMetadata[key])) differences.push(`userAgentMetadata.${key}`);
+    if (JSON.stringify(a.userAgentMetadata[key]) !== JSON.stringify(b.userAgentMetadata[key]))
+      differences.push(`userAgentMetadata.${key}`);
   }
   return differences;
 }

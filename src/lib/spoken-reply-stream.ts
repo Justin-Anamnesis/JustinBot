@@ -15,11 +15,11 @@
 // holds the rest of the buffer back until the block closes or the
 // authoritative frame lands. Held secret values are known only to the server,
 // so `/api/tts/prepare` masks those itself.
-import { redactSecretsInText } from "../../shared/redact";
-import type { RuntimeEvent } from "../../shared/runtime-events";
-import { currentCall } from "@/lib/call";
-import { speaker, type SpeechStream } from "@/lib/tts";
-import type { LiveCallState } from "../../shared/wire";
+import { redactSecretsInText } from '../../shared/redact';
+import type { RuntimeEvent } from '../../shared/runtime-events';
+import { currentCall } from '@/lib/call';
+import { speaker, type SpeechStream } from '@/lib/tts';
+import type { LiveCallState } from '../../shared/wire';
 
 /** The bot whose reply may speak, when the store's speak gates pass. */
 export interface SpokenReplyOwner {
@@ -28,15 +28,28 @@ export interface SpokenReplyOwner {
 }
 
 interface SpeechGateState {
-  bots: readonly { id: string; threadId: string; voice?: string; speakReplies?: boolean; tasks?: readonly { threadId: string }[] }[];
+  bots: readonly {
+    id: string;
+    threadId: string;
+    voice?: string;
+    speakReplies?: boolean;
+    tasks?: readonly { threadId: string }[];
+  }[];
   liveCall: LiveCallState | null;
 }
 
 /** The speak gates: the thread's bot speaks its replies, and no call (in-app or live) holds the speaker. */
 export function speechOwner(state: SpeechGateState, threadId: string): SpokenReplyOwner | null {
-  const owner = state.bots.find((b) => b.threadId === threadId || b.tasks?.some((task) => task.threadId === threadId));
+  const owner = state.bots.find(
+    (b) => b.threadId === threadId || b.tasks?.some((task) => task.threadId === threadId),
+  );
   const live = state.liveCall;
-  if (!owner?.speakReplies || currentCall() !== null || (live && live.status !== "ended" && live.botId === owner.id)) return null;
+  if (
+    !owner?.speakReplies ||
+    currentCall() !== null ||
+    (live && live.status !== 'ended' && live.botId === owner.id)
+  )
+    return null;
   return { botId: owner.id, voiceId: owner.voice };
 }
 
@@ -82,23 +95,23 @@ export class SpokenReplyStream {
   constructor(private readonly speech: ReplySpeechSink) {}
 
   onRuntimeEvent(event: RuntimeEvent, owner: SpokenReplyOwner | null): void {
-    if (event.type === "turn.started") {
+    if (event.type === 'turn.started') {
       const current = this.turns.get(event.threadId);
       if (current) this.drop(current);
       return;
     }
-    if (event.type === "turn.completed") {
+    if (event.type === 'turn.completed') {
       this.finishTurn(event.threadId, event.turnId, event.ok);
       return;
     }
-    if (event.type === "content.delta" && event.streamKind === "assistant_text" && owner) {
+    if (event.type === 'content.delta' && event.streamKind === 'assistant_text' && owner) {
       this.appendDelta(event.threadId, event.turnId, event.delta, owner);
     }
   }
 
   /** A live call takes the bot's speaker: its queued and playing reply speech stops. */
   onLiveCall(call: LiveCallState | null): void {
-    if (!call || call.status === "ended") return;
+    if (!call || call.status === 'ended') return;
     for (const turn of this.turns.values()) {
       if (turn.botId !== call.botId) continue;
       this.turns.delete(turn.threadId);
@@ -111,7 +124,13 @@ export class SpokenReplyStream {
 
   /** The authoritative bot-text frame for a reply. `owner` null means the
    * store's speak gates fail now, and a live stream must go silent. */
-  completeBotText(threadId: string, turnId: string | undefined, text: string, owner: SpokenReplyOwner | null, messageId?: string): void {
+  completeBotText(
+    threadId: string,
+    turnId: string | undefined,
+    text: string,
+    owner: SpokenReplyOwner | null,
+    messageId?: string,
+  ): void {
     const current = this.turns.get(threadId);
     if (current && sameTurn(current, turnId)) {
       if (!owner) {
@@ -132,7 +151,7 @@ export class SpokenReplyStream {
       botId: owner.botId,
       turnId,
       stream: this.speech.begin({ botId: owner.botId, voiceId: owner.voiceId, messageId }),
-      buffer: "",
+      buffer: '',
       authoritativeCut: 0,
       spoken: [],
       authoritative: text,
@@ -145,7 +164,12 @@ export class SpokenReplyStream {
     this.finishTurn(threadId, turnId, true);
   }
 
-  private appendDelta(threadId: string, turnId: string | undefined, delta: string, owner: SpokenReplyOwner): void {
+  private appendDelta(
+    threadId: string,
+    turnId: string | undefined,
+    delta: string,
+    owner: SpokenReplyOwner,
+  ): void {
     const current = this.turns.get(threadId);
     if (current && sameTurn(current, turnId)) {
       current.buffer += delta;
@@ -215,7 +239,12 @@ export class SpokenReplyStream {
             if (turn.buffer) turn.dirty = true;
             const blocks = await turn.stream.prepare(speakableStreamText(text));
             let resume = 0;
-            while (resume < spoken.length && resume < blocks.length && spoken[resume] === blocks[resume]) resume += 1;
+            while (
+              resume < spoken.length &&
+              resume < blocks.length &&
+              spoken[resume] === blocks[resume]
+            )
+              resume += 1;
             // Re-speak from the first divergence: content the authoritative
             // frame holds is never dropped, and this matches what speaking the
             // completed frame alone would have said.

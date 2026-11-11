@@ -23,13 +23,17 @@ export interface ManagedTunnelOriginTarget {
 }
 
 export interface ManagedTunnel {
-  start(access: ManagedTunnelAccess & { originTarget: ManagedTunnelOriginTarget }): Promise<ManagedTunnelState>;
+  start(
+    access: ManagedTunnelAccess & { originTarget: ManagedTunnelOriginTarget },
+  ): Promise<ManagedTunnelState>;
   stop(): Promise<ManagedTunnelState>;
   shutdown(): Promise<ManagedTunnelState>;
 }
 
 export declare function normalizeManagedCompanionEndpoint(value: unknown): string;
-export declare function managedCompanionTunnelAccess(credentials: Record<string, unknown>): ManagedTunnelAccess | null;
+export declare function managedCompanionTunnelAccess(
+  credentials: Record<string, unknown>,
+): ManagedTunnelAccess | null;
 export declare function stagedCloudflaredPath(options?: {
   appPath?: string;
   platform?: NodeJS.Platform;

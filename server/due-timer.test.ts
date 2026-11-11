@@ -1,15 +1,25 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { DUE_CLOCK_MS, startDueTimer } from "./due-timer.ts";
+import { DUE_CLOCK_MS, startDueTimer } from './due-timer.ts';
 
-describe("startDueTimer", () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+describe('startDueTimer', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-  it("runs once at start, then only at the next due time, however far off", async () => {
+  it('runs once at start, then only at the next due time, however far off', async () => {
     const runs: number[] = [];
     let due: number | null = Date.now() + 90 * 60_000;
-    const timer = startDueTimer({ run: () => { runs.push(Date.now()); if (Date.now() >= due!) due = null; }, next: () => due });
+    const timer = startDueTimer({
+      run: () => {
+        runs.push(Date.now());
+        if (Date.now() >= due!) due = null;
+      },
+      next: () => due,
+    });
     const start = Date.now();
     await vi.advanceTimersByTimeAsync(90 * 60_000 - 1);
     expect(runs).toEqual([start]);
@@ -20,7 +30,7 @@ describe("startDueTimer", () => {
     timer.stop();
   });
 
-  it("with many timers and nothing due, wakes once a minute in all and runs nothing", async () => {
+  it('with many timers and nothing due, wakes once a minute in all and runs nothing', async () => {
     const run = vi.fn();
     const before = vi.getTimerCount();
     const timers = [1, 2, 3, 4].map(() => startDueTimer({ run, next: () => null }));
@@ -31,10 +41,16 @@ describe("startDueTimer", () => {
     expect(vi.getTimerCount() - before).toBe(0);
   });
 
-  it("finds work on the wall clock when no timer could have told it: a change it was not told of, or time lost to sleep", async () => {
+  it('finds work on the wall clock when no timer could have told it: a change it was not told of, or time lost to sleep', async () => {
     const runs: number[] = [];
     let due: number | null = null;
-    const timer = startDueTimer({ run: () => { runs.push(Date.now()); due = null; }, next: () => due });
+    const timer = startDueTimer({
+      run: () => {
+        runs.push(Date.now());
+        due = null;
+      },
+      next: () => due,
+    });
     await vi.advanceTimersByTimeAsync(0);
     due = Date.now();
     await vi.advanceTimersByTimeAsync(DUE_CLOCK_MS - 1);
@@ -44,10 +60,16 @@ describe("startDueTimer", () => {
     timer.stop();
   });
 
-  it("brings the run forward when a change makes work due sooner, and never pushes a nearer run back", async () => {
+  it('brings the run forward when a change makes work due sooner, and never pushes a nearer run back', async () => {
     const runs: number[] = [];
     let due: number | null = null;
-    const timer = startDueTimer({ run: () => { runs.push(Date.now()); due = null; }, next: () => due });
+    const timer = startDueTimer({
+      run: () => {
+        runs.push(Date.now());
+        due = null;
+      },
+      next: () => due,
+    });
     const start = Date.now();
     await vi.advanceTimersByTimeAsync(0);
     due = start + 5_000;
@@ -61,7 +83,7 @@ describe("startDueTimer", () => {
     timer.stop();
   });
 
-  it("runs work due now on a poke after a wake, though the clock has passed the timer the sleep left behind", async () => {
+  it('runs work due now on a poke after a wake, though the clock has passed the timer the sleep left behind', async () => {
     const run = vi.fn();
     let due = Date.now() + 30_000;
     const timer = startDueTimer({ run, next: () => due });
@@ -75,7 +97,7 @@ describe("startDueTimer", () => {
     timer.stop();
   });
 
-  it("retries work still due after a run (waiting on something outside) every retryMs, not in a tight loop", async () => {
+  it('retries work still due after a run (waiting on something outside) every retryMs, not in a tight loop', async () => {
     const run = vi.fn();
     const timer = startDueTimer({ run, next: () => Date.now() - 1, retryMs: 5_000 });
     await vi.advanceTimersByTimeAsync(20_000);
@@ -83,12 +105,19 @@ describe("startDueTimer", () => {
     timer.stop();
   });
 
-  it("runs again straight after a run that a change interrupted with work due now", async () => {
+  it('runs again straight after a run that a change interrupted with work due now', async () => {
     let release!: () => void;
     const calls: number[] = [];
     let due: number | null = null;
     const timer = startDueTimer({
-      run: () => { calls.push(Date.now()); if (calls.length === 2) return new Promise<void>((resolve) => { release = resolve; }); due = null; },
+      run: () => {
+        calls.push(Date.now());
+        if (calls.length === 2)
+          return new Promise<void>((resolve) => {
+            release = resolve;
+          });
+        due = null;
+      },
       next: () => due,
     });
     await vi.advanceTimersByTimeAsync(0);

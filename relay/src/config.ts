@@ -1,5 +1,5 @@
-import type { KeyObject } from "node:crypto";
-import { parseTokenKeys } from "./token.ts";
+import type { KeyObject } from 'node:crypto';
+import { parseTokenKeys } from './token.ts';
 
 const MiB = 1024 * 1024;
 
@@ -89,15 +89,23 @@ const MIN_METRICS_TOKEN = 32;
 
 /** Reads the deployment facts from the environment. Throws a message that never repeats a value it read. */
 export function loadConfig(env: NodeJS.ProcessEnv): RelayConfig {
-  const node = env.RELAY_NODE ?? "";
-  if (!NODE.test(node)) throw new Error("RELAY_NODE must be relay1 … relay99");
-  if (!env.RELAY_TOKEN_KEYS) throw new Error("RELAY_TOKEN_KEYS is required");
+  const node = env.RELAY_NODE ?? '';
+  if (!NODE.test(node)) throw new Error('RELAY_NODE must be relay1 … relay99');
+  if (!env.RELAY_TOKEN_KEYS) throw new Error('RELAY_TOKEN_KEYS is required');
   const tokenKeys = parseTokenKeys(env.RELAY_TOKEN_KEYS);
   const metricsToken = env.RELAY_METRICS_TOKEN || undefined;
   if (metricsToken !== undefined && metricsToken.length < MIN_METRICS_TOKEN) {
     throw new Error(`RELAY_METRICS_TOKEN must be at least ${MIN_METRICS_TOKEN} characters`);
   }
   const port = Number(env.RELAY_PORT ?? 8080);
-  if (!Number.isInteger(port) || port < 0 || port > 65_535) throw new Error("RELAY_PORT must be a port number");
-  return { node, host: env.RELAY_HOST ?? "127.0.0.1", port, tokenKeys, metricsToken, limits: { ...DEFAULT_LIMITS } };
+  if (!Number.isInteger(port) || port < 0 || port > 65_535)
+    throw new Error('RELAY_PORT must be a port number');
+  return {
+    node,
+    host: env.RELAY_HOST ?? '127.0.0.1',
+    port,
+    tokenKeys,
+    metricsToken,
+    limits: { ...DEFAULT_LIMITS },
+  };
 }

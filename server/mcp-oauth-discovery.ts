@@ -1,7 +1,7 @@
 // Never follows a redirect or accepts a plain-http endpoint off this machine: a token endpoint is where a sign-in code is spent.
-import { isIP } from "node:net";
+import { isIP } from 'node:net';
 
-import { isPublicDomainAddress } from "./custom-domain.ts";
+import { isPublicDomainAddress } from './custom-domain.ts';
 
 export interface McpAuthMetadata {
   issuer: string;
@@ -17,12 +17,12 @@ export interface McpAuthMetadata {
   /** How the authorization server was found. `protected-resource`: an RFC 9728 document (the 401's `resource_metadata`
    * hint, or a well-known address for this URL or its origin) named it. `origin`: none did, and the MCP server's own
    * origin was assumed to be the issuer, as MCP 2025-03-26 clients do. */
-  source: "protected-resource" | "origin";
+  source: 'protected-resource' | 'origin';
 }
 
 const FETCH_TIMEOUT_MS = 5_000;
 const MAX_METADATA_BYTES = 65_536;
-const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '[::1]']);
 
 /** Scheme-only rule for a URL the owner configured or a browser opens. Discovery uses `isAllowedDiscoveryUrl` below,
  * because its URLs come from a remote server's response. */
@@ -34,8 +34,8 @@ export function isAllowedAuthUrl(value: string): boolean {
     return false;
   }
   if (url.username || url.password) return false;
-  if (url.protocol === "https:") return true;
-  return url.protocol === "http:" && LOOPBACK_HOSTS.has(url.hostname);
+  if (url.protocol === 'https:') return true;
+  return url.protocol === 'http:' && LOOPBACK_HOSTS.has(url.hostname);
 }
 
 /** `.local`, `.internal` and the like name this machine's network on some resolver, so a remote document must not aim a
@@ -56,7 +56,7 @@ export function isAllowedDiscoveryUrl(value: string, trustedOrigin: string): boo
     return false;
   }
   if (url.username || url.password) return false;
-  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return false;
   // The owner's own server keeps the configured-URL rule: https, or http on loopback only.
   if (url.origin === trustedOrigin) return isAllowedAuthUrl(value);
   let trusted: URL;
@@ -67,26 +67,40 @@ export function isAllowedDiscoveryUrl(value: string, trustedOrigin: string): boo
   }
   // A local MCP server may name a sign-in server on another loopback port: both are code the owner installed here.
   if (isLoopbackName(trusted.hostname) && isLoopbackName(url.hostname)) return true;
-  if (url.protocol !== "https:" || isLoopbackName(url.hostname)) return false;
+  if (url.protocol !== 'https:' || isLoopbackName(url.hostname)) return false;
   // A server the owner reaches on a private network (LAN, VPN, tailnet) may name a sign-in server on another private host;
   // a public server may only name public ones.
   return isPublicHost(trusted.hostname) ? isPublicHost(url.hostname) : true;
 }
 
 function isPublicHost(hostname: string): boolean {
-  const host = hostname.replace(/^\[|\]$/gu, "").replace(/\.$/u, "").toLowerCase();
+  const host = hostname
+    .replace(/^\[|\]$/gu, '')
+    .replace(/\.$/u, '')
+    .toLowerCase();
   if (isIP(host)) return isPublicDomainAddress(host);
-  return host.includes(".") && !LOCAL_SUFFIX.test(host);
+  return host.includes('.') && !LOCAL_SUFFIX.test(host);
 }
 
 function isLoopbackName(hostname: string): boolean {
-  const host = hostname.replace(/^\[|\]$/gu, "").replace(/\.$/u, "").toLowerCase();
-  if (host === "localhost") return true;
-  if (isIP(host) === 4) return host.startsWith("127.") || host === "0.0.0.0";
+  const host = hostname
+    .replace(/^\[|\]$/gu, '')
+    .replace(/\.$/u, '')
+    .toLowerCase();
+  if (host === 'localhost') return true;
+  if (isIP(host) === 4) return host.startsWith('127.') || host === '0.0.0.0';
   if (isIP(host) !== 6) return false;
   const mapped = /^::ffff:(.+)$/u.exec(host)?.[1];
-  if (mapped) return mapped.startsWith("127.") || mapped === "0.0.0.0" || /^7f[0-9a-f]{2}:/u.test(mapped) || mapped === "0:0";
-  return host === "::1" || host === "0:0:0:0:0:0:0:1" || host === "::" || host === "0:0:0:0:0:0:0:0";
+  if (mapped)
+    return (
+      mapped.startsWith('127.') ||
+      mapped === '0.0.0.0' ||
+      /^7f[0-9a-f]{2}:/u.test(mapped) ||
+      mapped === '0:0'
+    );
+  return (
+    host === '::1' || host === '0:0:0:0:0:0:0:1' || host === '::' || host === '0:0:0:0:0:0:0:0'
+  );
 }
 
 export function resourceMetadataUrl(wwwAuthenticate: string | null): string | null {
@@ -101,12 +115,20 @@ interface DiscoverOptions {
   signal?: AbortSignal;
 }
 
-async function getJson(url: string, trustedOrigin: string, options: DiscoverOptions): Promise<Record<string, unknown> | null> {
+async function getJson(
+  url: string,
+  trustedOrigin: string,
+  options: DiscoverOptions,
+): Promise<Record<string, unknown> | null> {
   if (!isAllowedDiscoveryUrl(url, trustedOrigin)) return null;
   const timeout = AbortSignal.timeout(FETCH_TIMEOUT_MS);
   const signal = options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
   try {
-    const response = await (options.fetch ?? fetch)(url, { headers: { accept: "application/json" }, redirect: "error", signal });
+    const response = await (options.fetch ?? fetch)(url, {
+      headers: { accept: 'application/json' },
+      redirect: 'error',
+      signal,
+    });
     if (!response.ok) {
       void response.body?.cancel().catch(() => {});
       return null;
@@ -127,19 +149,28 @@ async function getJson(url: string, trustedOrigin: string, options: DiscoverOpti
     } finally {
       await reader.cancel().catch(() => {});
     }
-    const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+    const parsed: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
   } catch {
     return null;
   }
 }
 
 function stringList(value: unknown): string[] | undefined {
-  return Array.isArray(value) && value.every((entry) => typeof entry === "string") ? value as string[] : undefined;
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string')
+    ? (value as string[])
+    : undefined;
 }
 
-async function protectedResource(mcpUrl: URL, hint: string | null, trustedOrigin: string, options: DiscoverOptions) {
-  const path = mcpUrl.pathname === "/" ? "" : mcpUrl.pathname;
+async function protectedResource(
+  mcpUrl: URL,
+  hint: string | null,
+  trustedOrigin: string,
+  options: DiscoverOptions,
+) {
+  const path = mcpUrl.pathname === '/' ? '' : mcpUrl.pathname;
   const candidates = [
     ...(hint ? [hint] : []),
     `${mcpUrl.origin}/.well-known/oauth-protected-resource${path}`,
@@ -152,10 +183,14 @@ async function protectedResource(mcpUrl: URL, hint: string | null, trustedOrigin
   return null;
 }
 
-async function authorizationServer(issuer: string, trustedOrigin: string, options: DiscoverOptions) {
-  const base = issuer.replace(/\/+$/, "");
+async function authorizationServer(
+  issuer: string,
+  trustedOrigin: string,
+  options: DiscoverOptions,
+) {
+  const base = issuer.replace(/\/+$/, '');
   const url = new URL(base);
-  const suffix = url.pathname === "/" ? "" : url.pathname;
+  const suffix = url.pathname === '/' ? '' : url.pathname;
   const candidates = [
     `${url.origin}/.well-known/oauth-authorization-server${suffix}`,
     `${url.origin}/.well-known/openid-configuration${suffix}`,
@@ -180,7 +215,12 @@ export async function discoverMcpAuth(
     return null;
   }
   const trustedOrigin = target.origin;
-  const resource = await protectedResource(target, resourceMetadataUrl(wwwAuthenticate), trustedOrigin, options);
+  const resource = await protectedResource(
+    target,
+    resourceMetadataUrl(wwwAuthenticate),
+    trustedOrigin,
+    options,
+  );
   const servers = stringList(resource?.authorization_servers);
   const named = servers?.[0];
   const issuer = named ?? target.origin;
@@ -190,21 +230,31 @@ export async function discoverMcpAuth(
 
   const authorizationEndpoint = metadata.authorization_endpoint;
   const tokenEndpoint = metadata.token_endpoint;
-  if (typeof authorizationEndpoint !== "string" || !isAllowedDiscoveryUrl(authorizationEndpoint, trustedOrigin)) return null;
-  if (typeof tokenEndpoint !== "string" || !isAllowedDiscoveryUrl(tokenEndpoint, trustedOrigin)) return null;
-  if (!stringList(metadata.code_challenge_methods_supported)?.includes("S256")) return null;
+  if (
+    typeof authorizationEndpoint !== 'string' ||
+    !isAllowedDiscoveryUrl(authorizationEndpoint, trustedOrigin)
+  )
+    return null;
+  if (typeof tokenEndpoint !== 'string' || !isAllowedDiscoveryUrl(tokenEndpoint, trustedOrigin))
+    return null;
+  if (!stringList(metadata.code_challenge_methods_supported)?.includes('S256')) return null;
 
   // RFC 8414 §3.3: the metadata must be for the issuer it was fetched for.
-  if (typeof metadata.issuer === "string" && metadata.issuer.replace(/\/+$/, "") !== issuer.replace(/\/+$/, "")) return null;
-  const optionalEndpoint = (value: unknown) => typeof value === "string" && isAllowedDiscoveryUrl(value, trustedOrigin) ? value : undefined;
+  if (
+    typeof metadata.issuer === 'string' &&
+    metadata.issuer.replace(/\/+$/, '') !== issuer.replace(/\/+$/, '')
+  )
+    return null;
+  const optionalEndpoint = (value: unknown) =>
+    typeof value === 'string' && isAllowedDiscoveryUrl(value, trustedOrigin) ? value : undefined;
   const registrationEndpoint = optionalEndpoint(metadata.registration_endpoint);
   const revocationEndpoint = optionalEndpoint(metadata.revocation_endpoint);
   const scopes = stringList(resource?.scopes_supported);
   const tokenEndpointAuthMethods = stringList(metadata.token_endpoint_auth_methods_supported);
-  target.hash = "";
+  target.hash = '';
   return {
     // RFC 9207: compared with a callback's iss, which may differ from the listed issuer by a trailing slash (Google).
-    issuer: typeof metadata.issuer === "string" ? metadata.issuer : issuer,
+    issuer: typeof metadata.issuer === 'string' ? metadata.issuer : issuer,
     authorizationEndpoint,
     tokenEndpoint,
     ...(registrationEndpoint ? { registrationEndpoint } : {}),
@@ -212,6 +262,6 @@ export async function discoverMcpAuth(
     ...(scopes?.length ? { scopes } : {}),
     ...(tokenEndpointAuthMethods?.length ? { tokenEndpointAuthMethods } : {}),
     resource: target.toString(),
-    source: named === undefined ? "origin" : "protected-resource",
+    source: named === undefined ? 'origin' : 'protected-resource',
   };
 }

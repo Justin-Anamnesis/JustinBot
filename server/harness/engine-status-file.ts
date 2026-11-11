@@ -1,8 +1,8 @@
-import { mkdirSync, readFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { mkdirSync, readFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 
-import { writeFileAtomicIfChanged } from "../atomic.ts";
-import type { InstanceId, ProviderSnapshot } from "../contracts.ts";
+import { writeFileAtomicIfChanged } from '../atomic.ts';
+import type { InstanceId, ProviderSnapshot } from '../contracts.ts';
 
 export interface EngineStatusRow {
   instanceId: InstanceId;
@@ -13,31 +13,36 @@ export interface EngineStatusRow {
 
 type Target = (instanceId: InstanceId) => { driverKind: string; cli: string | null } | null;
 
-const text = (value: unknown): value is string => typeof value === "string";
-const flag = (value: unknown): value is boolean => typeof value === "boolean";
+const text = (value: unknown): value is string => typeof value === 'string';
+const flag = (value: unknown): value is boolean => typeof value === 'boolean';
 
-function strings<K extends string>(value: unknown, keys: readonly K[]): Record<K, string> | undefined {
-  if (!value || typeof value !== "object") return undefined;
+function strings<K extends string>(
+  value: unknown,
+  keys: readonly K[],
+): Record<K, string> | undefined {
+  if (!value || typeof value !== 'object') return undefined;
   const record = value as Record<string, unknown>;
-  return keys.every((key) => text(record[key])) ? Object.fromEntries(keys.map((key) => [key, record[key]])) as Record<K, string> : undefined;
+  return keys.every((key) => text(record[key]))
+    ? (Object.fromEntries(keys.map((key) => [key, record[key]])) as Record<K, string>)
+    : undefined;
 }
 
-function account(value: unknown): ProviderSnapshot["account"] {
-  if (!value || typeof value !== "object") return undefined;
+function account(value: unknown): ProviderSnapshot['account'] {
+  if (!value || typeof value !== 'object') return undefined;
   const { email, organization, method } = value as Record<string, unknown>;
   return {
     ...(text(email) ? { email } : {}),
     ...(text(organization) ? { organization } : {}),
-    ...(method === "login" || method === "api-key" ? { method } : {}),
+    ...(method === 'login' || method === 'api-key' ? { method } : {}),
   };
 }
 
 export function snapshotFrom(value: unknown): ProviderSnapshot | null {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== 'object') return null;
   const raw = value as Record<string, unknown>;
-  if (raw.state !== "available" && raw.state !== "unavailable") return null;
-  const update = strings(raw.update, ["title", "message", "command"] as const);
-  const warning = strings(raw.warning, ["title", "message"] as const);
+  if (raw.state !== 'available' && raw.state !== 'unavailable') return null;
+  const update = strings(raw.update, ['title', 'message', 'command'] as const);
+  const warning = strings(raw.warning, ['title', 'message'] as const);
   const signedInAs = account(raw.account);
   return {
     state: raw.state,
@@ -46,11 +51,15 @@ export function snapshotFrom(value: unknown): ProviderSnapshot | null {
     ...(flag(raw.chatgptPlan) ? { chatgptPlan: raw.chatgptPlan } : {}),
     // Until the start-up read reaches it, OpenCode on its free models alone still ranks and reads as the backup it is.
     ...(flag(raw.freeFallback) ? { freeFallback: raw.freeFallback } : {}),
-    ...(text(raw.authenticationUnavailableReason) ? { authenticationUnavailableReason: raw.authenticationUnavailableReason } : {}),
+    ...(text(raw.authenticationUnavailableReason)
+      ? { authenticationUnavailableReason: raw.authenticationUnavailableReason }
+      : {}),
     ...(signedInAs ? { account: signedInAs } : {}),
     ...(text(raw.version) || raw.version === null ? { version: raw.version } : {}),
     ...(update ? { update } : {}),
-    ...(raw.billing === "metered" || raw.billing === "subscription" ? { billing: raw.billing } : {}),
+    ...(raw.billing === 'metered' || raw.billing === 'subscription'
+      ? { billing: raw.billing }
+      : {}),
     ...(warning ? { warning } : {}),
   };
 }
@@ -84,8 +93,7 @@ export function engineStatusFile(file: string) {
       mkdirSync(dirname(file), { recursive: true });
       writeFileAtomicIfChanged(file, body, { mode: 0o600, durable: false });
       saved = body;
-    } catch {
-    }
+    } catch {}
   };
   return {
     /** The statuses the last run recorded, for the engines still configured with the same driver and CLI. */
@@ -93,7 +101,7 @@ export function engineStatusFile(file: string) {
       const seeds = new Map<InstanceId, ProviderSnapshot>();
       let rows: unknown;
       try {
-        rows = (JSON.parse(readFileSync(file, "utf8")) as { engines?: unknown }).engines;
+        rows = (JSON.parse(readFileSync(file, 'utf8')) as { engines?: unknown }).engines;
       } catch {
         return seeds;
       }
@@ -102,7 +110,8 @@ export function engineStatusFile(file: string) {
         if (!row || !text(row.instanceId)) continue;
         const now = target(row.instanceId);
         const snapshot = snapshotFrom(row.snapshot);
-        if (snapshot && now && now.driverKind === row.driverKind && now.cli === (row.cli ?? null)) seeds.set(row.instanceId, snapshot);
+        if (snapshot && now && now.driverKind === row.driverKind && now.cli === (row.cli ?? null))
+          seeds.set(row.instanceId, snapshot);
       }
       return seeds;
     },
@@ -118,7 +127,7 @@ export function engineStatusFile(file: string) {
         unsaved.add(write);
         if (!exitHooked) {
           exitHooked = true;
-          process.once("exit", flushEngineStatusFiles);
+          process.once('exit', flushEngineStatusFiles);
         }
       }
     },

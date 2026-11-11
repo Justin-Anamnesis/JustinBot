@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from 'zod';
 
 export const replaySettings = {
   /** Bytes of history a rebuilt session is replayed. */
@@ -12,7 +12,7 @@ export function replayToolHistoryEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   const override = env.OMB_REPLAY_TOOL_HISTORY?.trim();
-  if (override === "1") return true;
-  if (override === "0") return false;
+  if (override === '1') return true;
+  if (override === '0') return false;
   return settings?.replayToolHistory === true;
 }

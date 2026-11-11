@@ -17,10 +17,12 @@ export async function startCompanionWithRetries({
   let state = await start();
   for (const [index, delay] of delaysMs.entries()) {
     if (!state?.error) return state;
-    log(`companion start failed: ${state.error}; trying again in ${Math.round(delay / 1000)}s (${index + 1} of ${delaysMs.length})`);
+    log(
+      `companion start failed: ${state.error}; trying again in ${Math.round(delay / 1000)}s (${index + 1} of ${delaysMs.length})`,
+    );
     await sleep(delay);
     if (!wanted()) {
-      log("companion start retry skipped: the companion is no longer wanted");
+      log('companion start retry skipped: the companion is no longer wanted');
       return state;
     }
     state = await start();

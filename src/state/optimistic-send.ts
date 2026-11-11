@@ -1,6 +1,6 @@
 // A send shows at once as an optimistic user message; the server's copy, which carries the same sendId, replaces it.
-import { ApiError } from "./api";
-import type { Message } from "./store";
+import { ApiError } from './api';
+import type { Message } from './store';
 
 export const optimisticMessageId = (sendId: string): string => `optimistic-${sendId}`;
 
@@ -9,12 +9,12 @@ export function optimisticUserMessage(
   sendId: string,
   replyToId?: string,
   parentId?: string | null,
-  channelMode?: "chat" | "goal",
+  channelMode?: 'chat' | 'goal',
 ): Message {
   return {
     id: optimisticMessageId(sendId),
-    role: "user",
-    kind: "text",
+    role: 'user',
+    kind: 'text',
     text,
     at: Date.now(),
     parentId: parentId ?? null,
@@ -26,7 +26,11 @@ export function optimisticUserMessage(
 
 /** Whether the server's copy of a send is in these messages. */
 export function sendArrived(messages: readonly Message[] | undefined, sendId: string): boolean {
-  return Boolean(messages?.some((message) => message.sendId === sendId && message.id !== optimisticMessageId(sendId)));
+  return Boolean(
+    messages?.some(
+      (message) => message.sendId === sendId && message.id !== optimisticMessageId(sendId),
+    ),
+  );
 }
 
 export const LOST_SEND_RETRY_MS = [1_000, 3_000] as const;
@@ -42,7 +46,8 @@ export async function sendReconciled<T>(
     try {
       return { body: await post() };
     } catch (error) {
-      const lost = !(error instanceof ApiError) && (error as { name?: unknown } | null)?.name !== "AbortError";
+      const lost =
+        !(error instanceof ApiError) && (error as { name?: unknown } | null)?.name !== 'AbortError';
       if (!lost) throw error;
       if (arrived()) return { arrived: true };
       const delay = LOST_SEND_RETRY_MS[attempt];

@@ -1,5 +1,11 @@
-import { appendDraftAttachments, replaceDraftAttachment } from "./drafts";
-import { handoffAttachmentImagePreview, imageAttachmentFromFile, optimisticImageAttachment, releaseAttachmentImagePreview, type Attachment } from "./composer-attachments";
+import { appendDraftAttachments, replaceDraftAttachment } from './drafts';
+import {
+  handoffAttachmentImagePreview,
+  imageAttachmentFromFile,
+  optimisticImageAttachment,
+  releaseAttachmentImagePreview,
+  type Attachment,
+} from './composer-attachments';
 
 export async function uploadDraftImage(draftId: string, file: File): Promise<Attachment | null> {
   const optimistic = optimisticImageAttachment(file);

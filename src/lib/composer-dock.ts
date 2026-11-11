@@ -1,7 +1,7 @@
-import { useLayoutEffect, useState, type RefObject } from "react";
+import { useLayoutEffect, useState, type RefObject } from 'react';
 
 /** Must equal Tailwind `gap-3` on the transcript stack. */
-export const TRANSCRIPT_GAP = "0.75rem";
+export const TRANSCRIPT_GAP = '0.75rem';
 
 const FALLBACK_COMPOSER_PX = 64;
 

@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
 
-import { botShowsUnread } from "@/lib/bot-unread";
+import { botShowsUnread } from '@/lib/bot-unread';
 
-import { EFFECTS } from "./CursorAvatar";
+import { EFFECTS } from './CursorAvatar';
 
 export const UNREAD_NOTICE_MS = 2 * EFFECTS.notifying!.glyph!.period;
 
@@ -23,7 +23,10 @@ export function useUnreadNotice(unread: boolean): boolean {
 }
 
 /** Whether `bot` shows unread, and whether its mascot is still playing the notice for it. */
-export function useBotUnread(bot: Parameters<typeof botShowsUnread>[0]): { unread: boolean; noticing: boolean } {
+export function useBotUnread(bot: Parameters<typeof botShowsUnread>[0]): {
+  unread: boolean;
+  noticing: boolean;
+} {
   const unread = botShowsUnread(bot);
   return { unread, noticing: useUnreadNotice(unread) };
 }

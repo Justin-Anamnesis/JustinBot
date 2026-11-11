@@ -1,12 +1,16 @@
 // Audio comes from the harness, which holds the voice keys: the renderer never sees them or calls a voice provider.
 
-import { localSystemVoiceActive, remoteSystemVoice, resolveLocalSystemVoice } from "@/lib/local-voice";
-import { recordBlockTiming, recordPrepared, recordSpeakEnter } from "../voice-latency-probe";
-import { t, tFromServer } from "@/lib/i18n";
-import { serverErrorText } from "@/lib/server-error";
-import type { ServerErrorBody } from "../../../shared/server-text";
+import {
+  localSystemVoiceActive,
+  remoteSystemVoice,
+  resolveLocalSystemVoice,
+} from '@/lib/local-voice';
+import { recordBlockTiming, recordPrepared, recordSpeakEnter } from '../voice-latency-probe';
+import { t, tFromServer } from '@/lib/i18n';
+import { serverErrorText } from '@/lib/server-error';
+import type { ServerErrorBody } from '../../../shared/server-text';
 
-export type SpeechStatus = "idle" | "preparing" | "speaking";
+export type SpeechStatus = 'idle' | 'preparing' | 'speaking';
 
 export interface SpeechSnapshot {
   status: SpeechStatus;
@@ -45,7 +49,7 @@ export interface SpeechStream {
 type TtsErrorBody = Partial<ServerErrorBody>;
 type TtsPrepareBody = TtsErrorBody & { ready?: boolean; utterances?: string[] };
 
-const IDLE: SpeechSnapshot = { status: "idle" };
+const IDLE: SpeechSnapshot = { status: 'idle' };
 const PREFETCH_WINDOW = 3;
 
 export class Speaker {
@@ -77,7 +81,7 @@ export class Speaker {
   }
 
   isSpeaking(messageId?: string): boolean {
-    if (this.snapshot.status === "idle") return false;
+    if (this.snapshot.status === 'idle') return false;
     return messageId ? this.snapshot.messageId === messageId : true;
   }
 
@@ -91,11 +95,11 @@ export class Speaker {
     this.settleLocalSpeech?.(false);
     this.settleLocalSpeech = null;
     this.localUtterance = null;
-    if (typeof window !== "undefined") window.speechSynthesis?.cancel();
+    if (typeof window !== 'undefined') window.speechSynthesis?.cancel();
     // Pausing or removing an <audio> source does not reliably fire `ended` or `error`.
     if (this.settlePlayback) this.settlePlayback(false);
     else this.teardownAudio();
-    if (this.snapshot.status !== "idle" || this.snapshot.error) this.set(IDLE);
+    if (this.snapshot.status !== 'idle' || this.snapshot.error) this.set(IDLE);
   }
 
   claimExternalVoice(pause: () => void): () => void {
@@ -113,7 +117,7 @@ export class Speaker {
   private teardownAudio() {
     if (this.audio) {
       this.audio.pause();
-      this.audio.src = "";
+      this.audio.src = '';
       this.audio = null;
     }
     if (this.objectUrl) {
@@ -143,7 +147,7 @@ export class Speaker {
     this.request = controller;
     const live = () => this.token === mine && !controller.signal.aborted;
 
-    this.set({ status: "preparing", botId: opts.botId, messageId: opts.messageId });
+    this.set({ status: 'preparing', botId: opts.botId, messageId: opts.messageId });
     return localSystemVoiceActive()
       ? this.localStream(opts, live, controller)
       : this.networkStream(opts, live, controller);
@@ -151,15 +155,23 @@ export class Speaker {
 
   /** The completed frame's message id must reach the snapshot and the probe
    * records, which read `opts.messageId` when they fire. */
-  private adoptMessageId(opts: SpeakOptions, live: () => boolean, messageId: string | undefined): void {
+  private adoptMessageId(
+    opts: SpeakOptions,
+    live: () => boolean,
+    messageId: string | undefined,
+  ): void {
     opts.messageId = messageId;
-    if (live() && this.snapshot.status !== "idle") this.set({ ...this.snapshot, messageId });
+    if (live() && this.snapshot.status !== 'idle') this.set({ ...this.snapshot, messageId });
   }
 
   /** The system voice has no splitter round trip: one utterance per block, the
    * whole text for a completed reply, so streaming degrades to speaking at the
    * authoritative frame. */
-  private localStream(opts: SpeakOptions, live: () => boolean, controller: AbortController): SpeechStream {
+  private localStream(
+    opts: SpeakOptions,
+    live: () => boolean,
+    controller: AbortController,
+  ): SpeechStream {
     let chain: Promise<void> = Promise.resolve();
     let closed = false;
     let pushed = false;
@@ -167,7 +179,9 @@ export class Speaker {
       push: (block) => {
         if (closed || !block || !live()) return;
         pushed = true;
-        chain = chain.then(() => (live() ? this.speakWithLocalSystem(block, opts, live) : undefined));
+        chain = chain.then(() =>
+          live() ? this.speakWithLocalSystem(block, opts, live) : undefined,
+        );
       },
       end: async () => {
         closed = true;
@@ -177,7 +191,9 @@ export class Speaker {
       },
       prepare: async (text) => [text],
       identify: (messageId) => this.adoptMessageId(opts, live, messageId),
-      cancel: () => { if (live()) this.stop(); },
+      cancel: () => {
+        if (live()) this.stop();
+      },
       fail: (error) => {
         closed = true;
         if (live()) {
@@ -189,7 +205,11 @@ export class Speaker {
     };
   }
 
-  private networkStream(opts: SpeakOptions, live: () => boolean, controller: AbortController): SpeechStream {
+  private networkStream(
+    opts: SpeakOptions,
+    live: () => boolean,
+    controller: AbortController,
+  ): SpeechStream {
     type Rendered = { blob: Blob; error?: never } | { blob?: never; error: unknown };
     const pending: string[] = [];
     let closed = false;
@@ -197,7 +217,9 @@ export class Speaker {
     let running = false;
     let wake: (() => void) | null = null;
     let settleDrained: () => void = () => {};
-    const drained = new Promise<void>((resolve) => { settleDrained = resolve; });
+    const drained = new Promise<void>((resolve) => {
+      settleDrained = resolve;
+    });
     const finish = () => {
       if (finished) return;
       finished = true;
@@ -206,10 +228,10 @@ export class Speaker {
       settleDrained();
     };
     const render = (utterance: string, block: number): Promise<Rendered> => {
-      recordBlockTiming(opts.messageId, block, "renderStart");
+      recordBlockTiming(opts.messageId, block, 'renderStart');
       return this.render(utterance, opts.voiceId, controller.signal).then(
         (blob) => {
-          recordBlockTiming(opts.messageId, block, "renderDone");
+          recordBlockTiming(opts.messageId, block, 'renderDone');
           return { blob };
         },
         (error: unknown) => ({ error }),
@@ -229,7 +251,9 @@ export class Speaker {
             playedAll = closed;
             break;
           }
-          await new Promise<void>((resolve) => { wake = resolve; });
+          await new Promise<void>((resolve) => {
+            wake = resolve;
+          });
           wake = null;
           continue;
         }
@@ -237,9 +261,13 @@ export class Speaker {
         const at = index;
         index += 1;
         const rendered = await current;
-        if ("error" in rendered) {
+        if ('error' in rendered) {
           if (live()) {
-            this.set({ ...IDLE, error: rendered.error instanceof Error ? rendered.error.message : String(rendered.error) });
+            this.set({
+              ...IDLE,
+              error:
+                rendered.error instanceof Error ? rendered.error.message : String(rendered.error),
+            });
           }
           controller.abort();
           return;
@@ -248,10 +276,15 @@ export class Speaker {
           controller.abort();
           return;
         }
-        this.set({ status: "speaking", botId: opts.botId, messageId: opts.messageId, caption: pending[at]! });
+        this.set({
+          status: 'speaking',
+          botId: opts.botId,
+          messageId: opts.messageId,
+          caption: pending[at]!,
+        });
         const played = await this.play(rendered.blob, live, opts.messageId, at);
         if (!played || !live()) {
-          if (live()) this.set({ ...IDLE, error: t("voice.error.clip") });
+          if (live()) this.set({ ...IDLE, error: t('voice.error.clip') });
           controller.abort();
           return;
         }
@@ -266,10 +299,12 @@ export class Speaker {
       // A microtask lets one batch of pushes fill the prefetch window before
       // the first render starts, the way the whole-text path always did.
       running = true;
-      void Promise.resolve().then(run).finally(() => {
-        running = false;
-        finish();
-      });
+      void Promise.resolve()
+        .then(run)
+        .finally(() => {
+          running = false;
+          finish();
+        });
     };
     return {
       push: (block) => {
@@ -288,7 +323,9 @@ export class Speaker {
         return utterances;
       },
       identify: (messageId) => this.adoptMessageId(opts, live, messageId),
-      cancel: () => { if (live()) this.stop(); },
+      cancel: () => {
+        if (live()) this.stop();
+      },
       fail: (error) => {
         if (finished) return;
         const wasLive = live();
@@ -339,7 +376,7 @@ export class Speaker {
       utterance.onstart = () => {
         if (live()) {
           this.set({
-            status: "speaking",
+            status: 'speaking',
             botId: opts.botId,
             messageId: opts.messageId,
             caption: value,
@@ -348,49 +385,70 @@ export class Speaker {
       };
       utterance.onend = () => finish(true);
       utterance.onerror = (event) => {
-        const interrupted = event.error === "canceled" || event.error === "interrupted";
-        finish(false, interrupted ? undefined : t("voice.error.macPlay"));
+        const interrupted = event.error === 'canceled' || event.error === 'interrupted';
+        finish(false, interrupted ? undefined : t('voice.error.macPlay'));
       };
       try {
         synth.speak(utterance);
       } catch {
-        finish(false, t("voice.error.macStart"));
+        finish(false, t('voice.error.macStart'));
       }
     });
   }
 
-  private async prepare(text: string, voiceId: string | undefined, signal: AbortSignal): Promise<string[]> {
-    const res = await fetch("/api/tts/prepare", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
+  private async prepare(
+    text: string,
+    voiceId: string | undefined,
+    signal: AbortSignal,
+  ): Promise<string[]> {
+    const res = await fetch('/api/tts/prepare', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text, voiceId }),
       signal,
     });
     const body: TtsPrepareBody = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(serverErrorText(body, body.error ?? t("voice.error.service", { status: res.status })));
+    if (!res.ok)
+      throw new Error(
+        serverErrorText(body, body.error ?? t('voice.error.service', { status: res.status })),
+      );
     if (!body.ready) {
-      throw new Error(t("voice.error.notReady"));
+      throw new Error(t('voice.error.notReady'));
     }
     return body.utterances ?? [];
   }
 
-  private async render(text: string, voiceId: string | undefined, signal: AbortSignal): Promise<Blob> {
-    const res = await fetch("/api/tts/speak", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
+  private async render(
+    text: string,
+    voiceId: string | undefined,
+    signal: AbortSignal,
+  ): Promise<Blob> {
+    const res = await fetch('/api/tts/speak', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ text, voiceId }),
       signal,
     });
     if (!res.ok) {
       const body: TtsErrorBody = await res.json().catch(() => ({}));
       // OpenAI readout names its refusal with a voice.openai.error.* key; any other key that isn't a serverError.* is not ours to show.
-      const voiceKey = body.errorKey?.startsWith("voice.openai.error.") ? body.errorKey : undefined;
-      throw new Error(serverErrorText(body, tFromServer(voiceKey, body.error) ?? t("voice.error.service", { status: res.status })));
+      const voiceKey = body.errorKey?.startsWith('voice.openai.error.') ? body.errorKey : undefined;
+      throw new Error(
+        serverErrorText(
+          body,
+          tFromServer(voiceKey, body.error) ?? t('voice.error.service', { status: res.status }),
+        ),
+      );
     }
     return res.blob();
   }
 
-  private play(blob: Blob, live: () => boolean, probeMessageId?: string, probeBlock?: number): Promise<boolean> {
+  private play(
+    blob: Blob,
+    live: () => boolean,
+    probeMessageId?: string,
+    probeBlock?: number,
+  ): Promise<boolean> {
     return new Promise((resolve) => {
       if (!live()) return resolve(false);
       this.teardownAudio();
@@ -405,7 +463,7 @@ export class Speaker {
         audio.onended = null;
         audio.onerror = null;
         if (probeMessageId !== undefined && probeBlock !== undefined) {
-          recordBlockTiming(probeMessageId, probeBlock, "audioEnd");
+          recordBlockTiming(probeMessageId, probeBlock, 'audioEnd');
         }
         if (this.settlePlayback === done) this.settlePlayback = null;
         if (this.audio === audio) this.teardownAudio();
@@ -417,7 +475,7 @@ export class Speaker {
       audio.play().then(
         () => {
           if (probeMessageId !== undefined && probeBlock !== undefined) {
-            recordBlockTiming(probeMessageId, probeBlock, "audioStart");
+            recordBlockTiming(probeMessageId, probeBlock, 'audioStart');
           }
         },
         () => done(false),

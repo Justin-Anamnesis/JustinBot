@@ -1,22 +1,35 @@
-import type { TeamMapSection } from "./team-map";
+import type { TeamMapSection } from './team-map';
 
-export interface Point { x: number; y: number }
-export interface View extends Point { scale: number }
-export interface Tile extends Point { key: string; width: number; height: number }
+export interface Point {
+  x: number;
+  y: number;
+}
+export interface View extends Point {
+  scale: number;
+}
+export interface Tile extends Point {
+  key: string;
+  width: number;
+  height: number;
+}
 
 export const CARD_WIDTH = 236;
 export const CARD_HEIGHT = 126;
 export const GAP = 16;
 export const TEAM_PADDING = 20;
 export const HEADER_HEIGHT = 64;
-export const COMPUTER_DRAG_TYPE = "application/x-omb-computer";
+export const COMPUTER_DRAG_TYPE = 'application/x-omb-computer';
 
 export function orderBots<T extends { id: string }>(bots: T[], order: string[] = []): T[] {
   const rank = new Map(order.map((id, index) => [id, index]));
   return [...bots].sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity));
 }
 
-export function reorderBot(bots: { id: string }[], botId: string, insertionIndex: number): string[] {
+export function reorderBot(
+  bots: { id: string }[],
+  botId: string,
+  insertionIndex: number,
+): string[] {
   const ids = bots.map((bot) => bot.id);
   if (!ids.includes(botId)) return ids;
   const remaining = ids.filter((id) => id !== botId);
@@ -26,11 +39,24 @@ export function reorderBot(bots: { id: string }[], botId: string, insertionIndex
 
 export function parseBotOrders(raw: string | null): Record<string, string[]> {
   try {
-    const parsed: unknown = JSON.parse(raw ?? "null");
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return Object.fromEntries(Object.entries(parsed).flatMap(([key, value]) => Array.isArray(value)
-      ? [[key, [...new Set(value.filter((id): id is string => typeof id === "string" && id.length > 0))]]]
-      : []));
+    const parsed: unknown = JSON.parse(raw ?? 'null');
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).flatMap(([key, value]) =>
+        Array.isArray(value)
+          ? [
+              [
+                key,
+                [
+                  ...new Set(
+                    value.filter((id): id is string => typeof id === 'string' && id.length > 0),
+                  ),
+                ],
+              ],
+            ]
+          : [],
+      ),
+    );
   } catch {
     return {};
   }
@@ -56,7 +82,10 @@ export function layoutTeams(
   const columns = Math.max(1, Math.floor(options.columns ?? 2));
   const columnX = [40];
   for (let column = 1; column < columns; column++) {
-    const previous = Math.max(0, ...sizes.filter((_, index) => index % columns === column - 1).map((size) => size.width));
+    const previous = Math.max(
+      0,
+      ...sizes.filter((_, index) => index % columns === column - 1).map((size) => size.width),
+    );
     columnX.push(columnX[column - 1] + previous + 56);
   }
   let y = 40;
@@ -80,7 +109,10 @@ export function fitTeams(tiles: Tile[], width: number, height: number): View {
   const top = Math.min(...tiles.map((tile) => tile.y));
   const contentWidth = Math.max(...tiles.map((tile) => tile.x + tile.width)) - left;
   const contentHeight = Math.max(...tiles.map((tile) => tile.y + tile.height)) - top;
-  const scale = Math.max(0.3, Math.min(1, (width - 80) / contentWidth, (height - 80) / contentHeight));
+  const scale = Math.max(
+    0.3,
+    Math.min(1, (width - 80) / contentWidth, (height - 80) / contentHeight),
+  );
   return {
     x: (width - contentWidth * scale) / 2 - left * scale,
     y: (height - contentHeight * scale) / 2 - top * scale,
@@ -99,16 +131,22 @@ export function zoomAt(view: View, nextScale: number, point: Point): View {
 
 export function parsePositions(raw: string | null): Record<string, Point> {
   try {
-    const parsed: unknown = JSON.parse(raw ?? "null");
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return Object.fromEntries(Object.entries(parsed).flatMap(([key, value]) => {
-      if (value === null || typeof value !== "object" || Array.isArray(value)) return [];
-      const { x, y } = value;
-      return typeof x === "number" && Number.isFinite(x) && Math.abs(x) < 100_000 &&
-        typeof y === "number" && Number.isFinite(y) && Math.abs(y) < 100_000
-        ? [[key, { x, y }]]
-        : [];
-    }));
+    const parsed: unknown = JSON.parse(raw ?? 'null');
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(
+      Object.entries(parsed).flatMap(([key, value]) => {
+        if (value === null || typeof value !== 'object' || Array.isArray(value)) return [];
+        const { x, y } = value;
+        return typeof x === 'number' &&
+          Number.isFinite(x) &&
+          Math.abs(x) < 100_000 &&
+          typeof y === 'number' &&
+          Number.isFinite(y) &&
+          Math.abs(y) < 100_000
+          ? [[key, { x, y }]]
+          : [];
+      }),
+    );
   } catch {
     return {};
   }

@@ -55,9 +55,9 @@ export function createServerSupervisor({
   }
 
   function watch(proc) {
-    if (stopped || current) throw new Error("Cannot replace an owned server child");
+    if (stopped || current) throw new Error('Cannot replace an owned server child');
     current = proc;
-    proc.once("exit", () => {
+    proc.once('exit', () => {
       // Late exits from a failed boot must not clear a replacement's state.
       if (current !== proc) return;
       const wasReady = readySince !== null;

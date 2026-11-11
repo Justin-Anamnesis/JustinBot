@@ -3,22 +3,22 @@
 // used under the MIT License (third_party/t3-code/LICENSE).
 
 export type DriverErrorCode =
-  | "timeout"
-  | "stale-ref"
-  | "invalid-selector"
-  | "not-found"
-  | "ambiguous"
-  | "not-editable"
-  | "covered"
-  | "not-visible"
-  | "execution"
-  | "result-too-large"
-  | "navigation"
-  | "dialog-pending"
-  | "secret-on-page"
-  | "closed"
-  | "forbidden-method"
-  | "refused";
+  | 'timeout'
+  | 'stale-ref'
+  | 'invalid-selector'
+  | 'not-found'
+  | 'ambiguous'
+  | 'not-editable'
+  | 'covered'
+  | 'not-visible'
+  | 'execution'
+  | 'result-too-large'
+  | 'navigation'
+  | 'dialog-pending'
+  | 'secret-on-page'
+  | 'closed'
+  | 'forbidden-method'
+  | 'refused';
 
 export class DriverError extends Error {
   readonly code: DriverErrorCode;
@@ -26,7 +26,7 @@ export class DriverError extends Error {
 
   constructor(code: DriverErrorCode, message: string, detail?: Record<string, unknown>) {
     super(message);
-    this.name = "DriverError";
+    this.name = 'DriverError';
     this.code = code;
     this.detail = detail;
   }
@@ -39,7 +39,7 @@ export class CdpProtocolError extends Error {
 
   constructor(method: string, message: string, protocolCode?: number) {
     super(`${method}: ${message}`);
-    this.name = "CdpProtocolError";
+    this.name = 'CdpProtocolError';
     this.method = method;
     this.protocolCode = protocolCode;
   }
@@ -47,7 +47,7 @@ export class CdpProtocolError extends Error {
 
 export const staleRefError = (ref: string) =>
   new DriverError(
-    "stale-ref",
+    'stale-ref',
     `The element ref ${ref} is stale or belongs to another tab. Take a fresh snapshot and use its ref.`,
     { staleRef: true, ref },
   );
@@ -57,22 +57,29 @@ const GONE =
   /Target closed|Session closed|No session with given id|No target with given id|Cannot find context with specified id|Execution context was destroyed|Inspected target navigated or closed|Could not find node with given id|No node with given id found|Node with given id does not belong to the document|Frame with the given id was not found|No frame for given id found|Cannot find default execution context|Node is detached from document/i;
 
 export function isGone(error: unknown): boolean {
-  if (error instanceof DriverError) return error.code === "closed";
+  if (error instanceof DriverError) return error.code === 'closed';
   return error instanceof Error && GONE.test(error.message);
 }
 
 /** Chrome never answered a command: whatever it was doing may still be running. */
 export function isUnanswered(error: unknown): boolean {
-  return error instanceof DriverError && error.code === "timeout" && error.detail?.unanswered === true;
+  return (
+    error instanceof DriverError && error.code === 'timeout' && error.detail?.unanswered === true
+  );
 }
 
 export function isMissingContext(error: unknown): boolean {
-  return error instanceof Error && /Cannot find context with specified id|Execution context was destroyed|Cannot find default execution context/i.test(error.message);
+  return (
+    error instanceof Error &&
+    /Cannot find context with specified id|Execution context was destroyed|Cannot find default execution context/i.test(
+      error.message,
+    )
+  );
 }
 
 export function messageOf(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return message.split("\n")[0] ?? message;
+  return message.split('\n')[0] ?? message;
 }
 
 const NET_ERROR_CODES: Readonly<Record<string, number>> = {

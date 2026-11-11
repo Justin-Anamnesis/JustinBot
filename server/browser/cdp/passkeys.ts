@@ -11,9 +11,9 @@
 
 /** CDP WebAuthn.VirtualAuthenticatorOptions, measured on Chrome 155 on macOS and Linux. */
 export const NO_PASSKEY_AUTHENTICATOR = {
-  protocol: "ctap2",
-  ctap2Version: "ctap2_1",
-  transport: "internal",
+  protocol: 'ctap2',
+  ctap2Version: 'ctap2_1',
+  transport: 'internal',
   hasResidentKey: true,
   hasUserVerification: true,
   // The user is never verified, so a registration fails as well: a site cannot leave a passkey behind in a browser
@@ -25,6 +25,6 @@ export const NO_PASSKEY_AUTHENTICATOR = {
 
 /** What a page's session is sent, in order, before the page runs. The environment lives as long as the session. */
 export const NO_PASSKEY_COMMANDS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
-  ["WebAuthn.enable", { enableUI: false }],
-  ["WebAuthn.addVirtualAuthenticator", { options: NO_PASSKEY_AUTHENTICATOR }],
+  ['WebAuthn.enable', { enableUI: false }],
+  ['WebAuthn.addVirtualAuthenticator', { options: NO_PASSKEY_AUTHENTICATOR }],
 ];

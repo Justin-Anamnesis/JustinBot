@@ -1,9 +1,9 @@
-import { extractMcpImages } from "../../mcp-tool-images.ts";
-import { toolDetailPreview } from "../../tool-summary.ts";
+import { extractMcpImages } from '../../mcp-tool-images.ts';
+import { toolDetailPreview } from '../../tool-summary.ts';
 
-export type AcpToolEndEvent = { type: "item.completed" } & (
-  | { itemType: "tool"; itemId: string | undefined; ok: boolean; output?: string }
-  | { itemType: "assistant_image"; data: string; fromTool: true }
+export type AcpToolEndEvent = { type: 'item.completed' } & (
+  | { itemType: 'tool'; itemId: string | undefined; ok: boolean; output?: string }
+  | { itemType: 'assistant_image'; data: string; fromTool: true }
 );
 
 /**
@@ -20,7 +20,18 @@ export function acpToolEndEvents(
     ended.add(itemId);
   }
   return [
-    { type: "item.completed", itemType: "tool", itemId, ok: update.status !== "failed", output: toolDetailPreview(update.rawOutput ?? update.content) },
-    ...extractMcpImages(update.content ?? update.rawOutput).map((img): AcpToolEndEvent => ({ type: "item.completed", itemType: "assistant_image", data: img.data, fromTool: true })),
+    {
+      type: 'item.completed',
+      itemType: 'tool',
+      itemId,
+      ok: update.status !== 'failed',
+      output: toolDetailPreview(update.rawOutput ?? update.content),
+    },
+    ...extractMcpImages(update.content ?? update.rawOutput).map((img): AcpToolEndEvent => ({
+      type: 'item.completed',
+      itemType: 'assistant_image',
+      data: img.data,
+      fromTool: true,
+    })),
   ];
 }

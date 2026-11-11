@@ -19,7 +19,13 @@ export const MAX_DESKTOP_CPUS = 64;
  * letting it thrash the host. */
 export function resourceArgs(resources: DesktopResources, options: { swap: boolean }): string[] {
   const memory = `${resources.memoryGb}g`;
-  return ["--memory", memory, ...(options.swap ? ["--memory-swap", memory] : []), "--cpus", String(resources.cpus)];
+  return [
+    '--memory',
+    memory,
+    ...(options.swap ? ['--memory-swap', memory] : []),
+    '--cpus',
+    String(resources.cpus),
+  ];
 }
 
 const raised = new Set<string>();
@@ -33,7 +39,9 @@ export function raisePidsLimit(
 ): void {
   if (current !== PREVIOUS_PIDS_LIMIT || raised.has(container)) return;
   raised.add(container);
-  void Promise.resolve().then(() => docker(["update", "--pids-limit", String(PIDS_LIMIT), container], 15_000)).catch(() => {});
+  void Promise.resolve()
+    .then(() => docker(['update', '--pids-limit', String(PIDS_LIMIT), container], 15_000))
+    .catch(() => {});
 }
 
 /** A stopped desktop takes the configured limits before it starts. An engine without `update --memory` keeps the old ones. */
@@ -42,5 +50,7 @@ export async function applyResourcesBeforeStart(
   resources: DesktopResources,
   docker: (args: string[], timeoutMs?: number) => Promise<unknown>,
 ): Promise<void> {
-  await docker(["update", ...resourceArgs(resources, { swap: true }), container], 15_000).catch(() => {});
+  await docker(['update', ...resourceArgs(resources, { swap: true }), container], 15_000).catch(
+    () => {},
+  );
 }

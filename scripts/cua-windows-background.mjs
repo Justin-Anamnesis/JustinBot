@@ -2,18 +2,31 @@
 // Windows GUI-subsystem copy for that daemon; keep the upstream CLI unchanged
 // for the stdio MCP proxy. No executable section or entry point is modified.
 export function createBackgroundExecutable(source) {
-  const fail = () => { throw new Error("Unsupported CUA executable: expected a complete x64 PE32+ console image"); };
-  if (!Buffer.isBuffer(source) || source.length < 64 || source.toString("ascii", 0, 2) !== "MZ") fail();
+  const fail = () => {
+    throw new Error('Unsupported CUA executable: expected a complete x64 PE32+ console image');
+  };
+  if (!Buffer.isBuffer(source) || source.length < 64 || source.toString('ascii', 0, 2) !== 'MZ')
+    fail();
   const pe = source.readUInt32LE(60);
-  if (pe < 64 || pe + 24 > source.length || source.toString("ascii", pe, pe + 4) !== "PE\0\0") fail();
+  if (pe < 64 || pe + 24 > source.length || source.toString('ascii', pe, pe + 4) !== 'PE\0\0')
+    fail();
   const optional = pe + 24;
   const optionalSize = source.readUInt16LE(pe + 20);
   const sectionCount = source.readUInt16LE(pe + 6);
   const sectionTable = optional + optionalSize;
-  if (source.readUInt16LE(pe + 4) !== 0x8664 || optionalSize < 152 ||
-      sectionTable + sectionCount * 40 > source.length || sectionCount === 0) fail();
-  if (source.readUInt16LE(optional) !== 0x20b || source.readUInt16LE(optional + 68) !== 3 ||
-      source.readUInt32LE(optional + 108) < 5) fail();
+  if (
+    source.readUInt16LE(pe + 4) !== 0x8664 ||
+    optionalSize < 152 ||
+    sectionTable + sectionCount * 40 > source.length ||
+    sectionCount === 0
+  )
+    fail();
+  if (
+    source.readUInt16LE(optional) !== 0x20b ||
+    source.readUInt16LE(optional + 68) !== 3 ||
+    source.readUInt32LE(optional + 108) < 5
+  )
+    fail();
 
   const certificateEntry = optional + 144;
   const certificateStart = source.readUInt32LE(certificateEntry);
@@ -21,9 +34,14 @@ export function createBackgroundExecutable(source) {
   const headersEnd = sectionTable + sectionCount * 40;
   // A modified image must not carry the original publisher's signature. Only
   // remove a trailing certificate table; refuse unfamiliar overlays/layouts.
-  if ((certificateStart === 0) !== (certificateSize === 0) ||
-      (certificateSize && (certificateStart < headersEnd || certificateStart % 8 !== 0 ||
-        certificateStart + certificateSize !== source.length))) fail();
+  if (
+    (certificateStart === 0) !== (certificateSize === 0) ||
+    (certificateSize &&
+      (certificateStart < headersEnd ||
+        certificateStart % 8 !== 0 ||
+        certificateStart + certificateSize !== source.length))
+  )
+    fail();
   const imageEnd = certificateSize ? certificateStart : source.length;
   for (let i = 0; i < sectionCount; i++) {
     const section = sectionTable + i * 40;

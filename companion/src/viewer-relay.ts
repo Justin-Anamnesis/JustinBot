@@ -1,6 +1,6 @@
-import { randomBytes } from "node:crypto";
-import { request as httpRequest, type IncomingMessage, type ServerResponse } from "node:http";
-import type { Duplex } from "node:stream";
+import { randomBytes } from 'node:crypto';
+import { request as httpRequest, type IncomingMessage, type ServerResponse } from 'node:http';
+import type { Duplex } from 'node:stream';
 
 export interface ViewerDevice {
   id?: string;
@@ -20,7 +20,11 @@ interface ViewerSession {
 
 /** Whether `controlLeaseId` still holds `botId`'s computer, asked on behalf of
  * the paired device. Any failure must answer false. */
-export type ControlCheck = (deviceId: string, botId: string, controlLeaseId: string) => Promise<boolean>;
+export type ControlCheck = (
+  deviceId: string,
+  botId: string,
+  controlLeaseId: string,
+) => Promise<boolean>;
 
 const VIEWER_PATH = /^\/vps-viewer\/([A-Za-z0-9_-]{32})(\/.*)?$/;
 /** Both joins hand back a loopback noVNC address: a VPS through its SSH
@@ -32,7 +36,7 @@ const SESSION_TTL_MS = 8 * 60 * 60_000;
 const MAX_SESSIONS = 64;
 
 function safeLoopbackViewer(raw: unknown): URL | null {
-  if (typeof raw !== "string") return null;
+  if (typeof raw !== 'string') return null;
   let url: URL;
   try {
     url = new URL(raw);
@@ -41,15 +45,15 @@ function safeLoopbackViewer(raw: unknown): URL | null {
   }
   const port = Number(url.port);
   if (
-    url.protocol !== "http:"
-    || url.hostname !== "127.0.0.1"
-    || url.username
-    || url.password
-    || url.pathname !== "/vnc.html"
-    || url.search
-    || !Number.isSafeInteger(port)
-    || port < 1024
-    || port > 65_535
+    url.protocol !== 'http:' ||
+    url.hostname !== '127.0.0.1' ||
+    url.username ||
+    url.password ||
+    url.pathname !== '/vnc.html' ||
+    url.search ||
+    !Number.isSafeInteger(port) ||
+    port < 1024 ||
+    port > 65_535
   ) {
     return null;
   }
@@ -59,7 +63,7 @@ function safeLoopbackViewer(raw: unknown): URL | null {
 /** Null for a target the WHATWG parser rejects, such as `//[`. */
 export function requestTarget(rawUrl: string | undefined): URL | null {
   try {
-    return new URL(rawUrl ?? "/", "http://companion.invalid");
+    return new URL(rawUrl ?? '/', 'http://companion.invalid');
   } catch {
     return null;
   }
@@ -68,9 +72,9 @@ export function requestTarget(rawUrl: string | undefined): URL | null {
 function sendJson(res: ServerResponse, status: number, body: unknown): void {
   const text = JSON.stringify(body);
   res.writeHead(status, {
-    "cache-control": "private, no-store",
-    "content-length": Buffer.byteLength(text),
-    "content-type": "application/json",
+    'cache-control': 'private, no-store',
+    'content-length': Buffer.byteLength(text),
+    'content-type': 'application/json',
   });
   res.end(text);
 }
@@ -79,24 +83,25 @@ function socketError(socket: Duplex, status: number, message: string): void {
   if (socket.destroyed) return;
   const body = JSON.stringify({ error: message });
   socket.end(
-    `HTTP/1.1 ${status} ${status === 401 ? "Unauthorized" : status === 403 ? "Forbidden" : "Not Found"}\r\n`
-      + "Connection: close\r\n"
-      + "Content-Type: application/json\r\n"
-      + `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`,
+    `HTTP/1.1 ${status} ${status === 401 ? 'Unauthorized' : status === 403 ? 'Forbidden' : 'Not Found'}\r\n` +
+      'Connection: close\r\n' +
+      'Content-Type: application/json\r\n' +
+      `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`,
   );
 }
 
 function websocketHeaders(req: IncomingMessage): Record<string, string> | null {
-  if (req.method !== "GET" || String(req.headers.upgrade ?? "").toLowerCase() !== "websocket") return null;
-  const headers: Record<string, string> = { connection: "Upgrade", upgrade: "websocket" };
+  if (req.method !== 'GET' || String(req.headers.upgrade ?? '').toLowerCase() !== 'websocket')
+    return null;
+  const headers: Record<string, string> = { connection: 'Upgrade', upgrade: 'websocket' };
   for (const name of [
-    "sec-websocket-key",
-    "sec-websocket-version",
-    "sec-websocket-protocol",
-    "sec-websocket-extensions",
+    'sec-websocket-key',
+    'sec-websocket-version',
+    'sec-websocket-protocol',
+    'sec-websocket-extensions',
   ]) {
     const value = req.headers[name];
-    if (typeof value === "string") headers[name] = value;
+    if (typeof value === 'string') headers[name] = value;
   }
   return headers;
 }
@@ -104,18 +109,18 @@ function websocketHeaders(req: IncomingMessage): Record<string, string> | null {
 function acceptUpgrade(socket: Duplex, response: IncomingMessage): void {
   const headers: string[] = [];
   for (const name of [
-    "upgrade",
-    "connection",
-    "sec-websocket-accept",
-    "sec-websocket-protocol",
-    "sec-websocket-extensions",
+    'upgrade',
+    'connection',
+    'sec-websocket-accept',
+    'sec-websocket-protocol',
+    'sec-websocket-extensions',
   ]) {
     const value = response.headers[name];
-    if (typeof value === "string") headers.push(`${name}: ${value}`);
+    if (typeof value === 'string') headers.push(`${name}: ${value}`);
   }
   socket.write(
-    `HTTP/1.1 ${response.statusCode ?? 101} ${response.statusMessage ?? "Switching Protocols"}\r\n`
-      + `${headers.join("\r\n")}\r\n\r\n`,
+    `HTTP/1.1 ${response.statusCode ?? 101} ${response.statusMessage ?? 'Switching Protocols'}\r\n` +
+      `${headers.join('\r\n')}\r\n\r\n`,
   );
 }
 
@@ -178,25 +183,33 @@ export class CompanionViewerRelay {
     return BOT_JOIN_PATH.test(path);
   }
 
-  rewriteJoinResponse(path: string, value: unknown, deviceId?: string, controlLeaseId?: string | null): unknown {
+  rewriteJoinResponse(
+    path: string,
+    value: unknown,
+    deviceId?: string,
+    controlLeaseId?: string | null,
+  ): unknown {
     const join = BOT_JOIN_PATH.exec(path);
     const botId = join?.[1];
-    if (!botId || !value || typeof value !== "object" || Array.isArray(value)) return value;
+    if (!botId || !value || typeof value !== 'object' || Array.isArray(value)) return value;
     const body = value as Record<string, unknown>;
     const viewer = safeLoopbackViewer(body.joinUrl);
     if (!viewer) return value;
-    if (!deviceId) throw new Error("the paired device has no viewer identity");
+    if (!deviceId) throw new Error('the paired device has no viewer identity');
     // A Local VM viewer is bound to the control lease that asked for it, and
     // is closed the moment that lease stops holding the computer. Without a
     // lease, or nothing to check it with, it is never handed out at all.
-    const localVm = join[2] === "local-computer";
-    if (localVm && (!controlLeaseId || !CONTROL_LEASE.test(controlLeaseId) || !this.#checkControl)) {
-      throw new Error("a Local VM viewer needs a control lease");
+    const localVm = join[2] === 'local-computer';
+    if (
+      localVm &&
+      (!controlLeaseId || !CONTROL_LEASE.test(controlLeaseId) || !this.#checkControl)
+    ) {
+      throw new Error('a Local VM viewer needs a control lease');
     }
 
     this.#prune();
     this.close(deviceId, botId);
-    const id = randomBytes(24).toString("base64url");
+    const id = randomBytes(24).toString('base64url');
     const session: ViewerSession = {
       id,
       botId,
@@ -224,14 +237,17 @@ export class CompanionViewerRelay {
     }
 
     const settings = new URLSearchParams(viewer.hash.slice(1));
-    settings.set("path", `vps-viewer/${id}/websockify`);
+    settings.set('path', `vps-viewer/${id}/websockify`);
     return {
       ...body,
       joinUrl: `/vps-viewer/${id}${viewer.pathname}#${settings.toString()}`,
     };
   }
 
-  #target(rawUrl: string | undefined, device: ViewerDevice | null): { session: ViewerSession; target: URL } | null {
+  #target(
+    rawUrl: string | undefined,
+    device: ViewerDevice | null,
+  ): { session: ViewerSession; target: URL } | null {
     this.#prune();
     if (!device?.id || !device.cloudDesktopAccess) return null;
     const incoming = requestTarget(rawUrl);
@@ -239,7 +255,7 @@ export class CompanionViewerRelay {
     if (!match) return null;
     const session = this.#sessions.get(match[1]);
     if (!session || session.deviceId !== device.id || session.expiresAt <= Date.now()) return null;
-    const suffix = match[2] || "/";
+    const suffix = match[2] || '/';
     let target: URL;
     try {
       target = new URL(`${suffix}${incoming.search}`, session.origin);
@@ -252,68 +268,76 @@ export class CompanionViewerRelay {
   }
 
   isViewerPath(rawUrl: string | undefined): boolean {
-    return requestTarget(rawUrl)?.pathname.startsWith("/vps-viewer/") ?? false;
+    return requestTarget(rawUrl)?.pathname.startsWith('/vps-viewer/') ?? false;
   }
 
   handleHttp(req: IncomingMessage, res: ServerResponse, device: ViewerDevice | null): void {
     const resolved = this.#target(req.url, device);
-    if (!device) return sendJson(res, 401, { error: "pair this device first" });
-    if (!device.cloudDesktopAccess) return sendJson(res, 403, { error: "cloud desktop access is off for this device" });
-    if (!resolved || req.method !== "GET") return sendJson(res, 404, { error: "viewer session not found" });
+    if (!device) return sendJson(res, 401, { error: 'pair this device first' });
+    if (!device.cloudDesktopAccess)
+      return sendJson(res, 403, { error: 'cloud desktop access is off for this device' });
+    if (!resolved || req.method !== 'GET')
+      return sendJson(res, 404, { error: 'viewer session not found' });
 
-    const headers: Record<string, string> = { accept: String(req.headers.accept ?? "*/*") };
-    for (const name of ["range", "if-none-match", "if-modified-since"]) {
+    const headers: Record<string, string> = { accept: String(req.headers.accept ?? '*/*') };
+    for (const name of ['range', 'if-none-match', 'if-modified-since']) {
       const value = req.headers[name];
-      if (typeof value === "string") headers[name] = value;
+      if (typeof value === 'string') headers[name] = value;
     }
-    const upstream = httpRequest(resolved.target, { method: "GET", headers }, (remote) => {
+    const upstream = httpRequest(resolved.target, { method: 'GET', headers }, (remote) => {
       upstream.setTimeout(0);
       const responseHeaders: Record<string, string | string[]> = {
-        "cache-control": "private, no-store",
+        'cache-control': 'private, no-store',
       };
       for (const name of [
-        "content-type",
-        "content-length",
-        "content-encoding",
-        "content-range",
-        "accept-ranges",
-        "etag",
-        "last-modified",
+        'content-type',
+        'content-length',
+        'content-encoding',
+        'content-range',
+        'accept-ranges',
+        'etag',
+        'last-modified',
       ]) {
         const value = remote.headers[name];
         if (value !== undefined) responseHeaders[name] = value;
       }
       res.writeHead(remote.statusCode ?? 502, responseHeaders);
-      remote.once("error", () => res.destroy());
+      remote.once('error', () => res.destroy());
       remote.pipe(res);
     });
-    upstream.setTimeout(30_000, () => upstream.destroy(new Error("viewer did not answer")));
-    upstream.once("error", () => {
+    upstream.setTimeout(30_000, () => upstream.destroy(new Error('viewer did not answer')));
+    upstream.once('error', () => {
       if (res.headersSent) res.destroy();
-      else sendJson(res, 502, { error: "the VPS viewer did not answer" });
+      else sendJson(res, 502, { error: 'the VPS viewer did not answer' });
     });
-    res.once("close", () => upstream.destroy());
+    res.once('close', () => upstream.destroy());
     upstream.end();
   }
 
-  handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer, device: ViewerDevice | null): void {
+  handleUpgrade(
+    req: IncomingMessage,
+    socket: Duplex,
+    head: Buffer,
+    device: ViewerDevice | null,
+  ): void {
     // Node removes its own error listener from a socket it hands to `upgrade`.
-    socket.on("error", () => socket.destroy());
+    socket.on('error', () => socket.destroy());
     this.#upgrades.add(socket);
-    socket.once("close", () => this.#upgrades.delete(socket));
-    if (!device) return socketError(socket, 401, "pair this device first");
-    if (!device.cloudDesktopAccess) return socketError(socket, 403, "cloud desktop access is off for this device");
+    socket.once('close', () => this.#upgrades.delete(socket));
+    if (!device) return socketError(socket, 401, 'pair this device first');
+    if (!device.cloudDesktopAccess)
+      return socketError(socket, 403, 'cloud desktop access is off for this device');
     const resolved = this.#target(req.url, device);
     const headers = websocketHeaders(req);
-    if (!resolved || !headers) return socketError(socket, 404, "viewer session not found");
+    if (!resolved || !headers) return socketError(socket, 404, 'viewer session not found');
 
-    const upstream = httpRequest(resolved.target, { method: "GET", headers });
+    const upstream = httpRequest(resolved.target, { method: 'GET', headers });
     resolved.session.sockets.add(socket);
     resolved.session.sockets.add(upstream);
-    socket.once("close", () => resolved.session.sockets.delete(socket));
-    upstream.once("close", () => resolved.session.sockets.delete(upstream));
-    upstream.setTimeout(30_000, () => upstream.destroy(new Error("viewer upgrade timed out")));
-    upstream.once("upgrade", (response, remote, remoteHead) => {
+    socket.once('close', () => resolved.session.sockets.delete(socket));
+    upstream.once('close', () => resolved.session.sockets.delete(upstream));
+    upstream.setTimeout(30_000, () => upstream.destroy(new Error('viewer upgrade timed out')));
+    upstream.once('upgrade', (response, remote, remoteHead) => {
       upstream.setTimeout(0);
       remote.setTimeout(0);
       if (!this.#isActive(resolved.session) || socket.destroyed) {
@@ -333,20 +357,20 @@ export class CompanionViewerRelay {
         socket.destroy();
         remote.destroy();
       };
-      socket.on("error", teardown);
-      remote.on("error", teardown);
-      socket.once("close", release);
-      remote.once("close", release);
+      socket.on('error', teardown);
+      remote.on('error', teardown);
+      socket.once('close', release);
+      remote.once('close', release);
       if (head.length) remote.write(head);
       if (remoteHead.length) socket.write(remoteHead);
       socket.pipe(remote).pipe(socket);
     });
-    upstream.once("response", (response) => {
+    upstream.once('response', (response) => {
       response.resume();
-      socketError(socket, 404, "viewer WebSocket was refused");
+      socketError(socket, 404, 'viewer WebSocket was refused');
     });
-    upstream.once("error", () => socket.destroy());
-    socket.once("close", () => upstream.destroy());
+    upstream.once('error', () => socket.destroy());
+    socket.once('close', () => upstream.destroy());
     upstream.end();
   }
 }

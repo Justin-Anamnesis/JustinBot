@@ -1,6 +1,6 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
-export const USER_BUBBLE_COLOR_KEY = "omb-color-user-bubbles";
+export const USER_BUBBLE_COLOR_KEY = 'omb-color-user-bubbles';
 
 let sessionChoice: boolean | undefined;
 const listeners = new Set<() => void>();
@@ -16,7 +16,7 @@ function storage(): Storage | undefined {
 export function readColorUserBubbles(): boolean {
   if (sessionChoice !== undefined) return sessionChoice;
   try {
-    return storage()?.getItem(USER_BUBBLE_COLOR_KEY) !== "0";
+    return storage()?.getItem(USER_BUBBLE_COLOR_KEY) !== '0';
   } catch {
     return true;
   }
@@ -35,13 +35,13 @@ function onStorage(event: StorageEvent) {
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (listeners.size === 1 && typeof window !== "undefined") {
-    window.addEventListener("storage", onStorage);
+  if (listeners.size === 1 && typeof window !== 'undefined') {
+    window.addEventListener('storage', onStorage);
   }
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && typeof window !== "undefined") {
-      window.removeEventListener("storage", onStorage);
+    if (listeners.size === 0 && typeof window !== 'undefined') {
+      window.removeEventListener('storage', onStorage);
     }
   };
 }
@@ -49,9 +49,8 @@ function subscribe(listener: () => void): () => void {
 export function setColorUserBubbles(enabled: boolean): void {
   sessionChoice = enabled;
   try {
-    storage()?.setItem(USER_BUBBLE_COLOR_KEY, enabled ? "1" : "0");
-  } catch {
-  }
+    storage()?.setItem(USER_BUBBLE_COLOR_KEY, enabled ? '1' : '0');
+  } catch {}
   notify();
 }
 

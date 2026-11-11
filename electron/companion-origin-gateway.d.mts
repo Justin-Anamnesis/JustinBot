@@ -9,7 +9,10 @@ export interface CompanionOriginEndpoint {
   readonly directory: string | null;
 }
 
-export declare function validCompanionOriginTarget(target: unknown, platform?: NodeJS.Platform): boolean;
+export declare function validCompanionOriginTarget(
+  target: unknown,
+  platform?: NodeJS.Platform,
+): boolean;
 export declare function createCompanionOriginEndpoint(options?: {
   platform?: NodeJS.Platform;
   processId?: number;

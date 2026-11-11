@@ -26,7 +26,7 @@ export class LocalVmSeatPool {
     this.affinityTtlMs = affinityTtlMs;
     this.now = now;
     if (!Number.isFinite(affinityTtlMs) || affinityTtlMs <= 0) {
-      throw new Error("Local VM seat affinity TTL must be positive");
+      throw new Error('Local VM seat affinity TTL must be positive');
     }
   }
 
@@ -85,13 +85,18 @@ export class LocalVmSeatPool {
     this.affinity.delete(threadId);
   }
 
-  private selectSeat(threadId: string, holderOf: (seat: number) => LocalVmSeatHolder | null, now: number): number {
+  private selectSeat(
+    threadId: string,
+    holderOf: (seat: number) => LocalVmSeatHolder | null,
+    now: number,
+  ): number {
     const seats = this.count();
     const holders: Array<LocalVmSeatHolder | null> = [];
     for (let seat = 0; seat < seats; seat += 1) holders.push(holderOf(seat));
     const softHeld = new Set<number>();
     for (const [otherId, entry] of this.affinity) {
-      if (otherId !== threadId && entry.expiresAt > now && entry.seat < seats) softHeld.add(entry.seat);
+      if (otherId !== threadId && entry.expiresAt > now && entry.seat < seats)
+        softHeld.add(entry.seat);
     }
     for (let pass = 0; pass < 2; pass += 1) {
       for (let seat = 0; seat < seats; seat += 1) {

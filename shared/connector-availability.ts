@@ -1,6 +1,6 @@
-export type ConnectedAppsMode = "managed" | "self-hosted" | "unavailable";
+export type ConnectedAppsMode = 'managed' | 'self-hosted' | 'unavailable';
 
-const MANAGED_CUSTOM_AUTH_TOOLKITS = new Set(["twitter", "x"]);
+const MANAGED_CUSTOM_AUTH_TOOLKITS = new Set(['twitter', 'x']);
 
 /**
  * Some Composio toolkits no longer include provider-managed credentials.
@@ -12,8 +12,9 @@ export function managedConnectorUnavailableReason(
   mode: ConnectedAppsMode,
   slug: string,
 ): string | null {
-  if (mode !== "managed" || !MANAGED_CUSTOM_AUTH_TOOLKITS.has(slug.trim().toLowerCase())) return null;
-  return "Twitter/X needs your own X Developer app and Composio auth config. Use self-hosted connected apps for now.";
+  if (mode !== 'managed' || !MANAGED_CUSTOM_AUTH_TOOLKITS.has(slug.trim().toLowerCase()))
+    return null;
+  return 'Twitter/X needs your own X Developer app and Composio auth config. Use self-hosted connected apps for now.';
 }
 
 /** A Composio auth config id as the Composio dashboard shows it (ac_…). */

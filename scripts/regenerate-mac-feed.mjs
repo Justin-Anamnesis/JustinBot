@@ -4,19 +4,19 @@
 // (electron-updater filters it by arch on macOS, and the top-level path/sha512
 // is the legacy fallback from the first entry); only sha512 and size are
 // recomputed. Blockmaps go stale the same way: regenerate-blockmaps.mjs.
-import { createHash } from "node:crypto";
-import { readFileSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createHash } from 'node:crypto';
+import { readFileSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const feedPath = process.argv[2] ?? join(root, "release", "latest-mac.yml");
+const root = join(dirname(fileURLToPath(import.meta.url)), '..');
+const feedPath = process.argv[2] ?? join(root, 'release', 'latest-mac.yml');
 const releaseDir = dirname(feedPath);
 
-const sha512 = (file) => createHash("sha512").update(readFileSync(file)).digest("base64");
+const sha512 = (file) => createHash('sha512').update(readFileSync(file)).digest('base64');
 
-const original = readFileSync(feedPath, "utf8");
-const lines = original.split("\n");
+const original = readFileSync(feedPath, 'utf8');
+const lines = original.split('\n');
 
 let currentUrl = null;
 let firstUrl = null;
@@ -43,22 +43,22 @@ const out = lines.map((line) => {
   if (/^sha512:\s+/.test(line)) {
     return `sha512: ${sha512(join(releaseDir, firstUrl))}`;
   }
-  if (line.startsWith("releaseDate:")) {
+  if (line.startsWith('releaseDate:')) {
     return `releaseDate: '${new Date().toISOString()}'`;
   }
   return line;
 });
 
-const updated = out.join("\n");
+const updated = out.join('\n');
 if (updated === original) {
-  console.log("latest-mac.yml already matches the bytes on disk");
+  console.log('latest-mac.yml already matches the bytes on disk');
 } else {
   writeFileSync(feedPath, updated);
 }
 
 // Refuse to end with a feed that lies: verify every entry against the disk.
 const entries = [...updated.matchAll(/-\s+url:\s+(\S+)[\s\S]*?sha512:\s+(\S+)\n\s+size:\s+(\d+)/g)];
-if (entries.length === 0) throw new Error("no file entries found in latest-mac.yml");
+if (entries.length === 0) throw new Error('no file entries found in latest-mac.yml');
 for (const [, url, hash, size] of entries) {
   const file = join(releaseDir, url);
   const actualHash = sha512(file);

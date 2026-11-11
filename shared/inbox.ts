@@ -1,5 +1,5 @@
-import type { ConnectorCardData } from "./connector-card.ts";
-import type { OptionCardData, SecretRequestCardData, SignInRequestCardData } from "./wire.ts";
+import type { ConnectorCardData } from './connector-card.ts';
+import type { OptionCardData, SecretRequestCardData, SignInRequestCardData } from './wire.ts';
 
 /** On a Team Cloud, a line in a person's inbox: their own conversation with their own Chief of Staff (their own MausBot
  * when they crowned none), where everything addressed to them arrives. It says who it is from and where it came from,
@@ -8,7 +8,7 @@ import type { OptionCardData, SecretRequestCardData, SignInRequestCardData } fro
 export interface InboxItem {
   /** "message": a teammate's or a bot's message, or an @mention; "ask": a question or approval card, copied here
    * and answered here as there; "result": a routine's report; "notice": a failure or a sign-in it needs. */
-  kind: "message" | "ask" | "result" | "notice";
+  kind: 'message' | 'ask' | 'result' | 'notice';
   /** Who it is from: a teammate (their address) or a bot (its id). */
   from: { name: string; email?: string; botId?: string };
   /** The bot that passed a teammate's message on. */
@@ -20,7 +20,7 @@ export interface InboxItem {
   /** The sender's assistant wrote it for them, from what they share with the team. */
   assistant?: true;
   /** How it was answered: the person's own words, or their assistant's, which answers facts only. */
-  answers?: Array<{ by: "person" | "assistant"; text: string; at: number }>;
+  answers?: Array<{ by: 'person' | 'assistant'; text: string; at: number }>;
 }
 
 /** A task's fields on a team's server when it is a person's inbox, sent to that person alone. */
@@ -36,27 +36,27 @@ export interface InboxTask {
 
 /** Where a line of the inbox is listed: "needs-you" while it waits on the person (an ask whose card is open where it was
  * asked), "info" for news until they answer it or mark it done, "done" once it is settled or marked done. */
-export type InboxTab = "needs-you" | "info" | "done";
+export type InboxTab = 'needs-you' | 'info' | 'done';
 
 /** One line of a person's inbox as their inbox lists it, newest first. `kind` names its source; a new source adds a kind
  * of its own with what its row needs. */
 export interface InboxRow {
   /** The line's id in the inbox conversation. */
   id: string;
-  kind: InboxItem["kind"];
+  kind: InboxItem['kind'];
   tab: InboxTab;
-  from: InboxItem["from"];
-  via?: InboxItem["via"];
+  from: InboxItem['from'];
+  via?: InboxItem['via'];
   /** The bot that handed this work to the bot it is from. */
   workingFor?: { botId: string; name: string };
   /** On someone's Cloud: a guest's conversation asks this, not its owner's; `name` is empty when it isn't known. */
   askedBy?: { name: string };
-  origin?: InboxItem["origin"];
+  origin?: InboxItem['origin'];
   text: string;
   at: number;
   unread: boolean;
   replies?: true;
-  answers?: InboxItem["answers"];
+  answers?: InboxItem['answers'];
   /** An ask's card as the inbox holds it: answering it answers the card where it was asked. */
   card?: OptionCardData;
   /** A password the bot asked for, answered with the chat's own card for it. */

@@ -1,13 +1,18 @@
 // What a person types or pastes to reach a MausBot server: a pairing link, an address, an address and a code typed
 // apart, or a code on its own. One reader for the desktop's Connect sheet, `openmausbot connect` and the MCP bridge.
 
-export const PAIRING_CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+export const PAIRING_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
 export const PAIRING_CODE_LENGTH = 12;
 const PAIRING_CREDENTIAL = /^omb_pair_[A-Za-z0-9_-]{43}$/;
 /** The port `openmausbot serve` listens on, used in examples only. */
-export const EXAMPLE_ADDRESS = "http://192.168.1.20:8799";
+export const EXAMPLE_ADDRESS = 'http://192.168.1.20:8799';
 
-const bareHost = (host) => String(host ?? "").trim().toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+const bareHost = (host) =>
+  String(host ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.$/, '');
 
 function ipv4(host) {
   const parts = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
@@ -19,7 +24,12 @@ function ipv4(host) {
 export function isLoopbackHost(host) {
   const name = bareHost(host);
   const v4 = ipv4(name);
-  return name === "localhost" || name.endsWith(".localhost") || name === "::1" || (v4 !== null && v4[0] === 127);
+  return (
+    name === 'localhost' ||
+    name.endsWith('.localhost') ||
+    name === '::1' ||
+    (v4 !== null && v4[0] === 127)
+  );
 }
 
 /**
@@ -33,19 +43,31 @@ export function isPrivateHost(host) {
   const v4 = ipv4(name);
   if (v4) {
     const [a, b] = v4;
-    return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
+    return (
+      a === 127 ||
+      a === 10 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||
+      (a === 100 && b >= 64 && b <= 127)
+    );
   }
   if (/^\d+(\.\d+){0,3}$/.test(name)) return false;
-  if (name.includes(":")) return name === "::1" || /^f[cd][0-9a-f]{0,2}:/.test(name) || /^fe[89ab][0-9a-f]?:/.test(name);
-  if (isLoopbackHost(name) || [".ts.net", ".local", ".home.arpa"].some((suffix) => name.endsWith(suffix))) return true;
-  return !name.includes(".") && /^[a-z0-9-]+$/.test(name);
+  if (name.includes(':'))
+    return name === '::1' || /^f[cd][0-9a-f]{0,2}:/.test(name) || /^fe[89ab][0-9a-f]?:/.test(name);
+  if (
+    isLoopbackHost(name) ||
+    ['.ts.net', '.local', '.home.arpa'].some((suffix) => name.endsWith(suffix))
+  )
+    return true;
+  return !name.includes('.') && /^[a-z0-9-]+$/.test(name);
 }
 
 /** How a saved server is reached, for the line under its name. */
 export function serverTransport(origin) {
   const url = new URL(origin);
-  if (url.protocol === "https:") return url.hostname.endsWith(".ts.net") ? "tailscale" : "https";
-  return isLoopbackHost(url.hostname) ? "loopback" : "private-http";
+  if (url.protocol === 'https:') return url.hostname.endsWith('.ts.net') ? 'tailscale' : 'https';
+  return isLoopbackHost(url.hostname) ? 'loopback' : 'private-http';
 }
 
 /** An origin a client may talk to: https anywhere, http only on a private network. Everything else is refused. */
@@ -53,18 +75,26 @@ export function allowedServerOrigin(origin) {
   try {
     const url = new URL(origin);
     if (url.username || url.password) return false;
-    return url.protocol === "https:" || (url.protocol === "http:" && isPrivateHost(url.hostname));
+    return url.protocol === 'https:' || (url.protocol === 'http:' && isPrivateHost(url.hostname));
   } catch {
     return false;
   }
 }
 
 export function normalizePairingCode(input) {
-  return String(input).toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/0/g, "O").replace(/1/g, "I");
+  return String(input)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .replace(/0/g, 'O')
+    .replace(/1/g, 'I');
 }
 
 export function formatPairingCode(code) {
-  return normalizePairingCode(code).match(/.{1,4}/g)?.join("-") ?? code;
+  return (
+    normalizePairingCode(code)
+      .match(/.{1,4}/g)
+      ?.join('-') ?? code
+  );
 }
 
 /**
@@ -73,16 +103,23 @@ export function formatPairingCode(code) {
  * MausBot (6 digits), a script key (`omb_sess_…`), or not a code at all.
  */
 export function readPairingCode(raw) {
-  const value = String(raw ?? "").trim();
-  if (!value) return { kind: "empty" };
-  if (value.startsWith("omb_sess_")) return { kind: "wrong", problem: "scriptKey" };
-  if (value.startsWith("omb_pair_")) return PAIRING_CREDENTIAL.test(value) ? { kind: "credential", credential: value } : { kind: "wrong", problem: "notACode" };
-  const digits = value.replace(/[\s-]/g, "");
-  if (/^\d{8}$/.test(digits)) return { kind: "wrong", problem: "emailCode" };
-  if (/^\d{6}$/.test(digits)) return { kind: "wrong", problem: "oldCode" };
+  const value = String(raw ?? '').trim();
+  if (!value) return { kind: 'empty' };
+  if (value.startsWith('omb_sess_')) return { kind: 'wrong', problem: 'scriptKey' };
+  if (value.startsWith('omb_pair_'))
+    return PAIRING_CREDENTIAL.test(value)
+      ? { kind: 'credential', credential: value }
+      : { kind: 'wrong', problem: 'notACode' };
+  const digits = value.replace(/[\s-]/g, '');
+  if (/^\d{8}$/.test(digits)) return { kind: 'wrong', problem: 'emailCode' };
+  if (/^\d{6}$/.test(digits)) return { kind: 'wrong', problem: 'oldCode' };
   const code = normalizePairingCode(value);
-  if (code.length !== PAIRING_CODE_LENGTH || [...code].some((symbol) => !PAIRING_CODE_ALPHABET.includes(symbol))) return { kind: "wrong", problem: "notACode" };
-  return { kind: "code", code: formatPairingCode(code) };
+  if (
+    code.length !== PAIRING_CODE_LENGTH ||
+    [...code].some((symbol) => !PAIRING_CODE_ALPHABET.includes(symbol))
+  )
+    return { kind: 'wrong', problem: 'notACode' };
+  return { kind: 'code', code: formatPairingCode(code) };
 }
 
 function decoded(value) {
@@ -95,15 +132,15 @@ function decoded(value) {
 
 /** `{ address, secret }` from an `openmausbot://pair` link; only one naming a server's own http(s) origin. */
 function appLink(url) {
-  const address = url.searchParams.get("address") ?? "";
+  const address = url.searchParams.get('address') ?? '';
   if (!/^https?:\/\//i.test(address)) return null;
-  return { address, secret: url.searchParams.get("code") ?? url.searchParams.get("token") };
+  return { address, secret: url.searchParams.get('code') ?? url.searchParams.get('token') };
 }
 
 function secretOf(url) {
   const fromHash = /(?:^|[#&])code=([^&]*)/.exec(url.hash)?.[1];
   if (fromHash !== undefined) return decoded(fromHash);
-  return url.searchParams.get("code");
+  return url.searchParams.get('code');
 }
 
 /**
@@ -112,13 +149,14 @@ function secretOf(url) {
  * one of empty, codeOnly (with the `code` to move into the code field), emailCode, oldCode, scriptKey, notACode,
  * publicHttp (with `host`), phoneLink and notAnAddress.
  */
-export function parseServerInput(addressInput, codeInput = "") {
-  let text = String(addressInput ?? "").trim();
-  if (!text) return { ok: false, problem: "empty" };
+export function parseServerInput(addressInput, codeInput = '') {
+  let text = String(addressInput ?? '').trim();
+  if (!text) return { ok: false, problem: 'empty' };
   const asCode = readPairingCode(text);
-  if (asCode.kind === "code") return { ok: false, problem: "codeOnly", code: asCode.code };
-  if (asCode.kind === "wrong" && asCode.problem !== "notACode") return { ok: false, problem: asCode.problem };
-  if (/[\s\\]/.test(text)) return { ok: false, problem: "notAnAddress" };
+  if (asCode.kind === 'code') return { ok: false, problem: 'codeOnly', code: asCode.code };
+  if (asCode.kind === 'wrong' && asCode.problem !== 'notACode')
+    return { ok: false, problem: asCode.problem };
+  if (/[\s\\]/.test(text)) return { ok: false, problem: 'notAnAddress' };
   let secret = null;
   if (/^openmausbot:/i.test(text)) {
     let link;
@@ -127,7 +165,7 @@ export function parseServerInput(addressInput, codeInput = "") {
     } catch {
       link = null;
     }
-    if (!link) return { ok: false, problem: "phoneLink" };
+    if (!link) return { ok: false, problem: 'phoneLink' };
     text = link.address;
     secret = link.secret;
   }
@@ -136,25 +174,34 @@ export function parseServerInput(addressInput, codeInput = "") {
   try {
     url = new URL(schemed ? text : `https://${text}`);
   } catch {
-    return { ok: false, problem: "notAnAddress" };
+    return { ok: false, problem: 'notAnAddress' };
   }
-  if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password || !url.hostname) return { ok: false, problem: "notAnAddress" };
-  if (!["/", "", "/pair", "/pair/"].includes(url.pathname)) return { ok: false, problem: "notAnAddress" };
+  if (
+    (url.protocol !== 'https:' && url.protocol !== 'http:') ||
+    url.username ||
+    url.password ||
+    !url.hostname
+  )
+    return { ok: false, problem: 'notAnAddress' };
+  if (!['/', '', '/pair', '/pair/'].includes(url.pathname))
+    return { ok: false, problem: 'notAnAddress' };
   const fromLink = secret ?? secretOf(url);
-  const carried = url.hash || url.searchParams.has("code") || secret !== null;
-  const typed = String(codeInput ?? "").trim();
-  if (!typed && carried && !fromLink?.trim()) return { ok: false, problem: "notACode" };
-  const read = readPairingCode(typed || fromLink || "");
-  if (read.kind === "wrong") return { ok: false, problem: read.problem };
+  const carried = url.hash || url.searchParams.has('code') || secret !== null;
+  const typed = String(codeInput ?? '').trim();
+  if (!typed && carried && !fromLink?.trim()) return { ok: false, problem: 'notACode' };
+  const read = readPairingCode(typed || fromLink || '');
+  if (read.kind === 'wrong') return { ok: false, problem: read.problem };
   const privateHost = isPrivateHost(url.hostname);
-  if (url.protocol === "http:" && schemed && !privateHost) return { ok: false, problem: "publicHttp", host: url.host };
-  const https = `https://${url.host}`, http = `http://${url.host}`;
+  if (url.protocol === 'http:' && schemed && !privateHost)
+    return { ok: false, problem: 'publicHttp', host: url.host };
+  const https = `https://${url.host}`,
+    http = `http://${url.host}`;
   const candidates = schemed ? [url.origin] : privateHost ? [https, http] : [https];
   return {
     ok: true,
     candidates,
-    code: read.kind === "code" ? read.code : null,
-    credential: read.kind === "credential" ? read.credential : null,
+    code: read.kind === 'code' ? read.code : null,
+    credential: read.kind === 'credential' ? read.credential : null,
   };
 }
 

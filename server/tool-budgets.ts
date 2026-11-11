@@ -1,4 +1,4 @@
-import type { ToolBudget } from "../shared/tool-budget.ts";
+import type { ToolBudget } from '../shared/tool-budget.ts';
 
 const MAX_BOTS = 1_000;
 const budgets = new Map<string, ToolBudget>();

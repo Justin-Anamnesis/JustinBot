@@ -1,6 +1,6 @@
 // When an interval routine may run: its days, its hours and its end, read in this computer's local time. Moved out of
 // routines.ts unchanged.
-import type { RoutineIntervalSchedule } from "./routine-schedules.ts";
+import type { RoutineIntervalSchedule } from './routine-schedules.ts';
 
 export const MAX_DATE_MS = 8_640_000_000_000_000;
 const LOCAL_DAY_MS = 24 * 60 * 60_000;
@@ -13,9 +13,13 @@ export function clockMinutes(value: string): number | null {
 }
 
 export function intervalHasRestrictions(
-  schedule: Pick<RoutineIntervalSchedule, "weekdays" | "window" | "endsAt">,
+  schedule: Pick<RoutineIntervalSchedule, 'weekdays' | 'window' | 'endsAt'>,
 ): boolean {
-  return schedule.weekdays !== undefined || schedule.window !== undefined || schedule.endsAt !== undefined;
+  return (
+    schedule.weekdays !== undefined ||
+    schedule.window !== undefined ||
+    schedule.endsAt !== undefined
+  );
 }
 
 export function intervalAllowsOccurrence(schedule: RoutineIntervalSchedule, at: number): boolean {
@@ -34,10 +38,17 @@ export function intervalAllowsOccurrence(schedule: RoutineIntervalSchedule, at: 
 export function isSameLocalDay(left: number, right: number): boolean {
   const a = new Date(left);
   const b = new Date(right);
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
 }
 
-export function nextAlignedInterval(schedule: RoutineIntervalSchedule, after: number): number | null {
+export function nextAlignedInterval(
+  schedule: RoutineIntervalSchedule,
+  after: number,
+): number | null {
   if (schedule.anchorAt > after) return schedule.anchorAt;
   const intervalMs = schedule.everyMinutes * 60_000;
   const intervalsElapsed = Math.floor((after - schedule.anchorAt) / intervalMs);
@@ -52,7 +63,8 @@ export function latestIntervalOccurrence(
   const intervalMs = schedule.everyMinutes * 60_000;
   const ceiling = Math.min(at, schedule.endsAt ?? at);
   if (schedule.anchorAt > ceiling) return null;
-  let candidate = schedule.anchorAt + Math.floor((ceiling - schedule.anchorAt) / intervalMs) * intervalMs;
+  let candidate =
+    schedule.anchorAt + Math.floor((ceiling - schedule.anchorAt) / intervalMs) * intervalMs;
   if (!intervalHasRestrictions(schedule)) return candidate;
   const maxCandidates = Math.ceil(INTERVAL_RESTRICTION_SEARCH_MS / intervalMs) + 2;
   for (let checked = 0; checked < maxCandidates; checked++) {

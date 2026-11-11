@@ -1,6 +1,6 @@
-import { DriverError } from "./errors.ts";
-import { valueInWorld } from "./evaluate.ts";
-import type { FrameTree } from "./frames.ts";
+import { DriverError } from './errors.ts';
+import { valueInWorld } from './evaluate.ts';
+import type { FrameTree } from './frames.ts';
 
 // Hidden inputs included: multi-step sign-ins carry the password forward in them.
 const FIELD_VALUES = `(() => {
@@ -13,12 +13,17 @@ const FIELD_VALUES = `(() => {
   return values;
 })()`;
 
-export const SECRET_ON_PAGE = "A saved password is still on this page; submit it or navigate first.";
+export const SECRET_ON_PAGE =
+  'A saved password is still on this page; submit it or navigate first.';
 
 /** Every field value in every frame, read in the isolated world; values are compared here and dropped. */
 export async function fieldValues(frames: FrameTree): Promise<string[]> {
-  const perFrame = await Promise.all(frames.all().map((frame) => valueInWorld<string[]>(frames, frame.id, FIELD_VALUES).catch(() => [])));
-  return perFrame.flat().filter((value): value is string => typeof value === "string");
+  const perFrame = await Promise.all(
+    frames
+      .all()
+      .map((frame) => valueInWorld<string[]>(frames, frame.id, FIELD_VALUES).catch(() => [])),
+  );
+  return perFrame.flat().filter((value): value is string => typeof value === 'string');
 }
 
 /**
@@ -55,7 +60,7 @@ export class SecretGuard {
   }
 
   async refuseWhilePresent(frames: FrameTree): Promise<void> {
-    if (await this.present(frames)) throw new DriverError("secret-on-page", SECRET_ON_PAGE);
+    if (await this.present(frames)) throw new DriverError('secret-on-page', SECRET_ON_PAGE);
   }
 
   /** True for a value a snapshot must mask. */

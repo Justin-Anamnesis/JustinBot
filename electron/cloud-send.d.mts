@@ -1,6 +1,7 @@
-import type { PlanRow, SendKind } from "./cloud-send-parts.mjs";
+import type { PlanRow, SendKind } from './cloud-send-parts.mjs';
 
-export type CloudSendPlace = "none" | "asleep" | "unreachable" | "outdated" | "signed-out" | "local-unavailable" | "ready";
+export type CloudSendPlace =
+  'none' | 'asleep' | 'unreachable' | 'outdated' | 'signed-out' | 'local-unavailable' | 'ready';
 
 export interface CloudSendResult {
   /** Bots added to My Cloud, by name. */
@@ -18,7 +19,13 @@ export interface CloudSendResult {
   /** The chats My Cloud lacked, added by row or by Bring newer chats; null when this send did not bring chats. `left`:
    * conversations that did not all go this time (a bot answering in one, or My Cloud not taking a page yet). */
   chats: { conversations: number; messages: number; left?: number } | null;
-  failed: Array<{ key: string; kind: SendKind | "chats" | "connection" | "memory" | "files"; label: string; error: string; final?: true }>;
+  failed: Array<{
+    key: string;
+    kind: SendKind | 'chats' | 'connection' | 'memory' | 'files';
+    label: string;
+    error: string;
+    final?: true;
+  }>;
   /** A move's own: automations and skill extras it carried, memory files and learned facts merged, bot files sent (`kept`:
    * beside a different file of My Cloud's), and conversations whose own settings it set. */
   moved?: number;
@@ -27,21 +34,43 @@ export interface CloudSendResult {
   conversationSettings?: number;
   /** model: kept My Cloud's engine; settings: a setting My Cloud refused; narrowed: a login kept to bots My Cloud lacks; memory: notes not copied;
    * held: a key a trial's Cloud keeps unused while its Claude credit lasts. */
-  notes: Array<{ kind: "model" | "settings" | "narrowed" | "memory" | "held"; bot?: string; login?: string; connection?: string }>;
+  notes: Array<{
+    kind: 'model' | 'settings' | 'narrowed' | 'memory' | 'held';
+    bot?: string;
+    login?: string;
+    connection?: string;
+  }>;
 }
 /** `error`: the send failed as a whole (nothing after that point went), in words for the person. */
-export interface CloudSendOutcome { at: number; reason: string; result: CloudSendResult; error?: string }
+export interface CloudSendOutcome {
+  at: number;
+  reason: string;
+  result: CloudSendResult;
+  error?: string;
+}
 /** What did not go, grouped by reason (bots by name, logins only counted, at most three reasons), and `error`: why the
  * send stopped as a whole. */
 export interface CloudSendFailure {
   /** `connections`: apps and keys a move could not carry; absent from an older desktop. */
-  reasons?: Array<{ what: { bots: string[]; skills: number; logins: number; secrets?: number; onePassword: boolean; settings: number; connections?: number; chats: boolean }; error: string }>;
+  reasons?: Array<{
+    what: {
+      bots: string[];
+      skills: number;
+      logins: number;
+      secrets?: number;
+      onePassword: boolean;
+      settings: number;
+      connections?: number;
+      chats: boolean;
+    };
+    error: string;
+  }>;
   error?: string;
 }
 
 export interface CloudSendSnapshot {
   cloud: CloudSendPlace;
-  running: null | { reason: string; progress?: { done: number; total: number }; phase?: "chats" };
+  running: null | { reason: string; progress?: { done: number; total: number }; phase?: 'chats' };
   rows: PlanRow[];
   cloudOnly: Array<{ key: string; kind: SendKind; label: string; detail?: string; bot?: string }>;
   pending: number;
@@ -75,7 +104,7 @@ export interface CloudSendNotice {
   /** The running send's reason ("move": the one-time move of everything to My Cloud), progress and phase. */
   runningReason?: string;
   progress?: { done: number; total: number };
-  phase?: "chats";
+  phase?: 'chats';
   /** `sent`: counts only; `seen`: the person closed this result on the strip. */
   /** `final`: every failure is one trying again can't fix (1Password refused the token), so no Try again. */
   last: CloudSendTold | null;
@@ -84,14 +113,29 @@ export interface CloudSendNotice {
   /** What reached My Cloud from this computer, all sends together; absent from an older desktop. */
   arrived?: CloudSendArrived;
   /** The one-time move's own line, while there is one; absent from an older desktop. */
-  move?: import("./one-home.mjs").OneHomeView;
+  move?: import('./one-home.mjs').OneHomeView;
   /** On My Cloud's page: a bot moving into a team, while its line shows; absent from an older desktop. */
-  teamMove?: import("./team-move.mjs").TeamMoveView;
+  teamMove?: import('./team-move.mjs').TeamMoveView;
 }
-export type CloudSendTold = { at: number; reason: string; failed: number; seen: boolean; sent: CloudSendCounts; final?: boolean } & CloudSendFailure;
-export interface CloudSendArrived extends CloudSendCounts { chats: { conversations: number; messages: number } }
+export type CloudSendTold = {
+  at: number;
+  reason: string;
+  failed: number;
+  seen: boolean;
+  sent: CloudSendCounts;
+  final?: boolean;
+} & CloudSendFailure;
+export interface CloudSendArrived extends CloudSendCounts {
+  chats: { conversations: number; messages: number };
+}
 export interface CloudSendCounts {
-  bots: number; updatedBots: number; skills: number; logins: number; secrets?: number; onePassword: boolean; settings: number;
+  bots: number;
+  updatedBots: number;
+  skills: number;
+  logins: number;
+  secrets?: number;
+  onePassword: boolean;
+  settings: number;
   chats: { conversations: number; messages: number } | null;
 }
 
@@ -104,15 +148,31 @@ export interface CloudSendPageBridge {
   /** On My Cloud's page: the teams a bot of its can move into, from the Admin's verified session; absent from an older desktop. */
   teams?(): Promise<{ teams: Array<{ id: string; name: string; ready: boolean }> }>;
   /** Moves one bot into one of those teams (a real click). */
-  moveToTeam?(botId: string, teamId: string, name: string): Promise<import("./team-move.mjs").TeamMoveView | null>;
+  moveToTeam?(
+    botId: string,
+    teamId: string,
+    name: string,
+  ): Promise<import('./team-move.mjs').TeamMoveView | null>;
   /** `moveToTeam` with main's refusal as a value, which the page says in its own language; `moveToTeam` keeps rejecting
    * with the English only, for pages that predate this. Absent from an older desktop. */
-  moveToTeamCoded?(botId: string, teamId: string, name: string): Promise<{ view: import("./team-move.mjs").TeamMoveView | null } | { refused: import("./team-move.mjs").TeamMoveRefusal }>;
+  moveToTeamCoded?(
+    botId: string,
+    teamId: string,
+    name: string,
+  ): Promise<
+    | { view: import('./team-move.mjs').TeamMoveView | null }
+    | { refused: import('./team-move.mjs').TeamMoveRefusal }
+  >;
   /** A team's own page: the bots its person has on My Cloud, and one moved in once they agree in main's own confirm. */
-  teamBring?(): Promise<{ team?: { id: string; name: string; ready: boolean }; bots: Array<{ id: string; name: string; stays?: "default" | "chief" | "last" }> }>;
-  teamBringMove?(botId: string): Promise<{ started: boolean; move: import("./team-move.mjs").TeamMoveView | null }>;
-  teamBringStatus?(): Promise<import("./team-move.mjs").TeamMoveView | null>;
-  teamRetry?(): Promise<import("./team-move.mjs").TeamMoveView | null>;
+  teamBring?(): Promise<{
+    team?: { id: string; name: string; ready: boolean };
+    bots: Array<{ id: string; name: string; stays?: 'default' | 'chief' | 'last' }>;
+  }>;
+  teamBringMove?(
+    botId: string,
+  ): Promise<{ started: boolean; move: import('./team-move.mjs').TeamMoveView | null }>;
+  teamBringStatus?(): Promise<import('./team-move.mjs').TeamMoveView | null>;
+  teamRetry?(): Promise<import('./team-move.mjs').TeamMoveView | null>;
   /** Shows that team's page, where the bot now lives. */
   openTeam?(teamId: string): Promise<void>;
   /** The switch "Keep this computer's bots on this computer"; absent from an older desktop. */
@@ -124,11 +184,24 @@ export interface CloudSendPageBridge {
 /** The switch "Keep this computer's bots on this computer" (one-home-main.mjs). `shown`: this person has a Cloud of their
  * own the move applies to; `moved`: this computer's bots live on My Cloud, so turning it on brings them home; `coming`:
  * they are on their way, past turning back. */
-export interface KeepHereState { shown: boolean; on: boolean; moved: boolean; coming: boolean }
+export interface KeepHereState {
+  shown: boolean;
+  on: boolean;
+  moved: boolean;
+  coming: boolean;
+}
 
 export interface CloudSendSession {
-  call(method: string, route: string, body?: unknown): Promise<{ status: number; ok: boolean; body: any }>;
-  upload(route: string, bytes: Uint8Array, type: string): Promise<{ status: number; ok: boolean; body: any }>;
+  call(
+    method: string,
+    route: string,
+    body?: unknown,
+  ): Promise<{ status: number; ok: boolean; body: any }>;
+  upload(
+    route: string,
+    bytes: Uint8Array,
+    type: string,
+  ): Promise<{ status: number; ok: boolean; body: any }>;
   /** The answer as it came, for a download; only the owner sessions main opens have it. */
   fetch?(route: string, init?: RequestInit): Promise<Response>;
   close(): Promise<void>;
@@ -141,10 +214,17 @@ export class CloudSendError extends Error {
   errorParams?: Record<string, string | number>;
   constructor(code: string, message: string, options?: { cause?: unknown });
 }
-export function namedRefusal(answer: { status: number; body: any }): { message: string; errorKey: string; errorParams: Record<string, string | number> } | null;
+export function namedRefusal(answer: {
+  status: number;
+  body: any;
+}): { message: string; errorKey: string; errorParams: Record<string, string | number> } | null;
 export function unanswered(error: unknown): boolean;
 
-export function botPatch(bot: Record<string, unknown>, parts: string[], cloudBots: ReadonlySet<string>): Record<string, unknown>;
+export function botPatch(
+  bot: Record<string, unknown>,
+  parts: string[],
+  cloudBots: ReadonlySet<string>,
+): Record<string, unknown>;
 export function parseSendState(value: unknown): { v: 1; clouds: Record<string, any> };
 export function sendNotice(snapshot: CloudSendSnapshot): CloudSendNotice;
 
@@ -170,7 +250,12 @@ export interface CloudMoveCheck {
   /** Per conversation: rows My Cloud lacks, lines of its owner's it holds that do not carry the owner yet, and whether
    * this computer's visible path is My Cloud's ("equal"), appears in order inside a longer one ("inside", both sides added
    * to it) or does not hold ("broken"). */
-  chats: Array<{ threadId: string; missing: number; unstamped: number; path: "equal" | "inside" | "broken" }>;
+  chats: Array<{
+    threadId: string;
+    missing: number;
+    unstamped: number;
+    path: 'equal' | 'inside' | 'broken';
+  }>;
   attachments: string[];
   /** Credentials by id, compared by fingerprint only. */
   secrets: { equal: string[]; differs: string[]; missing: string[] };
@@ -203,7 +288,12 @@ export function createCloudSend(deps: {
   compare(): Promise<CloudSendSnapshot>;
   /** `reason: "move"`: everything this computer has, apps and keys first; `final`: the pass after this computer stopped,
    * which carries the sign-ins that refresh themselves and lets go of this computer's copies. */
-  send(options?: { keys?: string[] | null; force?: string[]; reason?: string; final?: boolean }): Promise<CloudSendOutcome>;
+  send(options?: {
+    keys?: string[] | null;
+    force?: string[];
+    reason?: string;
+    final?: boolean;
+  }): Promise<CloudSendOutcome>;
   check(): Promise<CloudMoveCheck>;
   /** Each automation a move carried ("routine:<id>", "call:<id>", "webhook:<id>", "app-event:<id>") and whether it was
    * on here when it went. */

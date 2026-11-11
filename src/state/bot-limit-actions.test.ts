@@ -1,30 +1,49 @@
 // @vitest-environment happy-dom
-import { createElement, type Dispatch } from "react";
-import { flushSync } from "react-dom";
-import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Action, AppState, BotAnnouncement } from "./store";
+import { createElement, type Dispatch } from 'react';
+import { flushSync } from 'react-dom';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Action, AppState, BotAnnouncement } from './store';
 
 class FixtureEventSource {
   static opened: FixtureEventSource[] = [];
   onopen: (() => void) | null = null;
   onerror: (() => void) | null = null;
   onmessage: ((event: { data: string; lastEventId?: string }) => void) | null = null;
-  constructor(readonly url: string) { FixtureEventSource.opened.push(this); }
+  constructor(readonly url: string) {
+    FixtureEventSource.opened.push(this);
+  }
   close() {}
-  send(frame: object, id?: string) { this.onmessage?.({ data: JSON.stringify(frame), lastEventId: id }); }
+  send(frame: object, id?: string) {
+    this.onmessage?.({ data: JSON.stringify(frame), lastEventId: id });
+  }
 }
 
 const botNamed = (id: string, extra: Partial<BotAnnouncement> = {}): BotAnnouncement => ({
-  id, threadId: `${id}-thread`, name: id, title: "", description: "", notifications: true, unread: false, color: "green",
-  modelSelection: { instanceId: "fake", model: "m" }, tasks: [{ threadId: `${id}-thread`, title: "Thread", createdAt: 1 }], messages: [], ...extra,
+  id,
+  threadId: `${id}-thread`,
+  name: id,
+  title: '',
+  description: '',
+  notifications: true,
+  unread: false,
+  color: 'green',
+  modelSelection: { instanceId: 'fake', model: 'm' },
+  tasks: [{ threadId: `${id}-thread`, title: 'Thread', createdAt: 1 }],
+  messages: [],
+  ...extra,
 });
-const REFUSED = { error: "You've reached the 5 bots Starter includes. To create more, upgrade this Cloud.", code: "bot_limit" };
-const json = (body: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(body), { status }));
+const REFUSED = {
+  error: "You've reached the 5 bots Starter includes. To create more, upgrade this Cloud.",
+  code: 'bot_limit',
+};
+const json = (body: unknown, status = 200) =>
+  Promise.resolve(new Response(JSON.stringify(body), { status }));
 
-const { StoreProvider, useStore } = await import("./store");
-const { api, ApiError } = await import("./api");
-const { botLimitReason, botLimitShown, closeBotLimit, createdPausedBot } = await import("@/lib/bot-limit");
+const { StoreProvider, useStore } = await import('./store');
+const { api, ApiError } = await import('./api');
+const { botLimitReason, botLimitShown, closeBotLimit, createdPausedBot } =
+  await import('@/lib/bot-limit');
 
 let seen!: AppState;
 let dispatch!: Dispatch<Action>;
@@ -36,27 +55,37 @@ let root: Root;
 let container: HTMLElement;
 let creates: number;
 let created: () => Promise<Response>;
-const settle = async () => { for (let i = 0; i < 8; i++) await new Promise((resolve) => setTimeout(resolve, 0)); };
+const settle = async () => {
+  for (let i = 0; i < 8; i++) await new Promise((resolve) => setTimeout(resolve, 0));
+};
 
 async function mount(bots: BotAnnouncement[], config: Record<string, unknown>) {
   FixtureEventSource.opened = [];
-  vi.stubGlobal("EventSource", FixtureEventSource);
-  vi.stubGlobal("fetch", (path: string, init?: RequestInit) => {
-    if (path.startsWith("/api/bots?")) return json({ bots, groups: [] });
-    if (path === "/api/config") return json(config);
-    if (path === "/api/instances") return json({ instances: [] });
-    if (path.startsWith("/api/routines")) return json({ routines: [], runs: [] });
-    if (path.startsWith("/api/webhooks")) return json({ webhooks: [], attempts: [] });
-    if (path === "/api/bot-defaults") return json({ defaults: { profile: {}, memory: {}, skills: [], routines: [] }, modelSelection: { instanceId: "fake", model: "m" }, suggestedName: "Scout" });
-    if (path === "/api/bots" && init?.method === "POST") { creates += 1; return created(); }
+  vi.stubGlobal('EventSource', FixtureEventSource);
+  vi.stubGlobal('fetch', (path: string, init?: RequestInit) => {
+    if (path.startsWith('/api/bots?')) return json({ bots, groups: [] });
+    if (path === '/api/config') return json(config);
+    if (path === '/api/instances') return json({ instances: [] });
+    if (path.startsWith('/api/routines')) return json({ routines: [], runs: [] });
+    if (path.startsWith('/api/webhooks')) return json({ webhooks: [], attempts: [] });
+    if (path === '/api/bot-defaults')
+      return json({
+        defaults: { profile: {}, memory: {}, skills: [], routines: [] },
+        modelSelection: { instanceId: 'fake', model: 'm' },
+        suggestedName: 'Scout',
+      });
+    if (path === '/api/bots' && init?.method === 'POST') {
+      creates += 1;
+      return created();
+    }
     return json({});
   });
-  container = document.createElement("div");
+  container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
   flushSync(() => root.render(createElement(StoreProvider, null, createElement(Probe))));
   await settle();
-  FixtureEventSource.opened[0]!.send({ kind: "hello", resumed: false, cursor: "run:0" });
+  FixtureEventSource.opened[0]!.send({ kind: 'hello', resumed: false, cursor: 'run:0' });
   await settle();
   expect(seen.bots).toHaveLength(bots.length);
   expect(seen.config).toMatchObject(config);
@@ -83,7 +112,10 @@ afterEach(async () => {
 });
 
 describe("a create button with no room, on an older server that caps Starter's bots", () => {
-  it.each<[string, Action]>([["New bot", { type: "newBot" }], ["Duplicate", { type: "duplicateBot", botId: "b0" }]])("%s opens the popup and asks the server nothing", async (_name, action) => {
+  it.each<[string, Action]>([
+    ['New bot', { type: 'newBot' }],
+    ['Duplicate', { type: 'duplicateBot', botId: 'b0' }],
+  ])('%s opens the popup and asks the server nothing', async (_name, action) => {
     await mount(five(), STARTER);
     await send(action);
     expect(botLimitShown()).toBe(true);
@@ -91,47 +123,58 @@ describe("a create button with no room, on an older server that caps Starter's b
     expect(seen.error).toBeNull();
   });
 
-  it("leaves the MausBot out of the count, as the server does", async () => {
-    await mount([botNamed("maus", { defaultBot: {} } as never), ...five().slice(1)], STARTER);
-    created = () => json({ bot: botNamed("new") }, 201);
-    await send({ type: "newBot" });
+  it('leaves the MausBot out of the count, as the server does', async () => {
+    await mount([botNamed('maus', { defaultBot: {} } as never), ...five().slice(1)], STARTER);
+    created = () => json({ bot: botNamed('new') }, 201);
+    await send({ type: 'newBot' });
     await vi.waitFor(() => expect(creates).toBe(1));
     expect(botLimitShown()).toBe(false);
   });
 
-  it("goes straight on the moment the plan is bigger, with nothing reloaded", async () => {
+  it('goes straight on the moment the plan is bigger, with nothing reloaded', async () => {
     await mount(five(), STARTER);
-    FixtureEventSource.opened[0]!.send({ kind: "config", ...seen.config, cloudStarter: false, botLimit: undefined }, "run:1");
+    FixtureEventSource.opened[0]!.send(
+      { kind: 'config', ...seen.config, cloudStarter: false, botLimit: undefined },
+      'run:1',
+    );
     await settle();
-    created = () => json({ bot: botNamed("new") }, 201);
-    await send({ type: "newBot" });
+    created = () => json({ bot: botNamed('new') }, 201);
+    await send({ type: 'newBot' });
     await vi.waitFor(() => expect(creates).toBe(1));
     expect(botLimitShown()).toBe(false);
   });
 
   it("has no limit on a plan that doesn't say one", async () => {
     await mount(five(), { cloudStarter: false });
-    created = () => json({ bot: botNamed("new") }, 201);
-    await send({ type: "newBot" });
+    created = () => json({ bot: botNamed('new') }, 201);
+    await send({ type: 'newBot' });
     await vi.waitFor(() => expect(creates).toBe(1));
     expect(botLimitShown()).toBe(false);
   });
 });
 
-describe("a sixth bot on a Starter Cloud that makes any number", () => {
-  it.each<[string, Action]>([["New bot", { type: "newBot" }], ["Duplicate", { type: "duplicateBot", botId: "b0" }]])("%s makes it and offers to swap it in", async (_name, action) => {
+describe('a sixth bot on a Starter Cloud that makes any number', () => {
+  it.each<[string, Action]>([
+    ['New bot', { type: 'newBot' }],
+    ['Duplicate', { type: 'duplicateBot', botId: 'b0' }],
+  ])('%s makes it and offers to swap it in', async (_name, action) => {
     await mount(five(), { cloudStarter: true, awakeLimit: 5 });
-    created = () => json({ bot: botNamed("sixth"), paused: true }, 201);
+    created = () => json({ bot: botNamed('sixth'), paused: true }, 201);
     await send(action);
     await vi.waitFor(() => expect(creates).toBe(1));
-    await vi.waitFor(() => expect([botLimitReason(), createdPausedBot()]).toEqual(["created", "sixth"]));
-    expect(seen.bots.map((bot) => bot.id)).toContain("sixth");
+    await vi.waitFor(() =>
+      expect([botLimitReason(), createdPausedBot()]).toEqual(['created', 'sixth']),
+    );
+    expect(seen.bots.map((bot) => bot.id)).toContain('sixth');
     expect(seen.error).toBeNull();
   });
 });
 
 describe("an older server's refusal, when the page's count was stale", () => {
-  it.each<[string, Action]>([["New bot", { type: "newBot" }], ["Duplicate", { type: "duplicateBot", botId: "b1" }]])("%s shows the popup and no error beside it", async (_name, action) => {
+  it.each<[string, Action]>([
+    ['New bot', { type: 'newBot' }],
+    ['Duplicate', { type: 'duplicateBot', botId: 'b1' }],
+  ])('%s shows the popup and no error beside it', async (_name, action) => {
     await mount(five().slice(1), STARTER);
     await send(action);
     await vi.waitFor(() => expect(botLimitShown()).toBe(true));
@@ -139,25 +182,30 @@ describe("an older server's refusal, when the page's count was stale", () => {
     expect(seen.error).toBeNull();
   });
 
-  it("any other refusal is still an error", async () => {
+  it('any other refusal is still an error', async () => {
     await mount(five().slice(1), STARTER);
-    created = () => json({ error: "this workspace is limited to 100 bots" }, 409);
-    await send({ type: "duplicateBot", botId: "b1" });
-    await vi.waitFor(() => expect(seen.error).toBe("this workspace is limited to 100 bots"));
+    created = () => json({ error: 'this workspace is limited to 100 bots' }, 409);
+    await send({ type: 'duplicateBot', botId: 'b1' });
+    await vi.waitFor(() => expect(seen.error).toBe('this workspace is limited to 100 bots'));
     expect(botLimitShown()).toBe(false);
   });
 
-  it("opens the popup from any request, and leaves the rest to whoever asked", async () => {
+  it('opens the popup from any request, and leaves the rest to whoever asked', async () => {
     await mount([], {});
-    vi.stubGlobal("fetch", () => json(REFUSED, 409));
-    await expect(api("/api/teams/import?mode=add", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
+    vi.stubGlobal('fetch', () => json(REFUSED, 409));
+    await expect(api('/api/teams/import?mode=add', { method: 'POST' })).rejects.toBeInstanceOf(
+      ApiError,
+    );
     expect(botLimitShown()).toBe(true);
   });
 
-  it.each<[Record<string, unknown>, number]>([[{ error: "busy", code: "thread_busy" }, 409], [{ error: "no", code: "bot_limit" }, 500]])("leaves %j (%i) alone", async (body, status) => {
+  it.each<[Record<string, unknown>, number]>([
+    [{ error: 'busy', code: 'thread_busy' }, 409],
+    [{ error: 'no', code: 'bot_limit' }, 500],
+  ])('leaves %j (%i) alone', async (body, status) => {
     await mount([], {});
-    vi.stubGlobal("fetch", () => json(body, status));
-    await expect(api("/api/bots", { method: "POST" })).rejects.toBeInstanceOf(ApiError);
+    vi.stubGlobal('fetch', () => json(body, status));
+    await expect(api('/api/bots', { method: 'POST' })).rejects.toBeInstanceOf(ApiError);
     expect(botLimitShown()).toBe(false);
   });
 });

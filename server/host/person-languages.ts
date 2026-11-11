@@ -4,21 +4,24 @@
 // A line for nobody in particular, or in a conversation more than one person reads (a room, a team's shared chat), reads
 // in the place's language: the one set on this server or by the team's Admin, else the one every app here shows, else
 // English. One person's pick never decides the words everyone else reads.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { z } from "zod";
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { z } from 'zod';
 
-import { writeFileAtomic } from "../atomic.ts";
-import type { LineLanguage } from "../server-lines.ts";
+import { writeFileAtomic } from '../atomic.ts';
+import type { LineLanguage } from '../server-lines.ts';
 
-export const PERSON_LANGUAGES_FILE = "person-languages.json";
+export const PERSON_LANGUAGES_FILE = 'person-languages.json';
 /** Pings from this computer's own app carry no session; they are kept under this key. */
-export const THIS_COMPUTER = "this-computer";
+export const THIS_COMPUTER = 'this-computer';
 const MAX_PEOPLE = 500;
 const TAG = /^[a-z]{2,3}(?:-[a-z0-9]{2,8}){0,3}$/;
 const fileSchema = z.object({
   version: z.literal(1),
-  people: z.record(z.string().min(1).max(200), z.object({ language: z.string().regex(TAG), at: z.number() })),
+  people: z.record(
+    z.string().min(1).max(200),
+    z.object({ language: z.string().regex(TAG), at: z.number() }),
+  ),
 });
 
 export interface PersonLanguagesDeps {
@@ -35,18 +38,26 @@ export function createPersonLanguages(deps: PersonLanguagesDeps) {
   const now = deps.now ?? Date.now;
   const people = new Map<string, { language: string; at: number }>();
   try {
-    const parsed = fileSchema.safeParse(JSON.parse(readFileSync(file, "utf8")));
-    if (parsed.success) for (const [person, heard] of Object.entries(parsed.data.people)) people.set(person, heard);
+    const parsed = fileSchema.safeParse(JSON.parse(readFileSync(file, 'utf8')));
+    if (parsed.success)
+      for (const [person, heard] of Object.entries(parsed.data.people)) people.set(person, heard);
     else console.warn(`person languages: ${file} is not a languages file; starting fresh`);
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") console.warn(`person languages: ${file} is unreadable; starting fresh`);
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT')
+      console.warn(`person languages: ${file} is unreadable; starting fresh`);
   }
 
   const save = () => {
     try {
-      writeFileAtomic(file, `${JSON.stringify({ version: 1, people: Object.fromEntries(people) })}\n`, { mode: 0o600 });
+      writeFileAtomic(
+        file,
+        `${JSON.stringify({ version: 1, people: Object.fromEntries(people) })}\n`,
+        { mode: 0o600 },
+      );
     } catch (error) {
-      console.warn(`person languages: could not save ${file}: ${error instanceof Error ? error.message : String(error)}`);
+      console.warn(
+        `person languages: could not save ${file}: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   };
 
@@ -56,7 +67,8 @@ export function createPersonLanguages(deps: PersonLanguagesDeps) {
     return heard.size === 1 ? [...heard][0] : undefined;
   };
 
-  const forLine: LineLanguage = (person) => (person ? people.get(person)?.language : undefined) ?? deps.configured() ?? everyones();
+  const forLine: LineLanguage = (person) =>
+    (person ? people.get(person)?.language : undefined) ?? deps.configured() ?? everyones();
 
   return {
     /** A presence ping from this person's app: the language it shows. Written down only when it changes. */
@@ -76,7 +88,8 @@ export function createPersonLanguages(deps: PersonLanguagesDeps) {
     forLine,
     /** A line in this conversation: its person's language when it is private to one person, else the place's, never that
      * of whoever spoke last where others read too. */
-    forThread: (threadId: string): string | undefined => forLine(deps.privateTo?.(threadId) ?? undefined),
+    forThread: (threadId: string): string | undefined =>
+      forLine(deps.privateTo?.(threadId) ?? undefined),
   };
 }
 

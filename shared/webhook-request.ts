@@ -7,14 +7,27 @@ export interface WebhookRequestDefinition {
   name: string;
   /** Instructions for every call; empty means each call's own task is used. */
   instructions: string;
-  runOn: "maus" | "cloud";
+  runOn: 'maus' | 'cloud';
   eventTypes?: string[];
 }
 
 export type WebhookRequestOperation =
-  | { action: "create"; webhook: WebhookRequestDefinition; forBot?: { botId: string; name: string } }
-  | { action: "update"; webhookId: string; changes: Partial<WebhookRequestDefinition>; forBot?: { botId: string; name: string } }
-  | { action: "pause" | "resume" | "run_now" | "delete"; webhookId: string; forBot?: { botId: string; name: string } };
+  | {
+      action: 'create';
+      webhook: WebhookRequestDefinition;
+      forBot?: { botId: string; name: string };
+    }
+  | {
+      action: 'update';
+      webhookId: string;
+      changes: Partial<WebhookRequestDefinition>;
+      forBot?: { botId: string; name: string };
+    }
+  | {
+      action: 'pause' | 'resume' | 'run_now' | 'delete';
+      webhookId: string;
+      forBot?: { botId: string; name: string };
+    };
 
 /** The webhook as it stood before an update, so Undo can restore it. */
 export interface WebhookRequestSnapshot extends WebhookRequestDefinition {

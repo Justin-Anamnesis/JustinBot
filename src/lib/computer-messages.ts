@@ -1,5 +1,5 @@
-import { t } from "./i18n";
-import type { LocaleKey } from "@/locales";
+import { t } from './i18n';
+import type { LocaleKey } from '@/locales';
 
 /**
  * Computer status responses come from the server so they can also be useful
@@ -9,23 +9,28 @@ import type { LocaleKey } from "@/locales";
 export function localizeComputerProblem(problem: string | null | undefined): string | null {
   if (!problem) return problem ?? null;
   const exact: Record<string, Parameters<typeof t>[0]> = {
-    "Create the Local VM": "computer.problem.createVm",
-    "The Local VM is stopped; start it to continue": "computer.problem.vmStopped",
-    "The Local VM started, but Cua Driver is not ready yet": "computer.problem.cuaNotReady",
-    "The existing Local VM uses an older desktop or Cua Driver; recreate it": "computer.problem.oldImage",
-    "The existing container was not created by OpenMausBot; recreate it": "computer.problem.unmanaged",
-    "The existing Local VM exposes its viewer publicly; recreate it": "computer.problem.publicViewer",
-    "The existing Local VM is missing safety limits; recreate it": "computer.problem.missingLimits",
-    "The existing Local VM is missing its durable folder; recreate it": "computer.problem.missingDurableFolder",
-    "Per-bot Local VMs require Docker or Podman because Apple container requires a fixed host port": "computer.problem.perBotRuntime",
-    "Install a supported container runtime first": "computer.problem.noRuntime",
+    'Create the Local VM': 'computer.problem.createVm',
+    'The Local VM is stopped; start it to continue': 'computer.problem.vmStopped',
+    'The Local VM started, but Cua Driver is not ready yet': 'computer.problem.cuaNotReady',
+    'The existing Local VM uses an older desktop or Cua Driver; recreate it':
+      'computer.problem.oldImage',
+    'The existing container was not created by OpenMausBot; recreate it':
+      'computer.problem.unmanaged',
+    'The existing Local VM exposes its viewer publicly; recreate it':
+      'computer.problem.publicViewer',
+    'The existing Local VM is missing safety limits; recreate it': 'computer.problem.missingLimits',
+    'The existing Local VM is missing its durable folder; recreate it':
+      'computer.problem.missingDurableFolder',
+    'Per-bot Local VMs require Docker or Podman because Apple container requires a fixed host port':
+      'computer.problem.perBotRuntime',
+    'Install a supported container runtime first': 'computer.problem.noRuntime',
   };
   const key = exact[problem];
   if (key) return t(key);
   const stopped = /^Start (\S+) first$/.exec(problem);
-  if (stopped) return t("computer.problem.startRuntime", { runtime: stopped[1]! });
+  if (stopped) return t('computer.problem.startRuntime', { runtime: stopped[1]! });
   const desktopFailure = /^The Local VM desktop failed to start: (.+)$/.exec(problem);
-  if (desktopFailure) return t("computer.problem.desktopFailed", { detail: desktopFailure[1]! });
+  if (desktopFailure) return t('computer.problem.desktopFailed', { detail: desktopFailure[1]! });
   return problem;
 }
 
@@ -42,7 +47,12 @@ export class LocalizedPanelError extends Error {
 
 export function panelErrorText(error: Error | string | null): string | null {
   if (error instanceof LocalizedPanelError) {
-    return t(error.key, error.fallbackKey ? { problem: localizeComputerProblem(error.problem) ?? t(error.fallbackKey) } : undefined);
+    return t(
+      error.key,
+      error.fallbackKey
+        ? { problem: localizeComputerProblem(error.problem) ?? t(error.fallbackKey) }
+        : undefined,
+    );
   }
   return localizeComputerProblem(error instanceof Error ? error.message : error);
 }

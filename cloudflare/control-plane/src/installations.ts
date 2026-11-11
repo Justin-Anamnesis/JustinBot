@@ -1,15 +1,15 @@
-import { z } from "zod";
-import { timingSafeEqual } from "node:crypto";
+import { z } from 'zod';
+import { timingSafeEqual } from 'node:crypto';
 
-import type { ControlPlaneAuth } from "./auth";
-import { accountSession } from "./auth";
-import { HTTPError, json, readBoundedJSON } from "./http";
+import type { ControlPlaneAuth } from './auth';
+import { accountSession } from './auth';
+import { HTTPError, json, readBoundedJSON } from './http';
 
 interface InstallationRow {
   id: string;
   client_instance_id: string;
   display_name: string;
-  platform: "darwin" | "windows" | "linux";
+  platform: 'darwin' | 'windows' | 'linux';
   app_version: string | null;
   created_at: number;
   updated_at: number;
@@ -26,7 +26,7 @@ interface InstallationCredentialRow {
   secret_hash: string;
   display_name: string;
   client_instance_id: string;
-  platform: "darwin" | "windows" | "linux";
+  platform: 'darwin' | 'windows' | 'linux';
   app_version: string | null;
   created_at: number;
   updated_at: number;
@@ -35,13 +35,18 @@ interface InstallationCredentialRow {
 }
 
 function printableString(maxLength: number) {
-  return z.string().trim().min(1).max(maxLength).refine((value) => {
-    for (const character of value) {
-      const point = character.codePointAt(0);
-      if (point === undefined || point < 32 || point === 127) return false;
-    }
-    return true;
-  });
+  return z
+    .string()
+    .trim()
+    .min(1)
+    .max(maxLength)
+    .refine((value) => {
+      for (const character of value) {
+        const point = character.codePointAt(0);
+        if (point === undefined || point < 32 || point === 127) return false;
+      }
+      return true;
+    });
 }
 
 const printableName = printableString(80);
@@ -49,18 +54,23 @@ export const printableVersion = printableString(64);
 
 /** The desktop app, or a self-hosted server (`openmausbot serve`, a fleet container). Optional on every request
  * that carries it: accepted here before any client sends it, since the request schemas are strict. */
-export const installationKindSchema = z.enum(["desktop", "server"]);
+export const installationKindSchema = z.enum(['desktop', 'server']);
 export type InstallationKind = z.infer<typeof installationKindSchema>;
 
 const createInstallationSchema = z.strictObject({
   name: printableName,
-  clientInstanceId: z.string().min(1).max(128).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
-  platform: z.enum(["darwin", "windows", "linux"]),
+  clientInstanceId: z
+    .string()
+    .min(1)
+    .max(128)
+    .regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/),
+  platform: z.enum(['darwin', 'windows', 'linux']),
   appVersion: printableVersion.optional(),
   kind: installationKindSchema.optional(),
 });
 
-const INSTALLATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const INSTALLATION_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const INSTALLATION_CREDENTIAL = /^omb_install_([A-Za-z0-9_-]{22})\.([A-Za-z0-9_-]{43})$/;
 const INSTALLATION_CREDENTIAL_TTL_MS = 90 * 24 * 60 * 60 * 1_000;
 const CREATION_RATE_WINDOW_MS = 60 * 60 * 1_000;
@@ -80,9 +90,9 @@ function installationJSON(row: InstallationRow) {
 }
 
 function base64URL(bytes: Uint8Array): string {
-  let binary = "";
+  let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 }
 
 function randomBytes(size: number): Uint8Array {
@@ -92,7 +102,7 @@ function randomBytes(size: number): Uint8Array {
 }
 
 function hex(bytes: ArrayBuffer): string {
-  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function fromHex(value: string): Uint8Array | null {
@@ -105,7 +115,7 @@ function fromHex(value: string): Uint8Array | null {
 }
 
 export async function sha256(value: string): Promise<string> {
-  return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+  return hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)));
 }
 
 async function newCredential(createdAt: number) {
@@ -122,7 +132,7 @@ async function newCredential(createdAt: number) {
 
 async function requireAccount(request: Request, auth: ControlPlaneAuth) {
   const session = await accountSession(request, auth);
-  if (!session) throw new HTTPError(401, "unauthorized");
+  if (!session) throw new HTTPError(401, 'unauthorized');
   return session;
 }
 
@@ -144,19 +154,17 @@ async function enforceCreationRateLimit(ownerUserId: string, env: Env): Promise<
        END,
        updated_at = excluded.updated_at
      WHERE window_started_at <= ? OR attempts < ?`,
-  ).bind(
-    ownerUserId,
-    now,
-    now,
-    cutoff,
-    cutoff,
-    cutoff,
-    CREATION_RATE_MAX_ATTEMPTS,
-  ).run();
-  if (result.meta.changes === 0) throw new HTTPError(429, "rate_limited");
+  )
+    .bind(ownerUserId, now, now, cutoff, cutoff, cutoff, CREATION_RATE_MAX_ATTEMPTS)
+    .run();
+  if (result.meta.changes === 0) throw new HTTPError(429, 'rate_limited');
 }
 
-export async function listInstallations(request: Request, env: Env, auth: ControlPlaneAuth): Promise<Response> {
+export async function listInstallations(
+  request: Request,
+  env: Env,
+  auth: ControlPlaneAuth,
+): Promise<Response> {
   const session = await requireAccount(request, auth);
   const result = await env.DB.prepare(
     `SELECT id, client_instance_id, display_name, platform, app_version,
@@ -165,15 +173,21 @@ export async function listInstallations(request: Request, env: Env, auth: Contro
       WHERE owner_user_id = ? AND revoked_at IS NULL
       ORDER BY created_at ASC, id ASC
       LIMIT 100`,
-  ).bind(session.user.id).all<InstallationRow>();
+  )
+    .bind(session.user.id)
+    .all<InstallationRow>();
   return json({ installations: result.results.map(installationJSON) });
 }
 
-export async function createInstallation(request: Request, env: Env, auth: ControlPlaneAuth): Promise<Response> {
+export async function createInstallation(
+  request: Request,
+  env: Env,
+  auth: ControlPlaneAuth,
+): Promise<Response> {
   const session = await requireAccount(request, auth);
   await enforceCreationRateLimit(session.user.id, env);
   const parsed = createInstallationSchema.safeParse(await readBoundedJSON(request));
-  if (!parsed.success) throw new HTTPError(400, "invalid_request");
+  if (!parsed.success) throw new HTTPError(400, 'invalid_request');
 
   const installationId = crypto.randomUUID();
   const credentialId = crypto.randomUUID();
@@ -184,8 +198,8 @@ export async function createInstallation(request: Request, env: Env, auth: Contr
       // `kind` is written only when sent, so registration does not depend on migration 0016.
       env.DB.prepare(
         `INSERT INTO installations
-          (id, owner_user_id, client_instance_id, display_name, platform, app_version, created_at, updated_at${parsed.data.kind ? ", kind" : ""})
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?${parsed.data.kind ? ", ?" : ""})`,
+          (id, owner_user_id, client_instance_id, display_name, platform, app_version, created_at, updated_at${parsed.data.kind ? ', kind' : ''})
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?${parsed.data.kind ? ', ?' : ''})`,
       ).bind(
         installationId,
         session.user.id,
@@ -201,32 +215,42 @@ export async function createInstallation(request: Request, env: Env, auth: Contr
         `INSERT INTO installation_credentials
           (id, installation_id, lookup_id, secret_hash, created_at, expires_at)
          VALUES (?, ?, ?, ?, ?, ?)`,
-      ).bind(credentialId, installationId, credential.lookupId, credential.secretHash, now, credential.expiresAt),
+      ).bind(
+        credentialId,
+        installationId,
+        credential.lookupId,
+        credential.secretHash,
+        now,
+        credential.expiresAt,
+      ),
     ]);
   } catch (error) {
     if (error instanceof Error && /active_installation_limit/i.test(error.message)) {
-      throw new HTTPError(409, "installation_limit_reached");
+      throw new HTTPError(409, 'installation_limit_reached');
     }
     if (error instanceof Error && /UNIQUE constraint failed/i.test(error.message)) {
-      throw new HTTPError(409, "installation_exists");
+      throw new HTTPError(409, 'installation_exists');
     }
     throw error;
   }
 
-  return json({
-    installation: {
-      id: installationId,
-      clientInstanceId: parsed.data.clientInstanceId,
-      name: parsed.data.name,
-      platform: parsed.data.platform,
-      appVersion: parsed.data.appVersion ?? null,
-      createdAt: now,
-      updatedAt: now,
-      lastSeenAt: null,
+  return json(
+    {
+      installation: {
+        id: installationId,
+        clientInstanceId: parsed.data.clientInstanceId,
+        name: parsed.data.name,
+        platform: parsed.data.platform,
+        appVersion: parsed.data.appVersion ?? null,
+        createdAt: now,
+        updatedAt: now,
+        lastSeenAt: null,
+      },
+      credential: credential.raw,
+      credentialExpiresAt: credential.expiresAt,
     },
-    credential: credential.raw,
-    credentialExpiresAt: credential.expiresAt,
-  }, 201);
+    201,
+  );
 }
 
 async function ownedActiveInstallation(id: string, ownerUserId: string, env: Env) {
@@ -236,7 +260,9 @@ async function ownedActiveInstallation(id: string, ownerUserId: string, env: Env
             created_at, updated_at, last_seen_at
        FROM installations
       WHERE id = ? AND owner_user_id = ? AND revoked_at IS NULL`,
-  ).bind(id, ownerUserId).first<InstallationRow>();
+  )
+    .bind(id, ownerUserId)
+    .first<InstallationRow>();
 }
 
 async function ownedInstallation(id: string, ownerUserId: string, env: Env) {
@@ -246,7 +272,9 @@ async function ownedInstallation(id: string, ownerUserId: string, env: Env) {
             created_at, updated_at, last_seen_at, revoked_at
        FROM installations
       WHERE id = ? AND owner_user_id = ?`,
-  ).bind(id, ownerUserId).first<OwnedInstallationRow>();
+  )
+    .bind(id, ownerUserId)
+    .first<OwnedInstallationRow>();
 }
 
 export async function rotateInstallationCredential(
@@ -257,7 +285,7 @@ export async function rotateInstallationCredential(
 ): Promise<Response> {
   const session = await requireAccount(request, auth);
   const installation = await ownedActiveInstallation(installationId, session.user.id, env);
-  if (!installation) throw new HTTPError(404, "not_found");
+  if (!installation) throw new HTTPError(404, 'not_found');
 
   const now = Date.now();
   const credential = await newCredential(now);
@@ -288,14 +316,17 @@ export async function rotateInstallationCredential(
     ]);
   } catch (error) {
     if (error instanceof Error && /credential_rotation_rate_limited/i.test(error.message)) {
-      throw new HTTPError(429, "credential_rotation_rate_limited");
+      throw new HTTPError(429, 'credential_rotation_rate_limited');
     }
     if (error instanceof Error && /credential_rotation_conflict/i.test(error.message)) {
-      throw new HTTPError(409, "credential_rotation_conflict");
+      throw new HTTPError(409, 'credential_rotation_conflict');
     }
     throw error;
   }
-  return json({ credential: credential.raw, createdAt: now, credentialExpiresAt: credential.expiresAt }, 201);
+  return json(
+    { credential: credential.raw, createdAt: now, credentialExpiresAt: credential.expiresAt },
+    201,
+  );
 }
 
 export async function revokeInstallation(
@@ -306,24 +337,30 @@ export async function revokeInstallation(
 ): Promise<Response> {
   const session = await requireAccount(request, auth);
   const installation = await ownedInstallation(installationId, session.user.id, env);
-  if (!installation) throw new HTTPError(404, "not_found");
+  if (!installation) throw new HTTPError(404, 'not_found');
 
   if (installation.revoked_at === null) {
     const now = Date.now();
     await env.DB.batch([
-      env.DB.prepare("UPDATE installations SET revoked_at = ?, updated_at = ? WHERE id = ? AND revoked_at IS NULL")
-        .bind(now, now, installationId),
       env.DB.prepare(
-        "UPDATE installation_credentials SET revoked_at = ? WHERE installation_id = ? AND revoked_at IS NULL",
+        'UPDATE installations SET revoked_at = ?, updated_at = ? WHERE id = ? AND revoked_at IS NULL',
+      ).bind(now, now, installationId),
+      env.DB.prepare(
+        'UPDATE installation_credentials SET revoked_at = ? WHERE installation_id = ? AND revoked_at IS NULL',
       ).bind(now, installationId),
-      env.DB.prepare("DELETE FROM installation_push_devices WHERE installation_id = ?").bind(installationId),
+      env.DB.prepare('DELETE FROM installation_push_devices WHERE installation_id = ?').bind(
+        installationId,
+      ),
     ]);
   }
-  return new Response(null, { status: 204, headers: { "cache-control": "no-store" } });
+  return new Response(null, { status: 204, headers: { 'cache-control': 'no-store' } });
 }
 
-async function authenticateInstallation(request: Request, env: Env): Promise<InstallationCredentialRow | null> {
-  const authorization = request.headers.get("authorization");
+async function authenticateInstallation(
+  request: Request,
+  env: Env,
+): Promise<InstallationCredentialRow | null> {
+  const authorization = request.headers.get('authorization');
   const bearer = authorization?.match(/^Bearer\s+([^\s]+)$/i)?.[1];
   const parsed = bearer?.match(INSTALLATION_CREDENTIAL);
   if (!bearer || !parsed) return null;
@@ -338,12 +375,16 @@ async function authenticateInstallation(request: Request, env: Env): Promise<Ins
         AND c.revoked_at IS NULL
         AND c.expires_at > ?
         AND i.revoked_at IS NULL`,
-  ).bind(parsed[1], Date.now()).first<InstallationCredentialRow>();
+  )
+    .bind(parsed[1], Date.now())
+    .first<InstallationCredentialRow>();
   if (!row) return null;
 
   const expected = fromHex(row.secret_hash);
   if (!expected) return null;
-  const actual = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(bearer)));
+  const actual = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(bearer)),
+  );
   if (!timingSafeEqual(actual, expected)) return null;
   return row;
 }
@@ -363,7 +404,7 @@ export async function requireInstallationAndRead<T>(
   read: ((installationId: string) => D1PreparedStatement) | null,
 ): Promise<{ installation: InstallationCredentialRow; row: T | null }> {
   const installation = await authenticateInstallation(request, env);
-  if (!installation) throw new HTTPError(401, "unauthorized");
+  if (!installation) throw new HTTPError(401, 'unauthorized');
 
   const now = Date.now();
   const statements = [
@@ -397,21 +438,35 @@ export async function recordReportedAppVersion(
   appVersion: string,
 ): Promise<void> {
   await env.DB.prepare(
-    "UPDATE installations SET app_version = ? WHERE id = ? AND revoked_at IS NULL",
-  ).bind(appVersion, installationId).run();
+    'UPDATE installations SET app_version = ? WHERE id = ? AND revoked_at IS NULL',
+  )
+    .bind(appVersion, installationId)
+    .run();
 }
 
 /** Stores the kind a client reported. Best effort: without migration 0016 nothing is stored. */
-export async function recordInstallationKind(env: Env, installationId: string, kind: InstallationKind): Promise<void> {
+export async function recordInstallationKind(
+  env: Env,
+  installationId: string,
+  kind: InstallationKind,
+): Promise<void> {
   await env.DB.prepare(
-    "UPDATE installations SET kind = ? WHERE id = ? AND revoked_at IS NULL AND kind IS NOT ?",
-  ).bind(kind, installationId, kind).run().catch(() => undefined);
+    'UPDATE installations SET kind = ? WHERE id = ? AND revoked_at IS NULL AND kind IS NOT ?',
+  )
+    .bind(kind, installationId, kind)
+    .run()
+    .catch(() => undefined);
 }
 
 /** The kind the installation last reported, or null: none reported, or no migration 0016. */
-export async function storedInstallationKind(env: Env, installationId: string): Promise<InstallationKind | null> {
-  const row = await env.DB.prepare("SELECT kind FROM installations WHERE id = ?")
-    .bind(installationId).first<{ kind: string | null }>().catch(() => null);
+export async function storedInstallationKind(
+  env: Env,
+  installationId: string,
+): Promise<InstallationKind | null> {
+  const row = await env.DB.prepare('SELECT kind FROM installations WHERE id = ?')
+    .bind(installationId)
+    .first<{ kind: string | null }>()
+    .catch(() => null);
   const parsed = installationKindSchema.safeParse(row?.kind);
   return parsed.success ? parsed.data : null;
 }

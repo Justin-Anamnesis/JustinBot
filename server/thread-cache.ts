@@ -1,5 +1,5 @@
-import type { ThreadRows } from "./message-db.ts";
-import type { Message } from "./store.ts";
+import type { ThreadRows } from './message-db.ts';
+import type { Message } from './store.ts';
 
 export interface ThreadState {
   messages: Message[];

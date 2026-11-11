@@ -1,4 +1,4 @@
-export type ConnectionKind = "mcp" | "key" | "composio" | "email";
+export type ConnectionKind = 'mcp' | 'key' | 'composio' | 'email';
 
 export interface Connection {
   /** "mcp:<name>", "key:<provider>", "composio" or "email". */
@@ -9,28 +9,50 @@ export interface Connection {
   launcher?: string;
   for?: string[];
   signIn?: true;
-  mode?: "managed" | "own";
+  mode?: 'managed' | 'own';
   account?: string;
   installationId?: string;
 }
 
 /** The computer an MCP server that needs it is marked as running on. */
-export interface ConnectionComputer { environmentId: string; label: string }
+export interface ConnectionComputer {
+  environmentId: string;
+  label: string;
+}
 
-export interface CollectedConnections { computer: ConnectionComputer; connections: Connection[] }
+export interface CollectedConnections {
+  computer: ConnectionComputer;
+  connections: Connection[];
+}
 
-export interface ConnectionsRead extends CollectedConnections { engines: string[]; commands: string[] }
+export interface ConnectionsRead extends CollectedConnections {
+  engines: string[];
+  commands: string[];
+}
 
 export interface ConnectionsLocal {
   json(route: string): Promise<unknown>;
-  handoff(what: { kind: "connection"; id: string } | { kind: "composio-share"; for: string } | { kind: "connection-release"; id: string; digest: string }): Promise<any>;
+  handoff(
+    what:
+      | { kind: 'connection'; id: string }
+      | { kind: 'composio-share'; for: string }
+      | { kind: 'connection-release'; id: string; digest: string },
+  ): Promise<any>;
 }
 
 export interface ConnectionsTarget {
-  call(method: string, route: string, body?: unknown): Promise<{ ok: boolean; status: number; body: any }>;
+  call(
+    method: string,
+    route: string,
+    body?: unknown,
+  ): Promise<{ ok: boolean; status: number; body: any }>;
 }
 
-export interface HeldSignIn { id: string; label: string; digest: string }
+export interface HeldSignIn {
+  id: string;
+  label: string;
+  digest: string;
+}
 
 export interface ConnectionsMoved {
   moved: Array<{ id: string; label: string }>;
@@ -53,14 +75,29 @@ export class ConnectionMoveError extends Error {
 
 export function parseConnections(value: unknown): ConnectionsRead | null;
 export function collectConnections(local: ConnectionsLocal): Promise<CollectedConnections>;
-export function adoptComposioId(target: ConnectionsTarget, options: { local: ConnectionsLocal; here: Connection; there: Connection | null; managedApps?: boolean; t?: (key: string, params?: Record<string, string | number>) => string }):
-  Promise<{ shared: true } | { kept: true; missing: string[] }>;
-export function sendConnections(collected: CollectedConnections, target: ConnectionsTarget, options: {
-  local: ConnectionsLocal;
-  release?: boolean;
-  t?(key: string, params?: Record<string, string | number>): string;
-  signIns?: boolean;
-  waitMs?: number;
-  onProgress?: (progress: { done: number; total: number; label: string }) => void;
-}): Promise<ConnectionsMoved>;
-export function releaseConnections(pending: HeldSignIn[], options: { local: ConnectionsLocal; target: ConnectionsTarget }): Promise<HeldSignIn[]>;
+export function adoptComposioId(
+  target: ConnectionsTarget,
+  options: {
+    local: ConnectionsLocal;
+    here: Connection;
+    there: Connection | null;
+    managedApps?: boolean;
+    t?: (key: string, params?: Record<string, string | number>) => string;
+  },
+): Promise<{ shared: true } | { kept: true; missing: string[] }>;
+export function sendConnections(
+  collected: CollectedConnections,
+  target: ConnectionsTarget,
+  options: {
+    local: ConnectionsLocal;
+    release?: boolean;
+    t?(key: string, params?: Record<string, string | number>): string;
+    signIns?: boolean;
+    waitMs?: number;
+    onProgress?: (progress: { done: number; total: number; label: string }) => void;
+  },
+): Promise<ConnectionsMoved>;
+export function releaseConnections(
+  pending: HeldSignIn[],
+  options: { local: ConnectionsLocal; target: ConnectionsTarget },
+): Promise<HeldSignIn[]>;

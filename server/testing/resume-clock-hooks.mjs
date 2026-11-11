@@ -12,5 +12,9 @@ const realNow = Date.now.bind(Date);
 let skew = 0;
 Date.now = () => realNow() + skew;
 setInterval(() => {
-  try { skew = Number(readFileSync(marker, 'utf8')) || 0; } catch { /* not resumed yet */ }
+  try {
+    skew = Number(readFileSync(marker, 'utf8')) || 0;
+  } catch {
+    /* not resumed yet */
+  }
 }, 20).unref();

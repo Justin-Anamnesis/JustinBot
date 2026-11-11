@@ -4,38 +4,53 @@
 //   node --experimental-strip-types scripts/verify-ios-local-vm.ts
 //
 // Prints the sidecar address and a pairing code, then stays up until Ctrl-C.
-import { spawn, type ChildProcess } from "node:child_process";
-import { randomBytes } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { deflateSync } from "node:zlib";
-import { launchVerificationServer, type VerificationServer } from "./control-omb.ts";
-import { fixtureApi } from "./testing/preview-fixture.ts";
-import { fakeVncDesktop } from "./testing/fake-vnc-desktop.ts";
-import { decodePng } from "./testing/png.ts";
-import { createServer as createHttpServer } from "node:http";
-import { BASE_IMAGE_DIGEST, CUA_DRIVER_VERSION, IMAGE, IMAGE_LAYER_VERSION, TARGET_LABEL, perBotLocalVmTarget } from "../server/container-computer.ts";
+import { spawn, type ChildProcess } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { deflateSync } from 'node:zlib';
+import { launchVerificationServer, type VerificationServer } from './control-omb.ts';
+import { fixtureApi } from './testing/preview-fixture.ts';
+import { fakeVncDesktop } from './testing/fake-vnc-desktop.ts';
+import { decodePng } from './testing/png.ts';
+import { createServer as createHttpServer } from 'node:http';
+import {
+  BASE_IMAGE_DIGEST,
+  CUA_DRIVER_VERSION,
+  IMAGE,
+  IMAGE_LAYER_VERSION,
+  TARGET_LABEL,
+  perBotLocalVmTarget,
+} from '../server/container-computer.ts';
 
-const root = fileURLToPath(new URL("..", import.meta.url));
+const root = fileURLToPath(new URL('..', import.meta.url));
 
 /** The synthetic desktop: a captured Local VM session (an XFCE desktop with
  * a terminal open), with `frame` characters typed at the prompt so each
  * capture is distinct. The capture holds no account or network details. */
-const captured = decodePng(readFileSync(join(root, "scripts/testing/fixtures/local-vm-desktop.png")));
+const captured = decodePng(
+  readFileSync(join(root, 'scripts/testing/fixtures/local-vm-desktop.png')),
+);
 function scene(frame: number): (x: number, y: number) => [number, number, number] {
   // The prompt's block cursor, in terminal cells of 9 by 16 pixels.
   const cursor = { x: 460, y: 153, w: 8, h: 16, step: 9 };
   const typed = frame % 4;
   return (x, y) => {
-    if (y >= cursor.y && y < cursor.y + cursor.h && x >= cursor.x && x < cursor.x + cursor.step * (typed + 1)) {
+    if (
+      y >= cursor.y &&
+      y < cursor.y + cursor.h &&
+      x >= cursor.x &&
+      x < cursor.x + cursor.step * (typed + 1)
+    ) {
       const cell = Math.floor((x - cursor.x) / cursor.step);
       const inGlyph = (x - cursor.x) % cursor.step < cursor.w;
       if (cell === typed) return inGlyph ? [0xff, 0xff, 0xff] : [0, 0, 0];
       // Typed characters: a lower-case run in the terminal's text colour.
-      const ink = inGlyph && y >= cursor.y + 5 && y < cursor.y + 13 && (x - cursor.x) % cursor.step !== 3;
+      const ink =
+        inGlyph && y >= cursor.y + 5 && y < cursor.y + 13 && (x - cursor.x) % cursor.step !== 3;
       return ink ? [0xd0, 0xd0, 0xd0] : [0, 0, 0];
     }
     return captured.pixel(x, y);
@@ -66,9 +81,9 @@ function desktopPng(frame: number, width = 1280, height = 800): Buffer {
   header[9] = 2; // truecolour
   return Buffer.concat([
     Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk("IHDR", header),
-    chunk("IDAT", deflateSync(raw)),
-    chunk("IEND", Buffer.alloc(0)),
+    chunk('IHDR', header),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
   ]);
 }
 
@@ -84,15 +99,19 @@ function crc32(data: Buffer): number {
 async function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
       const { port } = server.address() as { port: number };
       server.close(() => resolve(port));
     });
   });
 }
 
-async function waitFor(url: string, child: ChildProcess, headers: Record<string, string> = {}): Promise<void> {
+async function waitFor(
+  url: string,
+  child: ChildProcess,
+  headers: Record<string, string> = {},
+): Promise<void> {
   for (let attempt = 0; attempt < 100; attempt++) {
     if (child.exitCode !== null) throw new Error(`${url}: process exited (${child.exitCode})`);
     try {
@@ -103,14 +122,14 @@ async function waitFor(url: string, child: ChildProcess, headers: Record<string,
   throw new Error(`${url} did not come up`);
 }
 
-const scratch = mkdtempSync(join(tmpdir(), "omb-ios-local-vm-"));
-const bin = join(scratch, "bin");
-const frames = join(scratch, "frames");
-const fixtureTarget = join(scratch, "target.json");
+const scratch = mkdtempSync(join(tmpdir(), 'omb-ios-local-vm-'));
+const bin = join(scratch, 'bin');
+const frames = join(scratch, 'frames');
+const fixtureTarget = join(scratch, 'target.json');
 mkdirSync(bin);
 mkdirSync(frames);
 for (let frame = 0; frame < 4; frame++) {
-  writeFileSync(join(frames, `${frame}.b64`), desktopPng(frame).toString("base64"));
+  writeFileSync(join(frames, `${frame}.b64`), desktopPng(frame).toString('base64'));
 }
 let fixture: VerificationServer | undefined;
 let sidecar: ChildProcess | undefined;
@@ -121,27 +140,30 @@ const desktop = await fakeVncDesktop({ paint: scene(0) });
 const startup = new AbortController();
 let launching: Promise<VerificationServer> | undefined;
 let stopping: Promise<void> | undefined;
-const stop = () => stopping ??= (async () => {
-  sidecar?.kill("SIGTERM");
-  startup.abort();
-  await launching?.catch(() => {});
-  await desktop.close().catch(() => {});
-  await fixture?.close().catch(() => {});
-  rmSync(scratch, { recursive: true, force: true });
-})();
-process.once("SIGINT", () => void stop().then(() => process.exit(0)));
-process.once("SIGTERM", () => void stop().then(() => process.exit(0)));
+const stop = () =>
+  (stopping ??= (async () => {
+    sidecar?.kill('SIGTERM');
+    startup.abort();
+    await launching?.catch(() => {});
+    await desktop.close().catch(() => {});
+    await fixture?.close().catch(() => {});
+    rmSync(scratch, { recursive: true, force: true });
+  })());
+process.once('SIGINT', () => void stop().then(() => process.exit(0)));
+process.once('SIGTERM', () => void stop().then(() => process.exit(0)));
 
 try {
   // Read-only inspection plus the two screenshot execs. Anything else fails,
   // so no command can reach a real container runtime.
-  writeFileSync(join(bin, "docker"), `#!${process.execPath}
+  writeFileSync(
+    join(bin, 'docker'),
+    `#!${process.execPath}
 const fs = require('node:fs');
 let args = process.argv.slice(2);
 if (args[0] === '-H') args = args.slice(2);
-const labels = ${JSON.stringify({ "com.openmausbot.local-vm": "1", "com.openmausbot.cua-driver": CUA_DRIVER_VERSION, "com.openmausbot.cua-base": BASE_IMAGE_DIGEST, "com.openmausbot.image-layer": IMAGE_LAYER_VERSION, "com.openmausbot.workspace": "1" })};
+const labels = ${JSON.stringify({ 'com.openmausbot.local-vm': '1', 'com.openmausbot.cua-driver': CUA_DRIVER_VERSION, 'com.openmausbot.cua-base': BASE_IMAGE_DIGEST, 'com.openmausbot.image-layer': IMAGE_LAYER_VERSION, 'com.openmausbot.workspace': '1' })};
 const imageId = 'sha256:' + 'a'.repeat(64);
-const counter = ${JSON.stringify(join(scratch, "captures"))};
+const counter = ${JSON.stringify(join(scratch, 'captures'))};
 const target = fs.existsSync(${JSON.stringify(fixtureTarget)}) ? JSON.parse(fs.readFileSync(${JSON.stringify(fixtureTarget)}, 'utf8')) : null;
 let result;
 if (args[0] === 'exec' && args.includes('base64')) {
@@ -168,74 +190,113 @@ else if (args[0] === 'inspect' && (args[1] === 'openmausbot-computer' || args[1]
 else if (args[0] === 'ps') result = '';
 else process.exit(1);
 process.stdout.write(typeof result === 'string' ? result : JSON.stringify(result));
-`, { mode: 0o700 });
+`,
+    { mode: 0o700 },
+  );
 
   launching = launchVerificationServer(process.env, startup.signal, {
-    binDir: bin, host: "ssh://127.0.0.1:1", sshKey: join(scratch, "unused-key"), staticDir: join(root, "dist"),
+    binDir: bin,
+    host: 'ssh://127.0.0.1:1',
+    sshKey: join(scratch, 'unused-key'),
+    staticDir: join(root, 'dist'),
   });
   fixture = await launching;
   const api = fixtureApi(fixture.info.url);
-  const { bot } = await api("POST", "/api/bots", {
-    name: "Vee", description: "Works on the Local VM.", modelSelection: { instanceId: "claude", model: "claude-sonnet-4-5" },
+  const { bot } = await api('POST', '/api/bots', {
+    name: 'Vee',
+    description: 'Works on the Local VM.',
+    modelSelection: { instanceId: 'claude', model: 'claude-sonnet-4-5' },
   });
   const target = perBotLocalVmTarget(bot.id);
-  writeFileSync(fixtureTarget, JSON.stringify({ containerName: target.containerName, label: target.label }));
-  await api("PATCH", "/api/config", { localVm: { mode: "per-bot" } });
-  await api("PATCH", `/api/bots/${bot.id}`, { computer: "vm" });
-  const still = await api("POST", `/api/bots/${bot.id}/local-computer/screenshot?threadId=${bot.threadId}`);
-  if (!String(still.image).startsWith("data:image/png;base64,")) throw new Error("fixture screenshot route did not return a PNG");
+  writeFileSync(
+    fixtureTarget,
+    JSON.stringify({ containerName: target.containerName, label: target.label }),
+  );
+  await api('PATCH', '/api/config', { localVm: { mode: 'per-bot' } });
+  await api('PATCH', `/api/bots/${bot.id}`, { computer: 'vm' });
+  const still = await api(
+    'POST',
+    `/api/bots/${bot.id}/local-computer/screenshot?threadId=${bot.threadId}`,
+  );
+  if (!String(still.image).startsWith('data:image/png;base64,'))
+    throw new Error('fixture screenshot route did not return a PNG');
 
   const harnessPort = new URL(fixture.info.url).port;
   const companionPort = await freePort();
   const controlPort = await freePort();
-  const controlToken = randomBytes(32).toString("base64url");
-  const controlHeaders = { "x-openmausbot-control-token": controlToken };
-  const companionHome = join(scratch, "companion-home");
+  const controlToken = randomBytes(32).toString('base64url');
+  const controlHeaders = { 'x-openmausbot-control-token': controlToken };
+  const companionHome = join(scratch, 'companion-home');
   mkdirSync(companionHome);
-  sidecar = spawn(process.execPath, ["--experimental-strip-types", join(root, "companion", "src", "index.ts")], {
-    env: {
-      PATH: process.env.PATH,
-      HOME: companionHome,
-      USERPROFILE: companionHome,
-      OMB_PORT: harnessPort,
-      OMB_COMPANION_PORT: String(companionPort),
-      OMB_CONTROL_PORT: String(controlPort),
-      OMB_CONTROL_TOKEN: controlToken,
-      OMB_COMPANION_DIR: join(companionHome, "companion"),
+  sidecar = spawn(
+    process.execPath,
+    ['--experimental-strip-types', join(root, 'companion', 'src', 'index.ts')],
+    {
+      env: {
+        PATH: process.env.PATH,
+        HOME: companionHome,
+        USERPROFILE: companionHome,
+        OMB_PORT: harnessPort,
+        OMB_COMPANION_PORT: String(companionPort),
+        OMB_CONTROL_PORT: String(controlPort),
+        OMB_CONTROL_TOKEN: controlToken,
+        OMB_COMPANION_DIR: join(companionHome, 'companion'),
+      },
+      stdio: ['ignore', 'inherit', 'inherit'],
     },
-    stdio: ["ignore", "inherit", "inherit"],
-  });
+  );
   await waitFor(`http://127.0.0.1:${controlPort}/state`, sidecar, controlHeaders);
-  const { code } = await (await fetch(`http://127.0.0.1:${controlPort}/pairing`, { method: "POST", headers: controlHeaders })).json() as { code: string };
+  const { code } = (await (
+    await fetch(`http://127.0.0.1:${controlPort}/pairing`, {
+      method: 'POST',
+      headers: controlHeaders,
+    })
+  ).json()) as { code: string };
 
-  console.log(JSON.stringify({
-    harness: fixture.info.url,
-    companion: `127.0.0.1:${companionPort}`,
-    control: `http://127.0.0.1:${controlPort}`,
-    pairingCode: code,
-    bot: { id: bot.id, threadId: bot.threadId },
-    log: fixture.info.logPath,
-  }, null, 2));
-  console.log("Pair the Simulator with the address and code above. Allow computer view with:");
-  console.log(`  curl -X POST -H "x-openmausbot-control-token: ${controlToken}" http://127.0.0.1:${controlPort}/devices/<device-id>/cloud-desktop`);
+  console.log(
+    JSON.stringify(
+      {
+        harness: fixture.info.url,
+        companion: `127.0.0.1:${companionPort}`,
+        control: `http://127.0.0.1:${controlPort}`,
+        pairingCode: code,
+        bot: { id: bot.id, threadId: bot.threadId },
+        log: fixture.info.logPath,
+      },
+      null,
+      2,
+    ),
+  );
+  console.log('Pair the Simulator with the address and code above. Allow computer view with:');
+  console.log(
+    `  curl -X POST -H "x-openmausbot-control-token: ${controlToken}" http://127.0.0.1:${controlPort}/devices/<device-id>/cloud-desktop`,
+  );
   // What the phone has done to the desktop, and who holds the computer.
   const eventsPort = await freePort();
   createHttpServer(async (_req, res) => {
-    const control = await api("GET", `/api/bots/${bot.id}/computer/control`).catch(() => null);
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({
-      connections: desktop.connections(),
-      authenticated: desktop.authResponses.length,
-      pointerEvents: desktop.pointer.length,
-      lastPointer: desktop.pointer.at(-1) ?? null,
-      clicks: desktop.pointer.filter((event, index, all) => event.buttons & 1 && !((all[index - 1]?.buttons ?? 0) & 1)).length,
-      typed: desktop.typed(),
-      keys: desktop.keys.length,
-      controlHeld: control?.held ?? null,
-    }, null, 2));
-  }).listen(eventsPort, "127.0.0.1");
+    const control = await api('GET', `/api/bots/${bot.id}/computer/control`).catch(() => null);
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(
+      JSON.stringify(
+        {
+          connections: desktop.connections(),
+          authenticated: desktop.authResponses.length,
+          pointerEvents: desktop.pointer.length,
+          lastPointer: desktop.pointer.at(-1) ?? null,
+          clicks: desktop.pointer.filter(
+            (event, index, all) => event.buttons & 1 && !((all[index - 1]?.buttons ?? 0) & 1),
+          ).length,
+          typed: desktop.typed(),
+          keys: desktop.keys.length,
+          controlHeld: control?.held ?? null,
+        },
+        null,
+        2,
+      ),
+    );
+  }).listen(eventsPort, '127.0.0.1');
   console.log(`Desktop events and control state: http://127.0.0.1:${eventsPort}/`);
-  console.log("Ctrl-C stops everything and removes the temporary data.");
+  console.log('Ctrl-C stops everything and removes the temporary data.');
   await new Promise(() => {});
 } catch (error) {
   console.error(error);

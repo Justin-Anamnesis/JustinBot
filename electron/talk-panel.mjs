@@ -1,20 +1,27 @@
-import nativeText from "./native-text.cjs";
-import { fileURLToPath } from "node:url";
+import nativeText from './native-text.cjs';
+import { fileURLToPath } from 'node:url';
 
-export const TALK_PANEL = Object.freeze({ width: 400, margin: 24, minHeight: 56, maxHeight: 240, fadeMs: 180 });
+export const TALK_PANEL = Object.freeze({
+  width: 400,
+  margin: 24,
+  minHeight: 56,
+  maxHeight: 240,
+  fadeMs: 180,
+});
 const MASCOT_PX = 28;
 /** Lines of 13 px text at 1.4 that fit the tallest box with its label and padding. */
 const TEXT_LINES = 10;
-const LIGHT = "color-scheme:light;--panel:#f7f7f7f5;--border:#0000001a;--ink:#0d0d0d;--ink2:#444444;--accent:#0b62c4;--warning:#8a5a00;--danger:#c02b3a;--hover:#0000000d";
+const LIGHT =
+  'color-scheme:light;--panel:#f7f7f7f5;--border:#0000001a;--ink:#0d0d0d;--ink2:#444444;--accent:#0b62c4;--warning:#8a5a00;--danger:#c02b3a;--hover:#0000000d';
 
 export const TALK_LABELS = Object.freeze({
-  listening: "Listening…",
-  sending: "Sending to MausBot…",
-  thinking: "MausBot is thinking…",
-  reply: "MausBot",
-  "needs-you": "MausBot needs you · Open chat",
-  "still-working": "Still working · Open chat",
-  error: "",
+  listening: 'Listening…',
+  sending: 'Sending to MausBot…',
+  thinking: 'MausBot is thinking…',
+  reply: 'MausBot',
+  'needs-you': 'MausBot needs you · Open chat',
+  'still-working': 'Still working · Open chat',
+  error: '',
 });
 
 const panels = new WeakSet();
@@ -34,20 +41,20 @@ export function talkPanelBounds(workArea, height) {
 }
 
 export function replyPreview(text, limit = 400) {
-  const plain = String(text ?? "")
+  const plain = String(text ?? '')
     .slice(0, limit * 4)
-    .replace(/```/g, " ")
-    .replace(/^[ \t]*#{1,6}[ \t]+/gm, "")
-    .replace(/^[ \t]*(?:[-*+]|\d+[.)])[ \t]+/gm, "")
-    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-    .replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, "$2")
-    .replace(/(^|[\s(])([*_])(?=\S)(.+?)(?<=\S)\2(?=$|[\s).,;:!?])/g, "$1$3")
-    .replace(/`/g, "")
-    .replace(/\s+/g, " ")
+    .replace(/```/g, ' ')
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, '')
+    .replace(/^[ \t]*(?:[-*+]|\d+[.)])[ \t]+/gm, '')
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, '$2')
+    .replace(/(^|[\s(])([*_])(?=\S)(.+?)(?<=\S)\2(?=$|[\s).,;:!?])/g, '$1$3')
+    .replace(/`/g, '')
+    .replace(/\s+/g, ' ')
     .trim();
   if (plain.length <= limit) return plain;
   const room = plain.slice(0, limit - 1);
-  const space = plain[limit - 1] === " " ? limit - 1 : room.lastIndexOf(" ");
+  const space = plain[limit - 1] === ' ' ? limit - 1 : room.lastIndexOf(' ');
   return `${(space > 0 ? plain.slice(0, space) : room).trimEnd()}…`;
 }
 
@@ -92,10 +99,22 @@ document.getElementById("close").addEventListener("click",e=>{e.stopPropagation(
 function mascotPng(nativeImage, iconPath) {
   const icon = nativeImage.createFromPath(iconPath);
   if (icon.isEmpty()) throw new Error(`no talk box icon at ${iconPath}`);
-  return icon.resize({ width: 2 * MASCOT_PX, height: 2 * MASCOT_PX, quality: "best" }).toPNG().toString("base64");
+  return icon
+    .resize({ width: 2 * MASCOT_PX, height: 2 * MASCOT_PX, quality: 'best' })
+    .toPNG()
+    .toString('base64');
 }
 
-export function createTalkPanel({ BrowserWindow, screen, nativeImage, iconPath, onOpen, onDismiss, theme: initialTheme = null, t = nativeText.englishText.t }) {
+export function createTalkPanel({
+  BrowserWindow,
+  screen,
+  nativeImage,
+  iconPath,
+  onOpen,
+  onDismiss,
+  theme: initialTheme = null,
+  t = nativeText.englishText.t,
+}) {
   let win = null;
   let loaded = false;
   let shown = false;
@@ -106,17 +125,17 @@ export function createTalkPanel({ BrowserWindow, screen, nativeImage, iconPath, 
   let theme = initialTheme;
 
   const workArea = () => screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  const live = target => target && !target.isDestroyed();
+  const live = (target) => target && !target.isDestroyed();
 
   function create() {
     page ??= `data:text/html;charset=utf-8,${encodeURIComponent(talkPanelHtml(mascotPng(nativeImage, iconPath)))}`;
     area = workArea();
     const target = new BrowserWindow({
-      type: "panel",
+      type: 'panel',
       ...talkPanelBounds(area, TALK_PANEL.minHeight),
       frame: false,
       transparent: true,
-      backgroundColor: "#00000000",
+      backgroundColor: '#00000000',
       focusable: false,
       skipTaskbar: true,
       hasShadow: false,
@@ -134,26 +153,29 @@ export function createTalkPanel({ BrowserWindow, screen, nativeImage, iconPath, 
         sandbox: true,
         nodeIntegration: false,
         spellcheck: false,
-        preload: fileURLToPath(new URL("./talk-panel-preload.cjs", import.meta.url)),
+        preload: fileURLToPath(new URL('./talk-panel-preload.cjs', import.meta.url)),
       },
     });
     panels.add(target);
     target.excludedFromShownWindowsMenu = true;
-    target.setAlwaysOnTop(true, "screen-saver");
+    target.setAlwaysOnTop(true, 'screen-saver');
     // Electron/macOS: skipTransformProcessType keeps the Dock icon.
-    target.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
-    target.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
-    target.webContents.on("will-navigate", event => event.preventDefault());
-    target.webContents.on("did-finish-load", () => {
+    target.setVisibleOnAllWorkspaces(true, {
+      visibleOnFullScreen: true,
+      skipTransformProcessType: true,
+    });
+    target.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    target.webContents.on('will-navigate', (event) => event.preventDefault());
+    target.webContents.on('did-finish-load', () => {
       if (win !== target) return;
       loaded = true;
       if (view) repaint();
     });
-    target.webContents.on("ipc-message", (_event, channel) => {
-      if (channel === "talk-panel:open") onOpen();
-      else if (channel === "talk-panel:dismiss") onDismiss();
+    target.webContents.on('ipc-message', (_event, channel) => {
+      if (channel === 'talk-panel:open') onOpen();
+      else if (channel === 'talk-panel:dismiss') onDismiss();
     });
-    target.on("closed", () => {
+    target.on('closed', () => {
       if (win === target) win = null;
     });
     target.loadURL(page).catch(() => {});
@@ -163,8 +185,22 @@ export function createTalkPanel({ BrowserWindow, screen, nativeImage, iconPath, 
   async function paint() {
     const target = win;
     const ticket = ++latest;
-    const labels = { ...TALK_LABELS, listening: t("native.talk.listening"), sending: t("native.talk.sending"), thinking: t("native.talk.thinking"), "needs-you": t("native.talk.needsYou"), "still-working": t("native.talk.stillWorking") };
-    const payload = JSON.stringify({ state: view.state, text: view.textCode ? t(view.textCode) : replyPreview(view.text), labels, dismiss: t("native.talk.dismiss"), release: t("native.talk.releaseToSend"), ...(theme ? { theme } : {}) });
+    const labels = {
+      ...TALK_LABELS,
+      listening: t('native.talk.listening'),
+      sending: t('native.talk.sending'),
+      thinking: t('native.talk.thinking'),
+      'needs-you': t('native.talk.needsYou'),
+      'still-working': t('native.talk.stillWorking'),
+    };
+    const payload = JSON.stringify({
+      state: view.state,
+      text: view.textCode ? t(view.textCode) : replyPreview(view.text),
+      labels,
+      dismiss: t('native.talk.dismiss'),
+      release: t('native.talk.releaseToSend'),
+      ...(theme ? { theme } : {}),
+    });
     let height;
     try {
       height = await target.webContents.executeJavaScript(`render(${payload})`);
@@ -182,7 +218,9 @@ export function createTalkPanel({ BrowserWindow, screen, nativeImage, iconPath, 
   const repaint = () => void paint().catch(() => {});
 
   return {
-    relabel() { if (win && loaded && view) repaint(); },
+    relabel() {
+      if (win && loaded && view) repaint();
+    },
     render(next) {
       view = next;
       if (!win) {
@@ -205,8 +243,10 @@ export function createTalkPanel({ BrowserWindow, screen, nativeImage, iconPath, 
       view = null;
       if (!live(target)) return;
       if (loaded) {
-        target.webContents.executeJavaScript("fadeOut()").catch(() => {});
-        setTimeout(() => { if (live(target)) target.destroy(); }, TALK_PANEL.fadeMs);
+        target.webContents.executeJavaScript('fadeOut()').catch(() => {});
+        setTimeout(() => {
+          if (live(target)) target.destroy();
+        }, TALK_PANEL.fadeMs);
       } else {
         target.destroy();
       }
@@ -215,7 +255,12 @@ export function createTalkPanel({ BrowserWindow, screen, nativeImage, iconPath, 
       if (!live(win)) return false;
       const point = screen.getCursorScreenPoint();
       const box = win.getBounds();
-      return point.x >= box.x && point.x < box.x + box.width && point.y >= box.y && point.y < box.y + box.height;
+      return (
+        point.x >= box.x &&
+        point.x < box.x + box.width &&
+        point.y >= box.y &&
+        point.y < box.y + box.height
+      );
     },
   };
 }

@@ -21,7 +21,9 @@ export function createMoveSession({ open }) {
     if (held && held.origin !== target.origin) void end();
     if (!held) {
       const entry = { origin: target.origin, renewed, session: open(target) };
-      entry.session.catch(() => { if (held === entry) held = null; });
+      entry.session.catch(() => {
+        if (held === entry) held = null;
+      });
       held = entry;
     }
     return held;
@@ -46,7 +48,9 @@ export function createMoveSession({ open }) {
     const entry = held;
     held = null;
     if (!entry) return;
-    try { await (await entry.session).close(); } catch {}
+    try {
+      await (await entry.session).close();
+    } catch {}
   }
 
   return {
@@ -54,13 +58,16 @@ export function createMoveSession({ open }) {
     async open(target) {
       await current(target).session;
       return {
-        call: (method, route, body) => using(target, (session) => session.call(method, route, body)),
-        upload: (route, bytes, type) => using(target, (session) => session.upload(route, bytes, type)),
-        fetch: (route, init) => using(target, async (session) => {
-          const response = await session.fetch(route, init);
-          if (response.status === 401) await response.body?.cancel();
-          return response;
-        }),
+        call: (method, route, body) =>
+          using(target, (session) => session.call(method, route, body)),
+        upload: (route, bytes, type) =>
+          using(target, (session) => session.upload(route, bytes, type)),
+        fetch: (route, init) =>
+          using(target, async (session) => {
+            const response = await session.fetch(route, init);
+            if (response.status === 401) await response.body?.cancel();
+            return response;
+          }),
         close: async () => {},
       };
     },

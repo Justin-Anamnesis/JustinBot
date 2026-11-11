@@ -9,7 +9,7 @@ export function registerSecret(value: string | undefined | null): void {
 
 export function redact(text: string): string {
   let out = text;
-  for (const secret of secrets) if (out.includes(secret)) out = out.split(secret).join("[secret]");
+  for (const secret of secrets) if (out.includes(secret)) out = out.split(secret).join('[secret]');
   return out;
 }
 

@@ -68,72 +68,121 @@ export interface AppSample {
 }
 
 export const APP_SAMPLES: Record<string, AppSample> = {
-  counter: { html: COUNTER, title: "Coffee counter", height: 200 },
-  chart: { html: CHART, title: "Signups by month", height: 320, fallback_text: "Signups by month: Jan 120, Feb 180, Mar 240, Apr 310." },
-  report: { html: REPORT, title: "Weekly spend" },
-  fragment: { html: FRAGMENT, title: "Search tip" },
-  game: { html: GAME, title: "Tic-tac-toe", height: 260 },
+  counter: { html: COUNTER, title: 'Coffee counter', height: 200 },
+  chart: {
+    html: CHART,
+    title: 'Signups by month',
+    height: 320,
+    fallback_text: 'Signups by month: Jan 120, Feb 180, Mar 240, Apr 310.',
+  },
+  report: { html: REPORT, title: 'Weekly spend' },
+  fragment: { html: FRAGMENT, title: 'Search tip' },
+  game: { html: GAME, title: 'Tic-tac-toe', height: 260 },
 };
 
 export interface McpAppSample {
   server: string;
   serverTitle: string;
   loopback: boolean;
-  tool: { name: string; title?: string; description?: string; inputSchema: object; annotations?: object; _meta: object };
+  tool: {
+    name: string;
+    title?: string;
+    description?: string;
+    inputSchema: object;
+    annotations?: object;
+    _meta: object;
+  };
   resourceUri: string;
   html: string;
   /** `_meta.ui` of the UI resource's content item. */
-  resourceMeta: { csp?: { connectDomains?: string[]; resourceDomains?: string[]; frameDomains?: string[] }; permissions?: object; prefersBorder?: boolean };
+  resourceMeta: {
+    csp?: { connectDomains?: string[]; resourceDomains?: string[]; frameDomains?: string[] };
+    permissions?: object;
+    prefersBorder?: boolean;
+  };
   toolInput: Record<string, unknown>;
-  toolResult: { content: unknown[]; structuredContent?: unknown; _meta?: Record<string, unknown>; isError?: boolean };
+  toolResult: {
+    content: unknown[];
+    structuredContent?: unknown;
+    _meta?: Record<string, unknown>;
+    isError?: boolean;
+  };
 }
 
-const VIEW = (title: string) => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body><div id="root">${title}</div><script type="module">/* an SDK-built view */</script></body></html>`;
+const VIEW = (title: string) =>
+  `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body><div id="root">${title}</div><script type="module">/* an SDK-built view */</script></body></html>`;
 
 export const MCP_APP_SAMPLES: Record<string, McpAppSample> = {
   // @modelcontextprotocol/server-basic-vanillajs, over stdio.
   basic: {
-    server: "basic", serverTitle: "Basic Server", loopback: true,
+    server: 'basic',
+    serverTitle: 'Basic Server',
+    loopback: true,
     tool: {
-      name: "get-time", title: "Get Time", description: "Returns the current server time.",
-      inputSchema: { type: "object", properties: {} }, annotations: { readOnlyHint: true },
-      _meta: { ui: { resourceUri: "ui://get-time/mcp-app.html" }, "ui/resourceUri": "ui://get-time/mcp-app.html" },
+      name: 'get-time',
+      title: 'Get Time',
+      description: 'Returns the current server time.',
+      inputSchema: { type: 'object', properties: {} },
+      annotations: { readOnlyHint: true },
+      _meta: {
+        ui: { resourceUri: 'ui://get-time/mcp-app.html' },
+        'ui/resourceUri': 'ui://get-time/mcp-app.html',
+      },
     },
-    resourceUri: "ui://get-time/mcp-app.html",
-    html: VIEW("Get Server Time"),
+    resourceUri: 'ui://get-time/mcp-app.html',
+    html: VIEW('Get Server Time'),
     resourceMeta: {},
     toolInput: {},
-    toolResult: { content: [{ type: "text", text: "2026-10-14T09:30:00.000Z" }], structuredContent: { time: "2026-10-14T09:30:00.000Z" } },
+    toolResult: {
+      content: [{ type: 'text', text: '2026-10-14T09:30:00.000Z' }],
+      structuredContent: { time: '2026-10-14T09:30:00.000Z' },
+    },
   },
   // mcp.excalidraw.com
   excalidraw: {
-    server: "excalidraw", serverTitle: "Excalidraw", loopback: false,
+    server: 'excalidraw',
+    serverTitle: 'Excalidraw',
+    loopback: false,
     tool: {
-      name: "create_view", title: "Create view", description: "Draw a diagram.",
-      inputSchema: { type: "object", properties: { elements: { type: "array" } } }, annotations: { readOnlyHint: true },
-      _meta: { ui: { resourceUri: "ui://excalidraw/mcp-app.html" } },
+      name: 'create_view',
+      title: 'Create view',
+      description: 'Draw a diagram.',
+      inputSchema: { type: 'object', properties: { elements: { type: 'array' } } },
+      annotations: { readOnlyHint: true },
+      _meta: { ui: { resourceUri: 'ui://excalidraw/mcp-app.html' } },
     },
-    resourceUri: "ui://excalidraw/mcp-app.html",
-    html: VIEW("Excalidraw"),
+    resourceUri: 'ui://excalidraw/mcp-app.html',
+    html: VIEW('Excalidraw'),
     resourceMeta: {
-      csp: { resourceDomains: ["https://esm.sh"], connectDomains: ["https://esm.sh", "http://localhost:8080", "https://example.com/path"], frameDomains: ["https://www.youtube.com"] },
+      csp: {
+        resourceDomains: ['https://esm.sh'],
+        connectDomains: ['https://esm.sh', 'http://localhost:8080', 'https://example.com/path'],
+        frameDomains: ['https://www.youtube.com'],
+      },
       permissions: { clipboardWrite: {} },
       prefersBorder: true,
     },
-    toolInput: { elements: [{ type: "rectangle", x: 0, y: 0 }] },
-    toolResult: { content: [{ type: "text", text: "Diagram ready: 1 element." }], structuredContent: { checkpoint: "c1" } },
+    toolInput: { elements: [{ type: 'rectangle', x: 0, y: 0 }] },
+    toolResult: {
+      content: [{ type: 'text', text: 'Diagram ready: 1 element.' }],
+      structuredContent: { checkpoint: 'c1' },
+    },
   },
   // @modelcontextprotocol/server-debug: an error result.
   debugError: {
-    server: "debug", serverTitle: "Debug Server", loopback: true,
+    server: 'debug',
+    serverTitle: 'Debug Server',
+    loopback: true,
     tool: {
-      name: "debug-tool", title: "Debug Tool", inputSchema: { type: "object", properties: { fail: { type: "boolean" } } },
-      _meta: { ui: { resourceUri: "ui://debug/mcp-app.html", visibility: ["model", "app"] } },
+      name: 'debug-tool',
+      title: 'Debug Tool',
+      inputSchema: { type: 'object', properties: { fail: { type: 'boolean' } } },
+      _meta: { ui: { resourceUri: 'ui://debug/mcp-app.html', visibility: ['model', 'app'] } },
     },
-    resourceUri: "ui://debug/mcp-app.html",
-    html: VIEW("Debug Tool"),
+    resourceUri: 'ui://debug/mcp-app.html',
+    html: VIEW('Debug Tool'),
     resourceMeta: { prefersBorder: false },
     toolInput: { fail: true },
-    toolResult: { content: [{ type: "text", text: "Failed on purpose." }], isError: true },
+    toolResult: { content: [{ type: 'text', text: 'Failed on purpose.' }], isError: true },
   },
 };

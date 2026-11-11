@@ -2,7 +2,7 @@
 // into the window, a bubble that re-renders) reuses the React elements it already produced instead of parsing again.
 // An entry is only reused while everything the plugins read still matches (`variant`: mention names, thread links,
 // math); the cache holds an estimate of the memory its element trees take and lets the least recently drawn go first.
-import type { ReactElement } from "react";
+import type { ReactElement } from 'react';
 
 /** The estimated memory all cached element trees may hold. */
 export const MARKDOWN_CACHE_BYTES = 10 * 1024 * 1024;
@@ -26,7 +26,10 @@ export interface MarkdownRenderCache {
   clear(): void;
 }
 
-export function createMarkdownRenderCache(limit = MARKDOWN_CACHE_BYTES, maxChars = MARKDOWN_CACHE_MAX_CHARS): MarkdownRenderCache {
+export function createMarkdownRenderCache(
+  limit = MARKDOWN_CACHE_BYTES,
+  maxChars = MARKDOWN_CACHE_MAX_CHARS,
+): MarkdownRenderCache {
   const entries = new Map<string, Entry>();
   let held = 0;
   const drop = (text: string, entry: Entry) => {
@@ -54,8 +57,12 @@ export function createMarkdownRenderCache(limit = MARKDOWN_CACHE_BYTES, maxChars
       }
       return element;
     },
-    get size() { return entries.size; },
-    get bytes() { return held; },
+    get size() {
+      return entries.size;
+    },
+    get bytes() {
+      return held;
+    },
     clear() {
       entries.clear();
       held = 0;

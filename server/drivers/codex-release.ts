@@ -1,6 +1,9 @@
 // Release freshness is independent of account-specific model availability.
 function parseCodexReleaseVersion(value: string): { parts: number[]; prerelease: boolean } | null {
-  const match = /^(?:.*\bcodex-cli\s+)?v?(\d+)\.(\d+)\.(\d+)(-[0-9a-z.-]+)?(?:\+[0-9a-z.-]+)?$/i.exec(value.trim());
+  const match =
+    /^(?:.*\bcodex-cli\s+)?v?(\d+)\.(\d+)\.(\d+)(-[0-9a-z.-]+)?(?:\+[0-9a-z.-]+)?$/i.exec(
+      value.trim(),
+    );
   return match ? { parts: match.slice(1, 4).map(Number), prerelease: Boolean(match[4]) } : null;
 }
 
@@ -22,15 +25,15 @@ export function createCodexReleaseReader(fetchImpl: typeof fetch = fetch, now = 
     expires = now() + 60 * 60 * 1000;
     cached = (async () => {
       try {
-        const response = await fetchImpl("https://registry.npmjs.org/@openai/codex/latest", {
+        const response = await fetchImpl('https://registry.npmjs.org/@openai/codex/latest', {
           signal: AbortSignal.timeout(3000),
-          headers: { Accept: "application/json" },
+          headers: { Accept: 'application/json' },
         });
-        if (!response.ok) throw new Error("Release lookup failed");
-        const payload = await response.json() as { version?: unknown };
-        const version = typeof payload.version === "string" ? payload.version : "";
+        if (!response.ok) throw new Error('Release lookup failed');
+        const payload = (await response.json()) as { version?: unknown };
+        const version = typeof payload.version === 'string' ? payload.version : '';
         const parsed = parseCodexReleaseVersion(version);
-        if (!parsed || parsed.prerelease) throw new Error("Invalid stable release");
+        if (!parsed || parsed.prerelease) throw new Error('Invalid stable release');
         return version;
       } catch {
         // Offline checks must not make an otherwise usable engine unavailable.

@@ -1,9 +1,9 @@
 // @vitest-environment happy-dom
-import { act, createElement } from "react";
-import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { UNREAD_NOTICE_MS, useUnreadNotice } from "./unread-notice";
+import { UNREAD_NOTICE_MS, useUnreadNotice } from './unread-notice';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -20,7 +20,7 @@ const wait = (ms: number) => act(() => void vi.advanceTimersByTime(ms));
 
 beforeEach(() => {
   vi.useFakeTimers();
-  host = document.createElement("div");
+  host = document.createElement('div');
   root = createRoot(host);
 });
 
@@ -30,7 +30,7 @@ afterEach(() => {
 });
 
 describe("an unread bot's notice", () => {
-  it("plays when news arrives, then holds still while the bot stays unread", () => {
+  it('plays when news arrives, then holds still while the bot stays unread', () => {
     show(false);
     expect(noticing).toBe(false);
     show(true);
@@ -44,14 +44,14 @@ describe("an unread bot's notice", () => {
     expect(noticing).toBe(false);
   });
 
-  it("holds still for a bot that was already unread when its row appeared", () => {
+  it('holds still for a bot that was already unread when its row appeared', () => {
     show(true);
     expect(noticing).toBe(false);
     wait(UNREAD_NOTICE_MS);
     expect(noticing).toBe(false);
   });
 
-  it("stops when the bot is read and plays again for the next news", () => {
+  it('stops when the bot is read and plays again for the next news', () => {
     show(false);
     show(true);
     wait(1_000);

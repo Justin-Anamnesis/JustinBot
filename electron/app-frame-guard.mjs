@@ -6,7 +6,7 @@
 // Electron 43.7.9: a frame's self-navigation fires will-frame-navigate with frame.origin === "null" and an
 // empty frame.url, and preventDefault() stops it before any request leaves.
 
-const OWN_DOCUMENTS = new Set(["about:srcdoc", "about:blank"]);
+const OWN_DOCUMENTS = new Set(['about:srcdoc', 'about:blank']);
 
 /**
  * @param {{ isMainFrame?: boolean, url?: string, frame?: { origin?: string } | null } | null | undefined} details
@@ -15,7 +15,7 @@ const OWN_DOCUMENTS = new Set(["about:srcdoc", "about:blank"]);
 export function appFrameNavigationAllowed(details) {
   if (!details || details.isMainFrame) return true;
   // A link to a fragment of the page itself stays inside its own document.
-  const url = typeof details.url === "string" ? details.url.split("#")[0] : "";
+  const url = typeof details.url === 'string' ? details.url.split('#')[0] : '';
   if (OWN_DOCUMENTS.has(url)) return true;
   let origin;
   try {
@@ -25,5 +25,5 @@ export function appFrameNavigationAllowed(details) {
     // frame that navigates again right after a cancelled navigation. A frame nobody can read is not let through.
     return false;
   }
-  return origin !== "null";
+  return origin !== 'null';
 }

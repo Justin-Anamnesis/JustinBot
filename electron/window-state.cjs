@@ -7,11 +7,12 @@ const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 function parseWindowState(raw) {
   let value;
   try {
-    value = typeof raw === "string" ? JSON.parse(raw) : raw;
+    value = typeof raw === 'string' ? JSON.parse(raw) : raw;
   } catch {
     return null;
   }
-  if (!value || typeof value !== "object" || !value.bounds || typeof value.bounds !== "object") return null;
+  if (!value || typeof value !== 'object' || !value.bounds || typeof value.bounds !== 'object')
+    return null;
   const { x, y, width, height } = value.bounds;
   if (![x, y, width, height].every(integer) || width <= 0 || height <= 0) return null;
   return {

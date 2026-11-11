@@ -1,10 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hook = vi.hoisted(() => ({
   snapshot: undefined as undefined | (() => boolean),
 }));
 
-vi.mock("react", () => ({
+vi.mock('react', () => ({
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => boolean) => {
     hook.snapshot = snapshot;
     return snapshot();
@@ -24,40 +24,45 @@ let local: ReturnType<typeof memoryStorage>;
 beforeEach(() => {
   vi.resetModules();
   local = memoryStorage();
-  vi.stubGlobal("localStorage", local);
-  vi.stubGlobal("window", new EventTarget());
+  vi.stubGlobal('localStorage', local);
+  vi.stubGlobal('window', new EventTarget());
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("color my messages", () => {
-  it("is on until the person turns it off", async () => {
-    const preference = await import("./user-bubble-preference");
+describe('color my messages', () => {
+  it('is on until the person turns it off', async () => {
+    const preference = await import('./user-bubble-preference');
     expect(preference.readColorUserBubbles()).toBe(true);
     expect(preference.useColorUserBubbles()).toBe(true);
-    local.setItem(preference.USER_BUBBLE_COLOR_KEY, "0");
+    local.setItem(preference.USER_BUBBLE_COLOR_KEY, '0');
     expect(preference.readColorUserBubbles()).toBe(false);
-    local.setItem(preference.USER_BUBBLE_COLOR_KEY, "1");
+    local.setItem(preference.USER_BUBBLE_COLOR_KEY, '1');
     expect(preference.readColorUserBubbles()).toBe(true);
   });
 
   it("stays on when this device's storage cannot be read", async () => {
-    vi.stubGlobal("localStorage", { getItem: () => { throw new Error("blocked"); }, setItem: () => {} });
-    const preference = await import("./user-bubble-preference");
+    vi.stubGlobal('localStorage', {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {},
+    });
+    const preference = await import('./user-bubble-preference');
     expect(preference.readColorUserBubbles()).toBe(true);
   });
 
-  it("remembers the choice on this device", async () => {
-    let preference = await import("./user-bubble-preference");
+  it('remembers the choice on this device', async () => {
+    let preference = await import('./user-bubble-preference');
     preference.setColorUserBubbles(true);
-    expect(local.getItem(preference.USER_BUBBLE_COLOR_KEY)).toBe("1");
+    expect(local.getItem(preference.USER_BUBBLE_COLOR_KEY)).toBe('1');
     vi.resetModules();
-    preference = await import("./user-bubble-preference");
+    preference = await import('./user-bubble-preference');
     expect(preference.readColorUserBubbles()).toBe(true);
     preference.setColorUserBubbles(false);
-    expect(local.getItem(preference.USER_BUBBLE_COLOR_KEY)).toBe("0");
+    expect(local.getItem(preference.USER_BUBBLE_COLOR_KEY)).toBe('0');
     expect(preference.readColorUserBubbles()).toBe(false);
   });
 });

@@ -1,10 +1,10 @@
 // The usage ledger read for traces: streamed, and cached per month file. The ledger only grows, so a later read parses just
 // the lines appended since the last one.
-import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
-import { join } from "node:path";
-import { createInterface } from "node:readline";
-import { isUsageRow, monthsBetween, type UsageRow } from "../usage-ledger.ts";
+import { createReadStream } from 'node:fs';
+import { stat } from 'node:fs/promises';
+import { join } from 'node:path';
+import { createInterface } from 'node:readline';
+import { isUsageRow, monthsBetween, type UsageRow } from '../usage-ledger.ts';
 
 interface CachedMonth {
   size: number;
@@ -16,7 +16,7 @@ const cache = new Map<string, CachedMonth>();
 const loading = new Map<string, Promise<UsageRow[]>>();
 
 async function readFrom(file: string, start: number, into: UsageRow[]): Promise<number> {
-  const stream = createReadStream(file, { encoding: "utf8", start });
+  const stream = createReadStream(file, { encoding: 'utf8', start });
   let consumed = start;
   // A line that does not parse is counted only once another follows it: the last one may still be mid-append.
   let unparsed = 0;
@@ -70,7 +70,7 @@ async function loadMonth(file: string): Promise<UsageRow[]> {
 export async function ledgerRows(dataDir: string, from: number, to: number): Promise<UsageRow[]> {
   const out: UsageRow[] = [];
   for (const month of monthsBetween(new Date(from), new Date(to))) {
-    for (const row of await monthRows(join(dataDir, "usage", `${month}.jsonl`))) {
+    for (const row of await monthRows(join(dataDir, 'usage', `${month}.jsonl`))) {
       const at = Date.parse(row.at);
       if (at >= from && at <= to) out.push(row);
     }

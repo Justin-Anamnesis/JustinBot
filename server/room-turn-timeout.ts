@@ -2,13 +2,18 @@ import {
   MAX_MCP_CALL_TIMEOUT_MINUTES,
   MAX_ROOM_TURN_TIMEOUT_MINUTES,
   MIN_ROOM_TURN_TIMEOUT_MINUTES,
-} from "./config.ts";
-import type { RuntimeEvent } from "./contracts.ts";
-import { serverLine } from "./server-lines.ts";
+} from './config.ts';
+import type { RuntimeEvent } from './contracts.ts';
+import { serverLine } from './server-lines.ts';
 
 /** What the engine sends while it works. Retries, session news and cards are not progress. */
-export const ROOM_TURN_PROGRESS = new Set<RuntimeEvent["type"]>([
-  "content.delta", "item.started", "item.updated", "item.completed", "item.output", "turn.progress",
+export const ROOM_TURN_PROGRESS = new Set<RuntimeEvent['type']>([
+  'content.delta',
+  'item.started',
+  'item.updated',
+  'item.completed',
+  'item.output',
+  'turn.progress',
 ]);
 
 export function roomTurnTimeoutMs(minutes: number): number {
@@ -20,14 +25,14 @@ export function parseConversationTurnTimeout(
 ): { ok: true; minutes: number | null } | { ok: false; error: string } {
   if (value === null) return { ok: true, minutes: null };
   if (
-    typeof value !== "number" ||
+    typeof value !== 'number' ||
     !Number.isInteger(value) ||
     value < MIN_ROOM_TURN_TIMEOUT_MINUTES ||
     value > MAX_ROOM_TURN_TIMEOUT_MINUTES
   ) {
     return {
       ok: false,
-      error: "Turn limit must be a whole number from 1 to 1,440, or null to use the group default.",
+      error: 'Turn limit must be a whole number from 1 to 1,440, or null to use the group default.',
     };
   }
   return { ok: true, minutes: value };
@@ -38,7 +43,7 @@ export function effectiveRoomTurnTimeoutMinutes(
   override: number | null | undefined,
 ): number {
   if (
-    typeof override === "number" &&
+    typeof override === 'number' &&
     Number.isInteger(override) &&
     override >= MIN_ROOM_TURN_TIMEOUT_MINUTES &&
     override <= MAX_ROOM_TURN_TIMEOUT_MINUTES
@@ -77,10 +82,14 @@ export class RoomTurnDeadline {
 
   observe(e: RuntimeEvent): void {
     if (ROOM_TURN_PROGRESS.has(e.type)) this.progress();
-    if (e.type === "request.opened" || e.type === "turn.wait_started") this.setWaiting(true);
-    else if (e.type === "request.resolved" || e.type === "turn.wait_ended") this.setWaiting(false);
-    else if ((e.type === "item.started" || e.type === "item.completed") && e.itemType === "tool" && e.itemId) {
-      if (e.type === "item.started") this.runningTools.add(e.itemId);
+    if (e.type === 'request.opened' || e.type === 'turn.wait_started') this.setWaiting(true);
+    else if (e.type === 'request.resolved' || e.type === 'turn.wait_ended') this.setWaiting(false);
+    else if (
+      (e.type === 'item.started' || e.type === 'item.completed') &&
+      e.itemType === 'tool' &&
+      e.itemId
+    ) {
+      if (e.type === 'item.started') this.runningTools.add(e.itemId);
       else this.runningTools.delete(e.itemId);
       this.rearm();
     }
@@ -125,7 +134,9 @@ export class RoomTurnDeadline {
   }
 
   private quietLimitMs(): number {
-    return this.runningTools.size > 0 ? Math.max(this.limitMs, ROOM_TOOL_QUIET_LIMIT_MS) : this.limitMs;
+    return this.runningTools.size > 0
+      ? Math.max(this.limitMs, ROOM_TOOL_QUIET_LIMIT_MS)
+      : this.limitMs;
   }
 
   private hold(): void {
@@ -184,6 +195,14 @@ export class RoomTurnStallRegistry {
 }
 
 /** In the room's language for its status row; a coordinator reads it in English. */
-export function roomTurnTimeoutMessage(botName: string, minutes: number, language?: string): string {
-  return serverLine(language, minutes === 1 ? "server.rooms.turnStalled.one" : "server.rooms.turnStalled.many", { bot: botName, count: minutes });
+export function roomTurnTimeoutMessage(
+  botName: string,
+  minutes: number,
+  language?: string,
+): string {
+  return serverLine(
+    language,
+    minutes === 1 ? 'server.rooms.turnStalled.one' : 'server.rooms.turnStalled.many',
+    { bot: botName, count: minutes },
+  );
 }

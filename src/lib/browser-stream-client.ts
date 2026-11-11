@@ -3,7 +3,7 @@
 // access, a viewer that may operate sizes the page while it only watches, a larger frame cap is sent in place and a
 // reconnect opens with the newest size and cap, and OpenMausBot's own messages are passed on.
 
-import { t } from "./i18n";
+import { t } from './i18n';
 
 /** The browser's host cannot run Chrome until it is set up; the close reason names the fix. */
 export const PREVIEW_STREAM_HOST_SETUP_CLOSE_CODE = 4503;
@@ -11,17 +11,20 @@ export const PREVIEW_STREAM_TAB_GONE_CODE = 4404;
 
 /** A sandbox has no command to run, only steps for an administrator; missing libraries have one. */
 export type PreviewStreamHostSetup =
-  | { readonly need: "sandbox" }
-  | { readonly need: "libraries"; readonly command: string };
+  { readonly need: 'sandbox' } | { readonly need: 'libraries'; readonly command: string };
 
 /** The server's LIBRARIES_COMMAND and SANDBOX_STEPS_URL: a close reason is too short to carry the link. */
-export const PREVIEW_STREAM_LIBRARIES_COMMAND = "sudo openmausbot browser install --with-deps";
+export const PREVIEW_STREAM_LIBRARIES_COMMAND = 'sudo openmausbot browser install --with-deps';
 export const PREVIEW_STREAM_SANDBOX_STEPS_URL =
-  "https://github.com/milind-soni/OpenMausBot/blob/main/docs/deploy-vps.md#ubuntu-2404-browser-sandbox";
+  'https://github.com/milind-soni/OpenMausBot/blob/main/docs/deploy-vps.md#ubuntu-2404-browser-sandbox';
 
 export type PreviewViewportSetting =
-  | { readonly mode: "fill" }
-  | { readonly mode: "preset"; readonly preset: "desktop" | "fullHd" | "tablet" | "phone"; readonly landscape?: boolean };
+  | { readonly mode: 'fill' }
+  | {
+      readonly mode: 'preset';
+      readonly preset: 'desktop' | 'fullHd' | 'tablet' | 'phone';
+      readonly landscape?: boolean;
+    };
 
 /** Where a bot's browser is served: `httpBase` and `wsBase` end in `/api/bots/<id>/browser`. */
 export interface PreviewStreamAccess {
@@ -36,16 +39,20 @@ export interface PreviewStreamAccess {
 export const withAccessQuery = (url: string, access: PreviewStreamAccess): string => {
   const entries = Object.entries(access.query);
   if (entries.length === 0) return url;
-  const separator = url.includes("?") ? "&" : "?";
+  const separator = url.includes('?') ? '&' : '?';
   return `${url}${separator}${new URLSearchParams(entries).toString()}`;
 };
 
 /** The same origin's routes for a bot's browser. */
-export function browserStreamAccess(botId: string, location: Pick<Location, "protocol" | "host"> = window.location, scope: Readonly<Record<string, string>> = {}): PreviewStreamAccess {
+export function browserStreamAccess(
+  botId: string,
+  location: Pick<Location, 'protocol' | 'host'> = window.location,
+  scope: Readonly<Record<string, string>> = {},
+): PreviewStreamAccess {
   const path = `/api/bots/${encodeURIComponent(botId)}/browser`;
   return {
     httpBase: `${location.protocol}//${location.host}${path}`,
-    wsBase: `${location.protocol === "https:" ? "wss:" : "ws:"}//${location.host}${path}`,
+    wsBase: `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${path}`,
     query: { ...scope },
     credentials: true,
   };
@@ -56,11 +63,11 @@ export interface PreviewStreamViewport {
   readonly height: number;
 }
 
-export type PreviewStreamMouseButton = "none" | "left" | "middle" | "right";
+export type PreviewStreamMouseButton = 'none' | 'left' | 'middle' | 'right';
 
 export interface PreviewStreamControl {
   readonly canOperate: boolean;
-  readonly controller: "agent" | "you" | "another-viewer" | "unclaimed";
+  readonly controller: 'agent' | 'you' | 'another-viewer' | 'unclaimed';
   readonly generation: number;
   readonly dialog: null | {
     readonly type: string;
@@ -76,40 +83,40 @@ export interface PreviewStreamControl {
 /** Status line shown above a viewer; `null` control means the socket is not connected. */
 export const previewStreamControlLabel = (control: PreviewStreamControl | null): string =>
   !control
-    ? "Connecting..."
+    ? 'Connecting...'
     : !control.canOperate
-      ? "Read-only"
-      : control.controller === "you"
-        ? "You have control"
-        : control.controller === "agent"
-          ? "Bot has control"
-          : control.controller === "another-viewer"
-            ? "Another viewer has control"
-            : "Watching";
+      ? 'Read-only'
+      : control.controller === 'you'
+        ? 'You have control'
+        : control.controller === 'agent'
+          ? 'Bot has control'
+          : control.controller === 'another-viewer'
+            ? 'Another viewer has control'
+            : 'Watching';
 
-const isPreviewStreamDialog = (value: unknown): value is PreviewStreamControl["dialog"] =>
+const isPreviewStreamDialog = (value: unknown): value is PreviewStreamControl['dialog'] =>
   value === null ||
-  (typeof value === "object" &&
-    "type" in value &&
-    typeof value.type === "string" &&
-    "message" in value &&
-    typeof value.message === "string" &&
-    "defaultValue" in value &&
-    typeof value.defaultValue === "string");
+  (typeof value === 'object' &&
+    'type' in value &&
+    typeof value.type === 'string' &&
+    'message' in value &&
+    typeof value.message === 'string' &&
+    'defaultValue' in value &&
+    typeof value.defaultValue === 'string');
 
 /** Client-to-server messages. Coordinates are page CSS px. */
 export type PreviewStreamInput =
-  | { readonly type: "takeControl" }
-  | { readonly type: "releaseControl" }
-  | { readonly type: "dialog"; readonly accept: boolean; readonly promptText?: string }
-  | { readonly type: "viewport"; readonly setting: PreviewViewportSetting }
-  | { readonly type: "zoom"; readonly factor: number }
+  | { readonly type: 'takeControl' }
+  | { readonly type: 'releaseControl' }
+  | { readonly type: 'dialog'; readonly accept: boolean; readonly promptText?: string }
+  | { readonly type: 'viewport'; readonly setting: PreviewViewportSetting }
+  | { readonly type: 'zoom'; readonly factor: number }
   /** The installed extensions, for the Extensions menu; an extension's own page opens by its id only. */
-  | { readonly type: "extensions" }
-  | { readonly type: "openExtension"; readonly id: string }
+  | { readonly type: 'extensions' }
+  | { readonly type: 'openExtension'; readonly id: string }
   | {
-      readonly type: "mouse";
-      readonly action: "move" | "down" | "up";
+      readonly type: 'mouse';
+      readonly action: 'move' | 'down' | 'up';
       readonly x: number;
       readonly y: number;
       readonly button: PreviewStreamMouseButton;
@@ -119,7 +126,7 @@ export type PreviewStreamInput =
       readonly modifiers: number;
     }
   | {
-      readonly type: "wheel";
+      readonly type: 'wheel';
       readonly x: number;
       readonly y: number;
       readonly deltaX: number;
@@ -127,8 +134,8 @@ export type PreviewStreamInput =
       readonly modifiers: number;
     }
   | {
-      readonly type: "key";
-      readonly action: "down" | "up";
+      readonly type: 'key';
+      readonly action: 'down' | 'up';
       readonly key: string;
       readonly code: string;
       /** Windows virtual key code (DOM `keyCode`); Enter, Backspace, and arrows need it. */
@@ -137,24 +144,30 @@ export type PreviewStreamInput =
       readonly text?: string;
       readonly modifiers: number;
     }
-  | { readonly type: "text"; readonly text: string }
-  | { readonly type: "resize"; readonly width: number; readonly height: number }
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'resize'; readonly width: number; readonly height: number }
   /** The viewer can show larger frames now: the screencast restarts at the new cap without reconnecting. */
-  | { readonly type: "frameCap"; readonly maxWidth: number; readonly maxHeight: number }
-  | { readonly type: "navigate"; readonly url: string }
-  | { readonly type: "history"; readonly delta: -1 | 1 }
-  | { readonly type: "reload"; readonly ignoreCache?: boolean }
+  | { readonly type: 'frameCap'; readonly maxWidth: number; readonly maxHeight: number }
+  | { readonly type: 'navigate'; readonly url: string }
+  | { readonly type: 'history'; readonly delta: -1 | 1 }
+  | { readonly type: 'reload'; readonly ignoreCache?: boolean }
   /** Asks whether the page point takes text. Touch viewers send it on touch start. */
-  | { readonly type: "probe"; readonly x: number; readonly y: number }
-  | { readonly type: "tabSelect"; readonly tabId: string }
-  | { readonly type: "tabNew"; readonly url?: string }
-  | { readonly type: "tabClose"; readonly tabId: string }
-  | { readonly type: "selectChoose"; readonly id: string; readonly index: number }
+  | { readonly type: 'probe'; readonly x: number; readonly y: number }
+  | { readonly type: 'tabSelect'; readonly tabId: string }
+  | { readonly type: 'tabNew'; readonly url?: string }
+  | { readonly type: 'tabClose'; readonly tabId: string }
+  | { readonly type: 'selectChoose'; readonly id: string; readonly index: number }
   /** Answers the sign-in prompt `id` of tab `tabId`, as it was shown; without a username and password it cancels it. */
-  | { readonly type: "authAnswer"; readonly tabId: string; readonly id: string; readonly username?: string; readonly password?: string }
-  | { readonly type: "restart" }
+  | {
+      readonly type: 'authAnswer';
+      readonly tabId: string;
+      readonly id: string;
+      readonly username?: string;
+      readonly password?: string;
+    }
+  | { readonly type: 'restart' }
   /** Starts the browser again after it closed unused (the server sent `asleep`); `awake` follows once it runs. */
-  | { readonly type: "wake" };
+  | { readonly type: 'wake' };
 
 export interface PreviewStreamDownload {
   readonly fileName: string;
@@ -173,8 +186,14 @@ export interface PreviewStreamFileChooser {
   readonly credentials: boolean;
 }
 
-const previewStreamUploadUrl = (target: Pick<PreviewStreamTarget, "access">, chooser: string): string =>
-  withAccessQuery(`${target.access.httpBase}/upload?${new URLSearchParams({ chooser }).toString()}`, target.access);
+const previewStreamUploadUrl = (
+  target: Pick<PreviewStreamTarget, 'access'>,
+  chooser: string,
+): string =>
+  withAccessQuery(
+    `${target.access.httpBase}/upload?${new URLSearchParams({ chooser }).toString()}`,
+    target.access,
+  );
 
 /** Sends files to a page's open picker. Rejects when the server refuses them. */
 export async function uploadPreviewStreamFiles(
@@ -182,11 +201,11 @@ export async function uploadPreviewStreamFiles(
   files: ReadonlyArray<Blob & { readonly name?: string }>,
 ): Promise<void> {
   const body = new FormData();
-  for (const file of files) body.append("file", file, file.name ?? "file");
+  for (const file of files) body.append('file', file, file.name ?? 'file');
   const response = await fetch(chooser.uploadUrl, {
-    method: "POST",
+    method: 'POST',
     body,
-    credentials: chooser.credentials ? "include" : "omit",
+    credentials: chooser.credentials ? 'include' : 'omit',
   });
   if (!response.ok) {
     const text = await response.text();
@@ -194,12 +213,15 @@ export async function uploadPreviewStreamFiles(
     try {
       message = (JSON.parse(text) as { error?: string }).error ?? text;
     } catch {}
-    throw new Error(message || t("browser.page.uploadRefused"));
+    throw new Error(message || t('browser.page.uploadRefused'));
   }
 }
 
 /** A file a bot's browser downloaded, served with the stream's own access. */
-export const previewStreamDownloadUrl = (target: Pick<PreviewStreamTarget, "access">, id: string): string =>
+export const previewStreamDownloadUrl = (
+  target: Pick<PreviewStreamTarget, 'access'>,
+  id: string,
+): string =>
   withAccessQuery(`${target.access.httpBase}/download/${encodeURIComponent(id)}`, target.access);
 
 /** Answer to a `probe`, echoing its point. */
@@ -211,7 +233,7 @@ export interface PreviewStreamProbe {
 
 /** Where an agent action is about to land, in page CSS pixels. */
 export interface PreviewStreamPointer {
-  readonly phase: "move" | "click";
+  readonly phase: 'move' | 'click';
   readonly x: number;
   readonly y: number;
   readonly sequence: number;
@@ -280,26 +302,34 @@ export interface PreviewStreamClient {
 /** A viewer that may operate sizes the page while it watches, and may restart or wake it; the person holding the browser
  * hands it back from any of their views; everything else needs control. */
 const allowed = (input: PreviewStreamInput, control: PreviewStreamControl): boolean =>
-  input.type === "takeControl" || input.type === "resize" || input.type === "frameCap" || input.type === "restart" || input.type === "wake"
-  || (input.type === "releaseControl" && control.owned === true) || control.controller === "you";
+  input.type === 'takeControl' ||
+  input.type === 'resize' ||
+  input.type === 'frameCap' ||
+  input.type === 'restart' ||
+  input.type === 'wake' ||
+  (input.type === 'releaseControl' && control.owned === true) ||
+  control.controller === 'you';
 
-const ACK_MESSAGE = JSON.stringify({ type: "ack" });
+const ACK_MESSAGE = JSON.stringify({ type: 'ack' });
 export function createPreviewStreamClient(
   target: PreviewStreamTarget,
   events: PreviewStreamEvents,
 ): PreviewStreamClient {
   let cap = { width: target.maxWidth, height: target.maxHeight };
-  let size = target.width !== undefined && target.height !== undefined ? { width: target.width, height: target.height } : null;
+  let size =
+    target.width !== undefined && target.height !== undefined
+      ? { width: target.width, height: target.height }
+      : null;
   const streamUrl = () => {
     const query = new URLSearchParams({
       maxWidth: String(Math.max(1, Math.round(cap.width))),
       maxHeight: String(Math.max(1, Math.round(cap.height))),
     });
     if (size) {
-      query.set("width", String(Math.round(size.width)));
-      query.set("height", String(Math.round(size.height)));
+      query.set('width', String(Math.round(size.width)));
+      query.set('height', String(Math.round(size.height)));
     }
-    if (target.interactive === false) query.set("interactive", "false");
+    if (target.interactive === false) query.set('interactive', 'false');
     return withAccessQuery(`${target.access.wsBase}/stream?${query.toString()}`, target.access);
   };
   let stopped = false;
@@ -313,15 +343,15 @@ export function createPreviewStreamClient(
     if (stopped) return;
     const opening = { cap, size };
     const ws = new WebSocket(streamUrl());
-    ws.binaryType = "arraybuffer";
+    ws.binaryType = 'arraybuffer';
     socket = ws;
     let opened = false;
-    ws.addEventListener("open", () => {
+    ws.addEventListener('open', () => {
       if (socket !== ws) return;
       opened = true;
       events.onConnectedChange(true);
     });
-    ws.addEventListener("message", (event) => {
+    ws.addEventListener('message', (event) => {
       if (socket !== ws) return;
       if (event.data instanceof ArrayBuffer) {
         failures = 0;
@@ -329,14 +359,14 @@ export function createPreviewStreamClient(
         events.onFrame(event.data);
         return;
       }
-      if (typeof event.data !== "string") return;
+      if (typeof event.data !== 'string') return;
       let message: unknown;
       try {
         message = JSON.parse(event.data);
       } catch {
         return;
       }
-      if (typeof message !== "object" || message === null) return;
+      if (typeof message !== 'object' || message === null) return;
       const {
         type,
         x,
@@ -361,10 +391,10 @@ export function createPreviewStreamClient(
         tabId,
       } = message as Record<string, unknown>;
       if (
-        type === "fileChooser" &&
-        typeof id === "string" &&
-        typeof multiple === "boolean" &&
-        typeof accept === "string"
+        type === 'fileChooser' &&
+        typeof id === 'string' &&
+        typeof multiple === 'boolean' &&
+        typeof accept === 'string'
       ) {
         fileChooser = id;
         events.onFileChooser?.({
@@ -373,52 +403,52 @@ export function createPreviewStreamClient(
           uploadUrl: previewStreamUploadUrl(target, id),
           credentials: target.access.credentials,
         });
-      } else if (type === "fileChooserClosed" && typeof id === "string") {
+      } else if (type === 'fileChooserClosed' && typeof id === 'string') {
         if (fileChooser !== id) return;
         fileChooser = null;
         events.onFileChooser?.(null);
       } else if (
-        type === "pointer" &&
-        (phase === "move" || phase === "click") &&
-        typeof x === "number" &&
-        typeof y === "number" &&
-        typeof sequence === "number"
+        type === 'pointer' &&
+        (phase === 'move' || phase === 'click') &&
+        typeof x === 'number' &&
+        typeof y === 'number' &&
+        typeof sequence === 'number'
       ) {
         events.onPointer?.({ phase, x, y, sequence });
-      } else if (type === "popup" && typeof tabId === "string") {
+      } else if (type === 'popup' && typeof tabId === 'string') {
         events.onPopup?.(tabId);
-      } else if (type === "clipboard" && typeof text === "string") {
+      } else if (type === 'clipboard' && typeof text === 'string') {
         events.onClipboard?.(text);
       } else if (
-        type === "download" &&
-        typeof id === "string" &&
-        typeof fileName === "string" &&
-        typeof sizeBytes === "number"
+        type === 'download' &&
+        typeof id === 'string' &&
+        typeof fileName === 'string' &&
+        typeof sizeBytes === 'number'
       ) {
         events.onDownload?.({
           fileName,
           sizeBytes,
           url: previewStreamDownloadUrl(target, id),
         });
-      } else if (type === "viewport" && typeof width === "number" && typeof height === "number") {
+      } else if (type === 'viewport' && typeof width === 'number' && typeof height === 'number') {
         failures = 0;
         events.onViewport({ width, height });
         events.onMessage?.(message as Record<string, unknown>);
       } else if (
-        type === "probe" &&
-        typeof x === "number" &&
-        typeof y === "number" &&
-        typeof editable === "boolean"
+        type === 'probe' &&
+        typeof x === 'number' &&
+        typeof y === 'number' &&
+        typeof editable === 'boolean'
       ) {
         events.onProbe?.({ x, y, editable });
       } else if (
-        type === "control" &&
-        typeof canOperate === "boolean" &&
-        (controller === "agent" ||
-          controller === "you" ||
-          controller === "another-viewer" ||
-          controller === "unclaimed") &&
-        typeof generation === "number" &&
+        type === 'control' &&
+        typeof canOperate === 'boolean' &&
+        (controller === 'agent' ||
+          controller === 'you' ||
+          controller === 'another-viewer' ||
+          controller === 'unclaimed') &&
+        typeof generation === 'number' &&
         isPreviewStreamDialog(dialog)
       ) {
         const nextControl: PreviewStreamControl = {
@@ -432,14 +462,16 @@ export function createPreviewStreamClient(
         const first = control === null;
         control = nextControl;
         // A size or cap the viewer asked for while this socket was opening reaches the server now.
-        if (first && canOperate && cap !== opening.cap) ws.send(JSON.stringify({ type: "frameCap", maxWidth: cap.width, maxHeight: cap.height }));
-        if (first && canOperate && size && size !== opening.size) ws.send(JSON.stringify({ type: "resize", ...size }));
+        if (first && canOperate && cap !== opening.cap)
+          ws.send(JSON.stringify({ type: 'frameCap', maxWidth: cap.width, maxHeight: cap.height }));
+        if (first && canOperate && size && size !== opening.size)
+          ws.send(JSON.stringify({ type: 'resize', ...size }));
         events.onControl?.(nextControl);
-      } else if (typeof type === "string") {
+      } else if (typeof type === 'string') {
         events.onMessage?.(message as Record<string, unknown>);
       }
     });
-    ws.addEventListener("close", (event) => {
+    ws.addEventListener('close', (event) => {
       if (socket !== ws) return;
       socket = null;
       control = null;
@@ -464,15 +496,15 @@ export function createPreviewStreamClient(
       }
       retryTimer = setTimeout(connect, Math.min(500 * 2 ** failures++, 10_000));
     });
-    ws.addEventListener("error", () => ws.close());
+    ws.addEventListener('error', () => ws.close());
   };
 
   connect();
 
   return {
     send: (input) => {
-      if (input.type === "resize") size = { width: input.width, height: input.height };
-      else if (input.type === "frameCap") cap = { width: input.maxWidth, height: input.maxHeight };
+      if (input.type === 'resize') size = { width: input.width, height: input.height };
+      else if (input.type === 'frameCap') cap = { width: input.maxWidth, height: input.maxHeight };
       if (socket?.readyState !== WebSocket.OPEN) return false;
       if (!control?.canOperate) return false;
       if (!allowed(input, control)) return false;
@@ -500,13 +532,13 @@ export function createPreviewFramePainter(
   canvas: HTMLCanvasElement,
   onPainted?: () => void,
 ): PreviewFramePainter {
-  const context = canvas.getContext("2d");
+  const context = canvas.getContext('2d');
   let stopped = false;
   let decoding = false;
   let waiting: ArrayBuffer | null = null;
   const draw = (jpeg: ArrayBuffer) => {
     decoding = true;
-    void createImageBitmap(new Blob([jpeg], { type: "image/jpeg" }))
+    void createImageBitmap(new Blob([jpeg], { type: 'image/jpeg' }))
       .then((bitmap) => {
         if (stopped || !context) {
           bitmap.close();
@@ -546,13 +578,14 @@ export function createPreviewFramePainter(
 const decodeHostSetup = (reason: string): PreviewStreamHostSetup => {
   try {
     // An older server's command for either need was `openmausbot browser setup`, which never existed.
-    if ((JSON.parse(reason) as { need?: unknown }).need === "libraries") return { need: "libraries", command: PREVIEW_STREAM_LIBRARIES_COMMAND };
+    if ((JSON.parse(reason) as { need?: unknown }).need === 'libraries')
+      return { need: 'libraries', command: PREVIEW_STREAM_LIBRARIES_COMMAND };
   } catch {}
-  return { need: "sandbox" };
+  return { need: 'sandbox' };
 };
 
 /** What a viewer tells the person; beside it, the libraries `command` ready to copy or a link to the sandbox steps. */
 export const previewStreamHostSetupMessage = (setup: PreviewStreamHostSetup) =>
-  setup.need === "sandbox"
+  setup.need === 'sandbox'
     ? "This server's host blocks the sandbox its browser runs in. An administrator can allow it for one copy of Chrome with these steps, then try again:"
     : "This server's host is missing libraries its browser needs. Run this once on the host, then try again:";

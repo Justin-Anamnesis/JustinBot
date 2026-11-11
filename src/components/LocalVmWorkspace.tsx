@@ -1,24 +1,10 @@
-import {
-  AlertTriangle,
-  Hand,
-  Loader2,
-  Monitor,
-  RefreshCw,
-  X,
-} from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from "react";
-import { api, useStore, type Action, type Bot } from "@/state/store";
-import { useCaptionChrome } from "@/components/DesktopCapabilities";
-import { cn } from "@/lib/cn";
-import { t } from "@/lib/i18n";
-import { parseComputerHelp, transitionComputerControlLease } from "@/lib/computer-control";
+import { AlertTriangle, Hand, Loader2, Monitor, RefreshCw, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { api, useStore, type Action, type Bot } from '@/state/store';
+import { useCaptionChrome } from '@/components/DesktopCapabilities';
+import { cn } from '@/lib/cn';
+import { t } from '@/lib/i18n';
+import { parseComputerHelp, transitionComputerControlLease } from '@/lib/computer-control';
 import {
   initialLocalVmWorkspaceSlots,
   nativeViewOverlayIntersects,
@@ -32,13 +18,13 @@ import {
   type LocalVmWorkspaceControlSnapshot,
   type LocalVmWorkspaceSlots,
   type LocalVmWorkspaceStatus,
-} from "@/lib/local-vm-workspace";
-import { z } from "zod";
-import { Select } from "./Select";
-import { productName } from "@/lib/brand";
-import { randomUuid } from "@/lib/random-uuid";
+} from '@/lib/local-vm-workspace';
+import { z } from 'zod';
+import { Select } from './Select';
+import { productName } from '@/lib/brand';
+import { randomUuid } from '@/lib/random-uuid';
 
-const SLOT_CONTEXTS = ["local-vm-workspace:left", "local-vm-workspace:right"] as const;
+const SLOT_CONTEXTS = ['local-vm-workspace:left', 'local-vm-workspace:right'] as const;
 
 type WorkspaceDispatch = (action: Action) => void;
 
@@ -60,36 +46,36 @@ interface LocalVmWorkspaceProps {
 
 async function requestComputerControl(
   botId: string,
-  action: "take" | "release",
+  action: 'take' | 'release',
   controlLeaseId: string,
 ): Promise<LocalVmWorkspaceControlSnapshot> {
   const result = await api(`/api/bots/${botId}/computer/control`, {
-    method: "POST",
+    method: 'POST',
     body: JSON.stringify({ action, controlLeaseId }),
   });
   const parsed = controlSnapshotSchema.safeParse(result);
-  if (!parsed.success) throw new Error("invalid-control-snapshot");
+  if (!parsed.success) throw new Error('invalid-control-snapshot');
   return parsed.data;
 }
 
 async function readComputerControl(botId: string): Promise<LocalVmWorkspaceControlSnapshot> {
-  const parsed = controlSnapshotSchema.safeParse(
-    await api(`/api/bots/${botId}/computer/control`),
-  );
-  if (!parsed.success) throw new Error("invalid-control-snapshot");
+  const parsed = controlSnapshotSchema.safeParse(await api(`/api/bots/${botId}/computer/control`));
+  if (!parsed.success) throw new Error('invalid-control-snapshot');
   return parsed.data;
 }
 
 function bestEffortRelease(botId: string, controlLeaseId: string) {
   void fetch(`/api/bots/${botId}/computer/control`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ action: "release", controlLeaseId }),
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ action: 'release', controlLeaseId }),
     keepalive: true,
-  }).then(async (response) => {
-    if (!response.ok) return;
-    // The server lease is the source of truth: clear Electron only after the workspace-owned release was accepted.
-  }).catch(() => {});
+  })
+    .then(async (response) => {
+      if (!response.ok) return;
+      // The server lease is the source of truth: clear Electron only after the workspace-owned release was accepted.
+    })
+    .catch(() => {});
 }
 
 async function setNativeBrowserControl(_botId: string, _held: boolean): Promise<boolean> {
@@ -102,7 +88,7 @@ function dispatchControl(
   snapshot: LocalVmWorkspaceControlSnapshot,
 ) {
   dispatch({
-    type: "computerControl",
+    type: 'computerControl',
     botId,
     held: snapshot.held,
     helpReason: snapshot.helpReason,
@@ -125,18 +111,18 @@ const NATIVE_VIEW_OVERLAY_SELECTOR = [
   '[aria-modal="true"]',
   '[role="dialog"]',
   '[role="menu"]',
-  "[popover]",
-  "[data-native-view-overlay]",
-  ".fixed",
-  ".absolute",
-].join(",");
+  '[popover]',
+  '[data-native-view-overlay]',
+  '.fixed',
+  '.absolute',
+].join(',');
 
 /**
  * Electron's native views always paint above the renderer, so any intersecting overlay or popover counts, portals
  * included.
  */
 function rendererOverlayIntersectsNativeView() {
-  const hosts = [...document.querySelectorAll<HTMLElement>("[data-native-view-host]")];
+  const hosts = [...document.querySelectorAll<HTMLElement>('[data-native-view-host]')];
   const hostRects = hosts
     .map((host) => host.getBoundingClientRect())
     .filter((rect) => rect.width > 0 && rect.height > 0);
@@ -151,18 +137,15 @@ function rendererOverlayIntersectsNativeView() {
     )
     .map((candidate) => {
       const style = window.getComputedStyle(candidate);
-      const explicitlyOverlay =
-        candidate.matches(
-          '[aria-modal="true"], [role="dialog"], [role="menu"], [popover], [data-native-view-overlay]',
-        );
+      const explicitlyOverlay = candidate.matches(
+        '[aria-modal="true"], [role="dialog"], [role="menu"], [popover], [data-native-view-overlay]',
+      );
       const zIndex = Number.parseInt(style.zIndex, 10);
       return {
         rect: candidate.getBoundingClientRect(),
         explicit: explicitlyOverlay,
         visible:
-          style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          Number(style.opacity) !== 0,
+          style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) !== 0,
         zIndex: Number.isFinite(zIndex) ? zIndex : null,
       };
     });
@@ -187,25 +170,25 @@ function useNativeViewObscured(explicit: boolean) {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ["class", "style", "aria-hidden", "aria-modal", "role", "open", "popover"],
+      attributeFilter: ['class', 'style', 'aria-hidden', 'aria-modal', 'role', 'open', 'popover'],
     });
     const resizeObserver = new ResizeObserver(scheduleRead);
     resizeObserver.observe(document.body);
-    for (const host of document.querySelectorAll<HTMLElement>("[data-native-view-host]")) {
+    for (const host of document.querySelectorAll<HTMLElement>('[data-native-view-host]')) {
       resizeObserver.observe(host);
     }
     const overlayEvents = [
-      "toggle",
-      "animationstart",
-      "animationend",
-      "transitionstart",
-      "transitionend",
+      'toggle',
+      'animationstart',
+      'animationend',
+      'transitionstart',
+      'transitionend',
     ] as const;
     for (const eventName of overlayEvents) {
       document.addEventListener(eventName, scheduleRead, true);
     }
-    window.addEventListener("resize", scheduleRead);
-    window.addEventListener("scroll", scheduleRead, true);
+    window.addEventListener('resize', scheduleRead);
+    window.addEventListener('scroll', scheduleRead, true);
     return () => {
       if (frame) cancelAnimationFrame(frame);
       observer.disconnect();
@@ -213,21 +196,24 @@ function useNativeViewObscured(explicit: boolean) {
       for (const eventName of overlayEvents) {
         document.removeEventListener(eventName, scheduleRead, true);
       }
-      window.removeEventListener("resize", scheduleRead);
-      window.removeEventListener("scroll", scheduleRead, true);
+      window.removeEventListener('resize', scheduleRead);
+      window.removeEventListener('scroll', scheduleRead, true);
     };
   }, []);
   return explicit || domOverlay;
 }
 
-function statusLabel(status: LocalVmWorkspaceStatus | null, nativeStatus: DesktopWorkspaceState["status"]) {
-  if (!status) return t("vm.workspace.status.checking");
-  if (status.container === "missing") return t("vm.workspace.status.missing");
-  if (status.container === "stopped") return t("vm.workspace.status.stopped");
-  if (!status.ready) return t("vm.workspace.status.unavailable");
-  if (nativeStatus === "error") return t("vm.workspace.status.viewerUnavailable");
-  if (nativeStatus !== "ready") return t("vm.workspace.status.connecting");
-  return t("vm.workspace.status.live");
+function statusLabel(
+  status: LocalVmWorkspaceStatus | null,
+  nativeStatus: DesktopWorkspaceState['status'],
+) {
+  if (!status) return t('vm.workspace.status.checking');
+  if (status.container === 'missing') return t('vm.workspace.status.missing');
+  if (status.container === 'stopped') return t('vm.workspace.status.stopped');
+  if (!status.ready) return t('vm.workspace.status.unavailable');
+  if (nativeStatus === 'error') return t('vm.workspace.status.viewerUnavailable');
+  if (nativeStatus !== 'ready') return t('vm.workspace.status.connecting');
+  return t('vm.workspace.status.live');
 }
 
 interface LocalVmPaneProps {
@@ -261,7 +247,7 @@ function LocalVmPane({
 }: LocalVmPaneProps) {
   const contextId = SLOT_CONTEXTS[index];
   const botId = bot?.id ?? null;
-  const botName = bot?.name ?? t("vm.workspace.localVm");
+  const botName = bot?.name ?? t('vm.workspace.localVm');
   const viewportRef = useRef<HTMLDivElement>(null);
   const operationRef = useRef<Promise<void>>(Promise.resolve());
   const obscuredRef = useRef(obscured);
@@ -270,19 +256,21 @@ function LocalVmPane({
   const [nativeState, setNativeState] = useState<DesktopWorkspaceState>({
     contextId,
     open: false,
-    status: "closed",
+    status: 'closed',
     interactive: false,
   });
   const [error, setError] = useState<string | null>(null);
 
-  const refreshStatus = useCallback(async (signal?: AbortSignal) => {
-    if (!botId) return;
-    try {
-      const raw = await api(`/api/bots/${botId}/local-computer`, { signal });
-      if (!signal?.aborted) setStatus(sanitizeLocalVmWorkspaceStatus(raw));
-    } catch {
-    }
-  }, [botId]);
+  const refreshStatus = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!botId) return;
+      try {
+        const raw = await api(`/api/bots/${botId}/local-computer`, { signal });
+        if (!signal?.aborted) setStatus(sanitizeLocalVmWorkspaceStatus(raw));
+      } catch {}
+    },
+    [botId],
+  );
   const refreshStatusRef = useRef(refreshStatus);
   useEffect(() => {
     refreshStatusRef.current = refreshStatus;
@@ -297,7 +285,7 @@ function LocalVmPane({
     return bridge?.onState((next) => {
       if (next.contextId !== contextId) return;
       setNativeState(next);
-      if (next.status === "error" || next.status === "closed") void refreshStatusRef.current();
+      if (next.status === 'error' || next.status === 'closed') void refreshStatusRef.current();
     });
   }, [contextId]);
 
@@ -307,13 +295,13 @@ function LocalVmPane({
     const controller = new AbortController();
     setStatus(null);
     setError(null);
-    setNativeState({ contextId, open: false, status: "closed", interactive: false });
+    setNativeState({ contextId, open: false, status: 'closed', interactive: false });
 
     const run = async () => {
       if (bridge) await bridge.close(contextId).catch(() => {});
       if (!alive || !botId) return;
       if (!bridge) {
-        setError(t("vm.workspace.desktopRequired"));
+        setError(t('vm.workspace.desktopRequired'));
         return;
       }
       try {
@@ -342,11 +330,11 @@ function LocalVmPane({
         });
         if (!alive) return;
         const bounds = elementBounds(viewportRef);
-        if (!bounds) throw new Error("layout-unavailable");
+        if (!bounds) throw new Error('layout-unavailable');
         const next = await bridge.open({
           contextId,
           url: viewerUrl,
-          title: t("vm.workspace.windowTitle", { name: botName }),
+          title: t('vm.workspace.windowTitle', { name: botName }),
           bounds,
         });
         if (!alive) {
@@ -354,15 +342,13 @@ function LocalVmPane({
           return;
         }
         setNativeState(next);
-        await bridge.layout([
-          { contextId, bounds, visible: !obscuredRef.current && next.open },
-        ]);
+        await bridge.layout([{ contextId, bounds, visible: !obscuredRef.current && next.open }]);
       } catch (cause) {
         if (!alive || controller.signal.aborted) return;
         setError(
-          cause instanceof Error && cause.message === "layout-unavailable"
-            ? t("vm.workspace.layoutUnavailable")
-            : t("vm.workspace.connectFailed"),
+          cause instanceof Error && cause.message === 'layout-unavailable'
+            ? t('vm.workspace.layoutUnavailable')
+            : t('vm.workspace.connectFailed'),
         );
       }
     };
@@ -374,7 +360,12 @@ function LocalVmPane({
       if (bridge) {
         operationRef.current = operationRef.current
           .catch(() => {})
-          .then(() => bridge.close(contextId).then(() => undefined).catch(() => {}));
+          .then(() =>
+            bridge
+              .close(contextId)
+              .then(() => undefined)
+              .catch(() => {}),
+          );
       }
     };
   }, [botId, botName, contextId, retry]);
@@ -395,7 +386,7 @@ function LocalVmPane({
     if (!bridge || !bounds || !nativeState.open) return;
     void bridge
       .layout([{ contextId, bounds, visible: !obscured }])
-      .catch(() => setError(t("vm.workspace.positionFailed")));
+      .catch(() => setError(t('vm.workspace.positionFailed')));
   }, [contextId, nativeState.open, obscured]);
 
   useEffect(() => {
@@ -403,127 +394,131 @@ function LocalVmPane({
     if (!element) return;
     const observer = new ResizeObserver(updateLayout);
     observer.observe(element);
-    window.addEventListener("resize", updateLayout);
+    window.addEventListener('resize', updateLayout);
     const frame = requestAnimationFrame(updateLayout);
     return () => {
       cancelAnimationFrame(frame);
       observer.disconnect();
-      window.removeEventListener("resize", updateLayout);
+      window.removeEventListener('resize', updateLayout);
     };
   }, [updateLayout]);
 
   const label = statusLabel(status, nativeState.status);
-  const canDrive = Boolean(bot && status?.ready && nativeState.status === "ready" && nativeState.open);
+  const canDrive = Boolean(
+    bot && status?.ready && nativeState.status === 'ready' && nativeState.open,
+  );
 
   return (
     <section
       className={cn(
-        "flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border bg-panel",
-        active ? "border-accent/80 shadow-[0_0_0_1px_rgb(var(--accent)/0.35)]" : "border-hairline/50",
-      )}
-    >
-      <div className="flex min-h-[68px] items-center gap-3 border-b border-hairline/40 px-3 py-2.5">
-        <div className="min-w-0 flex-1">
-          <label className="sr-only" htmlFor={`local-vm-slot-${index}`}>
-            {t("vm.workspace.paneLabel", { number: index + 1 })}
+        'flex min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border bg-panel',
+        active
+          ? 'border-accent/80 shadow-[0_0_0_1px_rgb(var(--accent)/0.35)]'
+          : 'border-hairline/50',
+      )}>
+      <div className='flex min-h-[68px] items-center gap-3 border-b border-hairline/40 px-3 py-2.5'>
+        <div className='min-w-0 flex-1'>
+          <label className='sr-only' htmlFor={`local-vm-slot-${index}`}>
+            {t('vm.workspace.paneLabel', { number: index + 1 })}
           </label>
-          <Select size="sm" className="w-full"
+          <Select
+            size='sm'
+            className='w-full'
             id={`local-vm-slot-${index}`}
-            value={bot?.id ?? ""}
+            value={bot?.id ?? ''}
             onChange={(event) => onSelect(event.target.value || null)}
-            disabled={controlPending}
-          >
-            <option value="">{t("vm.workspace.chooseBot")}</option>
+            disabled={controlPending}>
+            <option value=''>{t('vm.workspace.chooseBot')}</option>
             {bots.map((candidate) => (
-              <option key={candidate.id} value={candidate.id} disabled={candidate.id === otherBotId}>
+              <option
+                key={candidate.id}
+                value={candidate.id}
+                disabled={candidate.id === otherBotId}>
                 {candidate.name}
               </option>
             ))}
           </Select>
-          <div className="mt-1 flex items-center gap-1.5 text-[11px] text-ink-secondary">
+          <div className='mt-1 flex items-center gap-1.5 text-[11px] text-ink-secondary'>
             <span
               className={cn(
-                "h-1.5 w-1.5 rounded-full",
+                'h-1.5 w-1.5 rounded-full',
                 active
-                  ? "bg-accent"
-                  : nativeState.status === "ready"
-                    ? "bg-success"
-                    : nativeState.status === "error"
-                      ? "bg-danger"
-                      : "bg-ink-secondary/50",
+                  ? 'bg-accent'
+                  : nativeState.status === 'ready'
+                    ? 'bg-success'
+                    : nativeState.status === 'error'
+                      ? 'bg-danger'
+                      : 'bg-ink-secondary/50',
               )}
             />
-            {active ? t("vm.workspace.youHaveControl") : heldElsewhere ? t("vm.workspace.controlElsewhere") : label}
+            {active
+              ? t('vm.workspace.youHaveControl')
+              : heldElsewhere
+                ? t('vm.workspace.controlElsewhere')
+                : label}
           </div>
         </div>
         {bot && active ? (
           <button
-            type="button"
+            type='button'
             onClick={onRelease}
             disabled={controlPending}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-2.5 py-2 text-[12px] font-medium text-white hover:brightness-110 disabled:opacity-50"
-          >
-            {controlPending ? <Loader2 size={13} className="animate-spin" /> : <Hand size={13} />}
-            {t("vm.workspace.handBack")}
+            className='flex shrink-0 items-center gap-1.5 rounded-lg bg-accent px-2.5 py-2 text-[12px] font-medium text-white hover:brightness-110 disabled:opacity-50'>
+            {controlPending ? <Loader2 size={13} className='animate-spin' /> : <Hand size={13} />}
+            {t('vm.workspace.handBack')}
           </button>
         ) : bot ? (
           <button
-            type="button"
+            type='button'
             onClick={() => onTake(bot.id)}
             disabled={!canDrive || controlPending || heldElsewhere}
-            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-raised px-2.5 py-2 text-[12px] text-ink hover:bg-raised-hover disabled:opacity-45"
-            title={t("vm.workspace.takeControlTitle")}
-          >
-            {controlPending ? <Loader2 size={13} className="animate-spin" /> : <Hand size={13} />}
-            {heldElsewhere ? t("vm.workspace.heldElsewhere") : t("vm.workspace.takeControl")}
+            className='flex shrink-0 items-center gap-1.5 rounded-lg bg-raised px-2.5 py-2 text-[12px] text-ink hover:bg-raised-hover disabled:opacity-45'
+            title={t('vm.workspace.takeControlTitle')}>
+            {controlPending ? <Loader2 size={13} className='animate-spin' /> : <Hand size={13} />}
+            {heldElsewhere ? t('vm.workspace.heldElsewhere') : t('vm.workspace.takeControl')}
           </button>
         ) : null}
       </div>
 
-      <div
-        ref={viewportRef}
-        data-native-view-host
-        className="relative min-h-0 flex-1 bg-[#070707]"
-      >
-        <div className="absolute inset-0 flex items-center justify-center p-6 text-center">
+      <div ref={viewportRef} data-native-view-host className='relative min-h-0 flex-1 bg-[#070707]'>
+        <div className='absolute inset-0 flex items-center justify-center p-6 text-center'>
           {!bot ? (
-            <div className="flex max-w-[260px] flex-col items-center gap-2 text-ink-secondary">
+            <div className='flex max-w-[260px] flex-col items-center gap-2 text-ink-secondary'>
               <Monitor size={22} />
-              <span className="text-[12px]">{t("vm.workspace.chooseAnother")}</span>
+              <span className='text-[12px]'>{t('vm.workspace.chooseAnother')}</span>
             </div>
           ) : !status && !error ? (
-            <div className="flex items-center gap-2 text-[12px] text-ink-secondary">
-              <Loader2 size={15} className="animate-spin" /> {t("vm.workspace.checking", { name: bot.name })}
+            <div className='flex items-center gap-2 text-[12px] text-ink-secondary'>
+              <Loader2 size={15} className='animate-spin' />{' '}
+              {t('vm.workspace.checking', { name: bot.name })}
             </div>
-          ) : status?.ready && nativeState.status !== "error" && !error ? (
-            <div className="flex items-center gap-2 text-[12px] text-ink-secondary">
-              <Loader2 size={15} className="animate-spin" /> {t("vm.workspace.connecting")}
+          ) : status?.ready && nativeState.status !== 'error' && !error ? (
+            <div className='flex items-center gap-2 text-[12px] text-ink-secondary'>
+              <Loader2 size={15} className='animate-spin' /> {t('vm.workspace.connecting')}
             </div>
           ) : (
-            <div className="flex max-w-[300px] flex-col items-center gap-3 text-ink-secondary">
-              <AlertTriangle size={21} className="text-warning" />
-              <div className="text-[12px] leading-relaxed">
+            <div className='flex max-w-[300px] flex-col items-center gap-3 text-ink-secondary'>
+              <AlertTriangle size={21} className='text-warning' />
+              <div className='text-[12px] leading-relaxed'>
                 {error ??
-                  (status?.container === "missing"
-                    ? t("vm.workspace.notCreated", { name: bot.name })
-                    : status?.container === "stopped"
-                      ? t("vm.workspace.stopped", { name: bot.name })
-                      : t("vm.workspace.notReady", { name: bot.name }))}
+                  (status?.container === 'missing'
+                    ? t('vm.workspace.notCreated', { name: bot.name })
+                    : status?.container === 'stopped'
+                      ? t('vm.workspace.stopped', { name: bot.name })
+                      : t('vm.workspace.notReady', { name: bot.name }))}
               </div>
-              <div className="flex gap-2">
+              <div className='flex gap-2'>
                 <button
-                  type="button"
+                  type='button'
                   onClick={() => setRetry((value) => value + 1)}
-                  className="flex items-center gap-1.5 rounded-lg bg-raised px-3 py-2 text-[12px] text-ink hover:bg-raised-hover"
-                >
-                  <RefreshCw size={13} /> {t("vm.workspace.retryStatus")}
+                  className='flex items-center gap-1.5 rounded-lg bg-raised px-3 py-2 text-[12px] text-ink hover:bg-raised-hover'>
+                  <RefreshCw size={13} /> {t('vm.workspace.retryStatus')}
                 </button>
                 <button
-                  type="button"
+                  type='button'
                   onClick={() => onOpenComputer(bot.id)}
-                  className="rounded-lg bg-raised px-3 py-2 text-[12px] text-ink hover:bg-raised-hover"
-                >
-                  {t("vm.workspace.openComputer")}
+                  className='rounded-lg bg-raised px-3 py-2 text-[12px] text-ink hover:bg-raised-hover'>
+                  {t('vm.workspace.openComputer')}
                 </button>
               </div>
             </div>
@@ -543,7 +538,7 @@ export function LocalVmWorkspace({
   const { state, dispatch } = useStore();
   const { dragProps } = useCaptionChrome();
   const eligibleBots = useMemo(
-    () => state.bots.filter((bot) => bot.computer === "vm" && !bot.hidden),
+    () => state.bots.filter((bot) => bot.computer === 'vm' && !bot.hidden),
     [state.bots],
   );
   const [slots, setSlots] = useState<LocalVmWorkspaceSlots>(() =>
@@ -570,7 +565,7 @@ export function LocalVmWorkspace({
     () => ({
       async take(botId) {
         const snapshot = await transitionComputerControlLease({
-          action: "take",
+          action: 'take',
           syncNativeBrowser: true,
           requestControl: (action) => requestComputerControl(botId, action, controlLeaseId),
           setNativeBrowserControl: (held) => setNativeBrowserControl(botId, held),
@@ -582,7 +577,7 @@ export function LocalVmWorkspace({
       },
       async release(botId) {
         const snapshot = await transitionComputerControlLease({
-          action: "release",
+          action: 'release',
           syncNativeBrowser: true,
           requestControl: (action) => requestComputerControl(botId, action, controlLeaseId),
           setNativeBrowserControl: (held) => setNativeBrowserControl(botId, held),
@@ -593,7 +588,7 @@ export function LocalVmWorkspace({
       },
       async setInteractive(contextId) {
         const bridge = window.ogb?.desktopWorkspace;
-        if (!bridge) throw new Error(t("vm.workspace.bridgeUnavailable"));
+        if (!bridge) throw new Error(t('vm.workspace.bridgeUnavailable'));
         return bridge.setInteractive(contextId);
       },
     }),
@@ -617,8 +612,7 @@ export function LocalVmWorkspace({
         try {
           const snapshot = await readComputerControl(botId);
           if (alive) dispatchControl(dispatch, botId, snapshot);
-        } catch {
-        }
+        } catch {}
       }
     };
     void readSelected();
@@ -635,7 +629,7 @@ export function LocalVmWorkspace({
         setControlledBotId(null);
       })
       .catch(() => {
-        setControlError(t("vm.workspace.handoffFailed"));
+        setControlError(t('vm.workspace.handoffFailed'));
       });
   }, [controlPort, slots]);
 
@@ -660,13 +654,10 @@ export function LocalVmWorkspace({
     };
   }, [controlLeaseId]);
 
-  const contextForBot = useCallback(
-    (botId: string) => {
-      const index = slotsRef.current.indexOf(botId);
-      return index < 0 ? null : SLOT_CONTEXTS[index];
-    },
-    [],
-  );
+  const contextForBot = useCallback((botId: string) => {
+    const index = slotsRef.current.indexOf(botId);
+    return index < 0 ? null : SLOT_CONTEXTS[index];
+  }, []);
 
   const handBack = useCallback(async () => {
     const current = controlledBotIdRef.current;
@@ -680,7 +671,7 @@ export function LocalVmWorkspace({
       setControlledBotId(null);
       return true;
     } catch {
-      setControlError(t("vm.workspace.handBackFailed", { app: productName() }));
+      setControlError(t('vm.workspace.handBackFailed', { app: productName() }));
       return false;
     } finally {
       controlBusyRef.current = false;
@@ -702,7 +693,7 @@ export function LocalVmWorkspace({
           ...controlPort,
           async setInteractive(nextContextId) {
             if (nextContextId && contextForBot(botId) !== nextContextId) {
-              throw new Error(t("vm.workspace.paneChanged"));
+              throw new Error(t('vm.workspace.paneChanged'));
             }
             return controlPort.setInteractive(nextContextId);
           },
@@ -714,8 +705,8 @@ export function LocalVmWorkspace({
           contextId,
         );
         setControlledBotId(null);
-        if (result.status === "held-elsewhere") {
-          setControlError(t("vm.workspace.alreadyControlled"));
+        if (result.status === 'held-elsewhere') {
+          setControlError(t('vm.workspace.alreadyControlled'));
           return;
         }
         if (!mountedRef.current) {
@@ -725,7 +716,7 @@ export function LocalVmWorkspace({
         setControlledBotId(botId);
       } catch {
         setControlledBotId(controlledBotIdRef.current);
-        setControlError(t("vm.workspace.switchFailed"));
+        setControlError(t('vm.workspace.switchFailed'));
       } finally {
         controlBusyRef.current = false;
         setControlPending(false);
@@ -762,35 +753,38 @@ export function LocalVmWorkspace({
   );
 
   return (
-    <main className="flex h-full min-w-0 flex-1 flex-col bg-app">
-      <header {...dragProps} className="flex min-h-[60px] items-center gap-3 border-b border-hairline/40 px-5 py-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent">
+    <main className='flex h-full min-w-0 flex-1 flex-col bg-app'>
+      <header
+        {...dragProps}
+        className='flex min-h-[60px] items-center gap-3 border-b border-hairline/40 px-5 py-3'>
+        <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent'>
           <Monitor size={18} />
         </div>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[14px] font-semibold text-ink">{t("vm.workspace.viewTitle")}</h1>
-          <p className="truncate text-[12px] text-ink-secondary">
-            {t("vm.workspace.viewSubtitle")}
+        <div className='min-w-0 flex-1'>
+          <h1 className='truncate text-[14px] font-semibold text-ink'>
+            {t('vm.workspace.viewTitle')}
+          </h1>
+          <p className='truncate text-[12px] text-ink-secondary'>
+            {t('vm.workspace.viewSubtitle')}
           </p>
         </div>
         <button
-          type="button"
+          type='button'
           onClick={() => void closeWorkspace()}
           disabled={controlPending}
-          className="rounded-md p-1.5 text-ink-secondary hover:bg-raised hover:text-ink disabled:opacity-50"
-          aria-label={t("vm.workspace.closeView")}
-        >
+          className='rounded-md p-1.5 text-ink-secondary hover:bg-raised hover:text-ink disabled:opacity-50'
+          aria-label={t('vm.workspace.closeView')}>
           <X size={18} />
         </button>
       </header>
 
       {controlError && (
-        <div className="mx-3 mt-3 flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">
-          <AlertTriangle size={14} className="shrink-0" /> {controlError}
+        <div className='mx-3 mt-3 flex items-center gap-2 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger'>
+          <AlertTriangle size={14} className='shrink-0' /> {controlError}
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-2 gap-3 p-3">
+      <div className='grid min-h-0 flex-1 grid-cols-2 gap-3 p-3'>
         {([0, 1] as const).map((index) => {
           const botId = slots[index];
           const bot = eligibleBots.find((candidate) => candidate.id === botId) ?? null;
@@ -804,7 +798,7 @@ export function LocalVmWorkspace({
               obscured={obscured}
               active={Boolean(bot && controlledBotId === bot.id)}
               heldElsewhere={Boolean(
-                bot && state.computerControl[bot.id]?.held && controlledBotId !== bot.id
+                bot && state.computerControl[bot.id]?.held && controlledBotId !== bot.id,
               )}
               controlPending={controlPending}
               onSelect={(next) => void selectSlot(index, next)}

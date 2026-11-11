@@ -2,23 +2,23 @@
 // calls Public (Windows 11 calls a newly joined Wi-Fi Public) unless a rule
 // allows the program, and the per-user installer adds none. This only finds
 // the Public network, so the pairing panel can say what to change.
-import { execFile } from "node:child_process";
+import { execFile } from 'node:child_process';
 
 /** One line per connected network: "<InterfaceAlias>\t<NetworkCategory>". The
  * alias is the adapter name `os.networkInterfaces()` reports. UTF-8 output so a
  * localized alias survives the pipe; no quote characters, since the script
  * travels as one argv entry. */
 const SCRIPT =
-  "[Console]::OutputEncoding = [Text.Encoding]::UTF8; " +
-  "Get-NetConnectionProfile | ForEach-Object { $_.InterfaceAlias + [char]9 + $_.NetworkCategory }";
+  '[Console]::OutputEncoding = [Text.Encoding]::UTF8; ' +
+  'Get-NetConnectionProfile | ForEach-Object { $_.InterfaceAlias + [char]9 + $_.NetworkCategory }';
 
 /** Anything unreadable is not Public: this only adds a hint, so a wrong "no"
  * costs nothing and a wrong "yes" would mislead. */
 export function publicNetworkAliases(output: string): Set<string> {
   const aliases = new Set<string>();
   for (const line of output.split(/\r?\n/)) {
-    const tab = line.lastIndexOf("\t");
-    if (tab > 0 && line.slice(tab + 1).trim() === "Public") aliases.add(line.slice(0, tab));
+    const tab = line.lastIndexOf('\t');
+    if (tab > 0 && line.slice(tab + 1).trim() === 'Public') aliases.add(line.slice(0, tab));
   }
   return aliases;
 }
@@ -26,9 +26,9 @@ export function publicNetworkAliases(output: string): Set<string> {
 const getNetConnectionProfile = (): Promise<string> =>
   new Promise((resolve, reject) => {
     execFile(
-      "powershell.exe",
-      ["-NoProfile", "-NonInteractive", "-Command", SCRIPT],
-      { timeout: 5_000, killSignal: "SIGKILL", windowsHide: true },
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-Command', SCRIPT],
+      { timeout: 5_000, killSignal: 'SIGKILL', windowsHide: true },
       (error, stdout) => (error ? reject(error) : resolve(stdout)),
     );
   });
@@ -54,12 +54,16 @@ export function createPublicNetworkCheck({
   let checkedAt = Number.NEGATIVE_INFINITY;
   let asking = false;
   return () => {
-    if (platform !== "win32" || asking || now() - checkedAt < maxAgeMs) return known;
+    if (platform !== 'win32' || asking || now() - checkedAt < maxAgeMs) return known;
     asking = true;
     run()
       .then(
-        (output) => { known = publicNetworkAliases(output); },
-        () => { known = new Set(); },
+        (output) => {
+          known = publicNetworkAliases(output);
+        },
+        () => {
+          known = new Set();
+        },
       )
       .finally(() => {
         checkedAt = now();

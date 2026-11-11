@@ -3,12 +3,12 @@
 // used under the MIT License (third_party/t3-code/LICENSE). Modified: renamed
 // globals.
 
-import type { CdpSession } from "./connection.ts";
-import { isGone } from "./errors.ts";
-import { WORLD_NAME } from "./frames.ts";
-import { AUTH_PATTERNS } from "./auth.ts";
-import type { IdentityOverride } from "./identity.ts";
-import { NO_PASSKEY_COMMANDS } from "./passkeys.ts";
+import type { CdpSession } from './connection.ts';
+import { isGone } from './errors.ts';
+import { WORLD_NAME } from './frames.ts';
+import { AUTH_PATTERNS } from './auth.ts';
+import type { IdentityOverride } from './identity.ts';
+import { NO_PASSKEY_COMMANDS } from './passkeys.ts';
 
 export const CLIPBOARD_TEXT_LIMIT = 1024 * 1024;
 
@@ -65,72 +65,94 @@ const AUTO_ATTACH = { autoAttach: true, waitForDebuggerOnStart: true, flatten: t
  * then lets it run. CDP runs one session's commands in order, so everything
  * lands before the first script.
  */
-export async function setUpDocumentSession(session: CdpSession, setup: TargetSetup, { isPage }: { isPage: boolean }): Promise<void> {
+export async function setUpDocumentSession(
+  session: CdpSession,
+  setup: TargetSetup,
+  { isPage }: { isPage: boolean },
+): Promise<void> {
   const calls: Array<Promise<unknown>> = [
-    session.send("Page.enable"),
-    session.send("Page.setLifecycleEventsEnabled", { enabled: true }),
-    session.send("Network.enable"),
-    session.send("Log.enable"),
+    session.send('Page.enable'),
+    session.send('Page.setLifecycleEventsEnabled', { enabled: true }),
+    session.send('Network.enable'),
+    session.send('Log.enable'),
   ];
-  if (setup.identity) calls.push(session.send("Emulation.setUserAgentOverride", { ...setup.identity }));
-  if (isPage && setup.focusEmulation) calls.push(session.send("Emulation.setFocusEmulationEnabled", { enabled: true }));
-  if (isPage && setup.handleAuth) calls.push(session.send("Fetch.enable", { patterns: AUTH_PATTERNS, handleAuthRequests: true }));
+  if (setup.identity)
+    calls.push(session.send('Emulation.setUserAgentOverride', { ...setup.identity }));
+  if (isPage && setup.focusEmulation)
+    calls.push(session.send('Emulation.setFocusEmulationEnabled', { enabled: true }));
+  if (isPage && setup.handleAuth)
+    calls.push(session.send('Fetch.enable', { patterns: AUTH_PATTERNS, handleAuthRequests: true }));
   // A Chrome without the WebAuthn domain still opens its pages: their passkey requests are then left as they were.
-  if (isPage && setup.noPasskeys) for (const [method, params] of NO_PASSKEY_COMMANDS) void session.send(method, params).catch(() => {});
+  if (isPage && setup.noPasskeys)
+    for (const [method, params] of NO_PASSKEY_COMMANDS)
+      void session.send(method, params).catch(() => {});
   calls.push(
-    session.send("Page.setInterceptFileChooserDialog", { enabled: setup.interceptFileChooser }),
-    session.send("Page.addScriptToEvaluateOnNewDocument", { source: BOOTSTRAP, worldName: WORLD_NAME, runImmediately: true }),
-    session.send("Target.setAutoAttach", AUTO_ATTACH),
+    session.send('Page.setInterceptFileChooserDialog', { enabled: setup.interceptFileChooser }),
+    session.send('Page.addScriptToEvaluateOnNewDocument', {
+      source: BOOTSTRAP,
+      worldName: WORLD_NAME,
+      runImmediately: true,
+    }),
+    session.send('Target.setAutoAttach', AUTO_ATTACH),
   );
-  const released = session.send("Runtime.runIfWaitingForDebugger");
+  const released = session.send('Runtime.runIfWaitingForDebugger');
   const results = await Promise.allSettled([...calls, released]);
-  const failed = results.find((result): result is PromiseRejectedResult => result.status === "rejected");
+  const failed = results.find(
+    (result): result is PromiseRejectedResult => result.status === 'rejected',
+  );
   if (failed && !isGone(failed.reason)) throw failed.reason;
 }
 
 /** Workers get the identity, and nothing else, before their first line runs. */
 export function setUpWorkerSession(session: CdpSession, identity: IdentityOverride | null): void {
   if (identity) {
-    void session.send("Emulation.setUserAgentOverride", { ...identity }).catch(() => {});
-    void session.send("Network.setUserAgentOverride", { ...identity }).catch(() => {});
+    void session.send('Emulation.setUserAgentOverride', { ...identity }).catch(() => {});
+    void session.send('Network.setUserAgentOverride', { ...identity }).catch(() => {});
   }
-  void session.send("Target.setAutoAttach", AUTO_ATTACH).catch(() => {});
-  void session.send("Runtime.runIfWaitingForDebugger").catch(() => {});
+  void session.send('Target.setAutoAttach', AUTO_ATTACH).catch(() => {});
+  void session.send('Runtime.runIfWaitingForDebugger').catch(() => {});
 }
 
 export function releaseSession(session: CdpSession): void {
-  void session.send("Runtime.runIfWaitingForDebugger").catch(() => {});
+  void session.send('Runtime.runIfWaitingForDebugger').catch(() => {});
 }
 
 /** Granted, as a normal profile has them; denied, which keeps the OS permission prompts away and agrees with Notification.permission. */
-export const PERMISSIONS: ReadonlyArray<{ name: string; setting: "granted" | "denied"; extra?: Record<string, unknown> }> = [
-  { name: "clipboard-write", setting: "granted" },
-  { name: "storage-access", setting: "granted" },
-  { name: "top-level-storage-access", setting: "granted" },
-  { name: "persistent-storage", setting: "granted" },
-  { name: "background-sync", setting: "granted" },
-  { name: "notifications", setting: "denied" },
-  { name: "geolocation", setting: "denied" },
-  { name: "camera", setting: "denied" },
-  { name: "microphone", setting: "denied" },
-  { name: "clipboard-read", setting: "denied" },
-  { name: "midi", setting: "denied" },
-  { name: "midi", setting: "denied", extra: { sysex: true } },
-  { name: "accelerometer", setting: "denied" },
-  { name: "gyroscope", setting: "denied" },
-  { name: "magnetometer", setting: "denied" },
-  { name: "ambient-light-sensor", setting: "denied" },
-  { name: "idle-detection", setting: "denied" },
-  { name: "local-network-access", setting: "denied" },
-  { name: "window-management", setting: "denied" },
-  { name: "display-capture", setting: "denied" },
-  { name: "nfc", setting: "denied" },
-  { name: "payment-handler", setting: "denied" },
+export const PERMISSIONS: ReadonlyArray<{
+  name: string;
+  setting: 'granted' | 'denied';
+  extra?: Record<string, unknown>;
+}> = [
+  { name: 'clipboard-write', setting: 'granted' },
+  { name: 'storage-access', setting: 'granted' },
+  { name: 'top-level-storage-access', setting: 'granted' },
+  { name: 'persistent-storage', setting: 'granted' },
+  { name: 'background-sync', setting: 'granted' },
+  { name: 'notifications', setting: 'denied' },
+  { name: 'geolocation', setting: 'denied' },
+  { name: 'camera', setting: 'denied' },
+  { name: 'microphone', setting: 'denied' },
+  { name: 'clipboard-read', setting: 'denied' },
+  { name: 'midi', setting: 'denied' },
+  { name: 'midi', setting: 'denied', extra: { sysex: true } },
+  { name: 'accelerometer', setting: 'denied' },
+  { name: 'gyroscope', setting: 'denied' },
+  { name: 'magnetometer', setting: 'denied' },
+  { name: 'ambient-light-sensor', setting: 'denied' },
+  { name: 'idle-detection', setting: 'denied' },
+  { name: 'local-network-access', setting: 'denied' },
+  { name: 'window-management', setting: 'denied' },
+  { name: 'display-capture', setting: 'denied' },
+  { name: 'nfc', setting: 'denied' },
+  { name: 'payment-handler', setting: 'denied' },
 ];
 
 /** Returns the permission names this Chrome does not know. */
 export async function applyPermissions(root: CdpSession): Promise<string[]> {
-  const results = await Promise.allSettled(PERMISSIONS.map(({ name, setting, extra }) =>
-    root.send("Browser.setPermission", { permission: { name, ...extra }, setting })));
-  return PERMISSIONS.filter((_, i) => results[i]!.status === "rejected").map(({ name }) => name);
+  const results = await Promise.allSettled(
+    PERMISSIONS.map(({ name, setting, extra }) =>
+      root.send('Browser.setPermission', { permission: { name, ...extra }, setting }),
+    ),
+  );
+  return PERMISSIONS.filter((_, i) => results[i]!.status === 'rejected').map(({ name }) => name);
 }

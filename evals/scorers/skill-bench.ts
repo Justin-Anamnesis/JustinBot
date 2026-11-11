@@ -1,11 +1,11 @@
-import type { ScenarioResult } from "./snapshot.ts";
+import type { ScenarioResult } from './snapshot.ts';
 import type {
   SkillBenchArmRun,
   SkillBenchArmSummary,
   SkillBenchAssertionDelta,
   SkillBenchFixture,
   SkillBenchReport,
-} from "../runners/run-skill-bench.ts";
+} from '../runners/run-skill-bench.ts';
 
 /** Pure scorers for the skill bench. The runner only produces arm runs
  * (with-skill and without-skill ScenarioResults); every number in the
@@ -46,7 +46,10 @@ function armSummary(runs: SkillBenchArmRun[]): SkillBenchArmSummary {
     runs: runs.length,
     passed: assertionResults.filter((assertion) => assertion.pass).length,
     total: assertionResults.length,
-    passRate: assertionResults.length === 0 ? 0 : assertionResults.filter((a) => a.pass).length / assertionResults.length,
+    passRate:
+      assertionResults.length === 0
+        ? 0
+        : assertionResults.filter((a) => a.pass).length / assertionResults.length,
     durationMeanMs: mean(durations),
     durationStddevMs: stddev(durations),
     estimatedTokensMean: mean(tokens),
@@ -60,26 +63,34 @@ function armSummary(runs: SkillBenchArmRun[]): SkillBenchArmSummary {
  * useful as controls; the flag keeps them out of the effect story.
  * Deltas are computed per prompt from each run's own assertion list, so
  * prompts may assert different things without bleeding into each other. */
-function assertionDeltas(bench: SkillBenchFixture, runs: SkillBenchArmRun[]): SkillBenchAssertionDelta[] {
+function assertionDeltas(
+  bench: SkillBenchFixture,
+  runs: SkillBenchArmRun[],
+): SkillBenchAssertionDelta[] {
   const deltas: SkillBenchAssertionDelta[] = [];
   for (const prompt of bench.prompts) {
     const promptRuns = runs.filter((run) => run.promptId === prompt.id);
     prompt.assertions.forEach((assertion, index) => {
-      const withRuns = promptRuns.filter((run) => run.arm === "with");
-      const withoutRuns = promptRuns.filter((run) => run.arm === "without");
-      const withPasses = withRuns.filter((run) => run.result.assertions[index]?.pass === true).length;
-      const withoutPasses = withoutRuns.filter((run) => run.result.assertions[index]?.pass === true).length;
+      const withRuns = promptRuns.filter((run) => run.arm === 'with');
+      const withoutRuns = promptRuns.filter((run) => run.arm === 'without');
+      const withPasses = withRuns.filter(
+        (run) => run.result.assertions[index]?.pass === true,
+      ).length;
+      const withoutPasses = withoutRuns.filter(
+        (run) => run.result.assertions[index]?.pass === true,
+      ).length;
       const withRate = withRuns.length === 0 ? 0 : withPasses / withRuns.length;
       const withoutRate = withoutRuns.length === 0 ? 0 : withoutPasses / withoutRuns.length;
       // High variance: within this prompt and arm, replicates of the same
       // run disagree about this assertion. Only assessable with n >= 2.
       let highVariance = false;
-      for (const arm of ["with", "without"] as const) {
+      for (const arm of ['with', 'without'] as const) {
         const group = promptRuns.filter((run) => run.arm === arm);
         const verdicts = new Set(group.map((run) => run.result.assertions[index]?.pass === true));
         if (group.length >= 2 && verdicts.size > 1) highVariance = true;
       }
-      const label = "#" + index + " " + assertion.kind + ("bot" in assertion ? " (" + assertion.bot + ")" : "");
+      const label =
+        '#' + index + ' ' + assertion.kind + ('bot' in assertion ? ' (' + assertion.bot + ')' : '');
       deltas.push({
         promptId: prompt.id,
         index,
@@ -99,7 +110,10 @@ function assertionDeltas(bench: SkillBenchFixture, runs: SkillBenchArmRun[]): Sk
   return deltas;
 }
 
-export function scoreSkillBench(bench: SkillBenchFixture, runs: SkillBenchArmRun[]): SkillBenchReport {
+export function scoreSkillBench(
+  bench: SkillBenchFixture,
+  runs: SkillBenchArmRun[],
+): SkillBenchReport {
   const assertions = assertionDeltas(bench, runs);
   return {
     fixtureId: bench.id,
@@ -120,19 +134,24 @@ export function scoreSkillBench(bench: SkillBenchFixture, runs: SkillBenchArmRun
           estimatedTokens: estimateTokens(run.result),
           failedAssertions: run.result.assertions
             .filter((assertion) => !assertion.pass)
-            .map((assertion) => assertion.assertion.kind + ": " + assertion.detail.replaceAll("\n", " ")),
+            .map(
+              (assertion) =>
+                assertion.assertion.kind + ': ' + assertion.detail.replaceAll('\n', ' '),
+            ),
           error: run.result.error,
         })),
     })),
     assertions,
     summary: {
-      withSkill: armSummary(runs.filter((run) => run.arm === "with")),
-      withoutSkill: armSummary(runs.filter((run) => run.arm === "without")),
+      withSkill: armSummary(runs.filter((run) => run.arm === 'with')),
+      withoutSkill: armSummary(runs.filter((run) => run.arm === 'without')),
       flags: {
         nonDiscriminating: assertions.filter((assertion) => assertion.nonDiscriminating).length,
         highVariance: assertions.filter((assertion) => assertion.highVariance).length,
       },
     },
-    errors: runs.filter((run) => run.result.error !== undefined).map((run) => run.promptId + "/" + run.arm + "#" + run.replicate + ": " + run.result.error),
+    errors: runs
+      .filter((run) => run.result.error !== undefined)
+      .map((run) => run.promptId + '/' + run.arm + '#' + run.replicate + ': ' + run.result.error),
   };
 }

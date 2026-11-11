@@ -2,7 +2,7 @@ import {
   ControlPlaneError,
   normalizeAccountEmail,
   normalizeControlPlaneURL,
-} from "./control-plane-client.mjs";
+} from './control-plane-client.mjs';
 import {
   MANAGED_COMPANION_ENDPOINT_FIELD,
   MANAGED_COMPANION_RELEASE_AT_FIELD,
@@ -10,32 +10,32 @@ import {
   normalizeManagedCompanionEndpoint,
   withManagedCompanionTunnelAccess,
   withoutManagedCompanionTunnelAccess,
-} from "./managed-companion-tunnel.mjs";
-import { MANAGED_ENDPOINT_PHONES_UNUSED } from "./companion-endpoint-need.mjs";
-import { FRIENDLY_MESSAGES, friendlyCompanionAccountError } from "./companion-account-messages.mjs";
+} from './managed-companion-tunnel.mjs';
+import { MANAGED_ENDPOINT_PHONES_UNUSED } from './companion-endpoint-need.mjs';
+import { FRIENDLY_MESSAGES, friendlyCompanionAccountError } from './companion-account-messages.mjs';
 export { friendlyCompanionAccountError };
 
-export { managedEndpointNeed, PHONE_UNUSED_RELEASE_MS } from "./companion-endpoint-need.mjs";
+export { managedEndpointNeed, PHONE_UNUSED_RELEASE_MS } from './companion-endpoint-need.mjs';
 
-export const DEFAULT_COMPANION_CONTROL_PLANE_URL = "https://accounts.openmausbot.com";
+export const DEFAULT_COMPANION_CONTROL_PLANE_URL = 'https://accounts.openmausbot.com';
 
-export const COMPANION_CLIENT_INSTANCE_FIELD = "companionClientInstanceId";
-export const COMPANION_ACCOUNT_TOKEN_FIELD = "companionAccountToken";
-export const COMPANION_ACCOUNT_USER_ID_FIELD = "companionAccountUserId";
-export const COMPANION_ACCOUNT_EMAIL_FIELD = "companionAccountEmail";
-export const COMPANION_INSTALLATION_ID_FIELD = "companionInstallationId";
-export const COMPANION_INSTALLATION_CREDENTIAL_FIELD = "companionInstallationCredential";
-export const COMPANION_INSTALLATION_EXPIRY_FIELD = "companionInstallationCredentialExpiresAt";
-export const COMPANION_ACCOUNT_CLEANUP_PENDING_FIELD = "companionAccountCleanupPending";
-export const COMPANION_ENDPOINT_RELEASE_PENDING_FIELD = "companionEndpointReleasePending";
+export const COMPANION_CLIENT_INSTANCE_FIELD = 'companionClientInstanceId';
+export const COMPANION_ACCOUNT_TOKEN_FIELD = 'companionAccountToken';
+export const COMPANION_ACCOUNT_USER_ID_FIELD = 'companionAccountUserId';
+export const COMPANION_ACCOUNT_EMAIL_FIELD = 'companionAccountEmail';
+export const COMPANION_INSTALLATION_ID_FIELD = 'companionInstallationId';
+export const COMPANION_INSTALLATION_CREDENTIAL_FIELD = 'companionInstallationCredential';
+export const COMPANION_INSTALLATION_EXPIRY_FIELD = 'companionInstallationCredentialExpiresAt';
+export const COMPANION_ACCOUNT_CLEANUP_PENDING_FIELD = 'companionAccountCleanupPending';
+export const COMPANION_ENDPOINT_RELEASE_PENDING_FIELD = 'companionEndpointReleasePending';
 /** The address was given back while phones were paired but unused; the control plane keeps its hostname. */
-export const COMPANION_ENDPOINT_PAUSED_FIELD = "companionEndpointPaused";
+export const COMPANION_ENDPOINT_PAUSED_FIELD = 'companionEndpointPaused';
 /** The control plane ended this computer's secure address for old phone apps: phones connect through the relay only. */
-export const COMPANION_TUNNEL_RETIRED_FIELD = "companionTunnelRetired";
+export const COMPANION_TUNNEL_RETIRED_FIELD = 'companionTunnelRetired';
 /** The control plane holds no address for this computer although an old phone would use one (ended for old phone
  * apps, or every account full): the watchdog keeps asking, so the address returns when the relay is switched off
  * or room frees up. */
-export const COMPANION_TUNNEL_WAITING_FIELD = "companionTunnelWaiting";
+export const COMPANION_TUNNEL_WAITING_FIELD = 'companionTunnelWaiting';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const INSTALLATION_ID = UUID;
@@ -51,23 +51,23 @@ const DEFAULT_RELEASE_JITTER_MS = 3 * 60 * 60_000;
 const REQUEST_WINDOW_MS = 60 * 60_000;
 
 const AUTO_RETRY_CODES = new Set([
-  "endpoint_capacity",
-  "endpoint_rate_limited",
-  "endpoint_unavailable",
-  "endpoint_busy",
-  "network_unavailable",
-  "control_plane_unavailable",
-  "internal_error",
-  "rate_limited",
-  "credential_rotation_rate_limited",
+  'endpoint_capacity',
+  'endpoint_rate_limited',
+  'endpoint_unavailable',
+  'endpoint_busy',
+  'network_unavailable',
+  'control_plane_unavailable',
+  'internal_error',
+  'rate_limited',
+  'credential_rotation_rate_limited',
 ]);
 
-const ENDPOINT_NEEDS_RECONCILE = new Set(["deleting", "deleted", "error"]);
+const ENDPOINT_NEEDS_RECONCILE = new Set(['deleting', 'deleted', 'error']);
 
 /** "ready" too: the connector verifies its route once, so after a long sleep it can report ready for a reclaimed tunnel. */
-const WATCHDOG_CHECK_STATES = new Set(["starting", "ready", "retrying", "error"]);
+const WATCHDOG_CHECK_STATES = new Set(['starting', 'ready', 'retrying', 'error']);
 
-const CONNECTOR_FAILING_STATES = new Set(["retrying", "error"]);
+const CONNECTOR_FAILING_STATES = new Set(['retrying', 'error']);
 
 const defaultSetTimer = (callback, milliseconds) => {
   const timer = setTimeout(callback, milliseconds);
@@ -76,17 +76,14 @@ const defaultSetTimer = (callback, milliseconds) => {
 };
 
 const ownString = (document, field) =>
-  typeof document?.[field] === "string" ? document[field] : "";
+  typeof document?.[field] === 'string' ? document[field] : '';
 
 /** Development must name an exact origin so an OTP or bearer never reaches an accidental host; an invalid override disables the feature. */
-export function resolveCompanionControlPlaneURL({
-  isPackaged,
-  environment = process.env,
-} = {}) {
-  if (Object.hasOwn(environment, "OMB_CONTROL_PLANE_URL")) {
+export function resolveCompanionControlPlaneURL({ isPackaged, environment = process.env } = {}) {
+  if (Object.hasOwn(environment, 'OMB_CONTROL_PLANE_URL')) {
     return normalizeControlPlaneURL(environment.OMB_CONTROL_PLANE_URL);
   }
-  return isPackaged ? DEFAULT_COMPANION_CONTROL_PLANE_URL : "";
+  return isPackaged ? DEFAULT_COMPANION_CONTROL_PLANE_URL : '';
 }
 
 export function companionAccountCleanupPending(credentials) {
@@ -103,12 +100,12 @@ function storedAccount(credentials) {
     accountToken: ownString(credentials, COMPANION_ACCOUNT_TOKEN_FIELD),
     installationId: INSTALLATION_ID.test(ownString(credentials, COMPANION_INSTALLATION_ID_FIELD))
       ? credentials[COMPANION_INSTALLATION_ID_FIELD]
-      : "",
+      : '',
     installationCredential: INSTALLATION_CREDENTIAL.test(
       ownString(credentials, COMPANION_INSTALLATION_CREDENTIAL_FIELD),
     )
       ? credentials[COMPANION_INSTALLATION_CREDENTIAL_FIELD]
-      : "",
+      : '',
   };
 }
 
@@ -149,7 +146,10 @@ function withInstallationCredentials(credentials, installation) {
 
 function withProvisionedAccount(credentials, { accountToken, user, installation, provision }) {
   const next = {
-    ...withInstallationCredentials(withManagedCompanionTunnelAccess(credentials, provision), installation),
+    ...withInstallationCredentials(
+      withManagedCompanionTunnelAccess(credentials, provision),
+      installation,
+    ),
     [COMPANION_ACCOUNT_TOKEN_FIELD]: accountToken,
     [COMPANION_ACCOUNT_USER_ID_FIELD]: user.id,
     [COMPANION_ACCOUNT_EMAIL_FIELD]: user.email,
@@ -190,20 +190,22 @@ function publicState({ available, status, email, endpoint, message, paused, tunn
   const normalizedEmail = normalizeAccountEmail(email);
   if (normalizedEmail) state.email = normalizedEmail;
   const accessEndpoint = (() => {
-    if (typeof endpoint !== "string") return "";
+    if (typeof endpoint !== 'string') return '';
     try {
       const parsed = new URL(endpoint);
-      return parsed.protocol === "https:" && parsed.pathname === "/" && !parsed.search && !parsed.hash
+      return parsed.protocol === 'https:' &&
+        parsed.pathname === '/' &&
+        !parsed.search &&
+        !parsed.hash
         ? parsed.origin
-        : "";
+        : '';
     } catch {
-      return "";
+      return '';
     }
   })();
   if (accessEndpoint) state.endpoint = accessEndpoint;
-  const safeMessage = typeof message === "string" && message.length >= 1 && message.length <= 280
-    ? message
-    : null;
+  const safeMessage =
+    typeof message === 'string' && message.length >= 1 && message.length <= 280 ? message : null;
   if (safeMessage) state.message = safeMessage;
   return Object.freeze(state);
 }
@@ -215,9 +217,9 @@ export function createCompanionAccountService({
   updateCredentials,
   identity,
   newClientInstanceId,
-  activatePersistedEndpoint = async () => ({ status: "stopped", ready: false }),
+  activatePersistedEndpoint = async () => ({ status: 'stopped', ready: false }),
   stopManagedEndpoint = async () => {},
-  managedConnectionState = () => ({ status: "stopped", ready: false }),
+  managedConnectionState = () => ({ status: 'stopped', ready: false }),
   companionIsOn = () => false,
   now = Date.now,
   healthCacheMs = DEFAULT_HEALTH_CACHE_MS,
@@ -280,14 +282,13 @@ export function createCompanionAccountService({
     const document = credentials();
     if (!storedAccount(document) || companionAccountCleanupPending(document)) return;
     cancelAutoRetry();
-    const backoff = Math.min(
-      autoRetryMaxMs,
-      autoRetryBaseMs * 2 ** Math.min(autoRetryAttempt, 20),
-    );
+    const backoff = Math.min(autoRetryMaxMs, autoRetryBaseMs * 2 ** Math.min(autoRetryAttempt, 20));
     const jittered = Math.round(backoff * (0.8 + 0.4 * random()));
     const delay = Math.min(autoRetryMaxMs, Math.max(jittered, error.retryAfterMs ?? 0));
     autoRetryAttempt += 1;
-    writeLog(`companion account: retrying ${error.code} in ${Math.round(delay / 1_000)}s (attempt ${autoRetryAttempt})`);
+    writeLog(
+      `companion account: retrying ${error.code} in ${Math.round(delay / 1_000)}s (attempt ${autoRetryAttempt})`,
+    );
     autoRetryTimer = setTimer(() => {
       autoRetryTimer = null;
       void retryFromTimer().catch(() => {});
@@ -322,7 +323,7 @@ export function createCompanionAccountService({
 
   const requireHealthyControlPlane = async () => {
     if (!(await probeControlPlane({ force: true }))) {
-      throw new ControlPlaneError("control_plane_unavailable");
+      throw new ControlPlaneError('control_plane_unavailable');
     }
   };
 
@@ -330,7 +331,7 @@ export function createCompanionAccountService({
     if (!configured) {
       return publicState({
         available: false,
-        status: "signed-out",
+        status: 'signed-out',
         message: FRIENDLY_MESSAGES.control_plane_unavailable,
       });
     }
@@ -338,12 +339,14 @@ export function createCompanionAccountService({
     const account = storedAccount(document);
     const persistedAccess = managedCompanionTunnelAccess(document);
     const available = healthy || Boolean(account);
-    const paused = Boolean(account) && !persistedAccess && document[COMPANION_ENDPOINT_PAUSED_FIELD] === true;
-    const tunnelRetired = Boolean(account) && !persistedAccess && document[COMPANION_TUNNEL_RETIRED_FIELD] === true;
+    const paused =
+      Boolean(account) && !persistedAccess && document[COMPANION_ENDPOINT_PAUSED_FIELD] === true;
+    const tunnelRetired =
+      Boolean(account) && !persistedAccess && document[COMPANION_TUNNEL_RETIRED_FIELD] === true;
     if (!healthy) {
       return publicState({
         available,
-        status: account ? "error" : "signed-out",
+        status: account ? 'error' : 'signed-out',
         email: account?.email,
         endpoint: persistedAccess?.endpoint,
         message: FRIENDLY_MESSAGES.control_plane_unavailable,
@@ -353,7 +356,7 @@ export function createCompanionAccountService({
     }
     if (
       phase &&
-      ["connecting", "error"].includes(phase.status) &&
+      ['connecting', 'error'].includes(phase.status) &&
       account &&
       persistedAccess &&
       !companionAccountCleanupPending(document) &&
@@ -362,41 +365,49 @@ export function createCompanionAccountService({
       phase = null;
     }
     if (phase) return publicState({ available, ...phase, paused, tunnelRetired });
-    if (!account) return publicState({ available, status: "signed-out" });
+    if (!account) return publicState({ available, status: 'signed-out' });
     const access = persistedAccess;
     if (!access) {
-      if (onDemand) return publicState({ available, status: "ready", email: account.email, paused, tunnelRetired });
+      if (onDemand)
+        return publicState({
+          available,
+          status: 'ready',
+          email: account.email,
+          paused,
+          tunnelRetired,
+        });
       return publicState({
         available,
-        status: "error",
+        status: 'error',
         email: account.email,
-        message: "This computer still needs a secure address. Try again; local pairing continues to work.",
+        message:
+          'This computer still needs a secure address. Try again; local pairing continues to work.',
       });
     }
     const connection = managedConnectionState?.() ?? {};
     if (companionIsOn()) {
-      if (["starting", "retrying"].includes(connection.status)) {
+      if (['starting', 'retrying'].includes(connection.status)) {
         return publicState({
           available,
-          status: "connecting",
+          status: 'connecting',
           email: account.email,
           endpoint: access.endpoint,
-          message: "The secure connection is starting. Local pairing remains available.",
+          message: 'The secure connection is starting. Local pairing remains available.',
         });
       }
-      if (["unavailable", "error"].includes(connection.status)) {
+      if (['unavailable', 'error'].includes(connection.status)) {
         return publicState({
           available,
-          status: "error",
+          status: 'error',
           email: account.email,
           endpoint: access.endpoint,
-          message: "The secure connection needs attention. Local pairing still works.",
+          message: 'The secure connection needs attention. Local pairing still works.',
         });
       }
     }
     return publicState({
       available,
-      status: "ready",
+      status: 'ready',
       email: account.email,
       endpoint: access.endpoint,
     });
@@ -406,7 +417,8 @@ export function createCompanionAccountService({
     const existing = ownString(credentials(), COMPANION_CLIENT_INSTANCE_FIELD);
     if (UUID.test(existing)) return existing;
     const candidate = newClientInstanceId?.();
-    if (!UUID.test(candidate ?? "")) throw new Error("A stable computer identity could not be created");
+    if (!UUID.test(candidate ?? ''))
+      throw new Error('A stable computer identity could not be created');
     await updateCredentials((document) => {
       if (UUID.test(ownString(document, COMPANION_CLIENT_INSTANCE_FIELD))) return document;
       return { ...document, [COMPANION_CLIENT_INSTANCE_FIELD]: candidate };
@@ -442,17 +454,16 @@ export function createCompanionAccountService({
     if (account.installationCredential) {
       try {
         await client.deleteEndpoint(account.installationCredential);
-      } catch {
-      }
+      } catch {}
     }
     if (!account.accountToken) {
-      throw new ControlPlaneError("signed_out", 401);
+      throw new ControlPlaneError('signed_out', 401);
     }
 
     // A lost response can leave a server installation with no local ID, so revoke every record matching this computer's UUID before forgetting the bearer.
     const clientInstanceId = ownString(document, COMPANION_CLIENT_INSTANCE_FIELD);
     if (!UUID.test(clientInstanceId)) {
-      throw new ControlPlaneError("invalid_client_identity");
+      throw new ControlPlaneError('invalid_client_identity');
     }
 
     if (account.installationId) {
@@ -474,8 +485,7 @@ export function createCompanionAccountService({
     }
     try {
       await client.signOut(account.accountToken);
-    } catch {
-    }
+    } catch {}
     await clearAfterCleanup();
     return true;
   };
@@ -507,34 +517,45 @@ export function createCompanionAccountService({
     const previous = storedAccount(before);
     const installation = await client.ensureInstallation({
       accountToken,
-      currentCredential:
-        previous?.userId === user.id ? previous.installationCredential : "",
+      currentCredential: previous?.userId === user.id ? previous.installationCredential : '',
       clientInstanceId,
       name: identity.name,
       platform: identity.platform,
-      appVersion: identity.appVersion, ...(identity.kind ? { kind: identity.kind } : {}),
+      appVersion: identity.appVersion,
+      ...(identity.kind ? { kind: identity.kind } : {}),
     });
     // Persist the verified installation before provisioning, or each Retry rotates the credential until rate-limited.
     try {
       await updateCredentials((document) => withInstallationCredentials(document, installation));
     } catch (error) {
-      if (previous?.installationId !== installation.installation.id ||
-          previous?.installationCredential !== installation.credential) {
+      if (
+        previous?.installationId !== installation.installation.id ||
+        previous?.installationCredential !== installation.credential
+      ) {
         await client.revokeInstallation(accountToken, installation.installation.id).catch(() => {});
       }
       throw error;
     }
     const withoutTunnel = async () => {
-      await updateCredentials((document) => withAuthenticatedAccount(document, { accountToken, user, clientInstanceId }));
+      await updateCredentials((document) =>
+        withAuthenticatedAccount(document, { accountToken, user, clientInstanceId }),
+      );
       resetAutoRetry();
-      return (phase = null), settledState();
+      return ((phase = null), settledState());
     };
     if (onDemand && (await currentNeed()) === false) return withoutTunnel();
     let relayOnly = null;
-    const endpoint = await client.ensureEndpoint(installation.credential, { appVersion: identity.appVersion, ...(identity.kind ? { kind: identity.kind } : {}), ...(await relay.legacyDevices().then((count) => (count === null ? {} : { legacyDevices: count }))) })
+    const endpoint = await client
+      .ensureEndpoint(installation.credential, {
+        appVersion: identity.appVersion,
+        ...(identity.kind ? { kind: identity.kind } : {}),
+        ...(await relay
+          .legacyDevices()
+          .then((count) => (count === null ? {} : { legacyDevices: count }))),
+      })
       .catch((error) => {
-        if (error?.code !== "relay_capable") throw error;
-        relayOnly = error.tunnel ?? "none";
+        if (error?.code !== 'relay_capable') throw error;
+        relayOnly = error.tunnel ?? 'none';
         return null;
       });
     if (!endpoint) {
@@ -543,14 +564,17 @@ export function createCompanionAccountService({
       if (managedCompanionTunnelAccess(credentials())) {
         await stopManagedEndpoint();
         await updateCredentials(withoutManagedCompanionTunnelAccess);
-        writeLog(`companion account: the secure address ended (${relayOnly}); phones connect through the relay`);
+        writeLog(
+          `companion account: the secure address ended (${relayOnly}); phones connect through the relay`,
+        );
       }
       await updateCredentials((document) => {
         const next = { ...document };
-        if (relayOnly === "retired") next[COMPANION_TUNNEL_RETIRED_FIELD] = true;
+        if (relayOnly === 'retired') next[COMPANION_TUNNEL_RETIRED_FIELD] = true;
         else delete next[COMPANION_TUNNEL_RETIRED_FIELD];
         // With the address forgotten nothing else would ask again: this keeps the watchdog asking.
-        if (relayOnly === "retired" || relayOnly === "full") next[COMPANION_TUNNEL_WAITING_FIELD] = true;
+        if (relayOnly === 'retired' || relayOnly === 'full')
+          next[COMPANION_TUNNEL_WAITING_FIELD] = true;
         else delete next[COMPANION_TUNNEL_WAITING_FIELD];
         return next;
       });
@@ -574,16 +598,13 @@ export function createCompanionAccountService({
     resetAutoRetry();
     const connection = await activatePersistedEndpoint();
     phase = null;
-    if (
-      companionIsOn() &&
-      connection &&
-      ["unavailable", "error"].includes(connection.status)
-    ) {
+    if (companionIsOn() && connection && ['unavailable', 'error'].includes(connection.status)) {
       phase = {
-        status: "error",
+        status: 'error',
         email: user.email,
         endpoint: endpoint.endpoint.url,
-        message: "The address is ready, but this app could not start its secure connection. Local pairing still works.",
+        message:
+          'The address is ready, but this app could not start its secure connection. Local pairing still works.',
       };
     }
     return settledState();
@@ -592,8 +613,7 @@ export function createCompanionAccountService({
   const writeLog = (line) => {
     try {
       log(line);
-    } catch {
-    }
+    } catch {}
   };
 
   const failAction = (
@@ -603,95 +623,97 @@ export function createCompanionAccountService({
     const message = friendlyCompanionAccountError(error);
     writeLog(
       error instanceof ControlPlaneError
-        ? `companion account: setup failed code=${error.code} status=${error.status || "none"} ref=${error.requestId || "none"}`
-        : "companion account: setup failed on this computer (not a control-plane answer)",
+        ? `companion account: setup failed code=${error.code} status=${error.status || 'none'} ref=${error.requestId || 'none'}`
+        : 'companion account: setup failed on this computer (not a control-plane answer)',
     );
     phase = {
       status:
         signedOut ||
         (expiredSessionIsSignedOut && error instanceof ControlPlaneError && error.status === 401)
-          ? "signed-out"
-          : "error",
+          ? 'signed-out'
+          : 'error',
       email,
       message,
     };
     return message;
   };
 
-  const requestCode = (rawEmail) => serialize(async () => {
-    if (!configured) throw new Error(FRIENDLY_MESSAGES.control_plane_unavailable);
-    const email = normalizeAccountEmail(rawEmail);
-    let requested;
-    try {
-      await requireHealthyControlPlane();
-      requested = await client.requestOTP(email);
-    } catch (error) {
-      const message = failAction(error, { email, signedOut: true });
-      throw new Error(message);
-    }
-    phase = {
-      status: "signed-out",
-      email: requested.email,
-    };
-    return settledState();
-  });
-
-  const verifyCode = (rawEmail, rawCode) => serialize(async () => {
-    if (!configured) throw new Error(FRIENDLY_MESSAGES.control_plane_unavailable);
-    requestedAt = now();
-    const email = normalizeAccountEmail(rawEmail);
-    phase = { status: "connecting", email };
-    let verified;
-    try {
-      await requireHealthyControlPlane();
-      verified = await client.verifyOTP(email, rawCode);
-    } catch (error) {
-      const message = failAction(error, { email, signedOut: true });
-      throw new Error(message);
-    }
-
-    const previous = storedAccount(credentials());
-    const refreshingPendingCleanup = Boolean(
-      previous &&
-      previous.userId === verified.user.id &&
-      companionAccountCleanupPending(credentials()),
-    );
-    let authenticatedPersisted = false;
-    try {
-      if (previous && previous.userId !== verified.user.id) {
-        await cleanupCurrentAccount();
+  const requestCode = (rawEmail) =>
+    serialize(async () => {
+      if (!configured) throw new Error(FRIENDLY_MESSAGES.control_plane_unavailable);
+      const email = normalizeAccountEmail(rawEmail);
+      let requested;
+      try {
+        await requireHealthyControlPlane();
+        requested = await client.requestOTP(email);
+      } catch (error) {
+        const message = failAction(error, { email, signedOut: true });
+        throw new Error(message);
       }
-      const existingIdentity = ownString(credentials(), COMPANION_CLIENT_INSTANCE_FIELD);
-      const clientInstanceId = UUID.test(existingIdentity)
-        ? existingIdentity
-        : newClientInstanceId?.();
-      if (!UUID.test(clientInstanceId ?? "")) {
-        throw new Error("A stable computer identity could not be created");
+      phase = {
+        status: 'signed-out',
+        email: requested.email,
+      };
+      return settledState();
+    });
+
+  const verifyCode = (rawEmail, rawCode) =>
+    serialize(async () => {
+      if (!configured) throw new Error(FRIENDLY_MESSAGES.control_plane_unavailable);
+      requestedAt = now();
+      const email = normalizeAccountEmail(rawEmail);
+      phase = { status: 'connecting', email };
+      let verified;
+      try {
+        await requireHealthyControlPlane();
+        verified = await client.verifyOTP(email, rawCode);
+      } catch (error) {
+        const message = failAction(error, { email, signedOut: true });
+        throw new Error(message);
       }
-      await updateCredentials((document) =>
-        withAuthenticatedAccount(document, {
-          ...verified,
-          clientInstanceId,
-          preserveCleanupPending: refreshingPendingCleanup,
-        }),
+
+      const previous = storedAccount(credentials());
+      const refreshingPendingCleanup = Boolean(
+        previous &&
+        previous.userId === verified.user.id &&
+        companionAccountCleanupPending(credentials()),
       );
-      authenticatedPersisted = true;
-      if (refreshingPendingCleanup) {
-        // Finish the interrupted sign-out; never turn it into a new endpoint provisioning.
-        await cleanupCurrentAccount({ markPending: false });
+      let authenticatedPersisted = false;
+      try {
+        if (previous && previous.userId !== verified.user.id) {
+          await cleanupCurrentAccount();
+        }
+        const existingIdentity = ownString(credentials(), COMPANION_CLIENT_INSTANCE_FIELD);
+        const clientInstanceId = UUID.test(existingIdentity)
+          ? existingIdentity
+          : newClientInstanceId?.();
+        if (!UUID.test(clientInstanceId ?? '')) {
+          throw new Error('A stable computer identity could not be created');
+        }
+        await updateCredentials((document) =>
+          withAuthenticatedAccount(document, {
+            ...verified,
+            clientInstanceId,
+            preserveCleanupPending: refreshingPendingCleanup,
+          }),
+        );
+        authenticatedPersisted = true;
+        if (refreshingPendingCleanup) {
+          // Finish the interrupted sign-out; never turn it into a new endpoint provisioning.
+          await cleanupCurrentAccount({ markPending: false });
+          return settledState();
+        }
+        return await provision(verified);
+      } catch (error) {
+        if (!authenticatedPersisted) await client.signOut(verified.accountToken).catch(() => {});
+        failAction(error, {
+          email: authenticatedPersisted ? verified.user.email : (previous?.email ?? email),
+          expiredSessionIsSignedOut: authenticatedPersisted,
+        });
+        if (authenticatedPersisted) scheduleAutoRetry(error);
         return settledState();
       }
-      return await provision(verified);
-    } catch (error) {
-      if (!authenticatedPersisted) await client.signOut(verified.accountToken).catch(() => {});
-      failAction(error, {
-        email: authenticatedPersisted ? verified.user.email : previous?.email ?? email,
-        expiredSessionIsSignedOut: authenticatedPersisted,
-      });
-      if (authenticatedPersisted) scheduleAutoRetry(error);
-      return settledState();
-    }
-  });
+    });
 
   const retryWork = async () => {
     if (!configured) return settledState();
@@ -701,7 +723,7 @@ export function createCompanionAccountService({
       return settledState();
     }
     if (companionAccountCleanupPending(credentials())) {
-      phase = { status: "connecting", email: account.email };
+      phase = { status: 'connecting', email: account.email };
       try {
         await requireHealthyControlPlane();
         await cleanupCurrentAccount({ markPending: false });
@@ -710,7 +732,7 @@ export function createCompanionAccountService({
       }
       return settledState();
     }
-    phase = { status: "connecting", email: account.email };
+    phase = { status: 'connecting', email: account.email };
     try {
       await requireHealthyControlPlane();
       return await provision({
@@ -724,10 +746,11 @@ export function createCompanionAccountService({
     }
   };
 
-  const retry = () => serialize(async () => {
-    requestedAt = now();
-    return retryWork();
-  });
+  const retry = () =>
+    serialize(async () => {
+      requestedAt = now();
+      return retryWork();
+    });
 
   /** Re-provisions only on a definitive "no endpoint" answer; a network or service failure keeps everything as is. */
   const reconcileIfEndpointGone = async ({ onGone = retryWork } = {}) => {
@@ -739,7 +762,7 @@ export function createCompanionAccountService({
       !access ||
       !account.installationCredential ||
       companionAccountCleanupPending(document) ||
-      typeof client.getEndpoint !== "function"
+      typeof client.getEndpoint !== 'function'
     ) {
       return null;
     }
@@ -751,7 +774,11 @@ export function createCompanionAccountService({
       if (error instanceof ControlPlaneError && error.status === 401) return onGone();
       return null;
     }
-    if (endpoint && endpoint.url === access.endpoint && !ENDPOINT_NEEDS_RECONCILE.has(endpoint.status)) {
+    if (
+      endpoint &&
+      endpoint.url === access.endpoint &&
+      !ENDPOINT_NEEDS_RECONCILE.has(endpoint.status)
+    ) {
       return null;
     }
     return onGone();
@@ -771,16 +798,19 @@ export function createCompanionAccountService({
 
   const requestedRecently = () => requestedAt !== null && now() - requestedAt < REQUEST_WINDOW_MS;
 
-  const savedAddress = (document) => normalizeManagedCompanionEndpoint(document[MANAGED_COMPANION_ENDPOINT_FIELD]);
+  const savedAddress = (document) =>
+    normalizeManagedCompanionEndpoint(document[MANAGED_COMPANION_ENDPOINT_FIELD]);
 
   let phonesUnused = false;
   /** "unused" (paired phones, none seen for 30 days) reads as false and is remembered for the release. */
   const currentNeed = async () => {
-    const answer = await Promise.resolve().then(() => managedEndpointNeeded()).catch(() => null);
+    const answer = await Promise.resolve()
+      .then(() => managedEndpointNeeded())
+      .catch(() => null);
     phonesUnused = answer === MANAGED_ENDPOINT_PHONES_UNUSED;
-    const need = phonesUnused ? false : typeof answer === "boolean" ? answer : null;
+    const need = phonesUnused ? false : typeof answer === 'boolean' ? answer : null;
     if (need === false && relay.capable()) return false;
-    if (requestedRecently()) return (phonesUnused = false), true;
+    if (requestedRecently()) return ((phonesUnused = false), true);
     return need;
   };
 
@@ -820,13 +850,15 @@ export function createCompanionAccountService({
     try {
       await client.deleteEndpoint(account.installationCredential);
     } catch (error) {
-      removalPending = error instanceof ControlPlaneError && error.code === "endpoint_cleanup_pending";
-      const handedOver = removalPending || (error instanceof ControlPlaneError && error.status === 401);
+      removalPending =
+        error instanceof ControlPlaneError && error.code === 'endpoint_cleanup_pending';
+      const handedOver =
+        removalPending || (error instanceof ControlPlaneError && error.status === 401);
       if (!handedOver) {
         writeLog(
           error instanceof ControlPlaneError
-            ? `companion account: could not give the secure address back code=${error.code} status=${error.status || "none"} ref=${error.requestId || "none"}`
-            : "companion account: could not give the secure address back (not a control-plane answer)",
+            ? `companion account: could not give the secure address back code=${error.code} status=${error.status || 'none'} ref=${error.requestId || 'none'}`
+            : 'companion account: could not give the secure address back (not a control-plane answer)',
         );
         await activatePersistedEndpoint();
         return settledState();
@@ -839,9 +871,11 @@ export function createCompanionAccountService({
     }));
     resetAutoRetry();
     phase = null;
-    writeLog(pause
-      ? "companion account: gave the secure address back; no paired phone was used in 30 days"
-      : "companion account: gave the secure address back; no device needs it");
+    writeLog(
+      pause
+        ? 'companion account: gave the secure address back; no paired phone was used in 30 days'
+        : 'companion account: gave the secure address back; no device needs it',
+    );
     return settledState();
   };
 
@@ -874,10 +908,14 @@ export function createCompanionAccountService({
     }
     if (releaseAt === null || releaseAt - now() > releaseGraceMs + releaseJitterMs) {
       const delay = releaseGraceMs + Math.round(random() * releaseJitterMs);
-      await updateCredentials((current) => managedCompanionTunnelAccess(current)
-        ? { ...current, [MANAGED_COMPANION_RELEASE_AT_FIELD]: now() + delay }
-        : current);
-      writeLog(`companion account: no device needs the secure address; giving it back in ${Math.round(delay / 60_000)} min`);
+      await updateCredentials((current) =>
+        managedCompanionTunnelAccess(current)
+          ? { ...current, [MANAGED_COMPANION_RELEASE_AT_FIELD]: now() + delay }
+          : current,
+      );
+      writeLog(
+        `companion account: no device needs the secure address; giving it back in ${Math.round(delay / 60_000)} min`,
+      );
     }
     return null;
   };
@@ -888,41 +926,42 @@ export function createCompanionAccountService({
       return retryWork();
     }
     resetAutoRetry();
-    if (phase?.status === "error") phase = null;
-    writeLog("companion account: stopped retrying; no device needs a secure address");
+    if (phase?.status === 'error') phase = null;
+    writeLog('companion account: stopped retrying; no device needs a secure address');
     return settledState();
   };
 
   retryFromTimer = () => serialize(onDemand ? retryIfWanted : retryWork);
 
-  const prepare = () => serialize(async () => {
-    const document = credentials();
-    if (
-      !configured ||
-      !companionIsOn() ||
-      !storedAccount(document) ||
-      companionAccountCleanupPending(document)
-    ) {
+  const prepare = () =>
+    serialize(async () => {
+      const document = credentials();
+      if (
+        !configured ||
+        !companionIsOn() ||
+        !storedAccount(document) ||
+        companionAccountCleanupPending(document)
+      ) {
+        return settledState();
+      }
+      requestedAt = now();
+      if (!managedCompanionTunnelAccess(document)) return retryWork();
+      await cancelRelease();
+      const connection = managedConnectionState?.() ?? {};
+      if (['stopped', 'unconfigured'].includes(connection.status)) {
+        await activatePersistedEndpoint();
+      } else if (CONNECTOR_FAILING_STATES.has(connection.status)) {
+        const repaired = await reconcileIfEndpointGone();
+        if (repaired) return repaired;
+      }
       return settledState();
-    }
-    requestedAt = now();
-    if (!managedCompanionTunnelAccess(document)) return retryWork();
-    await cancelRelease();
-    const connection = managedConnectionState?.() ?? {};
-    if (["stopped", "unconfigured"].includes(connection.status)) {
-      await activatePersistedEndpoint();
-    } else if (CONNECTOR_FAILING_STATES.has(connection.status)) {
-      const repaired = await reconcileIfEndpointGone();
-      if (repaired) return repaired;
-    }
-    return settledState();
-  });
+    });
 
   const watchdogTick = () => {
     watchdogTimer = null;
     if (disposed) return;
     watchdogTimer = setTimer(watchdogTick, endpointCheckIntervalMs);
-    if (phase?.status === "signed-out") return;
+    if (phase?.status === 'signed-out') return;
     if (onDemand) {
       void serialize(() => reviewAddress()).catch(() => {});
       return;
@@ -935,47 +974,49 @@ export function createCompanionAccountService({
     watchdogTimer = setTimer(watchdogTick, firstEndpointCheckMs);
   };
 
-  const signOut = () => serialize(async () => {
-    resetAutoRetry();
-    if (!storedAccount(credentials())) {
-      await clearAfterCleanup();
-      return settledState();
-    }
-    const email = storedAccount(credentials())?.email;
-    phase = { status: "connecting", email };
-    try {
-      // No health preflight: local access must stop on Sign out even when the control plane is down.
-      await cleanupCurrentAccount();
-      healthy = true;
-      lastHealthCheck = now();
-      return settledState();
-    } catch (error) {
-      failAction(error, { email });
-      return settledState();
-    }
-  });
+  const signOut = () =>
+    serialize(async () => {
+      resetAutoRetry();
+      if (!storedAccount(credentials())) {
+        await clearAfterCleanup();
+        return settledState();
+      }
+      const email = storedAccount(credentials())?.email;
+      phase = { status: 'connecting', email };
+      try {
+        // No health preflight: local access must stop on Sign out even when the control plane is down.
+        await cleanupCurrentAccount();
+        healthy = true;
+        lastHealthCheck = now();
+        return settledState();
+      } catch (error) {
+        failAction(error, { email });
+        return settledState();
+      }
+    });
 
-  const restore = () => serialize(async () => {
-    if (!configured) return settledState();
-    startWatchdog();
-    if (!(await probeControlPlane({ force: true }))) return settledState();
-    if (companionAccountCleanupPending(credentials())) return retryWork();
-    await ensureClientIdentity();
-    if (onDemand) {
-      const reviewed = await reviewAddress({ atLaunch: true });
-      if (reviewed) return reviewed;
+  const restore = () =>
+    serialize(async () => {
+      if (!configured) return settledState();
+      startWatchdog();
+      if (!(await probeControlPlane({ force: true }))) return settledState();
+      if (companionAccountCleanupPending(credentials())) return retryWork();
+      await ensureClientIdentity();
+      if (onDemand) {
+        const reviewed = await reviewAddress({ atLaunch: true });
+        if (reviewed) return reviewed;
+        phase = null;
+        return settledState();
+      }
+      const account = storedAccount(credentials());
+      if (account && !managedCompanionTunnelAccess(credentials())) return retryWork();
+      if (autoRecover && account && companionIsOn()) {
+        const reconciled = await reconcileIfEndpointGone();
+        if (reconciled) return reconciled;
+      }
       phase = null;
       return settledState();
-    }
-    const account = storedAccount(credentials());
-    if (account && !managedCompanionTunnelAccess(credentials())) return retryWork();
-    if (autoRecover && account && companionIsOn()) {
-      const reconciled = await reconcileIfEndpointGone();
-      if (reconciled) return reconciled;
-    }
-    phase = null;
-    return settledState();
-  });
+    });
 
   const dispose = () => {
     disposed = true;

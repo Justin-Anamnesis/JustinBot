@@ -1,9 +1,9 @@
-import type { ExecFileOptions } from "node:child_process";
-import { dirname } from "node:path";
+import type { ExecFileOptions } from 'node:child_process';
+import { dirname } from 'node:path';
 
-import { enginesBinDir, installNpmEngine } from "./engine-install.ts";
-import { findCliCandidates } from "./env-path.ts";
-import { describeSpawnFailure, execCli } from "./procs.ts";
+import { enginesBinDir, installNpmEngine } from './engine-install.ts';
+import { findCliCandidates } from './env-path.ts';
+import { describeSpawnFailure, execCli } from './procs.ts';
 
 type ExecCli = (
   cli: string,
@@ -12,10 +12,10 @@ type ExecCli = (
   callback: (error: Error | null, stdout: string, stderr?: string) => void,
 ) => void;
 
-const FALLBACK = "Run `claude update` in Terminal, then refresh Engines.";
+const FALLBACK = 'Run `claude update` in Terminal, then refresh Engines.';
 
 /** Claude Code's npm package: the one ClaudeDriver's install descriptor names. */
-export const CLAUDE_CODE_PACKAGE = "@anthropic-ai/claude-code";
+export const CLAUDE_CODE_PACKAGE = '@anthropic-ai/claude-code';
 
 /** The copy Settings installed into the app's npm prefix shadows every other on PATH, and `claude update` cannot update it:
  * Claude's updater reinstalls through the first npm it finds. A configured path or wrapper is never the app's copy. */
@@ -36,11 +36,11 @@ const appCopy: AppCopy = {
 
 function stderrOf(error: unknown): string {
   const stderr = (error as { stderr?: unknown }).stderr;
-  return typeof stderr === "string"
+  return typeof stderr === 'string'
     ? stderr
     : Buffer.isBuffer(stderr)
-      ? stderr.toString("utf8")
-      : "";
+      ? stderr.toString('utf8')
+      : '';
 }
 
 function run(
@@ -56,8 +56,7 @@ function run(
           Object.assign(error, { stderr });
         }
         reject(error);
-      }
-      else resolve(stdout);
+      } else resolve(stdout);
     });
   });
 }
@@ -65,17 +64,17 @@ function run(
 function updateFailure(error: unknown, cli: string): Error {
   const err = error instanceof Error ? error : new Error(String(error));
   const processError = err as NodeJS.ErrnoException & { killed?: boolean };
-  if (processError.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
+  if (processError.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
     return new Error(`Claude update produced too much output. ${FALLBACK}`);
   }
-  if (typeof processError.code === "string") {
+  if (typeof processError.code === 'string') {
     return new Error(`${describeSpawnFailure(processError, cli).message}. ${FALLBACK}`);
   }
   if (processError.killed) {
     return new Error(`Claude update timed out after 3 minutes. ${FALLBACK}`);
   }
-  const detail = (stderrOf(err).trim() || err.message).split("\n")[0].slice(0, 400);
-  return new Error(`Claude update failed${detail ? `: ${detail}` : ""}. ${FALLBACK}`);
+  const detail = (stderrOf(err).trim() || err.message).split('\n')[0].slice(0, 400);
+  return new Error(`Claude update failed${detail ? `: ${detail}` : ''}. ${FALLBACK}`);
 }
 
 /** The caller owns the environment, so credentials are stripped before the executable (or a wrapper) launches. */
@@ -94,10 +93,10 @@ export async function updateClaudeCli(
     }
   } else {
     try {
-      await run(execute, cli, ["update"], {
+      await run(execute, cli, ['update'], {
         env,
         timeout: 180_000,
-        killSignal: "SIGKILL",
+        killSignal: 'SIGKILL',
         maxBuffer: 1024 * 1024,
       });
     } catch (error) {
@@ -106,16 +105,18 @@ export async function updateClaudeCli(
   }
 
   try {
-    const stdout = await run(execute, cli, ["--version"], {
+    const stdout = await run(execute, cli, ['--version'], {
       env,
       timeout: 10_000,
-      killSignal: "SIGKILL",
+      killSignal: 'SIGKILL',
       maxBuffer: 64 * 1024,
     });
-    const version = stdout.trim().split("\n")[0];
-    if (!version) throw new Error("Claude returned an empty version");
+    const version = stdout.trim().split('\n')[0];
+    if (!version) throw new Error('Claude returned an empty version');
     return { version };
   } catch {
-    throw new Error("Claude finished updating, but OpenMausBot could not verify the installed version. Refresh Engines to check it.");
+    throw new Error(
+      'Claude finished updating, but OpenMausBot could not verify the installed version. Refresh Engines to check it.',
+    );
   }
 }

@@ -1,37 +1,48 @@
 // Ported from upstream's provider contracts with Promises for Effect and listeners for Stream; shapes and names are kept.
 
-import type { ApprovalMode } from "../shared/approval-mode.ts";
-import type { ToolIdentity, ToolScope } from "../shared/tool-scope.ts";
-import type { EffortLevel } from "../shared/wire.ts";
+import type { ApprovalMode } from '../shared/approval-mode.ts';
+import type { ToolIdentity, ToolScope } from '../shared/tool-scope.ts';
+import type { EffortLevel } from '../shared/wire.ts';
 import type {
-  DriverKind, InstanceId, ModelVariantOption, RuntimeEventListener, ThreadId, TurnId,
-} from "../shared/runtime-events.ts";
-import type { LocalModelFacts } from "../shared/local-model.ts";
-import type { ProviderIcon } from "../shared/provider-icon.ts";
+  DriverKind,
+  InstanceId,
+  ModelVariantOption,
+  RuntimeEventListener,
+  ThreadId,
+  TurnId,
+} from '../shared/runtime-events.ts';
+import type { LocalModelFacts } from '../shared/local-model.ts';
+import type { ProviderIcon } from '../shared/provider-icon.ts';
 
-export type { CloudBackend, EffortLevel, ModelSelection } from "../shared/wire.ts";
+export type { CloudBackend, EffortLevel, ModelSelection } from '../shared/wire.ts';
 export type {
-  DriverKind, InstanceId, ModelVariantOption, ModelVariantState, RuntimeEvent,
-  RuntimeEventBase, RuntimeEventListener, ThreadId, TurnId,
-} from "../shared/runtime-events.ts";
-
+  DriverKind,
+  InstanceId,
+  ModelVariantOption,
+  ModelVariantState,
+  RuntimeEvent,
+  RuntimeEventBase,
+  RuntimeEventListener,
+  ThreadId,
+  TurnId,
+} from '../shared/runtime-events.ts';
 
 export type ProviderErrorCode =
-  | "missing_cli"
-  | "invalid_credentials"
-  | "inactive_subscription"
+  | 'missing_cli'
+  | 'invalid_credentials'
+  | 'inactive_subscription'
   /** The account has no credit left for a pay-as-you-go model. */
-  | "insufficient_funds"
-  | "quota_or_region_restriction"
-  | "upstream_outage"
-  | "model_catalog_outage";
+  | 'insufficient_funds'
+  | 'quota_or_region_restriction'
+  | 'upstream_outage'
+  | 'model_catalog_outage';
 
 export class ProviderError extends Error {
   readonly code: ProviderErrorCode;
 
   constructor(code: ProviderErrorCode, message: string, options?: { cause?: unknown }) {
     super(message, options);
-    this.name = "ProviderError";
+    this.name = 'ProviderError';
     this.code = code;
   }
 }
@@ -42,7 +53,7 @@ export class TurnNotStartedError extends Error {
 
   constructor(turnId: TurnId, message: string) {
     super(message);
-    this.name = "TurnNotStartedError";
+    this.name = 'TurnNotStartedError';
     this.turnId = turnId;
   }
 }
@@ -50,7 +61,7 @@ export class TurnNotStartedError extends Error {
 /** The CLI refused sign-in before any model or tool activity, and its process stopped. `known`: refused here because the
  * engine is already known to be signed out, so it is no new refusal. */
 export class TurnAuthenticationRefusedError extends TurnNotStartedError {
-  override readonly name = "TurnAuthenticationRefusedError";
+  override readonly name = 'TurnAuthenticationRefusedError';
   readonly known: boolean;
 
   constructor(turnId: TurnId, message: string, known = false) {
@@ -64,12 +75,18 @@ export class TurnAuthenticationRefusedError extends TurnNotStartedError {
  * model's own window ("model") or extra usage credits ("credits"), which leave the engine's other models working.
  * `known`: refused here by a limit already noted, so it is no new refusal. */
 export class TurnUsageLimitRefusedError extends TurnNotStartedError {
-  override readonly name = "TurnUsageLimitRefusedError";
+  override readonly name = 'TurnUsageLimitRefusedError';
   readonly resetsAt: number | undefined;
-  readonly scope: "engine" | "model" | "credits";
+  readonly scope: 'engine' | 'model' | 'credits';
   readonly known: boolean;
 
-  constructor(turnId: TurnId, message: string, resetsAt?: number, scope: "engine" | "model" | "credits" = "engine", known = false) {
+  constructor(
+    turnId: TurnId,
+    message: string,
+    resetsAt?: number,
+    scope: 'engine' | 'model' | 'credits' = 'engine',
+    known = false,
+  ) {
     super(turnId, message);
     this.resetsAt = resetsAt;
     this.scope = scope;
@@ -79,23 +96,28 @@ export class TurnUsageLimitRefusedError extends TurnNotStartedError {
 
 /** Variants are opaque provider IDs, not the cross-engine effort enum. */
 export function isModelVariant(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 256 &&
-    value.trim() === value && !/\p{Cc}/u.test(value);
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= 256 &&
+    value.trim() === value &&
+    !/\p{Cc}/u.test(value)
+  );
 }
 
 /** An image already admitted to the private attachment store; drivers get this, never a host path in the prompt. */
 export interface TurnImageInput {
   path: string;
-  mime: "image/png" | "image/jpeg" | "image/gif" | "image/webp";
+  mime: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
   bytes: number;
   /** Set on a frame sampled from an attached video, so a content-type router can tell it apart from a person's own picture. */
-  source?: "video-frame";
+  source?: 'video-frame';
 }
 
 /** A video already admitted to the private attachment store; resolved into TurnImageInput frames before any driver sees it. */
 export interface TurnVideoInput {
   path: string;
-  mime: "video/mp4" | "video/webm" | "video/quicktime";
+  mime: 'video/mp4' | 'video/webm' | 'video/quicktime';
   bytes: number;
 }
 
@@ -118,7 +140,7 @@ export interface InstanceConfig {
 export type InstanceConfigMap = Record<InstanceId, InstanceConfig>;
 
 /** `allowed-once` grants only the asked-about action; `unavailable` is the fail-closed default: no answerer, no action. */
-export type RequestOutcome = "allowed-once" | "rejected" | "answered" | "unavailable";
+export type RequestOutcome = 'allowed-once' | 'rejected' | 'answered' | 'unavailable';
 
 // Sessions start implicitly on the first turn; resumeCursor carries the provider-native continuation (e.g. a Claude session id).
 export interface SendTurnInput {
@@ -152,11 +174,11 @@ export interface SendTurnInput {
   /** Given to a driver with `capabilities.engineAdmission`: awaited right before it starts an engine process ("process") or
    * adds this thread's session to the running one whose pid is `joining` ("session"); rejects with TurnNotStartedError when
    * the turn is stopped first. */
-  engineAdmission?: (start: "process" | "session", joining?: number) => Promise<void>;
+  engineAdmission?: (start: 'process' | 'session', joining?: number) => Promise<void>;
   /** The turn with the conversation replayed inline, sent once on a fresh session when the provider refuses resumeCursor before reading the prompt. */
   recoveryText?: string;
   /** Prior turns for transcript-replay providers (API-backed drivers). */
-  transcript?: Array<{ role: "user" | "assistant"; text: string }>;
+  transcript?: Array<{ role: 'user' | 'assistant'; text: string }>;
   /** Bot persona (name/title/description) as a system prompt. */
   system?: string;
   /** `system` without its volatile sections (systemVolatile). A per-thread CLI process keys on this half; request-per-turn drivers
@@ -178,9 +200,9 @@ export interface SendTurnInput {
       command: string;
       args: string[];
       env: Record<string, string>;
-      platform?: "darwin" | "linux" | "win32";
+      platform?: 'darwin' | 'linux' | 'win32';
       generation?: string;
-      scope?: "local-computer";
+      scope?: 'local-computer';
     };
     /** Loopback URL and turn-scoped bearer for the engine's hook helper; hooks observe and inject context, never decide state. */
     hooks?: { url: string; token: string };
@@ -231,7 +253,7 @@ export interface StdioMcpSpec {
 
 /** An MCP server over streamable HTTP (`http`) or the older SSE transport; header values are credentials and never go on argv. */
 export interface RemoteMcpSpec {
-  type: "http" | "sse";
+  type: 'http' | 'sse';
   url: string;
   headers: Record<string, string>;
 }
@@ -245,7 +267,7 @@ export interface TurnStartResult {
 export interface ProviderAdapter {
   readonly provider: DriverKind;
   readonly capabilities: {
-    sessionModelSwitch: "in-session" | "unsupported";
+    sessionModelSwitch: 'in-session' | 'unsupported';
     /** The driver mounts integrations.agents. Every *Mcp flag guards one rule: never tell a bot about tools its driver cannot mount. */
     agentsMcp?: boolean;
     /** The driver mounts isolated computer MCP descriptors. */
@@ -287,9 +309,9 @@ export interface ProviderAdapter {
     /** sendTurn can register the harness's hook helper with the engine (integrations.hooks). */
     hooks?: boolean;
     /** "confined": sendTurn honours `guestConfined`; absent, a guest turn is refused. */
-    guestTurns?: "confined";
+    guestTurns?: 'confined';
     /** "meter": `contextTokens` / `contextWindow` are the engine's own report, shown on the context meter but never used to time compaction. */
-    contextReading?: "meter";
+    contextReading?: 'meter';
     /** sendTurn calls `engineAdmission` itself before it starts an engine process or joins one. */
     engineAdmission?: boolean;
     /** The tool the model asks the person with: its question and choices become a card they answer with a tap. */
@@ -302,7 +324,7 @@ export interface ProviderAdapter {
     threadId: ThreadId,
     requestId: string,
     decision: {
-      behavior: "allow" | "deny" | "answer";
+      behavior: 'allow' | 'deny' | 'answer';
       message?: string;
       /** "Always allow this session": the provider's own remembered approval; the app keeps no grant of its own. */
       always?: boolean;
@@ -313,7 +335,11 @@ export interface ProviderAdapter {
    * - "refused": provably not delivered; the caller may queue it.
    * - "indeterminate": maybe delivered; the caller must NOT re-queue, or it could run twice.
    * A driver that cannot read an attached image refuses the whole steer. */
-  steer?(threadId: ThreadId, text: string, images?: readonly TurnImageInput[]): Promise<SteerOutcome>;
+  steer?(
+    threadId: ThreadId,
+    text: string,
+    images?: readonly TurnImageInput[],
+  ): Promise<SteerOutcome>;
   hasSession(threadId: ThreadId): boolean;
   /** The local process running this thread's engine, while there is one: a long tool call's own processes are under it. */
   enginePid?(threadId: ThreadId): number | undefined;
@@ -326,23 +352,44 @@ export interface ProviderAdapter {
   cacheKeepWarm?: {
     ping(threadId: ThreadId, options?: { signal?: AbortSignal }): Promise<CacheWarmPingResult>;
     hold(threadId: ThreadId, until: number | null): boolean;
-    compact?(threadId: ThreadId, options: { instructions: string; session?: string; signal?: AbortSignal }): Promise<IdleCompactResult>;
+    compact?(
+      threadId: ThreadId,
+      options: { instructions: string; session?: string; signal?: AbortSignal },
+    ): Promise<IdleCompactResult>;
   };
 }
 
 /** Tokens are the ping's own; `costUsd` is notional on a subscription. `busy`: a turn was running and nothing was sent;
  * `limit`: the account's usage limit refused it. */
 export type CacheWarmPingResult =
-  | { ok: true; input: number; cacheRead: number; cacheWrite: number; output: number; costUsd: number | null; model: string | null }
+  | {
+      ok: true;
+      input: number;
+      cacheRead: number;
+      cacheWrite: number;
+      output: number;
+      costUsd: number | null;
+      model: string | null;
+    }
   | { ok: false; reason: string; busy?: boolean; limit?: boolean };
 
 /** A warm summary: the fork's `session` replaces `sessionBefore`; the tokens are the summary call's own. `busy`: a turn ran
  * meanwhile and nothing changed. */
 export type IdleCompactResult =
-  | { ok: true; session: string; sessionBefore: string; input: number; cacheRead: number; cacheWrite: number; output: number; costUsd: number | null; model: string | null }
+  | {
+      ok: true;
+      session: string;
+      sessionBefore: string;
+      input: number;
+      cacheRead: number;
+      cacheWrite: number;
+      output: number;
+      costUsd: number | null;
+      model: string | null;
+    }
   | { ok: false; reason: string; busy?: boolean; limit?: boolean };
 
-export type SteerOutcome = "steered" | "refused" | "indeterminate";
+export type SteerOutcome = 'steered' | 'refused' | 'indeterminate';
 
 export interface ProviderSnapshot {
   /** Separate, explicitly authorized ChatGPT-plan billing (not Codex login). */
@@ -351,13 +398,13 @@ export interface ProviderSnapshot {
    * ranks last for a new bot's default and never counts as "an AI already works" in the welcome. */
   freeFallback?: boolean;
   authenticationUnavailableReason?: string;
-  state: "available" | "unavailable";
+  state: 'available' | 'unavailable';
   reason?: string;
   authenticated?: boolean;
   /** The CLI path runs another program: it answered --version as something other than this engine's own CLI. */
   notEngineCli?: true;
   /** Display identity from the provider CLI, never credentials; `method` is a personal login or the workspace API key. */
-  account?: { email?: string; organization?: string; method?: "login" | "api-key" };
+  account?: { email?: string; organization?: string; method?: 'login' | 'api-key' };
   version?: string | null;
   /** A non-blocking provider update; the renderer shows the exact terminal command. */
   update?: {
@@ -366,7 +413,7 @@ export interface ProviderSnapshot {
     command: string;
   };
   /** On a subscription a reported cost is notional. */
-  billing?: "metered" | "subscription";
+  billing?: 'metered' | 'subscription';
   /** A setup condition costing the person without their asking, with nothing to run. */
   warning?: {
     title: string;
@@ -377,9 +424,9 @@ export interface ProviderSnapshot {
 // How a user installs this engine; onboarding, the picker and settings render from it.
 export interface EngineInstall {
   /** Added by the registry: commands run on this server, not its web client. */
-  platform?: "darwin" | "win32" | "linux";
+  platform?: 'darwin' | 'win32' | 'linux';
   /** One-liner per platform; omit a platform with no such command and the UI falls back to docsUrl. */
-  command?: Partial<Record<"darwin" | "win32" | "linux", string>>;
+  command?: Partial<Record<'darwin' | 'win32' | 'linux', string>>;
   /** Docs or download page. The only route for GUI-installed engines. */
   docsUrl?: string;
   /** Interactive sign-in run after installing, when install isn't enough. */
@@ -395,7 +442,7 @@ export interface EngineInstall {
     downloadBytes: number;
   };
   /** The engine needs a key saved in the app rather than a terminal step. */
-  settings?: "connections";
+  settings?: 'connections';
   /** The vendor's own build, pinned here, that the app can download, verify and install without Node.js. */
   standalone?: StandaloneRelease;
   /** Settings can install this on the server as its own user into an app-owned dir: the vendor's standalone build when one
@@ -414,15 +461,20 @@ export function clientInstall(install: EngineInstall | undefined): EngineInstall
 
 /** `${platform}-${arch}`, with `-musl` on a Linux without glibc. */
 export type StandalonePlatform =
-  | "darwin-arm64" | "darwin-x64"
-  | "linux-x64" | "linux-arm64" | "linux-x64-musl" | "linux-arm64-musl"
-  | "win32-x64" | "win32-arm64";
+  | 'darwin-arm64'
+  | 'darwin-x64'
+  | 'linux-x64'
+  | 'linux-arm64'
+  | 'linux-x64-musl'
+  | 'linux-arm64-musl'
+  | 'win32-x64'
+  | 'win32-arm64';
 
 export interface StandaloneAsset {
   /** HTTPS, on one of the release's hosts. */
   url: string;
   sha256: string;
-  archive: "zip" | "tar.gz" | "raw";
+  archive: 'zip' | 'tar.gz' | 'raw';
   /** The executable's `/`-separated path inside the archive; a raw download is saved under this name. */
   executable: string;
   /** SHA-256 of the executable itself, checked after unpacking, before reusing a copy and at every start. */
@@ -454,7 +506,7 @@ export interface StandaloneRelease {
 }
 
 export interface ProviderAuthenticationStart {
-  phase: "waiting" | "succeeded";
+  phase: 'waiting' | 'succeeded';
   flowId: string | null;
   authorizationUrl: string | null;
   expiresAt: string | null;
@@ -462,8 +514,8 @@ export interface ProviderAuthenticationStart {
   userCode?: string;
 }
 
-export interface ProviderAuthenticationStatus extends Omit<ProviderAuthenticationStart, "phase"> {
-  phase: "waiting" | "succeeded" | "failed" | "expired" | "cancelled";
+export interface ProviderAuthenticationStatus extends Omit<ProviderAuthenticationStart, 'phase'> {
+  phase: 'waiting' | 'succeeded' | 'failed' | 'expired' | 'cancelled';
   /** Safe, actionable copy; never unfiltered CLI output or credentials. */
   message?: string;
 }
@@ -493,7 +545,7 @@ export function titleCaseModelId(id: string, wordBreaks: RegExp): string {
     .split(wordBreaks)
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
+    .join(' ');
 }
 
 /** A picker label with a second facet (display name, provider host) unless the id already says it. */
@@ -563,7 +615,7 @@ export interface ProviderInstance {
   /** Optional first-party runtime installation and account setup. */
   readonly installRuntime?: () => Promise<void>;
   readonly startAuthentication?: () => Promise<ProviderAuthenticationStart>;
-  readonly authenticationMethod?: "browser-pkce";
+  readonly authenticationMethod?: 'browser-pkce';
   readonly getAuthentication?: (flowId: string) => Promise<ProviderAuthenticationStatus>;
   readonly completeAuthentication?: (flowId: string, callbackUrl: string) => Promise<void>;
   readonly cancelAuthentication?: () => Promise<void>;
@@ -584,7 +636,7 @@ export interface ProviderInstance {
  *  `subscription` — first-party cloud catalog; Custom is extra.
  *  `custom` — no subscription catalog; Custom is the product.
  *  `api` — a cloud model catalog billed through an API key. */
-export type EngineAccess = "subscription" | "custom" | "api";
+export type EngineAccess = 'subscription' | 'custom' | 'api';
 
 export interface ProviderDriver<Config = unknown> {
   readonly driverKind: DriverKind;

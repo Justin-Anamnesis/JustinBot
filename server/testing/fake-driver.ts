@@ -7,7 +7,7 @@ import type {
   ProviderSnapshot,
   RuntimeEvent,
   RuntimeEventListener,
-} from "../contracts.ts";
+} from '../contracts.ts';
 
 export interface FakeDriverOptions {
   kind?: string;
@@ -36,7 +36,7 @@ export interface FakeDriverHandle {
 }
 
 export function makeFakeDriver(opts: FakeDriverOptions = {}): FakeDriverHandle {
-  const kind = opts.kind ?? "fake";
+  const kind = opts.kind ?? 'fake';
   const handle: FakeDriverHandle = {
     created: new Map(),
     decodedConfigs: [],
@@ -47,7 +47,7 @@ export function makeFakeDriver(opts: FakeDriverOptions = {}): FakeDriverHandle {
       metadata: { displayName: `Fake ${kind}` },
       models: { default: `${kind}-1`, options: [{ id: `${kind}-1`, label: `${kind} one` }] },
       decodeConfig(raw: unknown) {
-        if (raw && typeof raw === "object" && (raw as Record<string, unknown>).bad) {
+        if (raw && typeof raw === 'object' && (raw as Record<string, unknown>).bad) {
           throw new Error(`${kind}: bad config`);
         }
         handle.decodedConfigs.push(raw);
@@ -71,14 +71,14 @@ export function makeFakeDriver(opts: FakeDriverOptions = {}): FakeDriverHandle {
             if (opts.failSnapshot) throw new Error(opts.failSnapshot);
             if (opts.hangSnapshot) await new Promise<never>(() => {});
             if (opts.holdSnapshot) await opts.holdSnapshot;
-            return opts.answer ?? { state: "available", version: "0.0.0-fake" };
+            return opts.answer ?? { state: 'available', version: '0.0.0-fake' };
           },
           adapter: {
             provider: kind,
-            capabilities: { sessionModelSwitch: "unsupported", effortLevels: opts.effortLevels },
-            sendTurn: async () => ({ turnId: "fake-turn" }),
+            capabilities: { sessionModelSwitch: 'unsupported', effortLevels: opts.effortLevels },
+            sendTurn: async () => ({ turnId: 'fake-turn' }),
             interruptTurn: async () => {},
-            respondToRequest: async () => "unavailable" as const, // this engine has no asks to answer
+            respondToRequest: async () => 'unavailable' as const, // this engine has no asks to answer
             hasSession: () => false,
             stopAll: async () => {},
             onEvent: (listener) => {

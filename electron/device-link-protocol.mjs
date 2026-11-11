@@ -16,42 +16,76 @@ export const MAX_STREAMS = 128;
 export const OPEN_MS = 20_000;
 const MAX_ID = 0xffff_ffff;
 
-const header = (id) => { const bytes = Buffer.allocUnsafe(4); bytes.writeUInt32BE(id); return bytes; };
+const header = (id) => {
+  const bytes = Buffer.allocUnsafe(4);
+  bytes.writeUInt32BE(id);
+  return bytes;
+};
 const validId = (id) => Number.isInteger(id) && id > 0 && id <= MAX_ID;
 
 /**
  * `send(frame)` writes a string or Buffer to the WebSocket. `accept(target)`, on the computer's side only, connects a
  * stream My Cloud opened and answers `{ socket }`, `{ refused }` or `{ failed }`. `traffic()` is called whenever bytes move.
  */
-export function createLinkMux({ send, accept = null, window = STREAM_WINDOW, maxStreams = MAX_STREAMS, openMs = OPEN_MS, traffic = () => {} }) {
+export function createLinkMux({
+  send,
+  accept = null,
+  window = STREAM_WINDOW,
+  maxStreams = MAX_STREAMS,
+  openMs = OPEN_MS,
+  traffic = () => {},
+}) {
   const streams = new Map();
   let nextId = 1;
   let closed = false;
-  const control = (message) => { if (!closed) send(JSON.stringify(message)); };
+  const control = (message) => {
+    if (!closed) send(JSON.stringify(message));
+  };
 
-  const stream = (id) => ({ id, socket: null, pending: [], room: window, unread: 0, consumed: 0, credited: 0, inbox: [], ended: false, endSent: false, peerEnded: false, settle: null, timer: null });
+  const stream = (id) => ({
+    id,
+    socket: null,
+    pending: [],
+    room: window,
+    unread: 0,
+    consumed: 0,
+    credited: 0,
+    inbox: [],
+    ended: false,
+    endSent: false,
+    peerEnded: false,
+    settle: null,
+    timer: null,
+  });
 
   /** Sends what the peer has room for; a socket whose bytes wait for room is paused. */
   const flush = (entry) => {
     while (entry.pending.length && entry.room > 0 && !closed) {
       const chunk = entry.pending[0];
       const size = Math.min(chunk.length, entry.room, MAX_CHUNK);
-      if (size === chunk.length) entry.pending.shift(); else entry.pending[0] = chunk.subarray(size);
+      if (size === chunk.length) entry.pending.shift();
+      else entry.pending[0] = chunk.subarray(size);
       entry.room -= size;
       send(Buffer.concat([header(entry.id), chunk.subarray(0, size)]));
       traffic();
     }
-    if (entry.pending.length) { entry.socket?.pause(); return; }
+    if (entry.pending.length) {
+      entry.socket?.pause();
+      return;
+    }
     entry.socket?.resume();
-    if (entry.ended && !entry.endSent) { entry.endSent = true; control({ t: "end", id: entry.id }); }
+    if (entry.ended && !entry.endSent) {
+      entry.endSent = true;
+      control({ t: 'end', id: entry.id });
+    }
   };
 
   const forget = (entry, tellPeer) => {
     if (streams.get(entry.id) !== entry) return;
     streams.delete(entry.id);
     clearTimeout(entry.timer);
-    if (tellPeer) control({ t: "close", id: entry.id });
-    entry.settle?.({ failed: "refused" });
+    if (tellPeer) control({ t: 'close', id: entry.id });
+    entry.settle?.({ failed: 'refused' });
     entry.settle = null;
     entry.socket?.destroy();
   };
@@ -60,21 +94,29 @@ export function createLinkMux({ send, accept = null, window = STREAM_WINDOW, max
   const drained = (entry, size) => {
     entry.consumed += size;
     if (entry.consumed - entry.credited >= window / 4 && streams.get(entry.id) === entry) {
-      control({ t: "credit", id: entry.id, bytes: entry.consumed - entry.credited });
+      control({ t: 'credit', id: entry.id, bytes: entry.consumed - entry.credited });
       entry.credited = entry.consumed;
     }
   };
 
   const write = (entry, bytes) => {
-    entry.socket.write(bytes, (error) => { if (!error) drained(entry, bytes.length); });
+    entry.socket.write(bytes, (error) => {
+      if (!error) drained(entry, bytes.length);
+    });
   };
 
   const attach = (entry, socket, early = []) => {
     entry.socket = socket;
-    socket.on("data", (chunk) => { entry.pending.push(chunk); flush(entry); });
-    socket.on("end", () => { entry.ended = true; flush(entry); });
-    socket.on("close", () => forget(entry, true));
-    socket.on("error", () => socket.destroy());
+    socket.on('data', (chunk) => {
+      entry.pending.push(chunk);
+      flush(entry);
+    });
+    socket.on('end', () => {
+      entry.ended = true;
+      flush(entry);
+    });
+    socket.on('close', () => forget(entry, true));
+    socket.on('error', () => socket.destroy());
     for (const bytes of entry.inbox.splice(0)) write(entry, bytes);
     if (entry.peerEnded) socket.end();
     for (const chunk of early) if (chunk.length) entry.pending.push(chunk);
@@ -84,45 +126,73 @@ export function createLinkMux({ send, accept = null, window = STREAM_WINDOW, max
   const onControl = (message) => {
     const entry = validId(message?.id) ? streams.get(message.id) : undefined;
     switch (message?.t) {
-      case "open": {
+      case 'open': {
         if (!accept || !validId(message.id) || streams.has(message.id)) return;
-        if (streams.size >= maxStreams) return control({ t: "failed", id: message.id, reason: "busy" });
+        if (streams.size >= maxStreams)
+          return control({ t: 'failed', id: message.id, reason: 'busy' });
         const opening = stream(message.id);
         streams.set(opening.id, opening);
-        void Promise.resolve().then(() => accept(message.chrome === true ? { chrome: true } : { host: message.host, port: message.port })).catch(() => ({ failed: "unreachable" })).then((result) => {
-          if (streams.get(opening.id) !== opening || closed) { result?.socket?.destroy(); return; }
-          if (result?.socket) { control({ t: "opened", id: opening.id }); attach(opening, result.socket); return; }
-          streams.delete(opening.id);
-          control(result?.refused ? { t: "refused", id: opening.id, reason: result.refused } : { t: "failed", id: opening.id, reason: result?.failed ?? "unreachable" });
-        });
+        void Promise.resolve()
+          .then(() =>
+            accept(
+              message.chrome === true
+                ? { chrome: true }
+                : { host: message.host, port: message.port },
+            ),
+          )
+          .catch(() => ({ failed: 'unreachable' }))
+          .then((result) => {
+            if (streams.get(opening.id) !== opening || closed) {
+              result?.socket?.destroy();
+              return;
+            }
+            if (result?.socket) {
+              control({ t: 'opened', id: opening.id });
+              attach(opening, result.socket);
+              return;
+            }
+            streams.delete(opening.id);
+            control(
+              result?.refused
+                ? { t: 'refused', id: opening.id, reason: result.refused }
+                : { t: 'failed', id: opening.id, reason: result?.failed ?? 'unreachable' },
+            );
+          });
         return;
       }
-      case "opened":
+      case 'opened':
         if (!entry?.settle) return;
         clearTimeout(entry.timer);
-        entry.settle({ join: (socket, early) => attach(entry, socket, early), cancel: () => forget(entry, true) });
+        entry.settle({
+          join: (socket, early) => attach(entry, socket, early),
+          cancel: () => forget(entry, true),
+        });
         entry.settle = null;
         return;
-      case "refused":
-      case "failed":
+      case 'refused':
+      case 'failed':
         if (!entry?.settle) return;
         clearTimeout(entry.timer);
         streams.delete(entry.id);
-        entry.settle(message.t === "refused" ? { refused: String(message.reason) } : { failed: String(message.reason) });
+        entry.settle(
+          message.t === 'refused'
+            ? { refused: String(message.reason) }
+            : { failed: String(message.reason) },
+        );
         entry.settle = null;
         return;
-      case "credit":
+      case 'credit':
         if (!entry || !Number.isInteger(message.bytes) || message.bytes <= 0) return;
         entry.room += message.bytes;
         // More room than a window means the peer is not counting what it was sent: the stream is not to be trusted.
         if (entry.room > window) return forget(entry, true);
         return flush(entry);
-      case "end":
+      case 'end':
         if (!entry) return;
         entry.peerEnded = true;
         entry.socket?.end();
         return;
-      case "close":
+      case 'close':
         if (entry) forget(entry, false);
         return;
     }
@@ -145,18 +215,26 @@ export function createLinkMux({ send, accept = null, window = STREAM_WINDOW, max
     /** A WebSocket message: a JSON control frame, or a stream's bytes. */
     receive(data) {
       if (closed) return;
-      if (typeof data === "string") {
+      if (typeof data === 'string') {
         let message;
-        try { message = JSON.parse(data); } catch { return; }
+        try {
+          message = JSON.parse(data);
+        } catch {
+          return;
+        }
         onControl(message);
         return;
       }
-      onData(Buffer.isBuffer(data) ? data : Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data));
+      onData(
+        Buffer.isBuffer(data)
+          ? data
+          : Buffer.from(data instanceof ArrayBuffer ? new Uint8Array(data) : data),
+      );
     },
     /** My Cloud's side: a stream to `host:port`, or to the computer's Chrome, through the computer. `{ gone }` when the link ended before it answered. */
     open(target) {
       if (closed) return Promise.resolve({ gone: true });
-      if (streams.size >= maxStreams) return Promise.resolve({ failed: "busy" });
+      if (streams.size >= maxStreams) return Promise.resolve({ failed: 'busy' });
       while (streams.has(nextId)) nextId = nextId >= MAX_ID ? 1 : nextId + 1;
       const entry = stream(nextId);
       nextId = nextId >= MAX_ID ? 1 : nextId + 1;
@@ -164,12 +242,24 @@ export function createLinkMux({ send, accept = null, window = STREAM_WINDOW, max
       return new Promise((settle) => {
         entry.settle = settle;
         // No answer this long: the link is not carrying anything, so the connection goes another way.
-        entry.timer = setTimeout(() => { if (entry.settle) { entry.settle({ gone: true }); entry.settle = null; forget(entry, true); } }, openMs);
+        entry.timer = setTimeout(() => {
+          if (entry.settle) {
+            entry.settle({ gone: true });
+            entry.settle = null;
+            forget(entry, true);
+          }
+        }, openMs);
         entry.timer.unref?.();
-        control(target.chrome === true ? { t: "open", id: entry.id, chrome: true } : { t: "open", id: entry.id, host: target.host, port: target.port });
+        control(
+          target.chrome === true
+            ? { t: 'open', id: entry.id, chrome: true }
+            : { t: 'open', id: entry.id, host: target.host, port: target.port },
+        );
       });
     },
-    get size() { return streams.size; },
+    get size() {
+      return streams.size;
+    },
     /** The link ended: every stream ends with it, and one still opening goes another way. */
     close() {
       if (closed) return;

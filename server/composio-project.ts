@@ -6,29 +6,29 @@
 // https://docs.composio.dev/kb/guide/mcp-tool-router-sessions
 // https://docs.composio.dev/reference/api-reference/auth-configs/getAuthConfigs
 // https://docs.composio.dev/reference/api-reference/auth-configs/patchAuthConfigsByNanoid
-import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { z } from "zod";
+import { createHash } from 'node:crypto';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { z } from 'zod';
 
-import { AUTH_CONFIG_ID } from "../shared/connector-availability.ts";
-import { writeFileAtomic } from "./atomic.ts";
-import { DATA_DIR } from "./config.ts";
+import { AUTH_CONFIG_ID } from '../shared/connector-availability.ts';
+import { writeFileAtomic } from './atomic.ts';
+import { DATA_DIR } from './config.ts';
 
-export const DEFAULT_BACKEND_ORIGIN = "https://backend.composio.dev";
+export const DEFAULT_BACKEND_ORIGIN = 'https://backend.composio.dev';
 
 export function apiBase() {
-  return (process.env.OMB_COMPOSIO_API ?? `${DEFAULT_BACKEND_ORIGIN}/api/v3.1`).replace(/\/$/, "");
+  return (process.env.OMB_COMPOSIO_API ?? `${DEFAULT_BACKEND_ORIGIN}/api/v3.1`).replace(/\/$/, '');
 }
 
 export function projectHeaders(apiKey: string, json = false) {
-  const headers = new Headers({ "x-api-key": apiKey });
-  if (json) headers.set("content-type", "application/json");
+  const headers = new Headers({ 'x-api-key': apiKey });
+  if (json) headers.set('content-type', 'application/json');
   return headers;
 }
 
 export async function responseError(res: Response, fallback: string) {
-  const raw = await res.text().catch(() => "");
+  const raw = await res.text().catch(() => '');
   try {
     const body = JSON.parse(raw);
     return String(body?.message ?? body?.error?.message ?? body?.error ?? fallback);
@@ -44,7 +44,7 @@ export function inputError(message: string, status = 400) {
 /** Composio's slug is `twitter`; saved cards and model calls may still say `x`. */
 export function canonicalToolkitSlug(slug: string): string {
   const normalized = slug.trim().toLowerCase();
-  return normalized === "x" ? "twitter" : normalized;
+  return normalized === 'x' ? 'twitter' : normalized;
 }
 
 export type AuthConfigMap = Record<string, string>;
@@ -114,8 +114,8 @@ async function readListing(apiKey: string): Promise<AuthConfigListing> {
   const byToolkit = new Map<string, ProjectAuthConfig[]>();
   let cursor: string | undefined;
   for (let page = 0; page < MAX_AUTH_CONFIG_PAGES; page++) {
-    const params = new URLSearchParams({ is_composio_managed: "false", limit: "100" });
-    if (cursor) params.set("cursor", cursor);
+    const params = new URLSearchParams({ is_composio_managed: 'false', limit: '100' });
+    if (cursor) params.set('cursor', cursor);
     const res = await fetch(`${apiBase()}/auth_configs?${params}`, {
       headers: projectHeaders(apiKey),
       signal: AbortSignal.timeout(15_000),
@@ -123,14 +123,17 @@ async function readListing(apiKey: string): Promise<AuthConfigListing> {
     if (!res.ok) throw new Error(await responseError(res, `HTTP ${res.status}`));
     const body = authConfigsPageSchema.parse(await res.json());
     for (const item of body.items ?? []) {
-      const slug = item.toolkit?.slug ? canonicalToolkitSlug(item.toolkit.slug) : "";
+      const slug = item.toolkit?.slug ? canonicalToolkitSlug(item.toolkit.slug) : '';
       if (!slug || !item.id || !usableConfig(item)) continue;
-      byToolkit.set(slug, [...byToolkit.get(slug) ?? [], {
-        id: item.id,
-        type: item.type || "custom",
-        toolRouter: item.is_enabled_for_tool_router === true,
-        created: item.created_at || item.last_updated_at || "",
-      }]);
+      byToolkit.set(slug, [
+        ...(byToolkit.get(slug) ?? []),
+        {
+          id: item.id,
+          type: item.type || 'custom',
+          toolRouter: item.is_enabled_for_tool_router === true,
+          created: item.created_at || item.last_updated_at || '',
+        },
+      ]);
     }
     const next = body.next_cursor ?? undefined;
     if (!next || next === cursor) break;
@@ -148,52 +151,75 @@ const loggedChoices = new Map<string, string>();
 
 /** Separates per-project state without keeping another plaintext copy of the key. */
 function projectFingerprint(apiKey: string): string {
-  return createHash("sha256").update("composio-project\0").update(apiKey.trim()).digest("hex");
+  return createHash('sha256').update('composio-project\0').update(apiKey.trim()).digest('hex');
 }
 
 function refreshListing(apiKey: string, project: string): Promise<ListingEntry> {
   const pending = listingReads.get(project);
   if (pending) return pending;
-  const read = readListing(apiKey).then(
-    (listing): ListingEntry => ({ listing, expiresAt: Date.now() + LISTING_TTL_MS }),
-    (error): ListingEntry => {
-      const readError = error instanceof Error ? error.message : String(error);
-      console.warn(`[composio] could not read the project's auth configs (${readError}); Sessions keep the last list`);
-      return {
-        listing: listings.get(project)?.listing ?? { byToolkit: new Map() },
-        expiresAt: Date.now() + LISTING_RETRY_MS,
-        readError,
-      };
-    },
-  ).then((entry) => {
-    listings.set(project, entry);
-    return entry;
-  }).finally(() => listingReads.delete(project));
+  const read = readListing(apiKey)
+    .then(
+      (listing): ListingEntry => ({ listing, expiresAt: Date.now() + LISTING_TTL_MS }),
+      (error): ListingEntry => {
+        const readError = error instanceof Error ? error.message : String(error);
+        console.warn(
+          `[composio] could not read the project's auth configs (${readError}); Sessions keep the last list`,
+        );
+        return {
+          listing: listings.get(project)?.listing ?? { byToolkit: new Map() },
+          expiresAt: Date.now() + LISTING_RETRY_MS,
+          readError,
+        };
+      },
+    )
+    .then((entry) => {
+      listings.set(project, entry);
+      return entry;
+    })
+    .finally(() => listingReads.delete(project));
   listingReads.set(project, read);
   return read;
 }
 
 /** The project's auth configs per toolkit. Never throws: a failed read keeps the last list (or none). */
-export async function projectAuthConfigs(apiKey: string, options: { fresh?: boolean } = {}): Promise<ProjectAuthConfigs> {
+export async function projectAuthConfigs(
+  apiKey: string,
+  options: { fresh?: boolean } = {},
+): Promise<ProjectAuthConfigs> {
   const project = projectFingerprint(apiKey);
   const cached = listings.get(project);
-  const entry = !options.fresh && cached && Date.now() < cached.expiresAt ? cached : await refreshListing(apiKey, project);
+  const entry =
+    !options.fresh && cached && Date.now() < cached.expiresAt
+      ? cached
+      : await refreshListing(apiKey, project);
   const picked = authConfigPicks(project);
   const choices: Record<string, AuthConfigChoice> = {};
   for (const slug of [...entry.listing.byToolkit.keys()].sort()) {
     const configs = entry.listing.byToolkit.get(slug)!;
     const named = configs.find((config) => config.id === picked[slug]);
     const chosen = named ?? configs[0]!;
-    choices[slug] = { id: chosen.id, type: chosen.type, toolRouter: chosen.toolRouter, of: configs.length, named: Boolean(named) };
+    choices[slug] = {
+      id: chosen.id,
+      type: chosen.type,
+      toolRouter: chosen.toolRouter,
+      of: configs.length,
+      named: Boolean(named),
+    };
     const logKey = `${project}:${slug}`;
     if (configs.length > 1 && !named && loggedChoices.get(logKey) !== chosen.id) {
       loggedChoices.set(logKey, chosen.id);
-      console.info(`[composio] ${configs.length} enabled auth configs for ${slug}; using the most recently created, ${chosen.id}`);
+      console.info(
+        `[composio] ${configs.length} enabled auth configs for ${slug}; using the most recently created, ${chosen.id}`,
+      );
     }
   }
   return {
     choices,
-    configs: Object.fromEntries(Object.entries(choices).flatMap(([slug, choice]) => choice.toolRouter ? [[slug, choice.id]] : [])),
+    configs: Object.fromEntries(
+      Object.entries(choices).flatMap(([slug, choice]) =>
+        choice.toolRouter ? [[slug, choice.id]] : [],
+      ),
+    ),
     ...(entry.readError ? { readError: entry.readError } : {}),
   };
 }
@@ -207,16 +233,25 @@ export function forgetProjectAuthConfigs(apiKey?: string): void {
 }
 
 /** Changes one flag on the person's own config, and only once a connection for its toolkit needs it. */
-export async function turnOnToolRouter(apiKey: string, toolkit: string, choice: AuthConfigChoice): Promise<void> {
+export async function turnOnToolRouter(
+  apiKey: string,
+  toolkit: string,
+  choice: AuthConfigChoice,
+): Promise<void> {
   const res = await fetch(`${apiBase()}/auth_configs/${encodeURIComponent(choice.id)}`, {
-    method: "PATCH",
+    method: 'PATCH',
     headers: projectHeaders(apiKey, true),
     body: JSON.stringify({ type: choice.type, is_enabled_for_tool_router: true }),
     signal: AbortSignal.timeout(15_000),
   });
-  if (!res.ok) throw inputError(toolRouterOffReason(toolkit, choice.id, await responseError(res, `HTTP ${res.status}`)), 409);
+  if (!res.ok)
+    throw inputError(
+      toolRouterOffReason(toolkit, choice.id, await responseError(res, `HTTP ${res.status}`)),
+      409,
+    );
   console.info(`[composio] turned on Tool Router for the ${toolkit} auth config ${choice.id}`);
-  for (const config of listings.get(projectFingerprint(apiKey))?.listing.byToolkit.get(toolkit) ?? []) {
+  for (const config of listings.get(projectFingerprint(apiKey))?.listing.byToolkit.get(toolkit) ??
+    []) {
     if (config.id === choice.id) config.toolRouter = true;
   }
 }
@@ -227,12 +262,12 @@ const picksFileSchema = z.object({
 });
 let picks: Record<string, AuthConfigMap> | undefined;
 
-const picksFile = () => join(DATA_DIR, "composio-auth-configs.json");
+const picksFile = () => join(DATA_DIR, 'composio-auth-configs.json');
 
 function authConfigPicks(project: string): AuthConfigMap {
   if (!picks) {
     try {
-      picks = picksFileSchema.parse(JSON.parse(readFileSync(picksFile(), "utf8"))).projects;
+      picks = picksFileSchema.parse(JSON.parse(readFileSync(picksFile(), 'utf8'))).projects;
     } catch {
       picks = {};
     }
@@ -241,13 +276,17 @@ function authConfigPicks(project: string): AuthConfigMap {
 }
 
 export function noAuthConfigReason(toolkit: string): string {
-  return `${toolkit} has no Composio-managed sign-in. In your Composio project, create an auth config for "${toolkit}" `
-    + "(Auth Configs → Create) with your own app credentials, then click Connect again.";
+  return (
+    `${toolkit} has no Composio-managed sign-in. In your Composio project, create an auth config for "${toolkit}" ` +
+    '(Auth Configs → Create) with your own app credentials, then click Connect again.'
+  );
 }
 
 function toolRouterOffReason(toolkit: string, id: string, said: string): string {
-  return `OpenMausBot could not turn on Tool Router for your ${toolkit} auth config ${id}, which Composio needs before it `
-    + `uses it. Check that your Composio project key may edit auth configs. Composio said: ${said}`;
+  return (
+    `OpenMausBot could not turn on Tool Router for your ${toolkit} auth config ${id}, which Composio needs before it ` +
+    `uses it. Check that your Composio project key may edit auth configs. Composio said: ${said}`
+  );
 }
 
 export function refusedAuthConfigReason(toolkit: string, said: string): string {
@@ -261,26 +300,40 @@ async function checkAuthConfigPick(apiKey: string, toolkit: string, id: string):
     signal: AbortSignal.timeout(15_000),
   });
   if (res.status === 400 || res.status === 404) {
-    throw inputError(`Composio has no auth config ${id} in the project OpenMausBot uses. Copy the id from Auth Configs in that Composio project.`);
+    throw inputError(
+      `Composio has no auth config ${id} in the project OpenMausBot uses. Copy the id from Auth Configs in that Composio project.`,
+    );
   }
-  if (!res.ok) throw new Error(await responseError(res, `Composio auth config: HTTP ${res.status}`));
+  if (!res.ok)
+    throw new Error(await responseError(res, `Composio auth config: HTTP ${res.status}`));
   const item = authConfigItemSchema.parse(await res.json());
   const owner = item.toolkit?.slug ? canonicalToolkitSlug(item.toolkit.slug) : toolkit;
   if (owner !== toolkit) throw inputError(`Auth config ${id} is for ${owner}, not ${toolkit}.`);
   if (item.is_composio_managed === true) {
-    throw inputError(`Auth config ${id} is Composio's own sign-in for ${toolkit}, which OpenMausBot already uses, so no auth_config_id is needed.`);
+    throw inputError(
+      `Auth config ${id} is Composio's own sign-in for ${toolkit}, which OpenMausBot already uses, so no auth_config_id is needed.`,
+    );
   }
-  if (!usableConfig(item)) throw inputError(`Auth config ${id} for ${toolkit} is disabled. Enable it in your Composio project, then connect again.`);
+  if (!usableConfig(item))
+    throw inputError(
+      `Auth config ${id} for ${toolkit} is disabled. Enable it in your Composio project, then connect again.`,
+    );
 }
 
 /** Checks a bot's pick and keeps it for this project's later Sessions; it wins over the newest config while it stays usable. */
-export async function keepAuthConfigPick(apiKey: string, toolkit: string, id: string): Promise<void> {
+export async function keepAuthConfigPick(
+  apiKey: string,
+  toolkit: string,
+  id: string,
+): Promise<void> {
   await checkAuthConfigPick(apiKey, toolkit, id);
   const project = projectFingerprint(apiKey);
   authConfigPicks(project);
   picks = { ...picks, [project]: { ...picks?.[project], [toolkit]: id } };
   mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
-  writeFileAtomic(picksFile(), `${JSON.stringify({ version: 1, projects: picks }, null, 2)}\n`, { mode: 0o600 });
+  writeFileAtomic(picksFile(), `${JSON.stringify({ version: 1, projects: picks }, null, 2)}\n`, {
+    mode: 0o600,
+  });
   forgetProjectAuthConfigs(apiKey);
 }
 
@@ -315,44 +368,52 @@ export async function listConnectedAccounts(
 
   for (let page = 0; page < MAX_CONNECTED_ACCOUNT_PAGES; page += 1) {
     const params = new URLSearchParams({
-      limit: "50",
-      order_by: "updated_at",
-      order_direction: "desc",
+      limit: '50',
+      order_by: 'updated_at',
+      order_direction: 'desc',
     });
-    if (userId !== null) params.set("user_ids", userId);
-    if (slugs.length) params.set("toolkit_slugs", slugs.join(","));
-    if (cursor) params.set("cursor", cursor);
+    if (userId !== null) params.set('user_ids', userId);
+    if (slugs.length) params.set('toolkit_slugs', slugs.join(','));
+    if (cursor) params.set('cursor', cursor);
     const response = await fetch(`${apiBase()}/connected_accounts?${params}`, {
       headers: projectHeaders(apiKey),
       signal: AbortSignal.timeout(15_000),
     });
-    if (!response.ok) throw new Error(await responseError(response, `Composio accounts: HTTP ${response.status}`));
+    if (!response.ok)
+      throw new Error(await responseError(response, `Composio accounts: HTTP ${response.status}`));
     const body = connectedAccountsPageSchema.parse(await response.json());
     accounts.push(...body.items);
     if (stop?.(body.items)) return accounts;
     const next = body.next_cursor || undefined;
     if (!next) return accounts;
-    if (seenCursors.has(next)) throw new Error("Composio account inventory contains a pagination cursor cycle");
+    if (seenCursors.has(next))
+      throw new Error('Composio account inventory contains a pagination cursor cycle');
     seenCursors.add(next);
     cursor = next;
   }
-  throw new Error("Composio account inventory exceeded the pagination safety limit");
+  throw new Error('Composio account inventory exceeded the pagination safety limit');
 }
 
 export async function deleteConnectedAccount(apiKey: string, id: string) {
   const removed = await fetch(
     `${apiBase()}/connected_accounts/${encodeURIComponent(id)}?revoke_on_delete=true`,
-    { method: "DELETE", headers: projectHeaders(apiKey), signal: AbortSignal.timeout(30_000) },
+    { method: 'DELETE', headers: projectHeaders(apiKey), signal: AbortSignal.timeout(30_000) },
   );
-  if (!removed.ok) throw new Error(await responseError(removed, `Composio disconnect: HTTP ${removed.status}`));
+  if (!removed.ok)
+    throw new Error(await responseError(removed, `Composio disconnect: HTTP ${removed.status}`));
 }
 
 /** Revokes and deletes every connected account of one Composio user in the project; how many went. */
 export async function removeUserConnections(apiKey: string, userId: string): Promise<number> {
   const accounts = await listConnectedAccounts(apiKey, userId, []);
   // Security: only an account Composio names as this user's is deleted.
-  if (accounts.some((account) => account.user_id !== userId)) throw new Error("Composio listed a connected account without naming this user as its owner");
+  if (accounts.some((account) => account.user_id !== userId))
+    throw new Error('Composio listed a connected account without naming this user as its owner');
   let removed = 0;
-  for (const { id } of accounts) if (id) { await deleteConnectedAccount(apiKey, id); removed += 1; }
+  for (const { id } of accounts)
+    if (id) {
+      await deleteConnectedAccount(apiKey, id);
+      removed += 1;
+    }
   return removed;
 }

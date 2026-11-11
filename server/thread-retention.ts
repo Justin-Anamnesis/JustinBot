@@ -1,7 +1,7 @@
 // Removes only the event logs of long-idle closed or archived threads; never transcripts or records, nor a busy, unread or handed-off thread.
-import { unlinkSync } from "node:fs";
-import { join } from "node:path";
-import { EVENTS_DIR, NATIVE_DIR } from "./config.ts";
+import { unlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { EVENTS_DIR, NATIVE_DIR } from './config.ts';
 
 export interface ThreadLogRetentionCandidate {
   threadId: string;
@@ -15,7 +15,9 @@ export interface ThreadLogRetentionCandidate {
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function idleSince(candidate: ThreadLogRetentionCandidate): number | null {
-  const stamps = [candidate.closedAt, candidate.archivedAt].filter((value): value is number => value !== null);
+  const stamps = [candidate.closedAt, candidate.archivedAt].filter(
+    (value): value is number => value !== null,
+  );
   return stamps.length ? Math.max(...stamps) : null;
 }
 
@@ -37,7 +39,7 @@ export function sweepThreadEventLogs(
         unlinkSync(path);
         removedAny = true;
       } catch (error) {
-        if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") {
+        if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') {
           console.warn(`[retention] could not remove ${path}: ${(error as Error).message}`);
         }
       }

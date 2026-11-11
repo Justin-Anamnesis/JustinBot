@@ -1,5 +1,16 @@
 export function createLendingTarget<E extends { origin: string; cloud?: { id: string } }>(deps: {
-  account: () => { state(): { status: string; message?: string; account?: { id: string } | null; machine?: { origin?: string } | null }; isOwnCloud?(origin: string): boolean } | null | undefined;
+  account: () =>
+    | {
+        state(): {
+          status: string;
+          message?: string;
+          account?: { id: string } | null;
+          machine?: { origin?: string } | null;
+        };
+        isOwnCloud?(origin: string): boolean;
+      }
+    | null
+    | undefined;
   environments: () => E[];
   /** A server of the person's own their bots moved to, while home is there. */
   ownHome?: () => { origin: string; environmentId: string } | null;

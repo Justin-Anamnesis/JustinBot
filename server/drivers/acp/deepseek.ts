@@ -23,29 +23,29 @@
 // Picker ids are `<provider>/<model>` so bot settings, badges and config.json
 // stay readable; resolveTurnModel turns them into dsh's wire pair just before
 // the core selects the model.
-import { readFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { parse as parseYaml } from "yaml";
+import { readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { parse as parseYaml } from 'yaml';
 
-import type { ModelCatalog } from "../../contracts.ts";
-import { harnessHome } from "../../env-path.ts";
-import { resolveCli, spawnCli } from "../../procs.ts";
-import { createAcpDriver, type AcpSupport } from "./core.ts";
+import type { ModelCatalog } from '../../contracts.ts';
+import { harnessHome } from '../../env-path.ts';
+import { resolveCli, spawnCli } from '../../procs.ts';
+import { createAcpDriver, type AcpSupport } from './core.ts';
 
 export const DEEPSEEK_MODELS: ModelCatalog = {
-  default: "deepseek-official/deepseek-v4-flash",
+  default: 'deepseek-official/deepseek-v4-flash',
   options: [
-    { id: "deepseek-official/deepseek-v4-flash", label: "DeepSeek-V4-Flash" },
-    { id: "deepseek-official/deepseek-flash", label: "DeepSeek-V4.1-Flash" },
-    { id: "deepseek-official/deepseek-v4-pro", label: "DeepSeek-V4-Pro" },
+    { id: 'deepseek-official/deepseek-v4-flash', label: 'DeepSeek-V4-Flash' },
+    { id: 'deepseek-official/deepseek-flash', label: 'DeepSeek-V4.1-Flash' },
+    { id: 'deepseek-official/deepseek-v4-pro', label: 'DeepSeek-V4-Pro' },
   ],
 };
 
 /** `provider/model` → dsh's `["provider","model"]`. An id with no provider
  * is handed to dsh as-is so its own error names the problem. */
 export function deepseekWireValue(pickerId: string): string {
-  const slash = pickerId.indexOf("/");
+  const slash = pickerId.indexOf('/');
   if (slash <= 0 || slash === pickerId.length - 1) return pickerId;
   return JSON.stringify([pickerId.slice(0, slash), pickerId.slice(slash + 1)]);
 }
@@ -60,15 +60,15 @@ export function deepseekPickerId(wireValue: string): string | null {
   }
   if (!Array.isArray(parsed) || parsed.length !== 2) return null;
   const [provider, model] = parsed;
-  if (typeof provider !== "string" || typeof model !== "string" || !provider || !model) return null;
+  if (typeof provider !== 'string' || typeof model !== 'string' || !provider || !model) return null;
   return `${provider}/${model}`;
 }
 
 export function dshHome(env: Record<string, string | undefined>): string {
-  return env.DSH_HOME || harnessHome("dsh", env);
+  return env.DSH_HOME || harnessHome('dsh', env);
 }
 
-const nonEmpty = (value: unknown): boolean => typeof value === "string" && value.trim() !== "";
+const nonEmpty = (value: unknown): boolean => typeof value === 'string' && value.trim() !== '';
 
 /** dsh 0.2.1 writes `version: 1` with the key under `refs:`; it also migrates
  * the pre-release flat layout (the key at the top level), so both count. An
@@ -76,13 +76,14 @@ const nonEmpty = (value: unknown): boolean => typeof value === "string" && value
 function storedCredentialPresent(path: string): boolean {
   let doc: unknown;
   try {
-    doc = parseYaml(readFileSync(path, "utf8"));
+    doc = parseYaml(readFileSync(path, 'utf8'));
   } catch {
     return false;
   }
-  if (!doc || typeof doc !== "object") return false;
+  if (!doc || typeof doc !== 'object') return false;
   const root = doc as Record<string, unknown>;
-  const refs = root.refs && typeof root.refs === "object" ? root.refs as Record<string, unknown> : {};
+  const refs =
+    root.refs && typeof root.refs === 'object' ? (root.refs as Record<string, unknown>) : {};
   return nonEmpty(refs.DEEPSEEK_API_KEY) || nonEmpty(root.DEEPSEEK_API_KEY);
 }
 
@@ -92,7 +93,7 @@ const DOTENV_LINE = /^[ \t]*(?:export[ \t]+)?DEEPSEEK_API_KEY[ \t]*=(.*)$/;
 function dotenvValuePresent(path: string): boolean {
   let text: string;
   try {
-    text = readFileSync(path, "utf8");
+    text = readFileSync(path, 'utf8');
   } catch {
     return false;
   }
@@ -102,8 +103,8 @@ function dotenvValuePresent(path: string): boolean {
     let value = match[1]!.trim();
     const quoted = /^(["'])(.*)\1(?:[ \t]+#.*)?$/.exec(value);
     if (quoted) value = quoted[2]!;
-    else value = value.replace(/[ \t]+#.*$/, "").trim();
-    if (value !== "") return true;
+    else value = value.replace(/[ \t]+#.*$/, '').trim();
+    if (value !== '') return true;
   }
   return false;
 }
@@ -114,11 +115,17 @@ function dotenvValuePresent(path: string): boolean {
 export function hasDeepSeekKey(env: Record<string, string | undefined>): boolean {
   if (nonEmpty(env.DEEPSEEK_API_KEY)) return true;
   const home = dshHome(env);
-  return storedCredentialPresent(join(home, ".credentials.yaml")) || dotenvValuePresent(join(home, ".env"));
+  return (
+    storedCredentialPresent(join(home, '.credentials.yaml')) ||
+    dotenvValuePresent(join(home, '.env'))
+  );
 }
 
 /** Every `value` string under a select option, descending into groups. */
-function offeredWireValues(sessionConfig: unknown, configId: string): { values: string[]; current: string | null } {
+function offeredWireValues(
+  sessionConfig: unknown,
+  configId: string,
+): { values: string[]; current: string | null } {
   const options = (sessionConfig as { configOptions?: unknown[] } | undefined)?.configOptions;
   const option = (Array.isArray(options) ? options : []).find(
     (entry: any) => entry?.id === configId,
@@ -127,12 +134,12 @@ function offeredWireValues(sessionConfig: unknown, configId: string): { values: 
   const collect = (entries: unknown) => {
     if (!Array.isArray(entries)) return;
     for (const entry of entries) {
-      if (typeof entry?.value === "string") values.push(entry.value);
+      if (typeof entry?.value === 'string') values.push(entry.value);
       else if (Array.isArray(entry?.options)) collect(entry.options);
     }
   };
   collect(option?.options);
-  return { values, current: typeof option?.currentValue === "string" ? option.currentValue : null };
+  return { values, current: typeof option?.currentValue === 'string' ? option.currentValue : null };
 }
 
 /** The `model` config option of a session/new answer, as a picker catalog.
@@ -140,35 +147,41 @@ function offeredWireValues(sessionConfig: unknown, configId: string): { values: 
  * badge so a gateway's copy of a model stays distinguishable. */
 export function parseDeepSeekCatalog(sessionResult: unknown): ModelCatalog {
   const options = (sessionResult as { configOptions?: unknown[] } | undefined)?.configOptions;
-  const option = (Array.isArray(options) ? options : []).find((entry: any) => entry?.id === "model") as
-    { currentValue?: unknown; options?: unknown } | undefined;
-  const out: ModelCatalog["options"] = [];
+  const option = (Array.isArray(options) ? options : []).find(
+    (entry: any) => entry?.id === 'model',
+  ) as { currentValue?: unknown; options?: unknown } | undefined;
+  const out: ModelCatalog['options'] = [];
   const collect = (entries: unknown, provider: string | undefined) => {
     if (!Array.isArray(entries)) return;
     for (const entry of entries) {
       if (Array.isArray(entry?.options)) {
-        const name = typeof entry.name === "string" && entry.name.trim() ? entry.name.trim()
-          : typeof entry.group === "string" ? entry.group : provider;
+        const name =
+          typeof entry.name === 'string' && entry.name.trim()
+            ? entry.name.trim()
+            : typeof entry.group === 'string'
+              ? entry.group
+              : provider;
         collect(entry.options, name);
         continue;
       }
-      if (typeof entry?.value !== "string") continue;
+      if (typeof entry?.value !== 'string') continue;
       const id = deepseekPickerId(entry.value);
       if (!id || out.some((row) => row.id === id)) continue;
-      const label = typeof entry.name === "string" && entry.name.trim() ? entry.name.trim() : id;
+      const label = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : id;
       out.push({ id, label, ...(provider ? { provider } : {}) });
     }
   };
   collect(option?.options, undefined);
-  if (!out.length) throw new Error("dsh advertised no models");
-  const current = typeof option?.currentValue === "string" ? deepseekPickerId(option.currentValue) : null;
+  if (!out.length) throw new Error('dsh advertised no models');
+  const current =
+    typeof option?.currentValue === 'string' ? deepseekPickerId(option.currentValue) : null;
   return {
     default: current && out.some((row) => row.id === current) ? current : out[0]!.id,
     options: out,
   };
 }
 
-export const DEEPSEEK_MODELS_TIMEOUT_ENV = "OPENMAUS_DEEPSEEK_MODELS_TIMEOUT_MS";
+export const DEEPSEEK_MODELS_TIMEOUT_ENV = 'OPENMAUS_DEEPSEEK_MODELS_TIMEOUT_MS';
 /** A warm `dsh --profile acp` answers session/new in ~2 s; the first boot
  * after an install also creates the profile, so leave real headroom. */
 export const DEEPSEEK_MODELS_DEFAULT_TIMEOUT_MS = 60_000;
@@ -177,7 +190,9 @@ function catalogTimeoutMs(env: Record<string, string | undefined>): number {
   const raw = env[DEEPSEEK_MODELS_TIMEOUT_ENV];
   if (raw === undefined) return DEEPSEEK_MODELS_DEFAULT_TIMEOUT_MS;
   const parsed = Number(raw);
-  return Number.isInteger(parsed) && parsed > 0 && parsed <= 2_147_483_647 ? parsed : DEEPSEEK_MODELS_DEFAULT_TIMEOUT_MS;
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 2_147_483_647
+    ? parsed
+    : DEEPSEEK_MODELS_DEFAULT_TIMEOUT_MS;
 }
 
 /** Ask the installed dsh what it offers: initialize, session/new in `cwd`,
@@ -193,8 +208,12 @@ export function fetchDeepSeekCatalog(
     let child: ReturnType<typeof spawnCli>;
     try {
       // Security: while the bot box is on, dsh runs in it, as a bot's turn does: it reads ~/.dsh, which a bot can write.
-      const resolved = resolveCli(cli, ["--profile", "acp"], env as NodeJS.ProcessEnv);
-      child = spawnCli(resolved.command, resolved.args, { stdio: ["pipe", "pipe", "ignore"], env: env as NodeJS.ProcessEnv, box: { allowEnv } });
+      const resolved = resolveCli(cli, ['--profile', 'acp'], env as NodeJS.ProcessEnv);
+      child = spawnCli(resolved.command, resolved.args, {
+        stdio: ['pipe', 'pipe', 'ignore'],
+        env: env as NodeJS.ProcessEnv,
+        box: { allowEnv },
+      });
     } catch (error) {
       return reject(error instanceof Error ? error : new Error(String(error)));
     }
@@ -211,29 +230,42 @@ export function fetchDeepSeekCatalog(
         if (child.kill()) {
           const hardKill = setTimeout(() => {
             try {
-              child.kill("SIGKILL");
+              child.kill('SIGKILL');
             } catch {}
           }, 1_000);
           hardKill.unref?.();
         }
       } catch {}
-      if ("catalog" in outcome) resolve(outcome.catalog);
+      if ('catalog' in outcome) resolve(outcome.catalog);
       else reject(outcome.error);
     };
-    timer = setTimeout(() => finish({ error: new Error(`dsh timed out after ${catalogTimeoutMs(env)} ms without answering session/new`) }), catalogTimeoutMs(env));
-    child.once("error", (error) => finish({ error }));
+    timer = setTimeout(
+      () =>
+        finish({
+          error: new Error(
+            `dsh timed out after ${catalogTimeoutMs(env)} ms without answering session/new`,
+          ),
+        }),
+      catalogTimeoutMs(env),
+    );
+    child.once('error', (error) => finish({ error }));
     // A child that already exited makes stdin emit EPIPE, and an unhandled stream 'error' crashes the server.
-    child.stdin?.on("error", (error) => finish({ error }));
-    child.once("close", (code, signal) => finish({ error: new Error(`dsh exited (${signal ?? code}) before answering session/new`) }));
+    child.stdin?.on('error', (error) => finish({ error }));
+    child.once('close', (code, signal) =>
+      finish({ error: new Error(`dsh exited (${signal ?? code}) before answering session/new`) }),
+    );
 
-    let buf = "";
+    let buf = '';
     let nextId = 0;
     const send = (method: string, params: unknown): number => {
       nextId += 1;
       try {
-        child.stdin!.write(`${JSON.stringify({ jsonrpc: "2.0", id: nextId, method, params })}\n`, (error) => {
-          if (error) finish({ error });
-        });
+        child.stdin!.write(
+          `${JSON.stringify({ jsonrpc: '2.0', id: nextId, method, params })}\n`,
+          (error) => {
+            if (error) finish({ error });
+          },
+        );
       } catch (error) {
         finish({ error: error instanceof Error ? error : new Error(String(error)) });
       }
@@ -243,10 +275,10 @@ export function fetchDeepSeekCatalog(
     let sessionReqId = 0;
     let closeId = 0;
     let catalog: ModelCatalog | null = null;
-    child.stdout?.on("data", (chunk) => {
+    child.stdout?.on('data', (chunk) => {
       buf += String(chunk);
       let nl: number;
-      while ((nl = buf.indexOf("\n")) >= 0) {
+      while ((nl = buf.indexOf('\n')) >= 0) {
         const line = buf.slice(0, nl);
         buf = buf.slice(nl + 1);
         let msg: any;
@@ -256,76 +288,81 @@ export function fetchDeepSeekCatalog(
           continue;
         }
         if (msg?.id === initId) {
-          if (!msg.result) return finish({ error: new Error(`dsh rejected initialize: ${JSON.stringify(msg.error ?? msg)}`) });
-          sessionReqId = send("session/new", { cwd, mcpServers: [] });
+          if (!msg.result)
+            return finish({
+              error: new Error(`dsh rejected initialize: ${JSON.stringify(msg.error ?? msg)}`),
+            });
+          sessionReqId = send('session/new', { cwd, mcpServers: [] });
         } else if (sessionReqId && msg?.id === sessionReqId) {
-          const sessionId = typeof msg.result?.sessionId === "string" ? msg.result.sessionId : null;
+          const sessionId = typeof msg.result?.sessionId === 'string' ? msg.result.sessionId : null;
           try {
             catalog = parseDeepSeekCatalog(msg.result);
           } catch (error) {
             // Best effort: the close is sent, but an unusable answer does not wait on it.
-            if (sessionId) send("session/close", { sessionId });
+            if (sessionId) send('session/close', { sessionId });
             return finish({ error: error instanceof Error ? error : new Error(String(error)) });
           }
           if (!sessionId) return finish({ catalog });
           // Leave no half-open session behind in dsh's persisted list.
-          closeId = send("session/close", { sessionId });
+          closeId = send('session/close', { sessionId });
         } else if (closeId && msg?.id === closeId) {
           finish({ catalog: catalog! });
         }
       }
     });
-    initId = send("initialize", {
+    initId = send('initialize', {
       protocolVersion: 1,
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
-      clientInfo: { name: "openmausbot", version: "catalog" },
+      clientInfo: { name: 'openmausbot', version: 'catalog' },
     });
   });
 }
 
 export const deepseekSupport: AcpSupport = {
-  driverKind: "deepseekAgent",
-  displayName: "DeepSeek Harness",
+  driverKind: 'deepseekAgent',
+  displayName: 'DeepSeek Harness',
   models: DEEPSEEK_MODELS,
-  defaultCli: "dsh",
-  nativeSource: "deepseek.acp",
-  loginNote: "DeepSeek Harness has no DeepSeek API key — paste one under Settings → Connections → Model providers, or set DEEPSEEK_API_KEY",
+  defaultCli: 'dsh',
+  nativeSource: 'deepseek.acp',
+  loginNote:
+    'DeepSeek Harness has no DeepSeek API key — paste one under Settings → Connections → Model providers, or set DEEPSEEK_API_KEY',
 
   install: {
     command: {
-      darwin: "npm install -g @deepseek-ai/dsh",
-      linux: "npm install -g @deepseek-ai/dsh",
-      win32: "npm install -g @deepseek-ai/dsh",
+      darwin: 'npm install -g @deepseek-ai/dsh',
+      linux: 'npm install -g @deepseek-ai/dsh',
+      win32: 'npm install -g @deepseek-ai/dsh',
     },
-    docsUrl: "https://github.com/deepseek-ai/deepseek-harness",
+    docsUrl: 'https://github.com/deepseek-ai/deepseek-harness',
     needsNode: true,
     // Keyless is "paste a key in Settings", not a terminal sign-in.
-    settings: "connections",
+    settings: 'connections',
   },
 
-  spawnArgs: () => ["--profile", "acp"],
-  credentialEnv: ["DEEPSEEK_API_KEY"],
+  spawnArgs: () => ['--profile', 'acp'],
+  credentialEnv: ['DEEPSEEK_API_KEY'],
   // Model and reasoning effort are session config options (see header).
-  selectModel: { configId: "model" },
+  selectModel: { configId: 'model' },
   modelVariants: true,
-  resumeMethod: "resume",
+  resumeMethod: 'resume',
   // dsh 0.2 rejects session/resume of a session still open in the same process
   // ("session is already active"), so a turn with new tools needs a new process.
   restartOnMcpChange: true,
   // Refresh only: a fresh profile boot can take long, and startup must not wait on it.
-  resolveModels: (env, config, _instanceId, _fresh, allowEnv) => fetchDeepSeekCatalog(config.cli || "dsh", env, tmpdir(), allowEnv),
+  resolveModels: (env, config, _instanceId, _fresh, allowEnv) =>
+    fetchDeepSeekCatalog(config.cli || 'dsh', env, tmpdir(), allowEnv),
   resolveModelsOnCreate: false,
 
   // initialize advertises no auth methods; the key rides in the child env or
   // dsh's own credential file, so there is nothing to call authenticate for.
   pickAuthMethod: () => null,
-  authFailure: "continue",
+  authFailure: 'continue',
   isAuthenticated: (env) => hasDeepSeekKey(env),
 
   resolveTurnModel: (model) => (model ? deepseekWireValue(model) : model),
   fallbackModel: (sessionConfig, catalogDefault) => {
-    const { values, current } = offeredWireValues(sessionConfig, "model");
-    const wanted = catalogDefault ? deepseekWireValue(catalogDefault) : "";
+    const { values, current } = offeredWireValues(sessionConfig, 'model');
+    const wanted = catalogDefault ? deepseekWireValue(catalogDefault) : '';
     if (wanted && values.includes(wanted)) return wanted;
     if (current && values.includes(current)) return current;
     return null;

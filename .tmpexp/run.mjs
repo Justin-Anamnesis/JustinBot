@@ -1,5 +1,5 @@
-import { fromMarkdown } from "mdast-util-from-markdown";
-import { windowsPathDestinations } from "./ext.mjs";
+import { fromMarkdown } from 'mdast-util-from-markdown';
+import { windowsPathDestinations } from './ext.mjs';
 const cases = [
   String.raw`[a](C:\Users\Maus\.openmausbot\report.md)`,
   String.raw`![b](<D:\.hidden\chart one.png>)`,
@@ -17,7 +17,10 @@ const cases = [
 for (const c of cases) {
   const tree = fromMarkdown(c, { mdastExtensions: [windowsPathDestinations] });
   const urls = [];
-  const walk = (n) => { if (n.url !== undefined) urls.push(n.url); (n.children||[]).forEach(walk); };
+  const walk = (n) => {
+    if (n.url !== undefined) urls.push(n.url);
+    (n.children || []).forEach(walk);
+  };
   walk(tree);
-  console.log(JSON.stringify(c), "=>", JSON.stringify(urls));
+  console.log(JSON.stringify(c), '=>', JSON.stringify(urls));
 }

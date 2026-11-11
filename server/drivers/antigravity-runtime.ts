@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from 'node:crypto';
 import {
   access,
   chmod,
@@ -12,27 +12,27 @@ import {
   stat,
   statfs,
   writeFile,
-} from "node:fs/promises";
-import { constants } from "node:fs";
-import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
+} from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path';
 
-import { DATA_DIR } from "../config.ts";
-import { antigravityRuntimesRoot } from "../engine-roots.ts";
-import { extractZipMember, readZipDirectory } from "../zip-archive.ts";
-import { augmentedPath } from "../env-path.ts";
+import { DATA_DIR } from '../config.ts';
+import { antigravityRuntimesRoot } from '../engine-roots.ts';
+import { extractZipMember, readZipDirectory } from '../zip-archive.ts';
+import { augmentedPath } from '../env-path.ts';
 import {
   resolveAntigravityReleaseAsset,
   type AntigravityReleaseAsset,
-} from "./antigravity-release.ts";
+} from './antigravity-release.ts';
 
 const FREE_SPACE_MARGIN = 256 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 45 * 60_000;
-const STAGING_PREFIX = ".install-";
+const STAGING_PREFIX = '.install-';
 
 /** Windows refuses to rename or delete a held file with EPERM/EBUSY/EACCES, not "in use" (a just-stopped runtime, an antivirus scan). */
 export function transientWindowsFileError(error: unknown): boolean {
-  const code = typeof error === "object" && error !== null ? Reflect.get(error, "code") : undefined;
-  return code === "EPERM" || code === "EBUSY" || code === "EACCES" || code === "ENOTEMPTY";
+  const code = typeof error === 'object' && error !== null ? Reflect.get(error, 'code') : undefined;
+  return code === 'EPERM' || code === 'EBUSY' || code === 'EACCES' || code === 'ENOTEMPTY';
 }
 
 export interface RetryOptions {
@@ -43,7 +43,10 @@ export interface RetryOptions {
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export async function retryOnWindowsFileLock<T>(step: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
+export async function retryOnWindowsFileLock<T>(
+  step: () => Promise<T>,
+  options: RetryOptions = {},
+): Promise<T> {
   const attempts = options.attempts ?? 8;
   const sleep = options.sleep ?? wait;
   for (let attempt = 1; ; attempt += 1) {
@@ -56,12 +59,12 @@ export async function retryOnWindowsFileLock<T>(step: () => Promise<T>, options:
   }
 }
 
-const INSTALL_RECORD = ".install-complete.json";
+const INSTALL_RECORD = '.install-complete.json';
 
 export interface AntigravityRuntime {
   executablePath: string;
   harnessPath: string;
-  source: "managed" | "override" | "path";
+  source: 'managed' | 'override' | 'path';
   version: string | null;
 }
 
@@ -70,7 +73,7 @@ export class AntigravitySetupError extends Error {
 
   constructor(message: string) {
     super(message);
-    this.name = "AntigravitySetupError";
+    this.name = 'AntigravitySetupError';
   }
 }
 
@@ -95,25 +98,30 @@ function runtimeRoot(baseDir = DATA_DIR): string {
 }
 
 function executableNames(platform: NodeJS.Platform = process.platform) {
-  return platform === "win32"
-    ? { executable: "agy_acp_server.exe", harness: "localharness_external.exe" }
-    : { executable: "agy_acp_server.par", harness: "localharness_external" };
+  return platform === 'win32'
+    ? { executable: 'agy_acp_server.exe', harness: 'localharness_external.exe' }
+    : { executable: 'agy_acp_server.par', harness: 'localharness_external' };
 }
 
 async function executableFile(path: string, bytes?: number): Promise<boolean> {
   try {
     const info = await stat(path);
     if (!info.isFile() || (bytes !== undefined && info.size !== bytes)) return false;
-    if (process.platform !== "win32") await access(path, constants.X_OK);
+    if (process.platform !== 'win32') await access(path, constants.X_OK);
     return true;
   } catch {
     return false;
   }
 }
 
-async function completedRelease(directory: string, asset: AntigravityReleaseAsset): Promise<AntigravityRuntime | null> {
+async function completedRelease(
+  directory: string,
+  asset: AntigravityReleaseAsset,
+): Promise<AntigravityRuntime | null> {
   try {
-    const record = JSON.parse(await readFile(join(directory, INSTALL_RECORD), "utf8")) as InstallRecord;
+    const record = JSON.parse(
+      await readFile(join(directory, INSTALL_RECORD), 'utf8'),
+    ) as InstallRecord;
     if (
       record.sha256 !== asset.sha256 ||
       record.version !== asset.version ||
@@ -121,30 +129,35 @@ async function completedRelease(directory: string, asset: AntigravityReleaseAsse
       record.executable.bytes !== asset.executable.bytes ||
       record.harness.name !== asset.harness.name ||
       record.harness.bytes !== asset.harness.bytes
-    ) return null;
+    )
+      return null;
     const executablePath = join(directory, asset.executable.name);
     const harnessPath = join(directory, asset.harness.name);
     if (!(await executableFile(executablePath, asset.executable.bytes))) return null;
     if (!(await executableFile(harnessPath, asset.harness.bytes))) return null;
-    return { executablePath, harnessPath, source: "managed", version: asset.version };
+    return { executablePath, harnessPath, source: 'managed', version: asset.version };
   } catch {
     return null;
   }
 }
 
 function pathCandidates(binary: string, env: NodeJS.ProcessEnv): string[] {
-  if (isAbsolute(binary) || binary.includes("/") || binary.includes("\\")) return [resolve(binary)];
-  const pathValue = process.platform === "win32"
-    ? Object.entries(env).findLast(([key]) => key.toUpperCase() === "PATH")?.[1]
-    : env.PATH;
+  if (isAbsolute(binary) || binary.includes('/') || binary.includes('\\')) return [resolve(binary)];
+  const pathValue =
+    process.platform === 'win32'
+      ? Object.entries(env).findLast(([key]) => key.toUpperCase() === 'PATH')?.[1]
+      : env.PATH;
   return (pathValue ?? augmentedPath())
     .split(delimiter)
-    .map((part) => part.trim().replace(/^"|"$/gu, ""))
+    .map((part) => part.trim().replace(/^"|"$/gu, ''))
     .filter(Boolean)
     .map((part) => resolve(part, binary));
 }
 
-async function externalRuntime(candidate: string, source: "override" | "path"): Promise<AntigravityRuntime | null> {
+async function externalRuntime(
+  candidate: string,
+  source: 'override' | 'path',
+): Promise<AntigravityRuntime | null> {
   const names = executableNames();
   const executablePath = resolve(candidate);
   const harnessPath = join(dirname(executablePath), names.harness);
@@ -159,27 +172,31 @@ export async function resolveAntigravityRuntime(
   baseDir = DATA_DIR,
 ): Promise<AntigravityRuntime> {
   const override = binaryPath?.trim();
-  const legacyCli = override !== undefined && /(?:^|[\\/])agy(?:\.(?:cmd|bat|exe|ps1))?$/iu.test(override);
-  if (override && override !== "agy") {
+  const legacyCli =
+    override !== undefined && /(?:^|[\\/])agy(?:\.(?:cmd|bat|exe|ps1))?$/iu.test(override);
+  if (override && override !== 'agy') {
     for (const candidate of pathCandidates(override, env)) {
-      const found = await externalRuntime(candidate, "override");
+      const found = await externalRuntime(candidate, 'override');
       if (found) return found;
     }
     if (!legacyCli) {
       throw new AntigravitySetupError(
-        "The custom Antigravity ACP executable or its localharness_external sibling is missing.",
+        'The custom Antigravity ACP executable or its localharness_external sibling is missing.',
       );
     }
   }
 
   const asset = resolveAntigravityReleaseAsset();
   if (asset) {
-    const managed = await completedRelease(join(runtimeRoot(baseDir), "versions", asset.sha256), asset);
+    const managed = await completedRelease(
+      join(runtimeRoot(baseDir), 'versions', asset.sha256),
+      asset,
+    );
     if (managed) return managed;
   }
   const names = executableNames();
   for (const candidate of pathCandidates(names.executable, env)) {
-    const found = await externalRuntime(candidate, "path");
+    const found = await externalRuntime(candidate, 'path');
     if (found) return found;
   }
   if (!asset) {
@@ -187,9 +204,11 @@ export async function resolveAntigravityRuntime(
       `Google does not publish an Antigravity runtime for ${process.platform}-${process.arch}. Set a custom executable path.`,
     );
   }
-  throw new AntigravitySetupError(legacyCli
-    ? "Antigravity now uses Google's official runtime. Choose Install official Antigravity, then Sign in with Google. Your previous agy login is not copied."
-    : "Antigravity is not installed. Install the official Google runtime to continue.");
+  throw new AntigravitySetupError(
+    legacyCli
+      ? "Antigravity now uses Google's official runtime. Choose Install official Antigravity, then Sign in with Google. Your previous agy login is not copied."
+      : 'Antigravity is not installed. Install the official Google runtime to continue.',
+  );
 }
 
 async function extractPinnedArchive(
@@ -206,22 +225,29 @@ async function extractPinnedArchive(
     const expectedBytes = expected.get(entry.name);
     const unixType = (entry.externalAttributes >>> 16) & 0o170000;
     if (
-      expectedBytes === undefined || seen.has(entry.name)
-      || entry.name.includes("/") || entry.name.includes("\\")
-      || (unixType !== 0 && unixType !== 0o100000)
-      || entry.uncompressedBytes !== expectedBytes || entry.compressedBytes <= 0
-    ) throw new Error("The archive contains an unexpected or unsafe file.");
+      expectedBytes === undefined ||
+      seen.has(entry.name) ||
+      entry.name.includes('/') ||
+      entry.name.includes('\\') ||
+      (unixType !== 0 && unixType !== 0o100000) ||
+      entry.uncompressedBytes !== expectedBytes ||
+      entry.compressedBytes <= 0
+    )
+      throw new Error('The archive contains an unexpected or unsafe file.');
     seen.add(entry.name);
     await extractZipMember(archivePath, entry, join(outputDirectory, entry.name));
   }
-  if (seen.size !== 2) throw new Error("The archive is missing an expected file.");
+  if (seen.size !== 2) throw new Error('The archive is missing an expected file.');
 }
 
 async function installOnce(options: AntigravityInstallOptions): Promise<AntigravityRuntime> {
   const asset = options.asset === undefined ? resolveAntigravityReleaseAsset() : options.asset;
-  if (!asset) throw new Error(`Google does not publish an Antigravity runtime for ${process.platform}-${process.arch}.`);
+  if (!asset)
+    throw new Error(
+      `Google does not publish an Antigravity runtime for ${process.platform}-${process.arch}.`,
+    );
   const root = runtimeRoot(options.baseDir);
-  const versions = join(root, "versions");
+  const versions = join(root, 'versions');
   const destination = join(versions, asset.sha256);
   await mkdir(versions, { recursive: true, mode: 0o700 });
   const existing = await completedRelease(destination, asset);
@@ -232,12 +258,16 @@ async function installOnce(options: AntigravityInstallOptions): Promise<Antigrav
 
   try {
     const disk = await statfs(versions, { bigint: true });
-    const required = BigInt(asset.archiveBytes + asset.executable.bytes + asset.harness.bytes + FREE_SPACE_MARGIN);
+    const required = BigInt(
+      asset.archiveBytes + asset.executable.bytes + asset.harness.bytes + FREE_SPACE_MARGIN,
+    );
     if (disk.bavail * disk.bsize < required) {
-      throw new Error(`Antigravity needs at least ${Math.ceil(Number(required) / 1024 / 1024)} MiB of free space to install.`);
+      throw new Error(
+        `Antigravity needs at least ${Math.ceil(Number(required) / 1024 / 1024)} MiB of free space to install.`,
+      );
     }
   } catch (error) {
-    if (error instanceof Error && error.message.includes("Antigravity needs")) throw error;
+    if (error instanceof Error && error.message.includes('Antigravity needs')) throw error;
     // statfs is unavailable on a few filesystems.
   }
 
@@ -245,37 +275,46 @@ async function installOnce(options: AntigravityInstallOptions): Promise<Antigrav
   const staging = await mkdtemp(join(versions, `${STAGING_PREFIX}${randomUUID()}-`));
   let failed = false;
   try {
-    const archivePath = join(staging, "download.zip");
-    const runtimeDirectory = join(staging, "runtime");
+    const archivePath = join(staging, 'download.zip');
+    const runtimeDirectory = join(staging, 'runtime');
     await mkdir(runtimeDirectory, { mode: 0o700 });
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
     timeout.unref?.();
     try {
-      const response = await (options.fetchImpl ?? fetch)(asset.url, { signal: controller.signal, redirect: "follow" });
-      if (!response.ok || !response.body) throw new Error(`Google download failed (${response.status}).`);
+      const response = await (options.fetchImpl ?? fetch)(asset.url, {
+        signal: controller.signal,
+        redirect: 'follow',
+      });
+      if (!response.ok || !response.body)
+        throw new Error(`Google download failed (${response.status}).`);
       const finalUrl = new URL(response.url || asset.url);
-      if (finalUrl.protocol !== "https:" || finalUrl.hostname !== "dl.google.com") {
-        throw new Error("The Antigravity download redirected outside dl.google.com.");
+      if (finalUrl.protocol !== 'https:' || finalUrl.hostname !== 'dl.google.com') {
+        throw new Error('The Antigravity download redirected outside dl.google.com.');
       }
-      const encoding = response.headers.get("content-encoding")?.trim().toLowerCase();
-      const length = response.headers.get("content-length");
-      if ((!encoding || encoding === "identity") && length && Number(length) !== asset.archiveBytes) {
-        throw new Error("The Antigravity download size did not match the pinned release.");
+      const encoding = response.headers.get('content-encoding')?.trim().toLowerCase();
+      const length = response.headers.get('content-length');
+      if (
+        (!encoding || encoding === 'identity') &&
+        length &&
+        Number(length) !== asset.archiveBytes
+      ) {
+        throw new Error('The Antigravity download size did not match the pinned release.');
       }
-      const handle = await open(archivePath, "wx", 0o600);
-      const hash = createHash("sha256");
+      const handle = await open(archivePath, 'wx', 0o600);
+      const hash = createHash('sha256');
       let downloaded = 0;
       try {
         for await (const raw of response.body as unknown as AsyncIterable<Uint8Array>) {
           const chunk = Buffer.from(raw);
           if (downloaded + chunk.length > asset.archiveBytes) {
-            throw new Error("The Antigravity download exceeded its pinned size.");
+            throw new Error('The Antigravity download exceeded its pinned size.');
           }
           let offset = 0;
           while (offset < chunk.length) {
             const { bytesWritten } = await handle.write(chunk, offset, chunk.length - offset, null);
-            if (bytesWritten <= 0) throw new Error("The Antigravity download could not be written completely.");
+            if (bytesWritten <= 0)
+              throw new Error('The Antigravity download could not be written completely.');
             offset += bytesWritten;
           }
           hash.update(chunk);
@@ -284,21 +323,23 @@ async function installOnce(options: AntigravityInstallOptions): Promise<Antigrav
       } finally {
         await handle.close();
       }
-      if (downloaded !== asset.archiveBytes || hash.digest("hex") !== asset.sha256) {
-        throw new Error("The Antigravity download failed its SHA-256 or size check. Nothing was installed.");
+      if (downloaded !== asset.archiveBytes || hash.digest('hex') !== asset.sha256) {
+        throw new Error(
+          'The Antigravity download failed its SHA-256 or size check. Nothing was installed.',
+        );
       }
     } finally {
       clearTimeout(timeout);
     }
     await extractPinnedArchive(archivePath, runtimeDirectory, asset);
-    if (process.platform !== "win32") {
+    if (process.platform !== 'win32') {
       await chmod(join(runtimeDirectory, asset.executable.name), 0o755);
       await chmod(join(runtimeDirectory, asset.harness.name), 0o755);
     }
     const candidate: AntigravityRuntime = {
       executablePath: join(runtimeDirectory, asset.executable.name),
       harnessPath: join(runtimeDirectory, asset.harness.name),
-      source: "managed",
+      source: 'managed',
       version: asset.version,
     };
     await options.validate?.(candidate, asset.version);
@@ -308,7 +349,10 @@ async function installOnce(options: AntigravityInstallOptions): Promise<Antigrav
       executable: asset.executable,
       harness: asset.harness,
     };
-    await writeFile(join(runtimeDirectory, INSTALL_RECORD), `${JSON.stringify(record)}\n`, { flag: "wx", mode: 0o600 });
+    await writeFile(join(runtimeDirectory, INSTALL_RECORD), `${JSON.stringify(record)}\n`, {
+      flag: 'wx',
+      mode: 0o600,
+    });
     try {
       await retryOnWindowsFileLock(() => rename(runtimeDirectory, destination));
     } catch (error) {
@@ -316,7 +360,7 @@ async function installOnce(options: AntigravityInstallOptions): Promise<Antigrav
       if (!winner) throw error;
     }
     const installed = await completedRelease(destination, asset);
-    if (!installed) throw new Error("The installed Antigravity runtime is incomplete.");
+    if (!installed) throw new Error('The installed Antigravity runtime is incomplete.');
     return installed;
   } catch (error) {
     failed = true;
@@ -327,12 +371,16 @@ async function installOnce(options: AntigravityInstallOptions): Promise<Antigrav
       await retryOnWindowsFileLock(() => rm(staging, { recursive: true, force: true }));
     } catch (cleanupError) {
       const detail = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
-      console.warn(`antigravity: could not remove the install folder ${staging} (${detail})${failed ? "" : "; the install itself succeeded"}`);
+      console.warn(
+        `antigravity: could not remove the install folder ${staging} (${detail})${failed ? '' : '; the install itself succeeded'}`,
+      );
     }
   }
 }
 
-export function installAntigravityRuntime(options: AntigravityInstallOptions = {}): Promise<AntigravityRuntime> {
+export function installAntigravityRuntime(
+  options: AntigravityInstallOptions = {},
+): Promise<AntigravityRuntime> {
   const key = runtimeRoot(options.baseDir);
   const existing = installs.get(key);
   if (existing) return existing;
@@ -342,15 +390,20 @@ export function installAntigravityRuntime(options: AntigravityInstallOptions = {
 }
 
 /** The newest runtime the app installed here, when it is not the pinned one; null when the pinned one is installed or none is. */
-export async function antigravityOlderRuntime(baseDir = DATA_DIR, asset = resolveAntigravityReleaseAsset()): Promise<string | null> {
+export async function antigravityOlderRuntime(
+  baseDir = DATA_DIR,
+  asset = resolveAntigravityReleaseAsset(),
+): Promise<string | null> {
   if (!asset) return null;
-  const versions = join(runtimeRoot(baseDir), "versions");
+  const versions = join(runtimeRoot(baseDir), 'versions');
   if (await completedRelease(join(versions, asset.sha256), asset)) return null;
   const found: string[] = [];
   for (const name of await readdir(versions).catch(() => [] as string[])) {
     try {
-      const record = JSON.parse(await readFile(join(versions, name, INSTALL_RECORD), "utf8")) as Partial<InstallRecord>;
-      if (record.sha256 === name && typeof record.version === "string") found.push(record.version);
+      const record = JSON.parse(
+        await readFile(join(versions, name, INSTALL_RECORD), 'utf8'),
+      ) as Partial<InstallRecord>;
+      if (record.sha256 === name && typeof record.version === 'string') found.push(record.version);
     } catch {}
   }
   return found.sort((a, b) => b.localeCompare(a, undefined, { numeric: true }))[0] ?? null;

@@ -5,27 +5,30 @@
 //       "config": { "cli": "my-agent acp" } } } }
 // `cli` is the whole command ("npx -y some-agent acp" works). No auth step: the CLI is signed in from
 // a terminal. Model selection uses ACP, never -m on argv, since conventions differ per CLI.
-import { createAcpDriver, type AcpSupport } from "./core.ts";
-import { resolveCustomAcpModels } from "./custom-model-catalog.ts";
+import { createAcpDriver, type AcpSupport } from './core.ts';
+import { resolveCustomAcpModels } from './custom-model-catalog.ts';
 
 const CONFIGURE_HINT =
   'a custom ACP engine needs its command — add "config": { "cli": "<your-agent> acp" } to this instance in config.json, or use Settings → Engines → Set CLI…';
 
 const support: AcpSupport = {
-  driverKind: "customAcp",
-  displayName: "Custom (ACP)",
-  access: "custom",
-  models: { default: "agent-default", options: [{ id: "agent-default", label: "Agent default", custom: true }] },
-  defaultCli: "",
-  nativeSource: "custom.acp",
+  driverKind: 'customAcp',
+  displayName: 'Custom (ACP)',
+  access: 'custom',
+  models: {
+    default: 'agent-default',
+    options: [{ id: 'agent-default', label: 'Agent default', custom: true }],
+  },
+  defaultCli: '',
+  nativeSource: 'custom.acp',
   loginNote: CONFIGURE_HINT,
   spawnArgs: () => [],
   resolveModels: resolveCustomAcpModels,
   resolveModelsOnCreate: false,
-  selectModel: { configId: "model", agentDefault: "agent-default", allowLegacy: true },
+  selectModel: { configId: 'model', agentDefault: 'agent-default', allowLegacy: true },
   modelVariants: true,
   pickAuthMethod: () => null,
-  authFailure: "continue",
+  authFailure: 'continue',
   isAuthenticated: () => true,
 };
 

@@ -1,4 +1,4 @@
-import { openExternalLink } from "./app-links";
+import { openExternalLink } from './app-links';
 
 export interface PendingAuthorization {
   url: string;
@@ -8,8 +8,13 @@ export interface PendingAuthorization {
 /** Composio authorization links expire after ten minutes; reopening the page must not renew the clock. */
 export const AUTHORIZATION_LINK_MS = 10 * 60 * 1_000;
 
-export function reusableConnectionUrl(page: PendingAuthorization | null | undefined, now = Date.now()): string | null {
-  return page && now >= page.createdAt && now - page.createdAt < AUTHORIZATION_LINK_MS ? page.url : null;
+export function reusableConnectionUrl(
+  page: PendingAuthorization | null | undefined,
+  now = Date.now(),
+): string | null {
+  return page && now >= page.createdAt && now - page.createdAt < AUTHORIZATION_LINK_MS
+    ? page.url
+    : null;
 }
 
 /** Reserve the tab during the click, before an authorization request consumes the browser's user activation. */
@@ -20,7 +25,7 @@ export function reserveConnectionPage() {
   let cancelled = false;
   if (!appOpensLinks) {
     try {
-      page = window.open("", "_blank");
+      page = window.open('', '_blank');
       if (page) page.opener = null;
     } catch {
       page?.close();

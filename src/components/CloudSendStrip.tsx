@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import type { CloudSendNotice, CloudSendPageBridge } from "../../electron/cloud-send.mjs";
-import { moveQuietUntil } from "@/lib/cloud-send";
-import { TeamMoveLine } from "./MoveToTeam";
+import { useEffect, useState } from 'react';
+import type { CloudSendNotice, CloudSendPageBridge } from '../../electron/cloud-send.mjs';
+import { moveQuietUntil } from '@/lib/cloud-send';
+import { TeamMoveLine } from './MoveToTeam';
 
 /** My Cloud's notice from main, kept fresh: undefined until main first answers, null when it can't. */
 export function useCloudSendNotice(bridge: CloudSendPageBridge | undefined) {
@@ -9,9 +9,21 @@ export function useCloudSendNotice(bridge: CloudSendPageBridge | undefined) {
   useEffect(() => {
     if (!bridge) return;
     let alive = true;
-    const unsubscribe = bridge.onNotice((next) => { if (alive) setNotice(next); });
-    void bridge.notice().then((next) => { if (alive) setNotice(next ?? null); }).catch(() => { if (alive) setNotice((known) => known ?? null); });
-    return () => { alive = false; unsubscribe(); };
+    const unsubscribe = bridge.onNotice((next) => {
+      if (alive) setNotice(next);
+    });
+    void bridge
+      .notice()
+      .then((next) => {
+        if (alive) setNotice(next ?? null);
+      })
+      .catch(() => {
+        if (alive) setNotice((known) => known ?? null);
+      });
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
   }, [bridge]);
   return [notice, setNotice] as const;
 }
@@ -24,7 +36,9 @@ export function useMoveQuiet(now: () => number = Date.now): boolean | null {
   const [after, setAfter] = useState(0);
   const [, setLooked] = useState(0);
   const until = moveQuietUntil(notice?.move);
-  useEffect(() => { if (Number.isFinite(until) && until > after) setAfter(until); }, [until, after]);
+  useEffect(() => {
+    if (Number.isFinite(until) && until > after) setAfter(until);
+  }, [until, after]);
   const end = Math.max(after, until);
   useEffect(() => {
     if (!Number.isFinite(end) || end <= now()) return;
@@ -41,5 +55,10 @@ export function CloudSendStrip({ cloudHome }: { cloudHome: boolean }) {
   const bridge = !window.ogb?.remoteClient?.active ? window.ogb?.cloudSendPage : undefined;
   const [notice, setNotice] = useCloudSendNotice(bridge);
   if (!bridge || !cloudHome || !notice?.teamMove) return null;
-  return <TeamMoveLine move={notice.teamMove} onChange={(next) => setNotice({ ...notice, teamMove: next ?? undefined })} />;
+  return (
+    <TeamMoveLine
+      move={notice.teamMove}
+      onChange={(next) => setNotice({ ...notice, teamMove: next ?? undefined })}
+    />
+  );
 }

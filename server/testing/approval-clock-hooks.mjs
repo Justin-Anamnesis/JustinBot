@@ -14,8 +14,12 @@ registerHooks({
     const source = String(result.source);
     // The broker's one timer is the only setTimeout in its scope.
     const anchor = 'const timeoutMs = opts.timeoutMs ?? 15 * 60_000;';
-    if (source.split(anchor).length !== 2) throw new Error('Claude permission broker timer seam changed');
-    return { ...result, source: `
+    if (source.split(anchor).length !== 2)
+      throw new Error('Claude permission broker timer seam changed');
+    return {
+      ...result,
+      source:
+        `
       import { existsSync as approvalMarkerExists } from 'node:fs';
       function approvalFixtureTimeout(callback, _delay) {
         const timer = setInterval(() => {
@@ -25,6 +29,7 @@ registerHooks({
         }, 25);
         return timer;
       }
-    ` + source.replace(anchor, `${anchor} const setTimeout = approvalFixtureTimeout;`) };
+    ` + source.replace(anchor, `${anchor} const setTimeout = approvalFixtureTimeout;`),
+    };
   },
 });

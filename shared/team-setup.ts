@@ -1,4 +1,4 @@
-import type { ModelSelection } from "./wire.ts";
+import type { ModelSelection } from './wire.ts';
 
 export interface TeamSetupFields {
   name?: string;
@@ -13,7 +13,7 @@ export interface TeamSetupFields {
 }
 
 export interface TeamSetupOperation {
-  action: "create" | "update";
+  action: 'create' | 'update';
   botId: string;
   threadId?: string;
   fields: TeamSetupFields;
@@ -21,8 +21,15 @@ export interface TeamSetupOperation {
 }
 
 export interface TeamSetupResult {
-  state: "applied" | "denied" | "cancelled" | "failed";
-  bots: Array<{ id: string; name: string; action: "created" | "updated" | "deleted"; section?: string; modelSelection?: ModelSelection; chiefOfStaff?: boolean }>;
+  state: 'applied' | 'denied' | 'cancelled' | 'failed';
+  bots: Array<{
+    id: string;
+    name: string;
+    action: 'created' | 'updated' | 'deleted';
+    section?: string;
+    modelSelection?: ModelSelection;
+    chiefOfStaff?: boolean;
+  }>;
   newTeams: string[];
   error?: string;
 }

@@ -1,6 +1,7 @@
 // Computer control's helper can die while the app runs. It is started again by itself a bounded number of times, and
 // what is true meanwhile is what readiness says.
-export const HELPER_RESTARTING = "Computer control stopped because its helper crashed. OpenMausBot is restarting it.";
+export const HELPER_RESTARTING =
+  'Computer control stopped because its helper crashed. OpenMausBot is restarting it.';
 export const HELPER_KEEPS_CRASHING =
   "Computer control's helper keeps crashing, so OpenMausBot stopped restarting it. Quit and reopen OpenMausBot to try again.";
 
@@ -46,7 +47,7 @@ export function createHelperRestarts({
       } catch (error) {
         log(`helper restart failed: ${error?.message ?? error}`);
       }
-      if (run !== epoch || back === "needs-person") return;
+      if (run !== epoch || back === 'needs-person') return;
       if (back) startedAt = now();
       else tryAgain();
     }, wait);
@@ -75,6 +76,7 @@ export function createHelperRestarts({
 
 /** The Linux runtime publishes its own connection records; a died daemon and a ready one are what restarts need from them. */
 export function followLinuxConnection(restarts, connection) {
-  if (connection?.status === "ready") restarts.started();
-  else if (connection?.reasonCode === "daemon-exited") restarts.exited(`exit ${connection.exitCode ?? connection.exitSignal ?? "unknown"}`);
+  if (connection?.status === 'ready') restarts.started();
+  else if (connection?.reasonCode === 'daemon-exited')
+    restarts.exited(`exit ${connection.exitCode ?? connection.exitSignal ?? 'unknown'}`);
 }

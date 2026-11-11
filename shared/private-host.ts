@@ -1,1 +1,1 @@
-export { isPrivateHost } from "../electron/server-address.mjs";
+export { isPrivateHost } from '../electron/server-address.mjs';

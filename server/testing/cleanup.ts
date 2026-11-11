@@ -1,6 +1,6 @@
 // Teardown primitives for suites that spawn a real process against a throwaway home.
-import type { ChildProcess } from "node:child_process";
-import { rmSync } from "node:fs";
+import type { ChildProcess } from 'node:child_process';
+import { rmSync } from 'node:fs';
 
 export interface WaitForExitOptions {
   /** Sent immediately. Omit for a child the caller has already signalled. */
@@ -15,7 +15,7 @@ export function waitForExit(
   child: ChildProcess | undefined,
   options: WaitForExitOptions | number = {},
 ): Promise<void> {
-  const { signal, graceMs = 5_000 } = typeof options === "number" ? { graceMs: options } : options;
+  const { signal, graceMs = 5_000 } = typeof options === 'number' ? { graceMs: options } : options;
 
   return new Promise<void>((resolve) => {
     // A process killed by a signal reports it in signalCode and leaves exitCode null.
@@ -26,7 +26,7 @@ export function waitForExit(
       if (timer) clearTimeout(timer);
       resolve();
     };
-    child.on("close", done);
+    child.on('close', done);
 
     if (signal) {
       try {
@@ -35,7 +35,7 @@ export function waitForExit(
     }
 
     timer = setTimeout(() => {
-      child.kill("SIGKILL");
+      child.kill('SIGKILL');
       timer = setTimeout(done, 2_000);
       timer.unref?.();
     }, graceMs);

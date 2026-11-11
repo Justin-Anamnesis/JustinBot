@@ -7,21 +7,30 @@ import type {
   DataReduction,
   DataSource,
   OmbChartSpec,
-} from "../../shared/data-surface.ts";
+} from '../../shared/data-surface.ts';
 
-export type { DataColumn, DataColumnStats, DataError, DataHistogram, DataPage, DataReduction, DataSource, OmbChartSpec };
+export type {
+  DataColumn,
+  DataColumnStats,
+  DataError,
+  DataHistogram,
+  DataPage,
+  DataReduction,
+  DataSource,
+  OmbChartSpec,
+};
 
 export class DataFailure extends Error {
   readonly error: DataError;
   constructor(error: DataError) {
     super(error.message);
-    this.name = "DataFailure";
+    this.name = 'DataFailure';
     this.error = error;
   }
 }
 
-export type DataConnection = "bot" | "panel";
-export type DataExtension = "httpfs" | "excel" | "azure" | "postgres" | "mysql" | "sqlite";
+export type DataConnection = 'bot' | 'panel';
+export type DataExtension = 'httpfs' | 'excel' | 'azure' | 'postgres' | 'mysql' | 'sqlite';
 
 export interface RunOptions {
   connection: DataConnection;
@@ -59,11 +68,27 @@ export interface BotDatabase {
   materialise(sql: string, name: string, options: RunOptions): Promise<MaterialiseResult>;
   /** A missing table is not an error. */
   dropResult(name: string, connection?: DataConnection): Promise<void>;
-  page(target: string, options: { offset: number; limit: number; sort?: { column: string; direction: "asc" | "desc" }; filter?: string; filterColumn?: string; signal?: AbortSignal }): Promise<DataPage>;
+  page(
+    target: string,
+    options: {
+      offset: number;
+      limit: number;
+      sort?: { column: string; direction: 'asc' | 'desc' };
+      filter?: string;
+      filterColumn?: string;
+      signal?: AbortSignal;
+    },
+  ): Promise<DataPage>;
   describe(target: string, options: RunOptions): Promise<DescribeResult>;
   stats(table: string, options?: { signal?: AbortSignal }): Promise<DataColumnStats>;
-  histogram(table: string, column: string, options?: { bins?: number; signal?: AbortSignal }): Promise<DataHistogram>;
-  listTables(): Promise<Array<{ name: string; sqlName?: string; rowCount: number; columns: DataColumn[] }>>;
+  histogram(
+    table: string,
+    column: string,
+    options?: { bins?: number; signal?: AbortSignal },
+  ): Promise<DataHistogram>;
+  listTables(): Promise<
+    Array<{ name: string; sqlName?: string; rowCount: number; columns: DataColumn[] }>
+  >;
   interrupt(connection: DataConnection): void;
   /** Resolves a bare or qualified identifier; `table_not_found` with candidates otherwise. */
   resolveTable(name: string): Promise<string>;
@@ -82,15 +107,29 @@ export interface CompiledChart {
   /** Selects the reduced rows; the panel binds them as dataset "table". */
   sql: string;
   vegaLite: Record<string, unknown>;
-  reduction: Omit<DataReduction, "inputRows" | "outputRows">;
+  reduction: Omit<DataReduction, 'inputRows' | 'outputRows'>;
 }
 
-export type ChartCompiler = (spec: OmbChartSpec, columns: DataColumn[], from: string) => CompiledChart;
+export type ChartCompiler = (
+  spec: OmbChartSpec,
+  columns: DataColumn[],
+  from: string,
+) => CompiledChart;
 
 /** The JSON schema, no inline data, then one headless render; throws DataFailure(spec_invalid) with the validator's message. */
 export type VegaLiteValidator = (spec: unknown) => Promise<Record<string, unknown>>;
 
 export interface ChartRenderer {
-  svg(vegaLite: Record<string, unknown>, rows: RunResult["rows"], columns: DataColumn[], options: { theme: "light" | "dark"; width?: number }): Promise<string>;
-  png(vegaLite: Record<string, unknown>, rows: RunResult["rows"], columns: DataColumn[], options: { theme: "light" | "dark"; width?: number; scale?: number }): Promise<Buffer>;
+  svg(
+    vegaLite: Record<string, unknown>,
+    rows: RunResult['rows'],
+    columns: DataColumn[],
+    options: { theme: 'light' | 'dark'; width?: number },
+  ): Promise<string>;
+  png(
+    vegaLite: Record<string, unknown>,
+    rows: RunResult['rows'],
+    columns: DataColumn[],
+    options: { theme: 'light' | 'dark'; width?: number; scale?: number },
+  ): Promise<Buffer>;
 }

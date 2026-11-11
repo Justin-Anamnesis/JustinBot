@@ -20,8 +20,9 @@ export function createGracefulShutdown({
       timer = setTimeout(resolve, timeoutMs);
       timer.unref?.();
     });
-    const settled = Promise.allSettled(cleanup.map((job) => Promise.resolve().then(job)))
-      .then(() => undefined);
+    const settled = Promise.allSettled(cleanup.map((job) => Promise.resolve().then(job))).then(
+      () => undefined,
+    );
 
     void Promise.race([settled, deadline]).finally(() => {
       if (timer) clearTimeout(timer);

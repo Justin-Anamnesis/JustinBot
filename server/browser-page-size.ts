@@ -1,6 +1,6 @@
 // The size of a bot's page on the agent-browser engine: the standard page while nobody watches, and the shape of the
 // watching person's panel, at a desktop's width, while someone does.
-import { fillPage } from "./browser/viewers/viewport.ts";
+import { fillPage } from './browser/viewers/viewport.ts';
 
 export type PageSize = { width: number; height: number };
 
@@ -8,11 +8,16 @@ export type PageSize = { width: number; height: number };
  * emulated UI out of it (page 1280×577, screencast 1280×720); `set viewport` is agent-browser's only page-size control. */
 export const BROWSER_VIEWPORT: PageSize = { width: 1280, height: 720 };
 
-export const viewportArgs = (size: PageSize): string[] => ["set", "viewport", String(size.width), String(size.height)];
+export const viewportArgs = (size: PageSize): string[] => [
+  'set',
+  'viewport',
+  String(size.width),
+  String(size.height),
+];
 
 /** A screenshot of a page larger than the standard one comes as JPEG unless the bot asked for a format: a tall PNG of a
  * busy page can pass the 5 MB that Claude's API (2026) takes for one image. */
-const ENLARGED_PICTURE = { format: "jpeg", quality: 80 } as const;
+const ENLARGED_PICTURE = { format: 'jpeg', quality: 80 } as const;
 
 /** agent-browser's live stream sends frames at the page's own size (0.37.0 ignores a size cap), and a frame of a page of
  * noise this large is about 2.8 MB of base64: a larger panel gets this many pixels in its shape, drawn larger. */
@@ -45,7 +50,10 @@ export interface PageSizeHost {
  */
 export class PageSizes {
   readonly #host: PageSizeHost;
-  readonly #sessions = new Map<string, { wanted: PageSize; applied: string | null; applying: Promise<void> | null }>();
+  readonly #sessions = new Map<
+    string,
+    { wanted: PageSize; applied: string | null; applying: Promise<void> | null }
+  >();
 
   constructor(host: PageSizeHost) {
     this.#host = host;
@@ -53,7 +61,11 @@ export class PageSizes {
 
   #entry(session: string) {
     let entry = this.#sessions.get(session);
-    if (!entry) this.#sessions.set(session, entry = { wanted: BROWSER_VIEWPORT, applied: null, applying: null });
+    if (!entry)
+      this.#sessions.set(
+        session,
+        (entry = { wanted: BROWSER_VIEWPORT, applied: null, applying: null }),
+      );
     return entry;
   }
 
@@ -77,7 +89,8 @@ export class PageSizes {
     const entry = this.#entry(session);
     entry.wanted = panel ? streamedPage(panel) : BROWSER_VIEWPORT;
     if (fresh) entry.applied = null;
-    if (!entry.applying && this.#behind(session, entry)) entry.applying = this.#follow(session, entry);
+    if (!entry.applying && this.#behind(session, entry))
+      entry.applying = this.#follow(session, entry);
     return entry.applying ?? Promise.resolve();
   }
 
@@ -86,7 +99,10 @@ export class PageSizes {
   }
 
   /** Applies the newest wanted size until the page has it; a size wanted meanwhile is picked up before this ends. */
-  async #follow(session: string, entry: { wanted: PageSize; applied: string | null; applying: Promise<void> | null }): Promise<void> {
+  async #follow(
+    session: string,
+    entry: { wanted: PageSize; applied: string | null; applying: Promise<void> | null },
+  ): Promise<void> {
     try {
       while (this.#behind(session, entry)) {
         await this.#host.lane(session, async () => {
@@ -121,7 +137,11 @@ export class PageSizes {
   callArguments(session: string, params: unknown): unknown {
     const call = params as { name?: unknown; arguments?: Record<string, unknown> } | null;
     const size = this.wanted(session);
-    if (call?.name !== "agent_browser_screenshot" || size.width * size.height <= BROWSER_VIEWPORT.width * BROWSER_VIEWPORT.height) return params;
+    if (
+      call?.name !== 'agent_browser_screenshot' ||
+      size.width * size.height <= BROWSER_VIEWPORT.width * BROWSER_VIEWPORT.height
+    )
+      return params;
     if (call.arguments?.format !== undefined) return params;
     return { ...call, arguments: { ...call.arguments, ...ENLARGED_PICTURE } };
   }

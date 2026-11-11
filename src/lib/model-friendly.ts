@@ -1,5 +1,11 @@
 export function displayModelLabel(label: string, provider: string, custom = false): string {
-  if (custom || !provider || /\d/.test(label) || label.toLowerCase().startsWith(provider.toLowerCase())) return label;
+  if (
+    custom ||
+    !provider ||
+    /\d/.test(label) ||
+    label.toLowerCase().startsWith(provider.toLowerCase())
+  )
+    return label;
   return `${provider} ${label}`;
 }
 

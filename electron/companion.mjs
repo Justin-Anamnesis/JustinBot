@@ -1,15 +1,25 @@
 // The companion sidecar is the only part of the app that listens off-machine; the renderer never reaches its control port.
-import { app, utilityProcess } from "electron";
-import { randomBytes } from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { resolveCompanionEntry } from "./companion-entry.mjs";
-import { anyRouteOn, COMPANION_SETTINGS_VERSION, countPairedPhones, directRoutesOn, hasTailnetAddress, phoneLinkStartsAtLaunch, readCompanionSettings, readPairedDevices, setRoute } from "./companion-settings.mjs";
+import { app, utilityProcess } from 'electron';
+import { randomBytes } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
+import { resolveCompanionEntry } from './companion-entry.mjs';
+import {
+  anyRouteOn,
+  COMPANION_SETTINGS_VERSION,
+  countPairedPhones,
+  directRoutesOn,
+  hasTailnetAddress,
+  phoneLinkStartsAtLaunch,
+  readCompanionSettings,
+  readPairedDevices,
+  setRoute,
+} from './companion-settings.mjs';
 import {
   cleanupCompanionOriginEndpoint,
   companionOriginHealth,
   createCompanionOriginEndpoint,
-} from "./companion-origin-gateway.mjs";
+} from './companion-origin-gateway.mjs';
 
 // Must stay clear of the harness's 8799 and its webhook receiver's 8800.
 const CONTROL_PORT = 8811;
@@ -17,7 +27,7 @@ const COMPANION_PORT = 8810;
 
 let proc = null;
 // New for each sidecar launch and held only by main and the sidecar, so a page served from the control port cannot drive it.
-let controlToken = "";
+let controlToken = '';
 let lastError = null;
 let advertisedHostedUrl = null;
 let originTarget = null;
@@ -32,7 +42,7 @@ const entryPoint = (resourcesPath) =>
     exists: fs.existsSync,
   });
 
-const settingsFile = () => path.join(app.getPath("userData"), "companion-settings.json");
+const settingsFile = () => path.join(app.getPath('userData'), 'companion-settings.json');
 
 let migrationFacts = () => ({});
 
@@ -44,11 +54,19 @@ export function setCompanionMigrationFacts(read) {
 export function companionSettings() {
   let raw = null;
   try {
-    raw = JSON.parse(fs.readFileSync(settingsFile(), "utf8"));
-  } catch {
-  }
+    raw = JSON.parse(fs.readFileSync(settingsFile(), 'utf8'));
+  } catch {}
   if (raw?.version === COMPANION_SETTINGS_VERSION) return readCompanionSettings(raw);
-  const settings = readCompanionSettings(raw, raw?.enabled === true ? { devices: readPairedDevices() ?? [], tailnetAddress: hasTailnetAddress(), ...migrationFacts() } : {});
+  const settings = readCompanionSettings(
+    raw,
+    raw?.enabled === true
+      ? {
+          devices: readPairedDevices() ?? [],
+          tailnetAddress: hasTailnetAddress(),
+          ...migrationFacts(),
+        }
+      : {},
+  );
   if (raw) writeCompanionSettings(settings);
   return settings;
 }
@@ -64,7 +82,12 @@ export function companionRouteOn(route) {
 
 /** The launch rule, with this computer's paired devices read from the companion's store. */
 export function companionStartsAtLaunch({ remoteClient, serverReady }) {
-  return phoneLinkStartsAtLaunch({ remoteClient, serverReady, settings: companionSettings(), pairedPhones: countPairedPhones() });
+  return phoneLinkStartsAtLaunch({
+    remoteClient,
+    serverReady,
+    settings: companionSettings(),
+    pairedPhones: countPairedPhones(),
+  });
 }
 
 export function companionKeepAwakeAtRest() {
@@ -81,8 +104,7 @@ function writeCompanionSettings(next) {
   } catch {
     try {
       fs.unlinkSync(temporary);
-    } catch {
-    }
+    } catch {}
   }
 }
 
@@ -94,8 +116,11 @@ export function rememberCompanionKeepAwake(keepAwake) {
 export async function rememberCompanionRoute(route, on, extra) {
   const next = setRoute(companionSettings(), route, on, extra);
   writeCompanionSettings(next);
-  if (proc && (route === "wifi" || route === "tailscale")) {
-    await control("PUT", "/routes", { ...directRoutesOn(next), tailnetName: next.routes.tailscale.name ?? null }).catch(() => {});
+  if (proc && (route === 'wifi' || route === 'tailscale')) {
+    await control('PUT', '/routes', {
+      ...directRoutesOn(next),
+      tailnetName: next.routes.tailscale.name ?? null,
+    }).catch(() => {});
   }
   return next;
 }
@@ -103,18 +128,21 @@ export async function rememberCompanionRoute(route, on, extra) {
 /** The person saw the update's note about a route kept on. */
 export function dismissCompanionNotice(route) {
   const settings = companionSettings();
-  writeCompanionSettings({ ...settings, notices: settings.notices.filter((notice) => notice !== route) });
+  writeCompanionSettings({
+    ...settings,
+    notices: settings.notices.filter((notice) => notice !== route),
+  });
 }
 
 async function control(method, urlPath, body, { timeoutMs = 4_000 } = {}) {
   const options = {
     method,
     signal: AbortSignal.timeout(timeoutMs),
-    headers: { "x-openmausbot-control-token": controlToken },
+    headers: { 'x-openmausbot-control-token': controlToken },
   };
   if (body !== undefined) {
     options.body = JSON.stringify(body);
-    options.headers["content-type"] = "application/json";
+    options.headers['content-type'] = 'application/json';
   }
   const res = await fetch(`http://127.0.0.1:${CONTROL_PORT}${urlPath}`, options);
   if (!res.ok && res.status !== 404) throw new Error(`companion control ${res.status}`);
@@ -181,14 +209,21 @@ export function stopCompanion() {
   return serialize(() => stop());
 }
 
-async function start({ resourcesPath, harnessPort, mutationToken, hostedUrl = null, secretPublicKey = null, log }) {
+async function start({
+  resourcesPath,
+  harnessPort,
+  mutationToken,
+  hostedUrl = null,
+  secretPublicKey = null,
+  log,
+}) {
   if (proc) return companionState();
   lastError = null;
   const resolved = entryPoint(resourcesPath);
   if (!resolved) {
     lastError = app.isPackaged
-      ? "the companion is missing from this build"
-      : "the companion sources are missing from this checkout";
+      ? 'the companion is missing from this build'
+      : 'the companion sources are missing from this checkout';
     return companionState();
   }
   log?.(`companion fork ${resolved.entry}`);
@@ -197,7 +232,7 @@ async function start({ resourcesPath, harnessPort, mutationToken, hostedUrl = nu
   try {
     allocatedOrigin = createCompanionOriginEndpoint();
   } catch {
-    lastError = "the private companion origin could not be created";
+    lastError = 'the private companion origin could not be created';
     return companionState();
   }
   let cleanedOrigin = false;
@@ -215,15 +250,18 @@ async function start({ resourcesPath, harnessPort, mutationToken, hostedUrl = nu
   delete childEnvironment.OMB_COMPANION_TAILNET_NAME;
   const settings = companionSettings();
   const direct = directRoutesOn(settings);
-  childEnvironment.OMB_COMPANION_ROUTES = Object.keys(direct).filter((route) => direct[route]).join(",");
-  if (direct.tailscale && settings.routes.tailscale.name) childEnvironment.OMB_COMPANION_TAILNET_NAME = settings.routes.tailscale.name;
+  childEnvironment.OMB_COMPANION_ROUTES = Object.keys(direct)
+    .filter((route) => direct[route])
+    .join(',');
+  if (direct.tailscale && settings.routes.tailscale.name)
+    childEnvironment.OMB_COMPANION_TAILNET_NAME = settings.routes.tailscale.name;
   if (hostedUrl) childEnvironment.OMB_COMPANION_HOSTED_URL = hostedUrl;
   childEnvironment.OMB_COMPANION_INTERNAL_ORIGIN = allocatedOrigin.socketPath;
-  if (/^[A-Za-z0-9_-]{87}$/.test(String(secretPublicKey ?? ""))) {
+  if (/^[A-Za-z0-9_-]{87}$/.test(String(secretPublicKey ?? ''))) {
     childEnvironment.OMB_PHONE_SECRET_PUBLIC_KEY = secretPublicKey;
   }
 
-  controlToken = randomBytes(32).toString("base64url");
+  controlToken = randomBytes(32).toString('base64url');
   let child;
   try {
     child = utilityProcess.fork(resolved.entry, [], {
@@ -234,39 +272,43 @@ async function start({ resourcesPath, harnessPort, mutationToken, hostedUrl = nu
         OMB_CONTROL_PORT: String(CONTROL_PORT),
       },
       execArgv: resolved.execArgv,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch {
     cleanupOrigin();
-    lastError = "the companion process could not be started";
+    lastError = 'the companion process could not be started';
     return companionState();
   }
-  child.once("spawn", () => {
+  child.once('spawn', () => {
     // Never expose this capability in argv, environment, logs or the renderer.
     try {
-      child.postMessage({ type: "openmausbot:companion-mutation-token", token: mutationToken, controlToken });
+      child.postMessage({
+        type: 'openmausbot:companion-mutation-token',
+        token: mutationToken,
+        controlToken,
+      });
       const e2e = e2eHooks.initialMessage();
       if (e2e) child.postMessage(e2e);
     } catch {
-      log?.("companion authorization could not be initialized");
+      log?.('companion authorization could not be initialized');
       child.kill();
     }
   });
-  child.on("message", (message) => {
-    if (message?.type === "openmausbot:companion-e2e-token-rejected") e2eHooks.tokenRejected();
+  child.on('message', (message) => {
+    if (message?.type === 'openmausbot:companion-e2e-token-rejected') e2eHooks.tokenRejected();
   });
-  child.stdout?.on("data", (d) => log?.(`[companion] ${String(d).trimEnd()}`));
-  child.stderr?.on("data", (d) => log?.(`[companion err] ${String(d).trimEnd()}`));
+  child.stdout?.on('data', (d) => log?.(`[companion] ${String(d).trimEnd()}`));
+  child.stderr?.on('data', (d) => log?.(`[companion err] ${String(d).trimEnd()}`));
 
   let exited = false;
-  child.once("exit", (code) => {
+  child.once('exit', (code) => {
     exited = true;
     if (proc === child) {
       proc = null;
       advertisedHostedUrl = null;
       originTarget = null;
       lifecycleListener({
-        type: "exit",
+        type: 'exit',
         expected: expectedStops.has(child),
         pid: child.pid,
       });
@@ -277,25 +319,24 @@ async function start({ resourcesPath, harnessPort, mutationToken, hostedUrl = nu
 
   for (let i = 0; i < 40; i++) {
     if (exited) {
-      lastError = "the companion could not start — check the log";
+      lastError = 'the companion could not start — check the log';
       return companionState();
     }
     try {
-      const state = await control("GET", "/state");
+      const state = await control('GET', '/state');
       // A hand-started or leftover sidecar answers the port the same way: match the pid.
       if (state?.pid !== undefined && child.pid !== undefined && state.pid !== child.pid) {
         try {
           child.kill();
-        } catch {
-        }
+        } catch {}
         lastError = `port ${CONTROL_PORT} is already serving another companion — stop it and try again`;
         return companionState();
       }
       if (!Number.isSafeInteger(child.pid) || child.pid <= 0) {
-        throw new Error("child pid unavailable");
+        throw new Error('child pid unavailable');
       }
       const target = { pid: child.pid, socketPath: allocatedOrigin.socketPath };
-      if (!(await companionOriginHealth(target))) throw new Error("private origin not ready");
+      if (!(await companionOriginHealth(target))) throw new Error('private origin not ready');
       proc = child;
       advertisedHostedUrl = hostedUrl;
       originTarget = Object.freeze(target);
@@ -306,9 +347,8 @@ async function start({ resourcesPath, harnessPort, mutationToken, hostedUrl = nu
   }
   try {
     child.kill();
-  } catch {
-  }
-  lastError = "the companion did not come up in time";
+  } catch {}
+  lastError = 'the companion did not come up in time';
   return companionState();
 }
 
@@ -323,8 +363,7 @@ async function stop() {
   expectedStops.add(child);
   try {
     child.kill();
-  } catch {
-  }
+  } catch {}
   // kill() only asks: wait, bounded, for the exit so the next start does not race the port.
   await new Promise((resolve) => {
     let done = false;
@@ -333,7 +372,7 @@ async function stop() {
       done = true;
       resolve();
     };
-    child.once("exit", finish);
+    child.once('exit', finish);
     setTimeout(finish, 5_000).unref?.();
   });
   return companionState();
@@ -343,7 +382,7 @@ async function stop() {
 export function setCompanionHostedUrl(endpoint) {
   return serialize(async () => {
     if (!proc) return companionState();
-    const state = await control("PUT", "/hosted-endpoint", { url: endpoint || null });
+    const state = await control('PUT', '/hosted-endpoint', { url: endpoint || null });
     advertisedHostedUrl = endpoint || null;
     return state;
   });
@@ -374,7 +413,7 @@ export async function companionState() {
     return state;
   }
   try {
-    const state = await control("GET", "/state");
+    const state = await control('GET', '/state');
     return { enabled: true, ...rest, ...state };
   } catch {
     return {
@@ -384,7 +423,7 @@ export async function companionState() {
       devices: [],
       connectedDeviceIds: [],
       pairing: null,
-      error: "the companion is not responding",
+      error: 'the companion is not responding',
     };
   }
 }
@@ -393,15 +432,15 @@ export async function companionState() {
 export async function companionPairing(open, expectedToken) {
   if (!proc) return companionState();
   const conditionalClose = !open && expectedToken !== undefined;
-  const candidate = String(expectedToken ?? "");
+  const candidate = String(expectedToken ?? '');
   const token = /^omb_pair_[A-Za-z0-9_-]{43}$/.test(candidate)
     ? candidate
-    : "invalid-pairing-token";
+    : 'invalid-pairing-token';
   const path = conditionalClose
     ? `/pairing?expectedToken=${encodeURIComponent(token)}`
-    : "/pairing";
+    : '/pairing';
   try {
-    const state = await control(open ? "POST" : "DELETE", path);
+    const state = await control(open ? 'POST' : 'DELETE', path);
     e2eHooks.changed();
     return {
       enabled: true,
@@ -412,7 +451,7 @@ export async function companionPairing(open, expectedToken) {
     const state = await companionState();
     return {
       ...state,
-      error: state.error ?? "Phone pairing could not be updated.",
+      error: state.error ?? 'Phone pairing could not be updated.',
     };
   }
 }
@@ -420,8 +459,8 @@ export async function companionPairing(open, expectedToken) {
 export async function companionRevoke(deviceId) {
   if (!proc) return companionState();
   // the id came from the renderer, so it does not get to shape a path
-  if (!/^[\w-]{1,64}$/.test(String(deviceId ?? ""))) return companionState();
-  await control("DELETE", `/devices/${deviceId}`).catch(() => {});
+  if (!/^[\w-]{1,64}$/.test(String(deviceId ?? ''))) return companionState();
+  await control('DELETE', `/devices/${deviceId}`).catch(() => {});
   e2eHooks.changed();
   return companionState();
 }
@@ -430,7 +469,7 @@ export async function companionRevoke(deviceId) {
 export async function companionPairingRenew() {
   if (!proc) return companionState();
   try {
-    return { enabled: true, ...restState(), ...(await control("POST", "/pairing/renew")) };
+    return { enabled: true, ...restState(), ...(await control('POST', '/pairing/renew')) };
   } catch {
     return companionPairing(true);
   }
@@ -439,23 +478,24 @@ export async function companionPairingRenew() {
 /** "any" or "local" (Wi-Fi and Tailscale only). */
 export async function companionDeviceRoutes(deviceId, routes) {
   if (!proc) return companionState();
-  if (!/^[\w-]{1,64}$/.test(String(deviceId ?? "")) || (routes !== "any" && routes !== "local")) return companionState();
-  await control("PUT", `/devices/${deviceId}/routes`, { routes }).catch(() => {});
+  if (!/^[\w-]{1,64}$/.test(String(deviceId ?? '')) || (routes !== 'any' && routes !== 'local'))
+    return companionState();
+  await control('PUT', `/devices/${deviceId}/routes`, { routes }).catch(() => {});
   e2eHooks.changed();
   return companionState();
 }
 
 export async function companionCloudDesktopAccess(deviceId, allowed) {
   if (!proc) return companionState();
-  if (!/^[\w-]{1,64}$/.test(String(deviceId ?? ""))) return companionState();
-  await control(allowed ? "POST" : "DELETE", `/devices/${deviceId}/cloud-desktop`).catch(() => {});
+  if (!/^[\w-]{1,64}$/.test(String(deviceId ?? ''))) return companionState();
+  await control(allowed ? 'POST' : 'DELETE', `/devices/${deviceId}/cloud-desktop`).catch(() => {});
   return companionState();
 }
 
 /** Browser access is its own per-device grant, never inherited from VM access. */
 export async function companionBrowserControlAccess(deviceId, allowed) {
   if (!proc) return companionState();
-  if (!/^[\w-]{1,64}$/.test(String(deviceId ?? ""))) return companionState();
-  await control(allowed ? "POST" : "DELETE", `/devices/${deviceId}/browser-control`);
+  if (!/^[\w-]{1,64}$/.test(String(deviceId ?? ''))) return companionState();
+  await control(allowed ? 'POST' : 'DELETE', `/devices/${deviceId}/browser-control`);
   return companionState();
 }

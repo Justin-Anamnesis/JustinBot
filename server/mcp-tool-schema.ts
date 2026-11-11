@@ -1,13 +1,13 @@
 // Strict providers (OpenAI, xAI, Bedrock, Kimi…) refuse a tool schema whose root is not a plain `type: "object"`, failing
 // the whole turn; cua-driver 0.22.1 ships such a root on browser_prepare. Servers still validate calls against their own.
-import { fitToolSchema, type ToolSchemaProfile } from "./tool-schema-profile.ts";
+import { fitToolSchema, type ToolSchemaProfile } from './tool-schema-profile.ts';
 
 type JsonObject = Record<string, unknown>;
 
-const ROOT_COMBINATORS = ["anyOf", "oneOf", "allOf", "not"] as const;
+const ROOT_COMBINATORS = ['anyOf', 'oneOf', 'allOf', 'not'] as const;
 
 function isObject(value: unknown): value is JsonObject {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function branches(value: unknown): JsonObject[] {
@@ -16,10 +16,13 @@ function branches(value: unknown): JsonObject[] {
 
 function objectShape(schema: JsonObject): { properties: JsonObject; required: string[] } {
   const properties: JsonObject = isObject(schema.properties) ? { ...schema.properties } : {};
-  const required = new Set(Array.isArray(schema.required) ? schema.required.filter((key) => typeof key === "string") : []);
+  const required = new Set(
+    Array.isArray(schema.required) ? schema.required.filter((key) => typeof key === 'string') : [],
+  );
 
   const adopt = (shape: { properties: JsonObject }) => {
-    for (const [key, value] of Object.entries(shape.properties)) if (!(key in properties)) properties[key] = value;
+    for (const [key, value] of Object.entries(shape.properties))
+      if (!(key in properties)) properties[key] = value;
   };
 
   for (const branch of branches(schema.allOf)) {
@@ -27,7 +30,7 @@ function objectShape(schema: JsonObject): { properties: JsonObject; required: st
     adopt(shape);
     for (const key of shape.required) required.add(key);
   }
-  for (const keyword of ["anyOf", "oneOf"] as const) {
+  for (const keyword of ['anyOf', 'oneOf'] as const) {
     const choices = branches(schema[keyword]).map(objectShape);
     if (choices.length === 0) continue;
     for (const choice of choices) adopt(choice);
@@ -39,32 +42,45 @@ function objectShape(schema: JsonObject): { properties: JsonObject; required: st
 }
 
 function describesObject(type: unknown): boolean {
-  return type === undefined || type === "object" || (Array.isArray(type) && type.includes("object"));
+  return (
+    type === undefined || type === 'object' || (Array.isArray(type) && type.includes('object'))
+  );
 }
 
 export function providerSafeInputSchema(schema: unknown): JsonObject {
-  if (!isObject(schema) || !describesObject(schema.type)) return { type: "object", properties: {} };
-  if (schema.type === "object" && ROOT_COMBINATORS.every((keyword) => !(keyword in schema))) return schema;
+  if (!isObject(schema) || !describesObject(schema.type)) return { type: 'object', properties: {} };
+  if (schema.type === 'object' && ROOT_COMBINATORS.every((keyword) => !(keyword in schema)))
+    return schema;
 
   const { properties, required } = objectShape(schema);
-  const safe: JsonObject = { ...schema, type: "object", properties };
+  const safe: JsonObject = { ...schema, type: 'object', properties };
   for (const keyword of ROOT_COMBINATORS) delete safe[keyword];
   if (required.length > 0) safe.required = required;
   else delete safe.required;
   return safe;
 }
 
-const REFERENCES = new Set(["$ref", "$dynamicRef", "$recursiveRef"]);
-const VALUES = new Set(["const", "enum", "default", "examples", "example"]);
-const SCHEMA_MAPS = new Set(["properties", "patternProperties", "$defs", "definitions", "dependentSchemas"]);
+const REFERENCES = new Set(['$ref', '$dynamicRef', '$recursiveRef']);
+const VALUES = new Set(['const', 'enum', 'default', 'examples', 'example']);
+const SCHEMA_MAPS = new Set([
+  'properties',
+  'patternProperties',
+  '$defs',
+  'definitions',
+  'dependentSchemas',
+]);
 
 function resolvesInside(root: JsonObject, ref: string): boolean {
-  if (ref === "#") return true;
-  if (!ref.startsWith("#/")) return false;
+  if (ref === '#') return true;
+  if (!ref.startsWith('#/')) return false;
   let node: unknown = root;
-  for (const token of ref.slice(2).split("/")) {
+  for (const token of ref.slice(2).split('/')) {
     let key: string;
-    try { key = decodeURIComponent(token).replace(/~1/g, "/").replace(/~0/g, "~"); } catch { return false; }
+    try {
+      key = decodeURIComponent(token).replace(/~1/g, '/').replace(/~0/g, '~');
+    } catch {
+      return false;
+    }
     if (!isObject(node) && !Array.isArray(node)) return false;
     if (!Object.hasOwn(node, key)) return false;
     node = (node as Record<string, unknown>)[key];
@@ -82,8 +98,14 @@ export function withoutDanglingReferences(schema: JsonObject): JsonObject {
     if (!isObject(node) || depth > 64) return node;
     const copy: JsonObject = {};
     for (const [key, value] of Object.entries(node)) {
-      if (REFERENCES.has(key) && typeof value === "string" && !resolvesInside(schema, value)) { changed = true; continue; }
-      if (SCHEMA_MAPS.has(key) && isObject(value)) copy[key] = Object.fromEntries(Object.entries(value).map(([name, child]) => [name, visit(child, depth + 1)]));
+      if (REFERENCES.has(key) && typeof value === 'string' && !resolvesInside(schema, value)) {
+        changed = true;
+        continue;
+      }
+      if (SCHEMA_MAPS.has(key) && isObject(value))
+        copy[key] = Object.fromEntries(
+          Object.entries(value).map(([name, child]) => [name, visit(child, depth + 1)]),
+        );
       else copy[key] = VALUES.has(key) ? value : visit(value, depth + 1);
     }
     return copy;
@@ -93,18 +115,24 @@ export function withoutDanglingReferences(schema: JsonObject): JsonObject {
 }
 
 function toolName(tool: JsonObject): string {
-  return typeof tool.name === "string" && tool.name ? tool.name : "unnamed";
+  return typeof tool.name === 'string' && tool.name ? tool.name : 'unnamed';
 }
 
 /** The note a shortened tool carries, so the model fills in what its schema no longer spells out. */
 export function shortenedToolNote(provider: string): string {
-  return `(OpenMausBot shortened this tool's parameters to fit ${provider}'s size limit for one tool: give any field it no longer lists `
-    + "as this description says. The tool still checks every call against its full schema.)";
+  return (
+    `(OpenMausBot shortened this tool's parameters to fit ${provider}'s size limit for one tool: give any field it no longer lists ` +
+    'as this description says. The tool still checks every call against its full schema.)'
+  );
 }
 
 /** A tool list under a provider's profile: each schema keeps a plain object root and fits, or the tool is left out.
  * Every change is one line to `log`; a tool already within the limits is the same object. */
-export function fitToolList(tools: readonly unknown[], profile: ToolSchemaProfile, log: (line: string) => void = () => {}): unknown[] {
+export function fitToolList(
+  tools: readonly unknown[],
+  profile: ToolSchemaProfile,
+  log: (line: string) => void = () => {},
+): unknown[] {
   const fitted: unknown[] = [];
   for (const tool of tools) {
     if (!isObject(tool)) {
@@ -115,34 +143,54 @@ export function fitToolList(tools: readonly unknown[], profile: ToolSchemaProfil
     const fit = fitToolSchema(rooted, profile);
     const name = toolName(tool);
     const limit = `${profile.provider}'s ${profile.maxSchemaBytes}-byte limit for one tool`;
-    if (fit.outcome === "dropped") {
-      log(`left out tool "${name}": its parameters are ${fit.from} bytes and still ${fit.bytes} at their shortest, over ${limit}`);
+    if (fit.outcome === 'dropped') {
+      log(
+        `left out tool "${name}": its parameters are ${fit.from} bytes and still ${fit.bytes} at their shortest, over ${limit}`,
+      );
       continue;
     }
-    if (fit.outcome === "kept") {
+    if (fit.outcome === 'kept') {
       fitted.push(fit.schema === tool.inputSchema ? tool : { ...tool, inputSchema: fit.schema });
       continue;
     }
-    const what = { trimmed: "shortened the descriptions in", loosened: "left nested fields out of", minimal: "kept only the top-level fields of" }[fit.outcome];
+    const what = {
+      trimmed: 'shortened the descriptions in',
+      loosened: 'left nested fields out of',
+      minimal: 'kept only the top-level fields of',
+    }[fit.outcome];
     log(`${what} tool "${name}"'s parameters (${fit.from} to ${fit.bytes} bytes) to fit ${limit}`);
-    if (fit.outcome === "trimmed") {
+    if (fit.outcome === 'trimmed') {
       fitted.push({ ...tool, inputSchema: fit.schema });
       continue;
     }
-    const description = typeof tool.description === "string" && tool.description.trim() ? `${tool.description.trimEnd()}\n\n` : "";
-    fitted.push({ ...tool, description: description + shortenedToolNote(profile.provider), inputSchema: fit.schema });
+    const description =
+      typeof tool.description === 'string' && tool.description.trim()
+        ? `${tool.description.trimEnd()}\n\n`
+        : '';
+    fitted.push({
+      ...tool,
+      description: description + shortenedToolNote(profile.provider),
+      inputSchema: fit.schema,
+    });
   }
   return fitted;
 }
 
 /** A `tools/list` result with its tools fitted to `profile`; anything else as it came. */
-export function fitToolListResult(result: unknown, profile: ToolSchemaProfile | undefined, log?: (line: string) => void): unknown {
+export function fitToolListResult(
+  result: unknown,
+  profile: ToolSchemaProfile | undefined,
+  log?: (line: string) => void,
+): unknown {
   if (!profile || !isObject(result) || !Array.isArray(result.tools)) return result;
   return { ...result, tools: fitToolList(result.tools, profile, log) };
 }
 
 /** Every listed schema gets a plain object root; under a profile each is also fitted to it. */
-export function createToolListNormalizer(profile?: ToolSchemaProfile, log?: (line: string) => void): {
+export function createToolListNormalizer(
+  profile?: ToolSchemaProfile,
+  log?: (line: string) => void,
+): {
   observeRequest: (line: string) => void;
   rewriteResponse: (line: string) => string;
 } {
@@ -158,7 +206,11 @@ export function createToolListNormalizer(profile?: ToolSchemaProfile, log?: (lin
       } catch {
         return;
       }
-      if (isObject(frame) && frame.method === "tools/list" && (typeof frame.id === "number" || typeof frame.id === "string")) {
+      if (
+        isObject(frame) &&
+        frame.method === 'tools/list' &&
+        (typeof frame.id === 'number' || typeof frame.id === 'string')
+      ) {
         pending.add(idKey(frame.id));
       }
     },
@@ -170,16 +222,19 @@ export function createToolListNormalizer(profile?: ToolSchemaProfile, log?: (lin
       } catch {
         return line;
       }
-      if (!isObject(frame) || "method" in frame || !pending.delete(idKey(frame.id))) return line;
+      if (!isObject(frame) || 'method' in frame || !pending.delete(idKey(frame.id))) return line;
       if (!isObject(frame.result) || !Array.isArray(frame.result.tools)) return line;
 
       const listed: unknown[] = frame.result.tools;
-      const tools = profile ? fitToolList(listed, profile, log) : listed.map((tool: unknown) => {
-        if (!isObject(tool)) return tool;
-        const inputSchema = providerSafeInputSchema(tool.inputSchema);
-        return inputSchema === tool.inputSchema ? tool : { ...tool, inputSchema };
-      });
-      const changed = tools.length !== listed.length || tools.some((tool, index) => tool !== listed[index]);
+      const tools = profile
+        ? fitToolList(listed, profile, log)
+        : listed.map((tool: unknown) => {
+            if (!isObject(tool)) return tool;
+            const inputSchema = providerSafeInputSchema(tool.inputSchema);
+            return inputSchema === tool.inputSchema ? tool : { ...tool, inputSchema };
+          });
+      const changed =
+        tools.length !== listed.length || tools.some((tool, index) => tool !== listed[index]);
       return changed ? JSON.stringify({ ...frame, result: { ...frame.result, tools } }) : line;
     },
   };

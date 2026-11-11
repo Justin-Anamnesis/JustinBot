@@ -7,28 +7,31 @@
  * Loaded by `node --experimental-strip-types`, so only erasable type syntax.
  */
 
-import { writeFileSync } from "node:fs"
-import { fileURLToPath } from "node:url"
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
-import { toPath } from "./mascot-bodies/draw.ts"
-import type { Def, Eyes, Fill } from "./mascot-bodies/carved.ts"
-import { DIWALI } from "./mascot-bodies/diwali.ts"
-import { HALLOWEEN } from "./mascot-bodies/halloween.ts"
+import { toPath } from './mascot-bodies/draw.ts';
+import type { Def, Eyes, Fill } from './mascot-bodies/carved.ts';
+import { DIWALI } from './mascot-bodies/diwali.ts';
+import { HALLOWEEN } from './mascot-bodies/halloween.ts';
 
 /** Picker order: each pack's ids, in its drawing order. */
-const PACKS: ReadonlyArray<[string, Def[]]> = [["halloween", HALLOWEEN], ["diwali", DIWALI]]
-const DEFS = PACKS.flatMap(([, defs]) => defs)
+const PACKS: ReadonlyArray<[string, Def[]]> = [
+  ['halloween', HALLOWEEN],
+  ['diwali', DIWALI],
+];
+const DEFS = PACKS.flatMap(([, defs]) => defs);
 
-const quote = (s: string) => JSON.stringify(s)
+const quote = (s: string) => JSON.stringify(s);
 
 interface Baked {
-  id: string
-  name: string
-  paint: Def["paint"]
-  bone: string | null
-  eyes: Eyes
-  clip: string
-  parts: Array<{ fill: Fill; d: string }>
+  id: string;
+  name: string;
+  paint: Def['paint'];
+  bone: string | null;
+  eyes: Eyes;
+  clip: string;
+  parts: Array<{ fill: Fill; d: string }>;
 }
 
 const BAKED: Baked[] = DEFS.map((def) => ({
@@ -36,53 +39,62 @@ const BAKED: Baked[] = DEFS.map((def) => ({
   name: def.name,
   paint: def.paint,
   bone: def.bone,
-  eyes: { ...def.eyes, mouth: def.eyes.mouth ?? true, mouthInk: def.eyes.mouthInk ?? def.eyes.ink, mouthY: def.eyes.mouthY ?? null },
+  eyes: {
+    ...def.eyes,
+    mouth: def.eyes.mouth ?? true,
+    mouthInk: def.eyes.mouthInk ?? def.eyes.ink,
+    mouthY: def.eyes.mouthY ?? null,
+  },
   clip: toPath(def.face),
   parts: def.parts.map(([field, fill]) => ({ fill, d: toPath(field) })),
-}))
+}));
 
 /** Long path data on several lines; both phone parsers read newlines as separators. */
 function wrap(d: string, pad: string, width = 100): string {
-  const lines: string[] = []
-  let line = ""
-  for (const token of d.split(" ")) {
+  const lines: string[] = [];
+  let line = '';
+  for (const token of d.split(' ')) {
     if (line && line.length + 1 + token.length > width) {
-      lines.push(pad + line)
-      line = token
-    } else line = line ? `${line} ${token}` : token
+      lines.push(pad + line);
+      line = token;
+    } else line = line ? `${line} ${token}` : token;
   }
-  if (line) lines.push(pad + line)
-  return lines.join("\n")
+  if (line) lines.push(pad + line);
+  return lines.join('\n');
 }
 
 function emitTs(): string {
   const entries = BAKED.map((body) => {
-    const parts = body.parts.map((part) => `      { fill: ${quote(part.fill)}, d: ${quote(part.d)} },`)
+    const parts = body.parts.map(
+      (part) => `      { fill: ${quote(part.fill)}, d: ${quote(part.d)} },`,
+    );
     return [
       `  ${body.id}: {`,
       `    id: ${quote(body.id)},`,
       `    name: ${quote(body.name)},`,
       `    paint: ${quote(body.paint)},`,
-      `    bone: ${body.bone ? quote(body.bone) : "null"},`,
-      `    eyes: ${JSON.stringify(body.eyes).replace(/"(\w+)":/g, "$1: ").replace(/,(?=\w)/g, ", ")},`,
+      `    bone: ${body.bone ? quote(body.bone) : 'null'},`,
+      `    eyes: ${JSON.stringify(body.eyes)
+        .replace(/"(\w+)":/g, '$1: ')
+        .replace(/,(?=\w)/g, ', ')},`,
       `    clip: ${quote(body.clip)},`,
       `    parts: [`,
       ...parts,
       `    ],`,
       `  },`,
-    ].join("\n")
-  })
+    ].join('\n');
+  });
   const packs = PACKS.map(([pack, defs]) => {
-    const upper = pack.toUpperCase()
-    const type = pack[0].toUpperCase() + pack.slice(1)
+    const upper = pack.toUpperCase();
+    const type = pack[0].toUpperCase() + pack.slice(1);
     return [
       `/** Every ${type} body id, in the order the picker shows them. */`,
-      `export const ${upper}_BODY_IDS = [${defs.map((def) => quote(def.id)).join(", ")}] as const;`,
+      `export const ${upper}_BODY_IDS = [${defs.map((def) => quote(def.id)).join(', ')}] as const;`,
       ``,
       `export type ${type}BodyId = (typeof ${upper}_BODY_IDS)[number];`,
-    ].join("\n")
-  })
-  const all = PACKS.map(([pack]) => `...${pack.toUpperCase()}_BODY_IDS`).join(", ")
+    ].join('\n');
+  });
+  const all = PACKS.map(([pack]) => `...${pack.toUpperCase()}_BODY_IDS`).join(', ');
   return `/**
  * The festival bodies a bot can wear, drawn flat with a carved face.
  *
@@ -93,7 +105,7 @@ function emitTs(): string {
  * and a carved face. Paths are in a 240-unit square centred on x = 120.
  */
 
-${packs.join("\n\n")}
+${packs.join('\n\n')}
 
 export const CARVED_BODY_IDS = [${all}] as const;
 
@@ -133,37 +145,39 @@ export interface CarvedBody {
 }
 
 export const CARVED_BODIES: Record<CarvedBodyId, CarvedBody> = {
-${entries.join("\n")}
+${entries.join('\n')}
 };
-`
+`;
 }
 
-const swiftNumber = (n: number | null) => (n === null ? "nil" : String(n))
+const swiftNumber = (n: number | null) => (n === null ? 'nil' : String(n));
 
 function emitSwift(): string {
   const entries = BAKED.map((body) => {
-    const e = body.eyes
-    const parts = body.parts.map((part) => [
-      `                Part(fill: ${quote(part.fill)}, path: """`,
-      wrap(part.d, "                "),
-      `                """),`,
-    ].join("\n"))
+    const e = body.eyes;
+    const parts = body.parts.map((part) =>
+      [
+        `                Part(fill: ${quote(part.fill)}, path: """`,
+        wrap(part.d, '                '),
+        `                """),`,
+      ].join('\n'),
+    );
     return [
       `        ${quote(body.id)}: Body(`,
       `            id: ${quote(body.id)},`,
       `            name: ${quote(body.name)},`,
       `            paint: ${quote(body.paint)},`,
-      `            bone: ${body.bone ? quote(body.bone) : "nil"},`,
+      `            bone: ${body.bone ? quote(body.bone) : 'nil'},`,
       `            eyes: Eyes(cx: ${e.cx}, cy: ${e.cy}, dx: ${e.dx}, w: ${e.w}, h: ${e.h}, round: ${e.round}, ink: ${quote(e.ink)}, mouth: ${e.mouth}, mouthInk: ${quote(e.mouthInk)}, mouthY: ${swiftNumber(e.mouthY)}),`,
       `            clip: """`,
-      wrap(body.clip, "            "),
+      wrap(body.clip, '            '),
       `            """,`,
       `            parts: [`,
       ...parts,
       `            ]`,
       `        ),`,
-    ].join("\n")
-  })
+    ].join('\n');
+  });
   return `// The festival bodies a bot can wear — the phone's half of \`shared/carved-bodies.ts\`.
 //
 // GENERATED FILE — do not hand-edit. Run \`pnpm gen:carved --swift <file>\` to rebuild it
@@ -204,10 +218,10 @@ enum CarvedBodies {
         let parts: [Part]
     }
 
-${PACKS.map(([pack, defs]) => `    static let ${pack}: [String] = [${defs.map((def) => quote(def.id)).join(", ")}]`).join("\n")}
+${PACKS.map(([pack, defs]) => `    static let ${pack}: [String] = [${defs.map((def) => quote(def.id)).join(', ')}]`).join('\n')}
 
     static let all: [String: Body] = [
-${entries.join("\n")}
+${entries.join('\n')}
     ]
 
     static func body(_ id: String?) -> Body? {
@@ -215,35 +229,37 @@ ${entries.join("\n")}
         return all[id]
     }
 }
-`
+`;
 }
 
-const kotlinFloat = (n: number) => `${n}f`
+const kotlinFloat = (n: number) => `${n}f`;
 
 function emitKotlin(): string {
   const entries = BAKED.map((body) => {
-    const e = body.eyes
-    const parts = body.parts.map((part) => [
-      `                Part(fill = ${quote(part.fill)}, path = """`,
-      wrap(part.d, "                "),
-      `                """),`,
-    ].join("\n"))
+    const e = body.eyes;
+    const parts = body.parts.map((part) =>
+      [
+        `                Part(fill = ${quote(part.fill)}, path = """`,
+        wrap(part.d, '                '),
+        `                """),`,
+      ].join('\n'),
+    );
     return [
       `        ${quote(body.id)} to Body(`,
       `            id = ${quote(body.id)},`,
       `            name = ${quote(body.name)},`,
       `            paint = ${quote(body.paint)},`,
-      `            bone = ${body.bone ? quote(body.bone) : "null"},`,
-      `            eyes = Eyes(cx = ${kotlinFloat(e.cx)}, cy = ${kotlinFloat(e.cy)}, dx = ${kotlinFloat(e.dx)}, w = ${kotlinFloat(e.w)}, h = ${kotlinFloat(e.h)}, round = ${kotlinFloat(e.round)}, ink = ${quote(e.ink)}, mouth = ${e.mouth}, mouthInk = ${quote(e.mouthInk)}, mouthY = ${e.mouthY === null ? "null" : kotlinFloat(e.mouthY)}),`,
+      `            bone = ${body.bone ? quote(body.bone) : 'null'},`,
+      `            eyes = Eyes(cx = ${kotlinFloat(e.cx)}, cy = ${kotlinFloat(e.cy)}, dx = ${kotlinFloat(e.dx)}, w = ${kotlinFloat(e.w)}, h = ${kotlinFloat(e.h)}, round = ${kotlinFloat(e.round)}, ink = ${quote(e.ink)}, mouth = ${e.mouth}, mouthInk = ${quote(e.mouthInk)}, mouthY = ${e.mouthY === null ? 'null' : kotlinFloat(e.mouthY)}),`,
       `            clip = """`,
-      wrap(body.clip, "            "),
+      wrap(body.clip, '            '),
       `            """,`,
       `            parts = listOf(`,
       ...parts,
       `            ),`,
       `        ),`,
-    ].join("\n")
-  })
+    ].join('\n');
+  });
   return `package com.openmausbot.companion.ui
 
 /**
@@ -283,26 +299,29 @@ internal object CarvedBodies {
         val parts: List<Part>,
     )
 
-${PACKS.map(([pack, defs]) => `    val ${pack}: List<String> = listOf(${defs.map((def) => quote(def.id)).join(", ")})`).join("\n")}
+${PACKS.map(([pack, defs]) => `    val ${pack}: List<String> = listOf(${defs.map((def) => quote(def.id)).join(', ')})`).join('\n')}
 
     val all: Map<String, Body> = mapOf(
-${entries.join("\n")}
+${entries.join('\n')}
     )
 
     fun body(id: String?): Body? = id?.let { all[it] }
 }
-`
+`;
 }
 
-const out = fileURLToPath(new URL("../shared/carved-bodies.ts", import.meta.url))
-writeFileSync(out, emitTs())
-console.log(`wrote ${BAKED.length} carved bodies to shared/carved-bodies.ts`)
+const out = fileURLToPath(new URL('../shared/carved-bodies.ts', import.meta.url));
+writeFileSync(out, emitTs());
+console.log(`wrote ${BAKED.length} carved bodies to shared/carved-bodies.ts`);
 
-for (const [flag, emitNative] of [["--swift", emitSwift], ["--kotlin", emitKotlin]] as const) {
-  const at = process.argv.indexOf(flag)
-  if (at === -1) continue
-  const nativeOut = process.argv[at + 1]
-  if (!nativeOut) throw new Error(`${flag} needs an output file`)
-  writeFileSync(nativeOut, emitNative())
-  console.log(`wrote ${nativeOut}`)
+for (const [flag, emitNative] of [
+  ['--swift', emitSwift],
+  ['--kotlin', emitKotlin],
+] as const) {
+  const at = process.argv.indexOf(flag);
+  if (at === -1) continue;
+  const nativeOut = process.argv[at + 1];
+  if (!nativeOut) throw new Error(`${flag} needs an output file`);
+  writeFileSync(nativeOut, emitNative());
+  console.log(`wrote ${nativeOut}`);
 }

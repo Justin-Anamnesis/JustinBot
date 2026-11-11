@@ -1,14 +1,14 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { BaseSequencer, type TestSpecification } from "vitest/node";
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { BaseSequencer, type TestSpecification } from 'vitest/node';
 
-import { E2E, hostE2eOnly, isPortableE2e } from "./host-e2e.ts";
+import { E2E, hostE2eOnly, isPortableE2e } from './host-e2e.ts';
 
 // Vitest's --shard cuts equal-count slices; this balances them by recorded
 // seconds instead (slowest first, each to the shard with the least time so
 // far), and `--shard=n/8` on the same OS with the same OMB_VITEST_E2E picks
 // the same files as that CI shard.
-export const SHARD_WEIGHTS_FILE = "scripts/testing/vitest-shard-weights.json";
+export const SHARD_WEIGHTS_FILE = 'scripts/testing/vitest-shard-weights.json';
 
 // A file absent from the weights is light (the file lists every file over
 // five seconds and every e2e file); a second covers its setup and import.
@@ -16,32 +16,58 @@ const UNLISTED_SECONDS = 1;
 
 export type ShardWeights = Readonly<Record<string, number>>;
 /** Each CI platform's own seconds: a file's share of a Windows run is not its share of a Linux run. */
-export type PlatformShardWeights = Readonly<Partial<Record<"linux" | "win32" | "darwin", ShardWeights>>>;
+export type PlatformShardWeights = Readonly<
+  Partial<Record<'linux' | 'win32' | 'darwin', ShardWeights>>
+>;
 
 export function loadPlatformShardWeights(root: string): PlatformShardWeights {
-  return JSON.parse(readFileSync(path.join(root, SHARD_WEIGHTS_FILE), "utf8")) as PlatformShardWeights;
+  return JSON.parse(
+    readFileSync(path.join(root, SHARD_WEIGHTS_FILE), 'utf8'),
+  ) as PlatformShardWeights;
 }
 
 /** A platform without seconds of its own is weighed by Linux's. */
-export function loadShardWeights(root: string, platform: NodeJS.Platform = process.platform): ShardWeights {
+export function loadShardWeights(
+  root: string,
+  platform: NodeJS.Platform = process.platform,
+): ShardWeights {
   const weights = loadPlatformShardWeights(root);
-  return (platform === "linux" || platform === "win32" || platform === "darwin" ? weights[platform] : undefined) ?? weights.linux ?? {};
+  return (
+    (platform === 'linux' || platform === 'win32' || platform === 'darwin'
+      ? weights[platform]
+      : undefined) ??
+    weights.linux ??
+    {}
+  );
 }
 
 // Weights are keyed by POSIX path from the repo root. On Windows vitest hands
 // over forward-slash paths whose drive letter case can differ from the root's;
 // path.win32.relative compares case-insensitively. A file outside the root
 // gets no key and is weighed as unlisted.
-export function weightKey(root: string, moduleId: string, paths: typeof path = path): string | null {
+export function weightKey(
+  root: string,
+  moduleId: string,
+  paths: typeof path = path,
+): string | null {
   const relative = paths.relative(root, moduleId);
-  if (!relative || paths.isAbsolute(relative) || relative === ".." || relative.startsWith(`..${paths.sep}`)) return null;
-  return relative.split(paths.sep).join("/");
+  if (
+    !relative ||
+    paths.isAbsolute(relative) ||
+    relative === '..' ||
+    relative.startsWith(`..${paths.sep}`)
+  )
+    return null;
+  return relative.split(paths.sep).join('/');
 }
 
 // A new e2e file has no recorded time yet; it is charged the median e2e file
 // rather than a second, so one heavy newcomer cannot quietly skew a shard.
 function unlistedE2eSeconds(weights: ShardWeights): number {
-  const e2e = Object.entries(weights).filter(([key]) => E2E.test(key)).map(([, seconds]) => seconds).sort((a, b) => a - b);
+  const e2e = Object.entries(weights)
+    .filter(([key]) => E2E.test(key))
+    .map(([, seconds]) => seconds)
+    .sort((a, b) => a - b);
   if (e2e.length === 0) return UNLISTED_SECONDS;
   const middle = Math.floor(e2e.length / 2);
   return e2e.length % 2 ? e2e[middle] : (e2e[middle - 1] + e2e[middle]) / 2;
@@ -52,9 +78,14 @@ function unlistedE2eSeconds(weights: ShardWeights): number {
 // the shard with the least time so far, the lowest index winning a tie.
 export function planShards(keys: readonly string[], weights: ShardWeights, count: number) {
   const e2eSeconds = unlistedE2eSeconds(weights);
-  const seconds = keys.map((key) => Object.hasOwn(weights, key) ? weights[key] : E2E.test(key) ? e2eSeconds : UNLISTED_SECONDS);
-  const order = keys.map((_, i) => i)
-    .sort((a, b) => seconds[b] - seconds[a] || (keys[a] < keys[b] ? -1 : keys[a] > keys[b] ? 1 : 0));
+  const seconds = keys.map((key) =>
+    Object.hasOwn(weights, key) ? weights[key] : E2E.test(key) ? e2eSeconds : UNLISTED_SECONDS,
+  );
+  const order = keys
+    .map((_, i) => i)
+    .sort(
+      (a, b) => seconds[b] - seconds[a] || (keys[a] < keys[b] ? -1 : keys[a] > keys[b] ? 1 : 0),
+    );
   const loads = Array.from({ length: count }, () => 0);
   const shardOf: number[] = [];
   for (const i of order) {
@@ -82,13 +113,17 @@ export class DurationSequencer extends BaseSequencer {
     const found = keys.filter((key) => Object.hasOwn(weights, key)).length;
     this.ctx.logger.log(
       `duration-sequencer: shard ${shard.index}/${shard.count} runs ${mine.length} of ${files.length} files, ` +
-      `~${Math.round(loads[shard.index - 1])}s recorded; ${found} of ${listed} weighted files found`,
+        `~${Math.round(loads[shard.index - 1])}s recorded; ${found} of ${listed} weighted files found`,
     );
     // A run of a chosen few files (OMB_VITEST_SUBSET: ci.yml's locale and docs tests) finds few by design.
-    if (process.env.GITHUB_ACTIONS === "true" && !process.env.OMB_VITEST_SUBSET && found < listed * 0.9) {
+    if (
+      process.env.GITHUB_ACTIONS === 'true' &&
+      !process.env.OMB_VITEST_SUBSET &&
+      found < listed * 0.9
+    ) {
       this.ctx.logger.log(
         `::warning title=duration-sequencer::Only ${found} of ${listed} weighted test files were found, so shards fall ` +
-        `back to about equal file counts. Check ${SHARD_WEIGHTS_FILE} against the test file paths.`,
+          `back to about equal file counts. Check ${SHARD_WEIGHTS_FILE} against the test file paths.`,
       );
     }
     return mine;

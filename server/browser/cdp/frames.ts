@@ -1,8 +1,8 @@
-import type { CdpSession, Params } from "./connection.ts";
-import { isMissingContext } from "./errors.ts";
+import type { CdpSession, Params } from './connection.ts';
+import { isMissingContext } from './errors.ts';
 
 /** The isolated world every frame gets: it sees the DOM, never the page's globals, and the page cannot see it. */
-export const WORLD_NAME = "omb";
+export const WORLD_NAME = 'omb';
 
 export interface FrameRecord {
   id: string;
@@ -17,7 +17,7 @@ export interface FrameChange {
   frameId: string;
   /** This frame and every frame inside it. */
   affected: Set<string>;
-  kind: "navigated" | "detached";
+  kind: 'navigated' | 'detached';
 }
 
 interface FramePayload {
@@ -45,7 +45,13 @@ export class FrameTree {
   constructor(mainSession: CdpSession, mainFrameId: string) {
     this.mainSession = mainSession;
     this.mainFrameId = mainFrameId;
-    this.#frames.set(mainFrameId, { id: mainFrameId, parentId: null, session: mainSession, url: "about:blank", loaderId: null });
+    this.#frames.set(mainFrameId, {
+      id: mainFrameId,
+      parentId: null,
+      session: mainSession,
+      url: 'about:blank',
+      loaderId: null,
+    });
     this.watch(mainSession);
   }
 
@@ -69,7 +75,9 @@ export class FrameTree {
 
   /** The frame an out-of-process iframe's session renders, or null for the page's own session. */
   rootOf(session: CdpSession): string | null {
-    return session === this.mainSession ? this.mainFrameId : this.#oopifRoots.get(session) ?? null;
+    return session === this.mainSession
+      ? this.mainFrameId
+      : (this.#oopifRoots.get(session) ?? null);
   }
 
   descendants(frameId: string): Set<string> {
@@ -92,17 +100,27 @@ export class FrameTree {
     if (oopifFrameId) {
       this.#oopifRoots.set(session, oopifFrameId);
       const existing = this.#frames.get(oopifFrameId);
-      this.#frames.set(oopifFrameId, { id: oopifFrameId, parentId: existing?.parentId ?? null, session, url: existing?.url ?? "", loaderId: null });
+      this.#frames.set(oopifFrameId, {
+        id: oopifFrameId,
+        parentId: existing?.parentId ?? null,
+        session,
+        url: existing?.url ?? '',
+        loaderId: null,
+      });
       this.#dropWorlds(new Set([oopifFrameId]));
     }
     const offs = [
-      session.on("Page.frameAttached", (params) => this.#attached(session, params)),
-      session.on("Page.frameNavigated", (params) => this.#navigated(session, params.frame as FramePayload)),
-      session.on("Page.navigatedWithinDocument", (params) => {
+      session.on('Page.frameAttached', (params) => this.#attached(session, params)),
+      session.on('Page.frameNavigated', (params) =>
+        this.#navigated(session, params.frame as FramePayload),
+      ),
+      session.on('Page.navigatedWithinDocument', (params) => {
         const frame = this.#frames.get(String(params.frameId));
         if (frame) frame.url = String(params.url);
       }),
-      session.on("Page.frameDetached", (params) => this.#detached(session, String(params.frameId), String(params.reason ?? "remove"))),
+      session.on('Page.frameDetached', (params) =>
+        this.#detached(session, String(params.frameId), String(params.reason ?? 'remove')),
+      ),
     ];
     const offDetach = session.onDetach(() => this.#sessionGone(session));
     return () => {
@@ -120,9 +138,15 @@ export class FrameTree {
     const visit = (node: FrameTreeNode, parentId: string | null) => {
       const existing = this.#frames.get(node.frame.id);
       if (!existing || existing.session === this.mainSession) {
-        const url = node.frame.url + (node.frame.urlFragment ?? "");
+        const url = node.frame.url + (node.frame.urlFragment ?? '');
         if (!existing || existing.url !== url || existing.loaderId === null) {
-          this.#frames.set(node.frame.id, { id: node.frame.id, parentId, session: this.mainSession, url, loaderId: node.frame.loaderId ?? existing?.loaderId ?? null });
+          this.#frames.set(node.frame.id, {
+            id: node.frame.id,
+            parentId,
+            session: this.mainSession,
+            url,
+            loaderId: node.frame.loaderId ?? existing?.loaderId ?? null,
+          });
         }
       }
       for (const child of node.childFrames ?? []) visit(child, node.frame.id);
@@ -132,21 +156,39 @@ export class FrameTree {
 
   #attached(session: CdpSession, params: Params): void {
     const frameId = String(params.frameId);
-    const parentId = typeof params.parentFrameId === "string" ? params.parentFrameId : null;
+    const parentId = typeof params.parentFrameId === 'string' ? params.parentFrameId : null;
     const existing = this.#frames.get(frameId);
     if (existing && existing.session !== session) return;
-    this.#frames.set(frameId, { id: frameId, parentId, session, url: existing?.url ?? "", loaderId: existing?.loaderId ?? null });
+    this.#frames.set(frameId, {
+      id: frameId,
+      parentId,
+      session,
+      url: existing?.url ?? '',
+      loaderId: existing?.loaderId ?? null,
+    });
   }
 
   #navigated(session: CdpSession, frame: FramePayload): void {
     const existing = this.#frames.get(frame.id);
-    if (existing && existing.session !== session && this.#oopifRoots.get(existing.session) === frame.id) return;
+    if (
+      existing &&
+      existing.session !== session &&
+      this.#oopifRoots.get(existing.session) === frame.id
+    )
+      return;
     const parentId = frame.parentId ?? existing?.parentId ?? null;
-    this.#frames.set(frame.id, { id: frame.id, parentId, session, url: frame.url + (frame.urlFragment ?? ""), loaderId: frame.loaderId ?? null });
+    this.#frames.set(frame.id, {
+      id: frame.id,
+      parentId,
+      session,
+      url: frame.url + (frame.urlFragment ?? ''),
+      loaderId: frame.loaderId ?? null,
+    });
     const affected = this.descendants(frame.id);
-    for (const id of affected) if (id !== frame.id && this.#frames.get(id)?.session === session) this.#frames.delete(id);
+    for (const id of affected)
+      if (id !== frame.id && this.#frames.get(id)?.session === session) this.#frames.delete(id);
     this.#dropWorlds(affected);
-    this.#emit({ frameId: frame.id, affected, kind: "navigated" });
+    this.#emit({ frameId: frame.id, affected, kind: 'navigated' });
   }
 
   #detached(session: CdpSession, frameId: string, reason: string): void {
@@ -155,24 +197,28 @@ export class FrameTree {
     const affected = this.descendants(frameId);
     this.#dropWorlds(affected);
     // "swap": the frame moves to another renderer and comes back on that one's session.
-    if (reason !== "swap") for (const id of affected) this.#frames.delete(id);
-    this.#emit({ frameId, affected, kind: "detached" });
+    if (reason !== 'swap') for (const id of affected) this.#frames.delete(id);
+    this.#emit({ frameId, affected, kind: 'detached' });
   }
 
   #sessionGone(session: CdpSession): void {
     const root = this.#oopifRoots.get(session);
     this.#oopifRoots.delete(session);
     const affected = new Set<string>();
-    for (const frame of this.#frames.values()) if (frame.session === session) for (const id of this.descendants(frame.id)) affected.add(id);
+    for (const frame of this.#frames.values())
+      if (frame.session === session) for (const id of this.descendants(frame.id)) affected.add(id);
     if (!affected.size) return;
     this.#dropWorlds(affected);
-    for (const id of affected) if (id !== root || this.#frames.get(id)?.session === session) this.#frames.delete(id);
-    this.#emit({ frameId: root ?? [...affected][0]!, affected, kind: "detached" });
+    for (const id of affected)
+      if (id !== root || this.#frames.get(id)?.session === session) this.#frames.delete(id);
+    this.#emit({ frameId: root ?? [...affected][0]!, affected, kind: 'detached' });
   }
 
   #emit(change: FrameChange): void {
     for (const listener of this.#listeners) {
-      try { listener(change); } catch {}
+      try {
+        listener(change);
+      } catch {}
     }
   }
 
@@ -183,11 +229,16 @@ export class FrameTree {
   /** The isolated world's execution context in this frame, created once per document. */
   world(frameId: string): Promise<number> {
     const frame = this.#frames.get(frameId);
-    if (!frame) return Promise.reject(new Error(`Frame with the given id was not found: ${frameId}`));
+    if (!frame)
+      return Promise.reject(new Error(`Frame with the given id was not found: ${frameId}`));
     let world = this.#worlds.get(frameId);
     if (!world) {
       world = frame.session
-        .send<{ executionContextId: number }>("Page.createIsolatedWorld", { frameId, worldName: WORLD_NAME, grantUniveralAccess: true })
+        .send<{ executionContextId: number }>('Page.createIsolatedWorld', {
+          frameId,
+          worldName: WORLD_NAME,
+          grantUniveralAccess: true,
+        })
         .then((result) => result.executionContextId);
       this.#worlds.set(frameId, world);
       world.catch(() => {
@@ -198,7 +249,10 @@ export class FrameTree {
   }
 
   /** Runs `work` in the frame's isolated world, once more on a fresh world if a navigation replaced the document. */
-  async inWorld<T>(frameId: string, work: (session: CdpSession, contextId: number) => Promise<T>): Promise<T> {
+  async inWorld<T>(
+    frameId: string,
+    work: (session: CdpSession, contextId: number) => Promise<T>,
+  ): Promise<T> {
     for (let attempt = 0; ; attempt++) {
       const frame = this.#frames.get(frameId);
       if (!frame) throw new Error(`Frame with the given id was not found: ${frameId}`);
@@ -216,8 +270,13 @@ export class FrameTree {
   async localRootOffset(session: CdpSession): Promise<{ x: number; y: number }> {
     const root = this.#oopifRoots.get(session);
     if (!root || !session.parent || session === this.mainSession) return { x: 0, y: 0 };
-    const owner = await session.parent.send<{ backendNodeId: number }>("DOM.getFrameOwner", { frameId: root });
-    const { model } = await session.parent.send<{ model: { content: number[] } }>("DOM.getBoxModel", { backendNodeId: owner.backendNodeId });
+    const owner = await session.parent.send<{ backendNodeId: number }>('DOM.getFrameOwner', {
+      frameId: root,
+    });
+    const { model } = await session.parent.send<{ model: { content: number[] } }>(
+      'DOM.getBoxModel',
+      { backendNodeId: owner.backendNodeId },
+    );
     const above = await this.localRootOffset(session.parent);
     return { x: above.x + (model.content[0] ?? 0), y: above.y + (model.content[1] ?? 0) };
   }

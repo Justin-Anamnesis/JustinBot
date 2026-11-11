@@ -1,8 +1,8 @@
-import { tailnetName, tailscaleAddress } from "./listener.ts";
-import { directRoutes, routedAddresses } from "./direct-routes.ts";
-import { defaultHostName } from "./mdns.ts";
+import { tailnetName, tailscaleAddress } from './listener.ts';
+import { directRoutes, routedAddresses } from './direct-routes.ts';
+import { defaultHostName } from './mdns.ts';
 
-export const COMPANION_ENDPOINT_KINDS = ["hosted", "tailnet", "lan", "bonjour"] as const;
+export const COMPANION_ENDPOINT_KINDS = ['hosted', 'tailnet', 'lan', 'bonjour'] as const;
 
 export type CompanionEndpointKind = (typeof COMPANION_ENDPOINT_KINDS)[number];
 
@@ -25,25 +25,27 @@ export function hostedCompanionUrl(value: string | undefined): string | null {
   try {
     parsed = new URL(configured);
   } catch {
-    throw new Error("OMB_COMPANION_HOSTED_URL must be an absolute HTTPS origin");
+    throw new Error('OMB_COMPANION_HOSTED_URL must be an absolute HTTPS origin');
   }
 
   if (
-    parsed.protocol !== "https:" ||
+    parsed.protocol !== 'https:' ||
     parsed.username ||
     parsed.password ||
-    (parsed.pathname !== "" && parsed.pathname !== "/") ||
+    (parsed.pathname !== '' && parsed.pathname !== '/') ||
     parsed.search ||
     parsed.hash
   ) {
-    throw new Error("OMB_COMPANION_HOSTED_URL must be an HTTPS origin without a path, credentials, query, or fragment");
+    throw new Error(
+      'OMB_COMPANION_HOSTED_URL must be an HTTPS origin without a path, credentials, query, or fragment',
+    );
   }
 
   return parsed.origin;
 }
 
 const httpOrigin = (host: string, port: number): string => {
-  const authority = host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
+  const authority = host.includes(':') && !host.startsWith('[') ? `[${host}]` : host;
   return `http://${authority}:${port}`;
 };
 
@@ -60,16 +62,17 @@ export function companionEndpointCandidates(
   const tailscale = tailscaleAddress(addresses);
   const candidates: CompanionEndpoint[] = [];
 
-  if (hostedUrl) candidates.push({ url: hostedUrl, kind: "hosted", priority: 0 });
+  if (hostedUrl) candidates.push({ url: hostedUrl, kind: 'hosted', priority: 0 });
   if (tailscale && magicDnsName) {
-    candidates.push({ url: httpOrigin(magicDnsName, port), kind: "tailnet", priority: 100 });
+    candidates.push({ url: httpOrigin(magicDnsName, port), kind: 'tailnet', priority: 100 });
   }
   addresses.forEach((address, index) => {
     if (address !== tailscale) {
-      candidates.push({ url: httpOrigin(address, port), kind: "lan", priority: 200 + index });
+      candidates.push({ url: httpOrigin(address, port), kind: 'lan', priority: 200 + index });
     }
   });
-  if (bonjourHost) candidates.push({ url: httpOrigin(bonjourHost, port), kind: "bonjour", priority: 300 });
+  if (bonjourHost)
+    candidates.push({ url: httpOrigin(bonjourHost, port), kind: 'bonjour', priority: 300 });
 
   const seen = new Set<string>();
   const ordered = candidates
@@ -81,7 +84,9 @@ export function companionEndpointCandidates(
     });
 
   if (ordered.length <= MAX_COMPANION_ENDPOINTS) return ordered;
-  const bonjour = ordered.find((endpoint) => endpoint.kind === "bonjour");
-  const head = ordered.filter((endpoint) => endpoint.kind !== "bonjour").slice(0, MAX_COMPANION_ENDPOINTS - 1);
+  const bonjour = ordered.find((endpoint) => endpoint.kind === 'bonjour');
+  const head = ordered
+    .filter((endpoint) => endpoint.kind !== 'bonjour')
+    .slice(0, MAX_COMPANION_ENDPOINTS - 1);
   return bonjour ? [...head, bonjour] : ordered.slice(0, MAX_COMPANION_ENDPOINTS);
 }

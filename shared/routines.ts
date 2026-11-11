@@ -1,9 +1,9 @@
 /** Routine wire shapes: the routine and run records as they ride the REST
  * snapshot and the `routine` / `routine.run` live frames. */
-import type { LimitResetSchedule, LimitResetScheduleInput } from "./limit-reset.ts";
-import type { RoutineCronSchedule } from "./routine-schedule.ts";
-import type { ModelSelection } from "./wire.ts";
-import type { ServerTextParams } from "./server-text.ts";
+import type { LimitResetSchedule, LimitResetScheduleInput } from './limit-reset.ts';
+import type { RoutineCronSchedule } from './routine-schedule.ts';
+import type { ModelSelection } from './wire.ts';
+import type { ServerTextParams } from './server-text.ts';
 
 export interface RoutineIntervalWindow {
   start: string;
@@ -13,104 +13,97 @@ export interface RoutineIntervalWindow {
 export type RoutineSchedule =
   | RoutineCronSchedule
   | LimitResetSchedule
-  | { type: "once"; at: number }
-  | { type: "daily"; time: string; weekdays: number[] }
+  | { type: 'once'; at: number }
+  | { type: 'daily'; time: string; weekdays: number[] }
   | {
-    type: "interval";
-    everyMinutes: number;
-    anchorAt: number;
-    /** Local weekdays (Sunday = 0). Missing means every day. */
-    weekdays?: number[];
-    /** Local wall-clock window. Missing means all day. */
-    window?: RoutineIntervalWindow;
-    /** Inclusive epoch-millisecond cutoff. Missing means never. */
-    endsAt?: number;
-  };
+      type: 'interval';
+      everyMinutes: number;
+      anchorAt: number;
+      /** Local weekdays (Sunday = 0). Missing means every day. */
+      weekdays?: number[];
+      /** Local wall-clock window. Missing means all day. */
+      window?: RoutineIntervalWindow;
+      /** Inclusive epoch-millisecond cutoff. Missing means never. */
+      endsAt?: number;
+    };
 
 export type RoutineScheduleInput =
-  | Extract<RoutineSchedule, { type: "once" | "daily" | "cron" }>
+  | Extract<RoutineSchedule, { type: 'once' | 'daily' | 'cron' }>
   | LimitResetScheduleInput
   | {
-    type: "interval";
-    everyMinutes: number;
-    anchorAt: number;
-    /** `null` explicitly restores the every-day default on updates. */
-    weekdays?: number[] | null;
-    /** `null` explicitly restores the all-day default on updates. */
-    window?: RoutineIntervalWindow | null;
-    /** `null` explicitly removes an existing end date on updates. */
-    endsAt?: number | null;
-  };
+      type: 'interval';
+      everyMinutes: number;
+      anchorAt: number;
+      /** `null` explicitly restores the every-day default on updates. */
+      weekdays?: number[] | null;
+      /** `null` explicitly restores the all-day default on updates. */
+      window?: RoutineIntervalWindow | null;
+      /** `null` explicitly removes an existing end date on updates. */
+      endsAt?: number | null;
+    };
 
-export type RoutineRunOn = "maus" | "cloud";
+export type RoutineRunOn = 'maus' | 'cloud';
 
-export type RoutineTarget = "bot" | "room-goal";
+export type RoutineTarget = 'bot' | 'room-goal';
 export type RoutineGoalStatus =
-  | "completed"
-  | "needs-input"
-  | "blocked"
-  | "limit-reached"
-  | "paused"
-  | "stopped"
-  | "failed";
+  'completed' | 'needs-input' | 'blocked' | 'limit-reached' | 'paused' | 'stopped' | 'failed';
 
 export interface RoutineContextAttachment {
   id: string;
-  kind: "file" | "image";
+  kind: 'file' | 'image';
   name: string;
   path: string;
   size: number;
 }
 
 /** "api": an outside caller through the bot's API; "webhook": an outside event. Both run as nobody's work. */
-export type RoutineRunTrigger = "schedule" | "manual" | "webhook" | "startup" | "api";
+export type RoutineRunTrigger = 'schedule' | 'manual' | 'webhook' | 'startup' | 'api';
 
 /** A check a routine runs on each tick before any AI turn, in plain code: `calendar` reads the next 36 hours, `mail`
  * new inbox mail since the last check, `runs` other routines' finished runs. Nothing new means no AI turn. */
-export type RoutineCheck = "calendar" | "mail" | "runs";
-export const ROUTINE_CHECKS: readonly RoutineCheck[] = ["calendar", "mail", "runs"];
+export type RoutineCheck = 'calendar' | 'mail' | 'runs';
+export const ROUTINE_CHECKS: readonly RoutineCheck[] = ['calendar', 'mail', 'runs'];
 
 /** What a routine's runs may do. `read-and-draft`: read Gmail and Google Calendar and write reply drafts; every other
  * tool is refused outright, never turned into a card. Missing means the bot's own level. */
-export type RoutineAccess = "read-and-draft";
+export type RoutineAccess = 'read-and-draft';
 
 /** Where a routine's results go. `brief`: they become rows of the main agent's brief, not chat lines of their own. */
-export type RoutineDelivery = "brief";
+export type RoutineDelivery = 'brief';
 
 /** Why OpenMausBot paused a routine by itself, after its owner left: no AI of theirs is signed in here any more, they
  * removed every connected app and server, or the plan was cancelled. It turns back on once that changes. */
-export type RoutineHoldCause = "plan_cancelled" | "no_engine" | "no_connections";
-export const ROUTINE_HOLD_CAUSES: readonly RoutineHoldCause[] = ["plan_cancelled", "no_engine", "no_connections"];
+export type RoutineHoldCause = 'plan_cancelled' | 'no_engine' | 'no_connections';
+export const ROUTINE_HOLD_CAUSES: readonly RoutineHoldCause[] = [
+  'plan_cancelled',
+  'no_engine',
+  'no_connections',
+];
 
 /** What a finished run left in the chat it reports to: nothing, because it
  * found nothing to tell; a report waiting for a turn there to end; or the bot
  * message it wrote. */
 export type RoutineRunReport =
-  | { state: "quiet" }
-  | { state: "pending" }
-  | { state: "posted"; threadId: string; messageId: string };
+  | { state: 'quiet' }
+  | { state: 'pending' }
+  | { state: 'posted'; threadId: string; messageId: string };
 
 export type RoutineRunStatus =
-  | "queued"
-  | "running"
-  | "waiting"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "missed";
+  'queued' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'missed';
 
 /** Why a run started a second time by itself: its engine stalled, OpenMausBot
  * restarted while it ran, the provider rate-limited it or failed for a moment,
  * it waited for its engine's usage limit to reset, or it failed some other way.
  * A run gets one. */
-export type RoutineRetryCause = "stalled" | "restarted" | "rate_limited" | "provider" | "usage_limit" | "failed";
+export type RoutineRetryCause =
+  'stalled' | 'restarted' | 'rate_limited' | 'provider' | 'usage_limit' | 'failed';
 
 /** The statuses both failure indicators count: a run that went wrong and has
  * not been acknowledged. */
-export const ROUTINE_PROBLEM_STATUSES: readonly RoutineRunStatus[] = ["failed", "missed"];
+export const ROUTINE_PROBLEM_STATUSES: readonly RoutineRunStatus[] = ['failed', 'missed'];
 
 /** A run's `attention` while it waits only on work it handed to teammates: nothing is asked of the person. */
-export const ROUTINE_HANDOFF_WAIT = "Waiting for work it handed on to finish";
+export const ROUTINE_HANDOFF_WAIT = 'Waiting for work it handed on to finish';
 
 export function isRoutineProblemRun(run: { status: RoutineRunStatus }): boolean {
   return ROUTINE_PROBLEM_STATUSES.includes(run.status);
@@ -118,7 +111,7 @@ export function isRoutineProblemRun(run: { status: RoutineRunStatus }): boolean 
 
 /** The logs view's status filter: every run, the composite problem set the
  * indicators count, or one exact status. */
-export type RoutineRunStatusFilter = "all" | "problems" | RoutineRunStatus;
+export type RoutineRunStatusFilter = 'all' | 'problems' | RoutineRunStatus;
 
 export interface Routine {
   id: string;
@@ -134,7 +127,7 @@ export interface Routine {
   durationMinutes: number;
   /** Optional wall-clock safety limit. Missing means the run is unlimited. */
   timeoutMinutes?: number;
-  overlap?: "skip" | "queue";
+  overlap?: 'skip' | 'queue';
   /** Each run starts with the previous run's report. */
   continuity?: boolean;
   /** The model each run's thread uses instead of its bot's. Missing means the bot's model. */
@@ -188,7 +181,7 @@ export interface RoutineRun {
   manual: boolean;
   triggerSource?: RoutineRunTrigger;
   /** "app": a connected-app event started it; "wait": a wait's follow-up did. triggerSource is then "webhook" (an outside event). */
-  eventSource?: "app" | "wait";
+  eventSource?: 'app' | 'wait';
   webhookId?: string;
   deliveryId?: string;
   /** Room task created for a team-goal run. */
@@ -238,7 +231,7 @@ export interface RoutineInput {
   durationMinutes?: number;
   /** `null` explicitly removes the limit; omission preserves it on updates. */
   timeoutMinutes?: number | null;
-  overlap?: "skip" | "queue";
+  overlap?: 'skip' | 'queue';
   /** Each run starts with the previous run's report. */
   continuity?: boolean;
   /** `null` removes it on updates; omission preserves it. */
@@ -255,4 +248,4 @@ export interface RoutineInput {
 }
 
 /** On a Team Cloud, "Just me": the routine reports into the person's own private chat with the bot, theirs alone. */
-export const RESULTS_JUST_ME = "just-me";
+export const RESULTS_JUST_ME = 'just-me';

@@ -1,6 +1,6 @@
 // Types for companion-account-service.mjs as the headless server uses it
 // (server/tunnel.ts). Keep in step with the implementation.
-import type { ControlPlaneClient } from "./control-plane-client.mjs";
+import type { ControlPlaneClient } from './control-plane-client.mjs';
 
 export declare const DEFAULT_COMPANION_CONTROL_PLANE_URL: string;
 export declare const COMPANION_CLIENT_INSTANCE_FIELD: string;
@@ -27,7 +27,10 @@ export declare function companionAccountCleanupPending(credentials: CredentialDo
  * last 30 days (or is connected, or has no known last-seen time); "unused"
  * when devices are paired but none was seen for 30 days; false only for a
  * cleanly read empty device list; null when that cannot be told. */
-export declare function managedEndpointNeed(state: unknown, now?: number): boolean | "unused" | null;
+export declare function managedEndpointNeed(
+  state: unknown,
+  now?: number,
+): boolean | 'unused' | null;
 export declare function friendlyCompanionAccountError(error: unknown): string;
 
 export interface CompanionAccountState {
@@ -64,7 +67,7 @@ export declare function createCompanionAccountService(options: {
     afterPersist?: (next: CredentialDocument) => Promise<void> | void,
   ) => Promise<unknown>;
   /** `kind`: a self-hosted server says `server` on registration and when it asks for its address. */
-  identity: { name: string; platform: string; appVersion?: string; kind?: "desktop" | "server" };
+  identity: { name: string; platform: string; appVersion?: string; kind?: 'desktop' | 'server' };
   newClientInstanceId: () => string;
   activatePersistedEndpoint?: () => Promise<{ status: string; ready: boolean }>;
   stopManagedEndpoint?: () => Promise<void>;
@@ -82,7 +85,7 @@ export declare function createCompanionAccountService(options: {
   firstEndpointCheckMs?: number;
   /** Hold the address only while something needs it (the desktop app). */
   onDemand?: boolean;
-  managedEndpointNeeded?: () => Promise<boolean | "unused" | null>;
+  managedEndpointNeeded?: () => Promise<boolean | 'unused' | null>;
   /** MausBot Relay: `capable` lets a "no" from managedEndpointNeeded hold even right after sign-in. */
   relay?: { capable: () => boolean; legacyDevices: () => Promise<number | null> };
   releaseGraceMs?: number;

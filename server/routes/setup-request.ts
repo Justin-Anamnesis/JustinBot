@@ -1,11 +1,11 @@
 // The setup card under a new bot's greeting (server/setup-request.ts): POST is a pick (with its words) or "Something
 // else" (without), DELETE the x on the card or its chip. Open to anyone who may write in that conversation (client
 // scope, like sending a message): a pick does nothing a typed /setup could not.
-import { ownerOrAdmin, type RequestAuth } from "../request-auth.ts";
-import { askForSetup, cancelSetupRequest, type SetupRequestStore } from "../setup-request.ts";
-import type { Message } from "../store.ts";
-import { PASS, type RouteHandler } from "./table.ts";
-import { refusalBody, userError } from "../user-errors.ts";
+import { ownerOrAdmin, type RequestAuth } from '../request-auth.ts';
+import { askForSetup, cancelSetupRequest, type SetupRequestStore } from '../setup-request.ts';
+import type { Message } from '../store.ts';
+import { PASS, type RouteHandler } from './table.ts';
+import { refusalBody, userError } from '../user-errors.ts';
 
 export interface SetupRequestRouteDeps {
   store: SetupRequestStore;
@@ -19,7 +19,12 @@ export interface SetupRequestRouteDeps {
   canSetUp(botId: string, threadId: string): boolean;
   /** Sends the caller's words in this conversation exactly as a typed message, starting (or queueing) its turn. A
    * refusal throws an error with its HTTP status. */
-  send(auth: RequestAuth, botId: string, threadId: string, text: string): Promise<{ ok: true; message?: Message }>;
+  send(
+    auth: RequestAuth,
+    botId: string,
+    threadId: string,
+    text: string,
+  ): Promise<{ ok: true; message?: Message }>;
 }
 
 const PATH = /^\/api\/bots\/([\w-]+)\/setup-request$/;
@@ -31,29 +36,43 @@ export function createSetupRequestRoutes(deps: SetupRequestRouteDeps): RouteHand
   const picking = new Set<string>();
   return async ({ req, res, path, method, auth, json, readBody }) => {
     const m = path.match(PATH);
-    if (!m || (method !== "POST" && method !== "DELETE")) return PASS;
+    if (!m || (method !== 'POST' && method !== 'DELETE')) return PASS;
     const botId = m[1]!;
     const body = await readBody(req, 2048);
-    const threadId = typeof body?.threadId === "string" ? body.threadId : "";
-    if (!ID.test(threadId)) return json(res, 400, { error: "threadId is required" });
-    if (!deps.store.bot(botId)) return json(res, 404, { error: "no such bot" });
+    const threadId = typeof body?.threadId === 'string' ? body.threadId : '';
+    if (!ID.test(threadId)) return json(res, 400, { error: 'threadId is required' });
+    if (!deps.store.bot(botId)) return json(res, 404, { error: 'no such bot' });
     const refused = deps.sendRefusal(auth, threadId);
     if (refused) return json(res, 403, { error: refused });
-    if (method === "DELETE") {
+    if (method === 'DELETE') {
       // An owner or admin may clear someone else's, so one never strands the chat.
-      const outcome = cancelSetupRequest(deps.store, botId, threadId, deps.presser(auth), { admin: ownerOrAdmin(auth) });
-      if (outcome === "unknown") return json(res, 404, userError("serverError.setup.missingConversation"));
-      if (outcome === "refused") return json(res, 403, userError("serverError.setup.stopOwner"));
+      const outcome = cancelSetupRequest(deps.store, botId, threadId, deps.presser(auth), {
+        admin: ownerOrAdmin(auth),
+      });
+      if (outcome === 'unknown')
+        return json(res, 404, userError('serverError.setup.missingConversation'));
+      if (outcome === 'refused') return json(res, 403, userError('serverError.setup.stopOwner'));
       return json(res, 200, { ok: true });
     }
-    const picked = body?.text === undefined ? undefined : typeof body.text === "string" ? body.text.trim() : "";
+    const picked =
+      body?.text === undefined ? undefined : typeof body.text === 'string' ? body.text.trim() : '';
     if (picked !== undefined && (!picked || picked.length > PICK_LIMIT)) {
-      return json(res, 400, { error: `text must be the words of a choice, at most ${PICK_LIMIT} characters` });
+      return json(res, 400, {
+        error: `text must be the words of a choice, at most ${PICK_LIMIT} characters`,
+      });
     }
-    if (deps.store.taskByThread(botId, threadId) && !deps.canSetUp(botId, threadId)) return json(res, 409, userError("serverError.setup.noTools"));
+    if (deps.store.taskByThread(botId, threadId) && !deps.canSetUp(botId, threadId))
+      return json(res, 409, userError('serverError.setup.noTools'));
     const key = `${botId}:${threadId}`;
-    if (picking.has(key)) return json(res, 409, { ...userError("serverError.chat.answerSent") });
-    const asked = askForSetup(deps.store, botId, threadId, deps.language(), deps.presser(auth), picked !== undefined);
+    if (picking.has(key)) return json(res, 409, { ...userError('serverError.chat.answerSent') });
+    const asked = askForSetup(
+      deps.store,
+      botId,
+      threadId,
+      deps.language(),
+      deps.presser(auth),
+      picked !== undefined,
+    );
     if (!asked.ok) return json(res, asked.status, refusalBody(asked));
     if (picked === undefined) return json(res, 200, asked);
     picking.add(key);
@@ -62,7 +81,7 @@ export function createSetupRequestRoutes(deps: SetupRequestRouteDeps): RouteHand
       return json(res, 200, { ok: true, ...(sent.message ? { message: sent.message } : {}) });
     } catch (error) {
       const status = (error as { status?: unknown } | null)?.status;
-      if (typeof status !== "number") throw error;
+      if (typeof status !== 'number') throw error;
       deps.store.patchTask(botId, threadId, { setupRequest: undefined });
       return json(res, status, { error: error instanceof Error ? error.message : String(error) });
     } finally {

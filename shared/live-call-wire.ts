@@ -5,14 +5,23 @@
  * page or a server's page in it), a web browser, or a phone. Self-declared;
  * for display and logs only. The phone apps show a value they do not know as
  * "another device". */
-export type LiveClient = "desktop" | "web" | "ios" | "android";
-export type LiveCallStatus = "connecting" | "live" | "ending" | "ended";
+export type LiveClient = 'desktop' | 'web' | 'ios' | 'android';
+export type LiveCallStatus = 'connecting' | 'live' | 'ending' | 'ended';
 /** Why a call ended. "signed-out": the sign-in or paired phone that started
  * it was signed out, revoked or unpaired. A client that does not know a
  * reason shows the call's `error` text, or plain "Call ended.". */
 export type LiveEndReason =
-  | "hung-up" | "idle" | "expired" | "content" | "remote-hangup" | "connection-lost"
-  | "sideband-lost" | "deleted" | "shutdown" | "signed-out" | "error";
+  | 'hung-up'
+  | 'idle'
+  | 'expired'
+  | 'content'
+  | 'remote-hangup'
+  | 'connection-lost'
+  | 'sideband-lost'
+  | 'deleted'
+  | 'shutdown'
+  | 'signed-out'
+  | 'error';
 
 /** The one Live call a harness runs. Never carries the key or any speech. */
 export interface LiveCallState {
@@ -46,10 +55,10 @@ export interface LiveCallRecord {
 }
 
 /** Who runs a Live call's GPT-Live session: OpenAI itself, or a GPT-Live deployment on the user's own Azure OpenAI / Foundry resource. */
-export type LiveProvider = "openai" | "azure";
+export type LiveProvider = 'openai' | 'azure';
 
 /** `live`: the key saved for Live calls only; `openai`: the OpenAI API key from Settings → API keys, used when there is no `live` key. */
-export type LiveKeySource = "live" | "openai";
+export type LiveKeySource = 'live' | 'openai';
 
 /** Non-secret Live settings, as GET /api/config and PATCH /api/live/settings report them. */
 export interface LiveSettings {

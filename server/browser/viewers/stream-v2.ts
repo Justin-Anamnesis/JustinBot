@@ -6,16 +6,16 @@
 // 2026 T3 Tools Inc. (full text in third_party/t3-code/LICENSE); modified: written on ws without Effect, the viewer is
 // the browser service's (it follows the tab in front of the bot's one browser), the socket opens before the browser
 // has started, and OpenMausBot's own messages are added.
-import type { IncomingMessage } from "node:http";
-import type { Socket } from "node:net";
+import type { IncomingMessage } from 'node:http';
+import type { Socket } from 'node:net';
 
-import { WebSocketServer, type RawData, type WebSocket } from "ws";
+import { WebSocketServer, type RawData, type WebSocket } from 'ws';
 
-import { BrowserHostError } from "../chrome/host-setup.ts";
-import type { BrowserService, BrowserTarget } from "../service.ts";
-import { FRAME_CAP_LIMITS, type Viewer, type ViewerOptions, type ViewerOutput } from "./core.ts";
-import { requestedSize } from "./viewport.ts";
-import { displayUrl } from "./live-v1.ts";
+import { BrowserHostError } from '../chrome/host-setup.ts';
+import type { BrowserService, BrowserTarget } from '../service.ts';
+import { FRAME_CAP_LIMITS, type Viewer, type ViewerOptions, type ViewerOutput } from './core.ts';
+import { requestedSize } from './viewport.ts';
+import { displayUrl } from './live-v1.ts';
 
 /** Close codes the stream client acts on. */
 export const STREAM_CLOSE = {
@@ -40,7 +40,7 @@ const VIEWERS_TOTAL = 16;
 const RECHECK_MS = 5_000;
 /** A client that does not answer the server's close frame is cut off this long after it was sent. */
 const CLOSE_GRACE_MS = 2_000;
-const GONE = "This browser view is no longer available.";
+const GONE = 'This browser view is no longer available.';
 const PING_MS = 15_000;
 /** The close code of a connection that broke without a close frame. */
 const ABNORMAL_CLOSE = 1006;
@@ -71,25 +71,35 @@ const intParam = (params: URLSearchParams, name: string, fallback: number, max: 
   return Number.isFinite(value) && value > 0 ? Math.min(Math.round(value), max) : fallback;
 };
 
-const isAck = (message: unknown) => typeof message === "object" && message !== null && (message as { type?: unknown }).type === "ack";
+const isAck = (message: unknown) =>
+  typeof message === 'object' && message !== null && (message as { type?: unknown }).type === 'ack';
 
 const parseMessage = (data: RawData): unknown => {
   try {
-    return JSON.parse(Array.isArray(data) ? Buffer.concat(data).toString("utf8") : Buffer.from(data as ArrayBuffer).toString("utf8"));
+    return JSON.parse(
+      Array.isArray(data)
+        ? Buffer.concat(data).toString('utf8')
+        : Buffer.from(data as ArrayBuffer).toString('utf8'),
+    );
   } catch {
     return null;
   }
 };
 
 /** A viewer's output as the client reads it: frames go as bytes, the rest as `{type, ...}`. */
-export function wireMessage(output: Exclude<ViewerOutput, { type: "frame" | "gone" }>): Record<string, unknown> | null {
+export function wireMessage(
+  output: Exclude<ViewerOutput, { type: 'frame' | 'gone' }>,
+): Record<string, unknown> | null {
   switch (output.type) {
-    case "tabs":
-      return { type: "tabs", tabs: output.tabs.map((tab) => ({ ...tab, url: displayUrl(tab.url) })) };
-    case "url":
-    case "nav":
+    case 'tabs':
+      return {
+        type: 'tabs',
+        tabs: output.tabs.map((tab) => ({ ...tab, url: displayUrl(tab.url) })),
+      };
+    case 'url':
+    case 'nav':
       return { ...output, url: displayUrl(output.url) };
-    case "status":
+    case 'status':
       return null;
     default:
       return { ...output };
@@ -126,11 +136,14 @@ class StreamSession {
 
   push(output: ViewerOutput): void {
     if (this.closed || this.closing) {
-      if (output.type === "frame") output.ack();
+      if (output.type === 'frame') output.ack();
       return;
     }
-    if (output.type === "frame") {
-      if (this.unacknowledged.length >= MAX_UNACKNOWLEDGED_FRAMES || !this.#fits(output.data.byteLength)) {
+    if (output.type === 'frame') {
+      if (
+        this.unacknowledged.length >= MAX_UNACKNOWLEDGED_FRAMES ||
+        !this.#fits(output.data.byteLength)
+      ) {
         output.ack();
         this.kill();
         return;
@@ -139,8 +152,8 @@ class StreamSession {
       this.ws.send(output.data, { binary: true });
       return;
     }
-    if (output.type === "gone") {
-      this.close(STREAM_CLOSE.reconnect, "reconnect", { dropped: true });
+    if (output.type === 'gone') {
+      this.close(STREAM_CLOSE.reconnect, 'reconnect', { dropped: true });
       return;
     }
     const message = wireMessage(output);
@@ -155,7 +168,7 @@ class StreamSession {
 
   /** A notice the person should read, such as why a restart was refused. */
   notice(message: string): void {
-    if (!this.closed && !this.closing) this.ws.send(JSON.stringify({ type: "notice", message }));
+    if (!this.closed && !this.closing) this.ws.send(JSON.stringify({ type: 'notice', message }));
   }
 
   receive(data: RawData, binary: boolean, service: BrowserService): void {
@@ -188,7 +201,7 @@ class StreamSession {
   }
 
   #input(message: unknown, service: BrowserService): void {
-    if ((message as { type?: unknown } | null)?.type === "restart") {
+    if ((message as { type?: unknown } | null)?.type === 'restart') {
       void this.#restart(service);
       return;
     }
@@ -206,7 +219,7 @@ class StreamSession {
     try {
       await service.restart(this.request.target.session, this.viewer.options.person);
     } catch {
-      this.notice("The browser could not restart. Wait for active work to finish and try again.");
+      this.notice('The browser could not restart. Wait for active work to finish and try again.');
     } finally {
       this.#restarting = false;
     }
@@ -218,7 +231,12 @@ class StreamSession {
     if (this.closed || this.closing) return;
     this.closing = true;
     void this.viewer?.close({ dropped }).catch(() => undefined);
-    try { this.ws.close(code, reason.slice(0, 120)); } catch { this.kill(); return; }
+    try {
+      this.ws.close(code, reason.slice(0, 120));
+    } catch {
+      this.kill();
+      return;
+    }
     setTimeout(() => this.kill(), CLOSE_GRACE_MS).unref();
   }
 
@@ -234,7 +252,11 @@ class StreamSession {
 
   /** Still the view of a person allowed to see this browser: its stream went, not its sign-in. */
   theirs(): boolean {
-    try { return this.request.isCurrent(); } catch { return false; }
+    try {
+      return this.request.isCurrent();
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -242,7 +264,11 @@ class StreamSession {
 export class StreamV2 {
   readonly #service: BrowserService;
   readonly #sessions = new Set<StreamSession>();
-  readonly #server = new WebSocketServer({ noServer: true, perMessageDeflate: false, maxPayload: MAX_MESSAGE_BYTES });
+  readonly #server = new WebSocketServer({
+    noServer: true,
+    perMessageDeflate: false,
+    maxPayload: MAX_MESSAGE_BYTES,
+  });
 
   constructor({ service }: { service: BrowserService }) {
     this.#service = service;
@@ -250,13 +276,18 @@ export class StreamV2 {
 
   /** Answers the handshake and streams. Frames are JPEGs already, so no deflate, which also keeps every pending write in the socket buffer bounded here. */
   open(request: StreamRequest): void {
-    const perProfile = [...this.#sessions].filter((session) => session.request.target.key === request.target.key).length;
+    const perProfile = [...this.#sessions].filter(
+      (session) => session.request.target.key === request.target.key,
+    ).length;
     const busy = this.#sessions.size >= VIEWERS_TOTAL || perProfile >= VIEWERS_PER_PROFILE;
     this.#server.handleUpgrade(request.req, request.socket, request.head, (ws) => {
       const session = new StreamSession(request, ws);
       if (busy) {
         session.closed = true;
-        ws.close(STREAM_CLOSE.busy, "Too many browser views are open. Close another browser panel first.");
+        ws.close(
+          STREAM_CLOSE.busy,
+          'Too many browser views are open. Close another browser panel first.',
+        );
         return;
       }
       this.#sessions.add(session);
@@ -268,47 +299,58 @@ export class StreamV2 {
     const { request, ws } = session;
     let alive = true;
     const ping = setInterval(() => {
-      if (!alive) { session.kill(); return; }
+      if (!alive) {
+        session.kill();
+        return;
+      }
       alive = false;
-      try { ws.ping(); } catch {}
+      try {
+        ws.ping();
+      } catch {}
     }, PING_MS);
     ping.unref();
     const recheck = setInterval(() => {
       if (!request.isCurrent()) session.close(STREAM_CLOSE.gone, GONE);
     }, RECHECK_MS);
     recheck.unref();
-    ws.on("pong", () => { alive = true; });
-    ws.on("message", (data, binary) => session.receive(data, binary, this.#service));
-    ws.on("error", () => session.kill());
+    ws.on('pong', () => {
+      alive = true;
+    });
+    ws.on('message', (data, binary) => session.receive(data, binary, this.#service));
+    ws.on('error', () => session.kill());
     // 1006: no close frame came, as when a phone goes to the background or the network drops; a panel that closes says so.
-    ws.once("close", (code) => {
+    ws.once('close', (code) => {
       clearInterval(ping);
       clearInterval(recheck);
       this.#sessions.delete(session);
       session.ended(code === ABNORMAL_CLOSE);
     });
     const params = request.params;
-    const size = requestedSize(Number(params.get("width")), Number(params.get("height")));
+    const size = requestedSize(Number(params.get('width')), Number(params.get('height')));
     const options: ViewerOptions = {
       owner: request.owner,
       ...(request.person ? { person: request.person } : {}),
       canOperate: request.canOperate,
-      maxWidth: intParam(params, "maxWidth", 1280, FRAME_CAP_LIMITS.maxWidth),
-      maxHeight: intParam(params, "maxHeight", 800, FRAME_CAP_LIMITS.maxHeight),
-      quality: intParam(params, "quality", DEFAULT_QUALITY, 100),
-      pace: "hi",
+      maxWidth: intParam(params, 'maxWidth', 1280, FRAME_CAP_LIMITS.maxWidth),
+      maxHeight: intParam(params, 'maxHeight', 800, FRAME_CAP_LIMITS.maxHeight),
+      quality: intParam(params, 'quality', DEFAULT_QUALITY, 100),
+      pace: 'hi',
       authPrompts: true,
       pagePopups: true,
       ...(size && request.canOperate ? { size } : {}),
     };
     try {
-      const viewer = await this.#service.attachViewer(request.target, options, (output) => session.push(output));
-      if (session.closed || session.closing) await viewer.close({ dropped: session.lost && session.theirs() });
+      const viewer = await this.#service.attachViewer(request.target, options, (output) =>
+        session.push(output),
+      );
+      if (session.closed || session.closing)
+        await viewer.close({ dropped: session.lost && session.theirs() });
       else session.attached(viewer, this.#service);
     } catch (error) {
       // The viewer knows the fix for each need: a close reason holds at most 123 bytes, too few for the steps link.
-      if (error instanceof BrowserHostError) session.close(STREAM_CLOSE.hostSetup, JSON.stringify({ need: error.kind }));
-      else session.close(STREAM_CLOSE.failed, "The browser could not start.");
+      if (error instanceof BrowserHostError)
+        session.close(STREAM_CLOSE.hostSetup, JSON.stringify({ need: error.kind }));
+      else session.close(STREAM_CLOSE.failed, 'The browser could not start.');
     }
   }
 
@@ -316,14 +358,26 @@ export class StreamV2 {
     return this.#sessions.size;
   }
 
-  closeForSession(session: string): void { this.#closeWhere((request) => request.target.session === session); }
-  closeForOwner(owner: string): void { this.#closeWhere((request) => request.owner === owner); }
-  closeForBot(botId: string): void { this.#closeWhere((request) => request.botId === botId); }
-  closeAll(): void { this.#closeWhere(() => true); }
+  closeForSession(session: string): void {
+    this.#closeWhere((request) => request.target.session === session);
+  }
+  closeForOwner(owner: string): void {
+    this.#closeWhere((request) => request.owner === owner);
+  }
+  closeForBot(botId: string): void {
+    this.#closeWhere((request) => request.botId === botId);
+  }
+  closeAll(): void {
+    this.#closeWhere(() => true);
+  }
   /** Closes now every view the 5 s recheck would close. */
-  recheck(): void { for (const session of this.#sessions) if (!session.request.isCurrent()) session.close(STREAM_CLOSE.gone, GONE); }
+  recheck(): void {
+    for (const session of this.#sessions)
+      if (!session.request.isCurrent()) session.close(STREAM_CLOSE.gone, GONE);
+  }
 
   #closeWhere(match: (request: StreamRequest) => boolean): void {
-    for (const session of this.#sessions) if (match(session.request)) session.close(STREAM_CLOSE.gone, "This browser view closed.");
+    for (const session of this.#sessions)
+      if (match(session.request)) session.close(STREAM_CLOSE.gone, 'This browser view closed.');
   }
 }

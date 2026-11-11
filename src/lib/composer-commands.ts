@@ -1,10 +1,15 @@
-import { blankCode, offersSkillCommand } from "../../shared/skill-command";
+import { blankCode, offersSkillCommand } from '../../shared/skill-command';
 
-export type ComposerSlashCommandId = "goal" | "learn" | "setup";
+export type ComposerSlashCommandId = 'goal' | 'learn' | 'setup';
 
 export type ComposerSlashCommand =
-  | { kind: "command"; id: ComposerSlashCommandId; label: `/${ComposerSlashCommandId}`; description: string }
-  | { kind: "skill"; id: string; label: `/${string}`; description: string };
+  | {
+      kind: 'command';
+      id: ComposerSlashCommandId;
+      label: `/${ComposerSlashCommandId}`;
+      description: string;
+    }
+  | { kind: 'skill'; id: string; label: `/${string}`; description: string };
 
 export interface SlashSkill {
   name: string;
@@ -15,12 +20,19 @@ export function skillSlashCommands(skills: readonly SlashSkill[]): ComposerSlash
   return skills
     .filter((skill) => offersSkillCommand(skill.name))
     .sort((a, b) => a.name.localeCompare(b.name))
-    .map((skill) => ({ kind: "skill", id: skill.name, label: `/${skill.name}`, description: skill.description }));
+    .map((skill) => ({
+      kind: 'skill',
+      id: skill.name,
+      label: `/${skill.name}`,
+      description: skill.description,
+    }));
 }
 
 export function slashCommandMatches(command: ComposerSlashCommand, query: string): boolean {
   const needle = query.toLowerCase();
-  return !needle || command.id.startsWith(needle) || command.description.toLowerCase().includes(needle);
+  return (
+    !needle || command.id.startsWith(needle) || command.description.toLowerCase().includes(needle)
+  );
 }
 
 export interface ComposerSlashTrigger {
@@ -29,19 +41,22 @@ export interface ComposerSlashTrigger {
   end: number;
 }
 
-export function composerSlashTrigger(text: string, caretInput: number): ComposerSlashTrigger | null {
+export function composerSlashTrigger(
+  text: string,
+  caretInput: number,
+): ComposerSlashTrigger | null {
   const caret = Math.max(0, Math.min(text.length, Math.floor(caretInput)));
   const prefix = text.slice(0, caret);
   const match = /(?:^|\s)\/([\p{L}\p{N}\p{M}-]*)$/u.exec(prefix);
   if (!match) return null;
-  const query = match[1] ?? "";
+  const query = match[1] ?? '';
   const start = caret - query.length - 1;
-  return blankCode(text)[start] === "/" ? { query, start, end: caret } : null;
+  return blankCode(text)[start] === '/' ? { query, start, end: caret } : null;
 }
 
 export function goalTextFromComposer(text: string): string | null {
   const match = /^\/goal(?:\s+([\s\S]*))?$/i.exec(text);
-  return match ? (match[1] ?? "").trimStart() : null;
+  return match ? (match[1] ?? '').trimStart() : null;
 }
 
 export function replaceComposerSlashTrigger(

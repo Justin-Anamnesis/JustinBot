@@ -1,58 +1,68 @@
-import { createServer, type Server } from "node:http";
-import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-describe("Boat trial provisioning", () => {
+describe('Boat trial provisioning', () => {
   let api: Server;
-  let provisionBoat: typeof import("./boat.ts").provisionBoat;
+  let provisionBoat: typeof import('./boat.ts').provisionBoat;
   const createBodies: Array<{ ttlSeconds: number; noEnv: boolean }> = [];
   const createKeys: string[] = [];
 
   beforeAll(async () => {
     api = createServer((req, res) => {
-      const url = new URL(req.url ?? "/", "http://boat.test");
-      let raw = "";
-      req.on("data", (chunk) => (raw += chunk));
-      req.on("end", () => {
-        res.setHeader("content-type", "application/json");
-        if (url.pathname === "/api/v1/sandboxes" && req.method === "GET") {
-          return res.end(JSON.stringify({ ok: true, type: "sandbox.list", sandboxes: [] }));
+      const url = new URL(req.url ?? '/', 'http://boat.test');
+      let raw = '';
+      req.on('data', (chunk) => (raw += chunk));
+      req.on('end', () => {
+        res.setHeader('content-type', 'application/json');
+        if (url.pathname === '/api/v1/sandboxes' && req.method === 'GET') {
+          return res.end(JSON.stringify({ ok: true, type: 'sandbox.list', sandboxes: [] }));
         }
-        if (url.pathname === "/api/v1/sandboxes" && req.method === "POST") {
+        if (url.pathname === '/api/v1/sandboxes' && req.method === 'POST') {
           const body = JSON.parse(raw);
           createBodies.push(body);
-          createKeys.push(String(req.headers["idempotency-key"] ?? ""));
+          createKeys.push(String(req.headers['idempotency-key'] ?? ''));
           if (createBodies.length === 1) {
             res.writeHead(400);
-            return res.end(JSON.stringify({
-              ok: false,
-              error: { code: "trial_auto_stop_required", details: { maxTtlSeconds: 7200 } },
-            }));
+            return res.end(
+              JSON.stringify({
+                ok: false,
+                error: { code: 'trial_auto_stop_required', details: { maxTtlSeconds: 7200 } },
+              }),
+            );
           }
           res.writeHead(202);
-          return res.end(JSON.stringify({ ok: true, type: "sandbox.created", sandbox: { id: "bx_23456789", state: "ready" } }));
+          return res.end(
+            JSON.stringify({
+              ok: true,
+              type: 'sandbox.created',
+              sandbox: { id: 'bx_23456789', state: 'ready' },
+            }),
+          );
         }
-        if (url.pathname === "/api/v1/sandboxes/bx_23456789" && req.method === "PATCH") {
+        if (url.pathname === '/api/v1/sandboxes/bx_23456789' && req.method === 'PATCH') {
           return res.end(JSON.stringify({ ok: true }));
         }
-        if (url.pathname === "/api/v1/sandboxes/bx_23456789" && req.method === "GET") {
-          return res.end(JSON.stringify({ ok: true, sandbox: { id: "bx_23456789", state: "ready" } }));
+        if (url.pathname === '/api/v1/sandboxes/bx_23456789' && req.method === 'GET') {
+          return res.end(
+            JSON.stringify({ ok: true, sandbox: { id: 'bx_23456789', state: 'ready' } }),
+          );
         }
-        if (url.pathname.endsWith("/commands")) {
-          return res.end(JSON.stringify({ ok: true, exitCode: 0, stdout: "", stderr: "" }));
+        if (url.pathname.endsWith('/commands')) {
+          return res.end(JSON.stringify({ ok: true, exitCode: 0, stdout: '', stderr: '' }));
         }
-        if (url.pathname.endsWith("/desktop")) {
-          return res.end(JSON.stringify({ ok: true, desktopUrl: "https://desktop.example/vnc" }));
+        if (url.pathname.endsWith('/desktop')) {
+          return res.end(JSON.stringify({ ok: true, desktopUrl: 'https://desktop.example/vnc' }));
         }
-        res.writeHead(404).end(JSON.stringify({ ok: false, message: "unexpected request" }));
+        res.writeHead(404).end(JSON.stringify({ ok: false, message: 'unexpected request' }));
       });
     });
-    await new Promise<void>((resolve) => api.listen(0, "127.0.0.1", resolve));
+    await new Promise<void>((resolve) => api.listen(0, '127.0.0.1', resolve));
     // SAFETY: the test server was bound as TCP above, not to a Unix socket.
     const port = (api.address() as AddressInfo).port;
-    vi.stubEnv("OMB_BOAT_API", `http://127.0.0.1:${port}/api/v1`);
+    vi.stubEnv('OMB_BOAT_API', `http://127.0.0.1:${port}/api/v1`);
     vi.resetModules();
-    ({ provisionBoat } = await import("./boat.ts"));
+    ({ provisionBoat } = await import('./boat.ts'));
   });
 
   afterAll(async () => {
@@ -60,11 +70,15 @@ describe("Boat trial provisioning", () => {
     await new Promise<void>((resolve) => api.close(() => resolve()));
   });
 
-  it("retries the structured trial TTL refusal exactly once at the allowed ceiling", async () => {
+  it('retries the structured trial TTL refusal exactly once at the allowed ceiling', async () => {
     // SAFETY: AppConfig's remaining sections are optional; this test supplies
     // the only credential the Boat path reads.
-    const result = await provisionBoat({ box: { token: "box_trial" } } as any, "trial-bot", "Trial Bot");
-    expect(result.boxId).toBe("bx_23456789");
+    const result = await provisionBoat(
+      { box: { token: 'box_trial' } } as any,
+      'trial-bot',
+      'Trial Bot',
+    );
+    expect(result.boxId).toBe('bx_23456789');
     expect(createBodies).toEqual([
       { ttlSeconds: 8 * 60 * 60, noEnv: true },
       { ttlSeconds: 2 * 60 * 60, noEnv: true },

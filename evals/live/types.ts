@@ -1,5 +1,5 @@
-import { z } from "zod";
-import { assertionSchema, stepSchema } from "../types.ts";
+import { z } from 'zod';
+import { assertionSchema, stepSchema } from '../types.ts';
 
 /** Tier 3: opt-in live-model smoke evals. A live scenario is pure data
  * like a tier-1 fixture, minus scripted turns (a real model drives the
@@ -21,7 +21,7 @@ export const liveBotSchema = z.object({
  * text reply in the named thread. */
 export const liveInvariantSchema = z.union([
   assertionSchema,
-  z.object({ kind: z.literal("botReplied"), bot: z.string(), thread: z.enum(["active", "node"]) }),
+  z.object({ kind: z.literal('botReplied'), bot: z.string(), thread: z.enum(['active', 'node']) }),
 ]);
 
 export const liveScenarioSchema = z.object({

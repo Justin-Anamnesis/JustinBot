@@ -1,11 +1,11 @@
 /** Inherited AWS variables that outrank AWS_PROFILE in the AWS SDK's own credential resolution, so a Bedrock
  *  instance never runs on another instance's (or this machine's shell) AWS credentials. */
 export const AWS_CREDENTIAL_ENV_KEYS = [
-  "AWS_ACCESS_KEY_ID",
-  "AWS_SECRET_ACCESS_KEY",
-  "AWS_SESSION_TOKEN",
-  "AWS_BEARER_TOKEN_BEDROCK",
-  "AWS_DEFAULT_PROFILE",
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'AWS_SESSION_TOKEN',
+  'AWS_BEARER_TOKEN_BEDROCK',
+  'AWS_DEFAULT_PROFILE',
 ] as const;
 
 // AWS credential failures surface from the SDK as plain English, not a structured error code; matched by text.
@@ -23,7 +23,7 @@ export function withBedrockCredentialError<T extends { message: string }>(
   bedrock: boolean | undefined,
   environment: Readonly<Record<string, string | undefined>>,
   said: string,
-  error: T
+  error: T,
 ): T | { message: string } {
   const awsProfile = bedrock ? environment.AWS_PROFILE : undefined;
   const message = awsProfile ? bedrockCredentialError(said, awsProfile) : null;
@@ -31,6 +31,10 @@ export function withBedrockCredentialError<T extends { message: string }>(
 }
 
 /** The same choice for a turn's final error text. */
-export function bedrockResultError(bedrock: boolean | undefined, environment: Readonly<Record<string, string | undefined>>, message: string): string {
+export function bedrockResultError(
+  bedrock: boolean | undefined,
+  environment: Readonly<Record<string, string | undefined>>,
+  message: string,
+): string {
   return withBedrockCredentialError(bedrock, environment, message, { message }).message;
 }

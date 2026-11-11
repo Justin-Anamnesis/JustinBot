@@ -1,5 +1,5 @@
 // The sidecar's own state directory, never the harness's ~/.openmausbot.
-import { randomUUID } from "node:crypto";
+import { randomUUID } from 'node:crypto';
 import {
   chmodSync,
   closeSync,
@@ -9,12 +9,12 @@ import {
   renameSync,
   unlinkSync,
   writeFileSync,
-} from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
+} from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 /** OMB_COMPANION_DIR isolates a test rig from a real paired fleet. */
-export const DATA_DIR = process.env.OMB_COMPANION_DIR ?? join(homedir(), ".openmausbot-companion");
+export const DATA_DIR = process.env.OMB_COMPANION_DIR ?? join(homedir(), '.openmausbot-companion');
 
 /** The paired fleet's hashes are an offline target, and the 0755/0644 defaults
  * would publish which phones someone owns to every account on the machine. */
@@ -26,8 +26,7 @@ export function ensureDataDir(): void {
   // mkdirSync's mode applies only to a directory it creates.
   try {
     chmodSync(DATA_DIR, DIR_MODE);
-  } catch {
-  }
+  } catch {}
 }
 
 /**
@@ -40,7 +39,7 @@ export function writeFileAtomic(path: string, data: string): void {
   let fd: number | null = null;
   try {
     // The mode goes on at creation, so the contents are never readable meanwhile.
-    fd = openSync(tmp, "w", FILE_MODE);
+    fd = openSync(tmp, 'w', FILE_MODE);
     writeFileSync(fd, data);
     fsyncSync(fd);
     closeSync(fd);
@@ -50,13 +49,11 @@ export function writeFileAtomic(path: string, data: string): void {
     if (fd !== null) {
       try {
         closeSync(fd);
-      } catch {
-      }
+      } catch {}
     }
     try {
       unlinkSync(tmp);
-    } catch {
-    }
+    } catch {}
     throw e;
   }
 }

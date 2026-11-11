@@ -1,4 +1,9 @@
-export interface TeamPlace { key: string; name: string; kind: "team"; read(): Promise<unknown> }
+export interface TeamPlace {
+  key: string;
+  name: string;
+  kind: 'team';
+  read(): Promise<unknown>;
+}
 export function parseRemembered(value: unknown): Record<string, { name: string; bots: string[] }>;
 export function botNames(body: unknown): string[];
 export function teamPlaces(deps: {

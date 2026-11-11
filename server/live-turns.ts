@@ -1,7 +1,7 @@
 // The turn each thread is running: set by its turn.started, cleared by its turn.completed, and nothing once the
 // thread is idle (a turn the harness retired, or one whose end was quarantined, never sends that end). Unlike the
 // last turn id seen on any event, a late event of a finished turn never makes it live again.
-import type { RuntimeEvent } from "./contracts.ts";
+import type { RuntimeEvent } from './contracts.ts';
 
 export class LiveTurns {
   readonly #byThread = new Map<string, string>();
@@ -12,10 +12,11 @@ export class LiveTurns {
     this.#busy = busy;
   }
 
-  onEvent(event: Pick<RuntimeEvent, "type" | "threadId" | "turnId">): void {
+  onEvent(event: Pick<RuntimeEvent, 'type' | 'threadId' | 'turnId'>): void {
     if (!event.turnId) return;
-    if (event.type === "turn.started") this.#byThread.set(event.threadId, event.turnId);
-    else if (event.type === "turn.completed" && this.#byThread.get(event.threadId) === event.turnId) this.#byThread.delete(event.threadId);
+    if (event.type === 'turn.started') this.#byThread.set(event.threadId, event.turnId);
+    else if (event.type === 'turn.completed' && this.#byThread.get(event.threadId) === event.turnId)
+      this.#byThread.delete(event.threadId);
   }
 
   /** A new turn is being dispatched on the thread: whatever turn it held before is over, its end lost or not. */

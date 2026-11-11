@@ -1,9 +1,9 @@
-import { t } from "@/lib/i18n";
-import type { BotDefaultsProfile } from "../../shared/new-bot-defaults";
+import { t } from '@/lib/i18n';
+import type { BotDefaultsProfile } from '../../shared/new-bot-defaults';
 
 export interface BotPreset {
   id: string;
-  source: "file" | "org";
+  source: 'file' | 'org';
   key: string;
   name: string;
   description?: string;
@@ -16,10 +16,14 @@ export interface BotPreset {
     description?: string;
     soul?: string;
     appearance?: {
-      color: NonNullable<BotDefaultsProfile["color"]>;
+      color: NonNullable<BotDefaultsProfile['color']>;
       mascotExpression?: string;
       mascotBody?: string;
-      avatar?: { mime: "image/png" | "image/jpeg" | "image/webp"; data: string; crop: "circle" | "rounded" | "square" };
+      avatar?: {
+        mime: 'image/png' | 'image/jpeg' | 'image/webp';
+        data: string;
+        crop: 'circle' | 'rounded' | 'square';
+      };
     };
   };
   skills: Array<{ name: string; description: string }>;
@@ -42,9 +46,10 @@ export interface PresetGroup {
 export function presetGroups(presets: readonly BotPreset[]): PresetGroup[] {
   const groups: PresetGroup[] = [];
   for (const preset of presets) {
-    const label = preset.source === "org"
-      ? t("newBot.presetsFromOrganization", { name: preset.publisherName ?? preset.packageName })
-      : t("newBot.presetsImported");
+    const label =
+      preset.source === 'org'
+        ? t('newBot.presetsFromOrganization', { name: preset.publisherName ?? preset.packageName })
+        : t('newBot.presetsImported');
     const group = groups.find((candidate) => candidate.label === label);
     if (group) group.presets.push(preset);
     else groups.push({ label, presets: [preset] });
@@ -56,15 +61,15 @@ export function presetGroups(presets: readonly BotPreset[]): PresetGroup[] {
 export function presetDraftPatch(preset: BotPreset): Partial<BotDefaultsProfile> {
   const patch: Partial<BotDefaultsProfile> = {
     name: preset.bot.name ?? preset.name,
-    title: preset.bot.title ?? "",
-    description: preset.bot.description ?? "",
-    soul: preset.bot.soul ?? "",
+    title: preset.bot.title ?? '',
+    description: preset.bot.description ?? '',
+    soul: preset.bot.soul ?? '',
   };
   const look = preset.bot.appearance;
   if (look) {
     patch.color = look.color;
     patch.mascotExpression = look.mascotExpression ?? null;
-    if (look.mascotBody) patch.mascotBody = look.mascotBody as BotDefaultsProfile["mascotBody"];
+    if (look.mascotBody) patch.mascotBody = look.mascotBody as BotDefaultsProfile['mascotBody'];
   }
   return patch;
 }
@@ -84,18 +89,34 @@ export function presetPictureFile(preset: BotPreset): File | null {
 }
 
 export function presetSummaryLines(preset: BotPreset): string[] {
-  const lines = [preset.source === "org" && preset.publisherName
-    ? t("newBot.presetFromOrg", { package: preset.packageName, release: preset.release, publisher: preset.publisherName })
-    : t("newBot.presetFrom", { package: preset.packageName, release: preset.release })];
+  const lines = [
+    preset.source === 'org' && preset.publisherName
+      ? t('newBot.presetFromOrg', {
+          package: preset.packageName,
+          release: preset.release,
+          publisher: preset.publisherName,
+        })
+      : t('newBot.presetFrom', { package: preset.packageName, release: preset.release }),
+  ];
   if (preset.description) lines.push(preset.description);
-  const skills = preset.skills.map((skill) => skill.name).join(", ");
-  if (skills) lines.push(t(preset.skillsEnabled ? "newBot.presetSkillsOn" : "newBot.presetSkillsOff", { names: skills }));
-  if (preset.notes.length) lines.push(t("newBot.presetNotes", { names: preset.notes.join(", ") }));
-  if (preset.playbooks.length) lines.push(t("newBot.presetPlaybooks", { names: preset.playbooks.join(", ") }));
-  lines.push(t("newBot.presetKeeps"));
+  const skills = preset.skills.map((skill) => skill.name).join(', ');
+  if (skills)
+    lines.push(
+      t(preset.skillsEnabled ? 'newBot.presetSkillsOn' : 'newBot.presetSkillsOff', {
+        names: skills,
+      }),
+    );
+  if (preset.notes.length) lines.push(t('newBot.presetNotes', { names: preset.notes.join(', ') }));
+  if (preset.playbooks.length)
+    lines.push(t('newBot.presetPlaybooks', { names: preset.playbooks.join(', ') }));
+  lines.push(t('newBot.presetKeeps'));
   return lines;
 }
 
 export function chosenPreset(preset: BotPreset): ChosenPreset {
-  return { id: preset.id, skills: preset.skills.map((skill) => skill.name), notes: [...preset.notes] };
+  return {
+    id: preset.id,
+    skills: preset.skills.map((skill) => skill.name),
+    notes: [...preset.notes],
+  };
 }

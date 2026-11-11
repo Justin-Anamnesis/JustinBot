@@ -1,10 +1,11 @@
 // The job runtime's public types: one record for every hand-off between bots, one lifecycle, one wake lane.
-import type { ApprovalMode } from "../../shared/approval-mode.ts";
+import type { ApprovalMode } from '../../shared/approval-mode.ts';
 
 /** Where the work ultimately started. Immutable down the whole tree. */
-export type OriginKind = "person" | "routine" | "outside";
+export type OriginKind = 'person' | 'routine' | 'outside';
 /** The concrete source behind an outside origin. */
-export type OriginSource = "chat" | "routine" | "webhook" | "relay" | "external_runtime" | "guest" | "peer" | "api";
+export type OriginSource =
+  'chat' | 'routine' | 'webhook' | 'relay' | 'external_runtime' | 'guest' | 'peer' | 'api';
 
 export interface Origin {
   kind: OriginKind;
@@ -17,7 +18,7 @@ export interface Origin {
   onBehalfOf?: string;
 }
 
-export type RequesterKind = "person" | "bot_turn" | "routine_run" | "external_runtime";
+export type RequesterKind = 'person' | 'bot_turn' | 'routine_run' | 'external_runtime';
 
 export interface Requester {
   kind: RequesterKind;
@@ -31,7 +32,7 @@ export interface Requester {
   chief?: boolean;
 }
 
-export type DestinationKind = "work_thread" | "standing_thread" | "room_thread";
+export type DestinationKind = 'work_thread' | 'standing_thread' | 'room_thread';
 
 export interface Assignee {
   botId: string;
@@ -42,40 +43,40 @@ export interface Assignee {
 
 /** work: do it with your own tools. consult: answer from what you know, act
  * on nothing. notify: one-way, nothing comes back. */
-export type Mode = "work" | "consult" | "notify";
+export type Mode = 'work' | 'consult' | 'notify';
 /** resume: the requester is woken with the result. poll: the result waits
  * in the inbox for status(). none: no inbox entry (notify). */
-export type Reply = "resume" | "poll" | "none";
+export type Reply = 'resume' | 'poll' | 'none';
 
 export type Status =
-  | "queued"          // accepted, not yet admitted
-  | "running"         // a turn of the assignee is executing it
-  | "needs_input"     // parked on the person (a card or a NEEDS INPUT line)
-  | "waiting"         // its turn ended after handing out work; waits on children
-  | "resume"          // every child settled, or one it waits on parked a new question; owes its own follow-up turn
-  | "completed"
-  | "failed"
-  | "cancelled";
+  | 'queued' // accepted, not yet admitted
+  | 'running' // a turn of the assignee is executing it
+  | 'needs_input' // parked on the person (a card or a NEEDS INPUT line)
+  | 'waiting' // its turn ended after handing out work; waits on children
+  | 'resume' // every child settled, or one it waits on parked a new question; owes its own follow-up turn
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
-export const TERMINAL: readonly Status[] = ["completed", "failed", "cancelled"];
+export const TERMINAL: readonly Status[] = ['completed', 'failed', 'cancelled'];
 
 /** Why it ended the way it did, typed so a requester can branch on it. */
 export type Outcome =
-  | "done"
-  | "needs_input"      // ended with a question the person has not answered
-  | "cap_continued"    // a step cap was hit and the work continued in place
-  | "stalled"
-  | "interrupted"      // a restart, reload or sleep cut it and it was not resumed again
-  | "budget"
-  | "provider_error"
-  | "denied"           // a permission the level did not cover was refused
-  | "expired"          // a wait on the person ran out: not run, not refused
-  | "stopped"          // the person stopped it
-  | "refused"          // validation refused it at dispatch
-  | "duplicate";
+  | 'done'
+  | 'needs_input' // ended with a question the person has not answered
+  | 'cap_continued' // a step cap was hit and the work continued in place
+  | 'stalled'
+  | 'interrupted' // a restart, reload or sleep cut it and it was not resumed again
+  | 'budget'
+  | 'provider_error'
+  | 'denied' // a permission the level did not cover was refused
+  | 'expired' // a wait on the person ran out: not run, not refused
+  | 'stopped' // the person stopped it
+  | 'refused' // validation refused it at dispatch
+  | 'duplicate';
 
 export type Level = ApprovalMode;
-export type LevelSource = "own" | "chief" | "engine_cap";
+export type LevelSource = 'own' | 'chief' | 'engine_cap';
 
 export interface Assignment {
   id: string;
@@ -106,7 +107,7 @@ export interface Assignment {
   restarts: number;
   /** Set until the turn after a restart settles: "rerun" its cut turn runs again; "cut" it was cut after
    * handing out work; "teammates" only work it waits on was cut. */
-  restart?: "rerun" | "cut" | "teammates";
+  restart?: 'rerun' | 'cut' | 'teammates';
   createdAt: number;
   startedAt?: number;
   /** Last durable progress: a dispatch, a settlement, a child's settlement. */
@@ -155,7 +156,7 @@ export interface Assignment {
   version: 1;
 }
 
-export type Answerer = { kind: "bot"; botId: string } | { kind: "default" };
+export type Answerer = { kind: 'bot'; botId: string } | { kind: 'default' };
 
 export interface TurnEvidence {
   commands?: number;
@@ -172,9 +173,24 @@ export interface TurnEvidence {
 }
 
 export type EventKind =
-  | "enqueued" | "refused" | "admitted" | "started" | "progress" | "parked" | "answered"
-  | "waiting" | "resume_due" | "settled" | "reported" | "woken" | "cancelled"
-  | "restart_reconciled" | "budget" | "stalled" | "continued" | "held";
+  | 'enqueued'
+  | 'refused'
+  | 'admitted'
+  | 'started'
+  | 'progress'
+  | 'parked'
+  | 'answered'
+  | 'waiting'
+  | 'resume_due'
+  | 'settled'
+  | 'reported'
+  | 'woken'
+  | 'cancelled'
+  | 'restart_reconciled'
+  | 'budget'
+  | 'stalled'
+  | 'continued'
+  | 'held';
 
 export interface AssignmentEvent {
   id: number;
@@ -184,7 +200,7 @@ export interface AssignmentEvent {
   detail?: string;
 }
 
-export type InboxKind = "settled" | "needs_input" | "stalled";
+export type InboxKind = 'settled' | 'needs_input' | 'stalled';
 
 /** The one wake lane: a requester learns about its work only through this. */
 export interface InboxItem {
@@ -223,11 +239,11 @@ export interface EnqueueRequest {
 
 export type EnqueueResult =
   | { ok: true; assignment: Assignment; duplicate: boolean }
-  | { ok: false; reason: string; outcome: "refused" | "budget" | "duplicate" };
+  | { ok: false; reason: string; outcome: 'refused' | 'budget' | 'duplicate' };
 
 export interface RunInput {
   /** first; resume (returns settled children's results and awaited children's open questions); rerun (after a restart cut it); answered; continued. */
-  turn: "first" | "resume" | "rerun" | "answered" | "continued";
+  turn: 'first' | 'resume' | 'rerun' | 'answered' | 'continued';
   /** Not the node's first turn (any `turn` but "first"). */
   resumed: boolean;
   /** What the restart did, for the first line of the turn ("" when nothing). */
@@ -250,12 +266,23 @@ export interface RunInput {
 
 export type RunResult =
   /** statusOnly: nothing in `text` for the requester to do (status-reply.ts). */
-  | { kind: "completed"; text: string; evidence?: TurnEvidence; statusOnly?: boolean }
-  | { kind: "failed"; outcome: Exclude<Outcome, "done" | "needs_input">; text: string; evidence?: TurnEvidence }
-  | { kind: "needs_input"; question: string; cards?: string[]; decide?: { default?: string }; evidence?: TurnEvidence }
+  | { kind: 'completed'; text: string; evidence?: TurnEvidence; statusOnly?: boolean }
+  | {
+      kind: 'failed';
+      outcome: Exclude<Outcome, 'done' | 'needs_input'>;
+      text: string;
+      evidence?: TurnEvidence;
+    }
+  | {
+      kind: 'needs_input';
+      question: string;
+      cards?: string[];
+      decide?: { default?: string };
+      evidence?: TurnEvidence;
+    }
   /** The turn stopped short (a step cap, a seat it could not get) and the
    * same node continues in place with its next execution. */
-  | { kind: "continue"; text: string; note: string; handoffPath?: string; evidence?: TurnEvidence };
+  | { kind: 'continue'; text: string; note: string; handoffPath?: string; evidence?: TurnEvidence };
 
 /** How a host-run root turn ended (Runtime.end). */
 export interface EndResult {
@@ -359,7 +386,7 @@ export const DEFAULT_LIMITS: Limits = {
 export interface LiveEdge {
   sourceBotId: string;
   targetBotId: string;
-  state: "queued" | "running" | "needs_input" | "waiting";
+  state: 'queued' | 'running' | 'needs_input' | 'waiting';
   threadId: string;
   groupId?: string;
 }

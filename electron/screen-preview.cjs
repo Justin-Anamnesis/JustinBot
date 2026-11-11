@@ -40,13 +40,13 @@ function createDisplayMediaGuard({ now = Date.now, ttlMs = 5_000 } = {}) {
 
       return Boolean(
         expiresAt !== undefined &&
-          expiresAt >= now() &&
-          request.userGesture === true &&
-          request.videoRequested === true &&
-          request.audioRequested === false &&
-          requestOrigin !== null &&
-          allowedOrigin !== null &&
-          requestOrigin === allowedOrigin,
+        expiresAt >= now() &&
+        request.userGesture === true &&
+        request.videoRequested === true &&
+        request.audioRequested === false &&
+        requestOrigin !== null &&
+        allowedOrigin !== null &&
+        requestOrigin === allowedOrigin,
       );
     },
   });
@@ -54,8 +54,8 @@ function createDisplayMediaGuard({ now = Date.now, ttlMs = 5_000 } = {}) {
 
 function selectCaptureSource({ sources, host, primaryDisplayId }) {
   if (!Array.isArray(sources) || sources.length === 0) return null;
-  if (host === "wayland") return sources.length === 1 ? sources[0] : null;
-  if (host === "x11") {
+  if (host === 'wayland') return sources.length === 1 ? sources[0] : null;
+  if (host === 'x11') {
     const exact = sources.find(
       (source) =>
         source.display_id !== undefined &&
@@ -65,7 +65,7 @@ function selectCaptureSource({ sources, host, primaryDisplayId }) {
     // Some X11 backends omit or misreport display_id: a single source is unambiguous, but never guess among several.
     return exact ?? (sources.length === 1 ? sources[0] : null);
   }
-  if (host === "darwin") return sources[0];
+  if (host === 'darwin') return sources[0];
   return null;
 }
 

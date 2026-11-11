@@ -10,5 +10,5 @@ export async function captureOutsideHumanControl(
   const { png, format } = await capture();
   const after = control();
   if (after.held || after.revision !== before.revision) return null;
-  return { png, mime: format === "jpeg" ? "image/jpeg" : "image/png" };
+  return { png, mime: format === 'jpeg' ? 'image/jpeg' : 'image/png' };
 }

@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
-import { basename, join } from "node:path";
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { basename, join } from 'node:path';
 
 import {
   parseTeamManifest,
@@ -7,17 +7,10 @@ import {
   TEAM_MANIFEST_VERSION,
   type TeamManifestMember,
   type TeamManifestV2,
-} from "./team-manifest.ts";
-import type { MausColor } from "./store.ts";
+} from './team-manifest.ts';
+import type { MausColor } from './store.ts';
 
-export type ScoutRole =
-  | "frontend"
-  | "backend"
-  | "mobile"
-  | "data"
-  | "testing"
-  | "infra"
-  | "docs";
+export type ScoutRole = 'frontend' | 'backend' | 'mobile' | 'data' | 'testing' | 'infra' | 'docs';
 
 export interface ProjectSignal {
   role: ScoutRole;
@@ -45,7 +38,7 @@ const MAX_DIR_ENTRIES = 400;
 function readText(path: string): string | null {
   try {
     if (statSync(path).size > MAX_FILE_BYTES) return null;
-    return readFileSync(path, "utf8");
+    return readFileSync(path, 'utf8');
   } catch {
     return null;
   }
@@ -68,22 +61,22 @@ function isDir(path: string): boolean {
 }
 
 function packageJson(cwd: string): { name?: string; description?: string; deps: Set<string> } {
-  const raw = readText(join(cwd, "package.json"));
+  const raw = readText(join(cwd, 'package.json'));
   if (!raw) return { deps: new Set() };
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return { deps: new Set() };
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { deps: new Set() };
     const pkg = parsed as Record<string, unknown>;
     const deps = new Set<string>();
-    for (const field of ["dependencies", "devDependencies"]) {
+    for (const field of ['dependencies', 'devDependencies']) {
       const block = pkg[field];
-      if (block && typeof block === "object" && !Array.isArray(block)) {
+      if (block && typeof block === 'object' && !Array.isArray(block)) {
         for (const dep of Object.keys(block)) deps.add(dep);
       }
     }
     return {
-      name: typeof pkg.name === "string" ? pkg.name : undefined,
-      description: typeof pkg.description === "string" ? pkg.description : undefined,
+      name: typeof pkg.name === 'string' ? pkg.name : undefined,
+      description: typeof pkg.description === 'string' ? pkg.description : undefined,
       deps,
     };
   } catch {
@@ -93,19 +86,27 @@ function packageJson(cwd: string): { name?: string; description?: string; deps: 
 
 function readme(cwd: string): { title?: string; summary?: string } {
   const raw =
-    readText(join(cwd, "README.md")) ?? readText(join(cwd, "readme.md")) ?? readText(join(cwd, "README"));
+    readText(join(cwd, 'README.md')) ??
+    readText(join(cwd, 'readme.md')) ??
+    readText(join(cwd, 'README'));
   if (!raw) return {};
   let title: string | undefined;
   let summary: string | undefined;
-  for (const line of raw.slice(0, 64_000).split("\n")) {
+  for (const line of raw.slice(0, 64_000).split('\n')) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    if (trimmed.startsWith("#")) {
-      if (!title) title = trimmed.replace(/^#+\s*/, "").trim() || undefined;
+    if (trimmed.startsWith('#')) {
+      if (!title) title = trimmed.replace(/^#+\s*/, '').trim() || undefined;
       continue;
     }
-    if (trimmed.startsWith("[![") || trimmed.startsWith("![") || trimmed.startsWith("<") || trimmed.startsWith(">")) continue;
-    summary = trimmed.replace(/[*_`]/g, "").slice(0, 1_000);
+    if (
+      trimmed.startsWith('[![') ||
+      trimmed.startsWith('![') ||
+      trimmed.startsWith('<') ||
+      trimmed.startsWith('>')
+    )
+      continue;
+    summary = trimmed.replace(/[*_`]/g, '').slice(0, 1_000);
     break;
   }
   return { title, summary };
@@ -120,57 +121,76 @@ interface Detector {
 // Order is priority: when a suggestion is trimmed, earlier roles survive.
 const DETECTORS: Detector[] = [
   {
-    role: "frontend",
-    deps: ["react", "vue", "svelte", "next", "nuxt", "astro", "vite", "@angular/core", "solid-js"],
-    paths: ["index.html", "vite.config.ts", "vite.config.js", "next.config.js", "next.config.ts"],
+    role: 'frontend',
+    deps: ['react', 'vue', 'svelte', 'next', 'nuxt', 'astro', 'vite', '@angular/core', 'solid-js'],
+    paths: ['index.html', 'vite.config.ts', 'vite.config.js', 'next.config.js', 'next.config.ts'],
   },
   {
-    role: "backend",
-    deps: ["express", "fastify", "koa", "hono", "@nestjs/core", "django", "flask", "fastapi"],
-    paths: ["server", "api", "go.mod"],
+    role: 'backend',
+    deps: ['express', 'fastify', 'koa', 'hono', '@nestjs/core', 'django', 'flask', 'fastapi'],
+    paths: ['server', 'api', 'go.mod'],
   },
   {
-    role: "mobile",
-    deps: ["react-native", "expo"],
-    paths: ["ios", "android", "pubspec.yaml"],
+    role: 'mobile',
+    deps: ['react-native', 'expo'],
+    paths: ['ios', 'android', 'pubspec.yaml'],
   },
   {
-    role: "data",
-    deps: ["prisma", "drizzle-orm", "knex", "sequelize", "typeorm", "mongoose", "pg", "mysql2", "better-sqlite3", "sqlalchemy"],
-    paths: ["prisma", "migrations"],
+    role: 'data',
+    deps: [
+      'prisma',
+      'drizzle-orm',
+      'knex',
+      'sequelize',
+      'typeorm',
+      'mongoose',
+      'pg',
+      'mysql2',
+      'better-sqlite3',
+      'sqlalchemy',
+    ],
+    paths: ['prisma', 'migrations'],
   },
   {
-    role: "testing",
-    deps: ["vitest", "jest", "mocha", "@playwright/test", "cypress", "pytest"],
-    paths: ["test", "tests", "__tests__", "e2e"],
+    role: 'testing',
+    deps: ['vitest', 'jest', 'mocha', '@playwright/test', 'cypress', 'pytest'],
+    paths: ['test', 'tests', '__tests__', 'e2e'],
   },
   {
-    role: "infra",
+    role: 'infra',
     deps: [],
-    paths: ["Dockerfile", "docker-compose.yml", "docker-compose.yaml", "compose.yaml", ".github/workflows", "terraform", "helm"],
+    paths: [
+      'Dockerfile',
+      'docker-compose.yml',
+      'docker-compose.yaml',
+      'compose.yaml',
+      '.github/workflows',
+      'terraform',
+      'helm',
+    ],
   },
   {
-    role: "docs",
+    role: 'docs',
     deps: [],
-    paths: ["docs", "mkdocs.yml"],
+    paths: ['docs', 'mkdocs.yml'],
   },
 ];
 
 const STACK_MARKERS: Array<{ stack: string; deps?: string[]; paths?: string[] }> = [
-  { stack: "TypeScript", deps: ["typescript"], paths: ["tsconfig.json"] },
-  { stack: "React", deps: ["react"] },
-  { stack: "Vue", deps: ["vue"] },
-  { stack: "Svelte", deps: ["svelte"] },
-  { stack: "Next.js", deps: ["next"] },
-  { stack: "Vite", deps: ["vite"] },
-  { stack: "Node", paths: ["package.json"] },
-  { stack: "Python", paths: ["pyproject.toml", "requirements.txt", "setup.py"] },
-  { stack: "Rust", paths: ["Cargo.toml"] },
-  { stack: "Go", paths: ["go.mod"] },
-  { stack: "Ruby", paths: ["Gemfile"] },
-  { stack: "PHP", paths: ["composer.json"] },
-  { stack: "Java", paths: ["pom.xml", "build.gradle", "build.gradle.kts"] },
-  { stack: "Docker", paths: ["Dockerfile", "docker-compose.yml", "compose.yaml"] },
+  { stack: 'TypeScript', deps: ['typescript'], paths: ['tsconfig.json'] },
+  { stack: 'React', deps: ['react'] },
+  { stack: 'Vue', deps: ['vue'] },
+  { stack: 'Svelte', deps: ['svelte'] },
+  { stack: 'Next.js', deps: ['next'] },
+  { stack: 'Vite', deps: ['vite'] },
+  { stack: 'Node', paths: ['package.json'] },
+  { stack: 'Python', paths: ['pyproject.toml', 'requirements.txt', 'setup.py'] },
+  { stack: 'Rust', paths: ['Cargo.toml'] },
+  { stack: 'Go', paths: ['go.mod'] },
+  { stack: 'Ruby', paths: ['Gemfile'] },
+  { stack: 'PHP', paths: ['composer.json'] },
+  { stack: 'Java', paths: ['pom.xml', 'build.gradle', 'build.gradle.kts'] },
+  { stack: 'Docker', paths: ['Dockerfile', 'docker-compose.yml', 'compose.yaml'] },
 ];
 
 export function scoutProject(cwd: string): ProjectProfile {
@@ -178,11 +198,14 @@ export function scoutProject(cwd: string): ProjectProfile {
   const md = readme(cwd);
   const entries = new Set(listNames(cwd));
 
-  const pythonDeps = `${readText(join(cwd, "requirements.txt")) ?? ""}\n${readText(join(cwd, "pyproject.toml")) ?? ""}`.toLowerCase();
-  const hasDep = (dep: string) => pkg.deps.has(dep) || (pythonDeps.length > 1 && pythonDeps.includes(dep));
+  const pythonDeps =
+    `${readText(join(cwd, 'requirements.txt')) ?? ''}\n${readText(join(cwd, 'pyproject.toml')) ?? ''}`.toLowerCase();
+  const hasDep = (dep: string) =>
+    pkg.deps.has(dep) || (pythonDeps.length > 1 && pythonDeps.includes(dep));
 
   const pathEvidence = (path: string): string | null => {
-    if (path.includes("/")) return isDir(join(cwd, path)) && listNames(join(cwd, path)).length > 0 ? `${path}/` : null;
+    if (path.includes('/'))
+      return isDir(join(cwd, path)) && listNames(join(cwd, path)).length > 0 ? `${path}/` : null;
     if (entries.has(path)) return isDir(join(cwd, path)) ? `${path}/` : path;
     return null;
   };
@@ -195,9 +218,9 @@ export function scoutProject(cwd: string): ProjectProfile {
       const found = pathEvidence(path);
       if (found) evidence.push(found);
     }
-    if (detector.role === "docs" && evidence.length > 0) {
-      const hasMkdocs = evidence.includes("mkdocs.yml");
-      const hasMarkdown = listNames(join(cwd, "docs")).some((name) => name.endsWith(".md"));
+    if (detector.role === 'docs' && evidence.length > 0) {
+      const hasMkdocs = evidence.includes('mkdocs.yml');
+      const hasMarkdown = listNames(join(cwd, 'docs')).some((name) => name.endsWith('.md'));
       if (!hasMkdocs && !hasMarkdown) continue;
     }
     if (evidence.length > 0) signals.push({ role: detector.role, evidence: evidence.slice(0, 6) });
@@ -212,7 +235,7 @@ export function scoutProject(cwd: string): ProjectProfile {
 
   return {
     name: (md.title ?? pkg.name ?? basename(cwd)).slice(0, 100),
-    summary: (md.summary ?? pkg.description ?? "").slice(0, 1_000),
+    summary: (md.summary ?? pkg.description ?? '').slice(0, 1_000),
     stacks,
     signals,
   };
@@ -226,77 +249,77 @@ interface RoleTemplate {
 }
 
 const stackLine = (profile: ProjectProfile) =>
-  profile.stacks.length > 0 ? ` The stack: ${profile.stacks.join(", ")}.` : "";
+  profile.stacks.length > 0 ? ` The stack: ${profile.stacks.join(', ')}.` : '';
 
 const ROLE_TEMPLATES: Record<ScoutRole, RoleTemplate> = {
   frontend: {
-    name: "Pixel",
-    title: "Frontend Builder",
-    color: "pink",
+    name: 'Pixel',
+    title: 'Frontend Builder',
+    color: 'pink',
     describe: (profile, evidence) =>
-      `You build and refine the user interface of ${profile.name}.${stackLine(profile)} Your turf shows up as ${evidence.join(", ")}. Keep changes small, match the existing component patterns, and check what you built actually renders before calling it done.`,
+      `You build and refine the user interface of ${profile.name}.${stackLine(profile)} Your turf shows up as ${evidence.join(', ')}. Keep changes small, match the existing component patterns, and check what you built actually renders before calling it done.`,
   },
   backend: {
-    name: "Forge",
-    title: "Backend Builder",
-    color: "blue",
+    name: 'Forge',
+    title: 'Backend Builder',
+    color: 'blue',
     describe: (profile, evidence) =>
-      `You own the server side of ${profile.name}: endpoints, business logic, and the contracts the frontend relies on.${stackLine(profile)} Your turf shows up as ${evidence.join(", ")}. Change behavior only alongside the tests that prove it.`,
+      `You own the server side of ${profile.name}: endpoints, business logic, and the contracts the frontend relies on.${stackLine(profile)} Your turf shows up as ${evidence.join(', ')}. Change behavior only alongside the tests that prove it.`,
   },
   mobile: {
-    name: "Pocket",
-    title: "Mobile Builder",
-    color: "coral",
+    name: 'Pocket',
+    title: 'Mobile Builder',
+    color: 'coral',
     describe: (profile, evidence) =>
-      `You keep ${profile.name} working on phones: screens, navigation, and platform quirks.${stackLine(profile)} Your turf shows up as ${evidence.join(", ")}. Test on both platforms before declaring victory.`,
+      `You keep ${profile.name} working on phones: screens, navigation, and platform quirks.${stackLine(profile)} Your turf shows up as ${evidence.join(', ')}. Test on both platforms before declaring victory.`,
   },
   data: {
-    name: "Schema",
-    title: "Data Engineer",
-    color: "teal",
+    name: 'Schema',
+    title: 'Data Engineer',
+    color: 'teal',
     describe: (profile, evidence) =>
-      `You own the data layer of ${profile.name}: models, migrations, and query performance.${stackLine(profile)} Your turf shows up as ${evidence.join(", ")}. Every migration ships with its rollback story.`,
+      `You own the data layer of ${profile.name}: models, migrations, and query performance.${stackLine(profile)} Your turf shows up as ${evidence.join(', ')}. Every migration ships with its rollback story.`,
   },
   testing: {
-    name: "Probe",
-    title: "Test Engineer",
-    color: "green",
+    name: 'Probe',
+    title: 'Test Engineer',
+    color: 'green',
     describe: (profile, evidence) =>
-      `You guard ${profile.name} with tests: you reproduce bugs before they are fixed and extend coverage where changes land.${stackLine(profile)} Your turf shows up as ${evidence.join(", ")}. A red test you wrote is worth more than a green suite nobody trusts.`,
+      `You guard ${profile.name} with tests: you reproduce bugs before they are fixed and extend coverage where changes land.${stackLine(profile)} Your turf shows up as ${evidence.join(', ')}. A red test you wrote is worth more than a green suite nobody trusts.`,
   },
   infra: {
-    name: "Anchor",
-    title: "Infra & CI",
-    color: "orange",
+    name: 'Anchor',
+    title: 'Infra & CI',
+    color: 'orange',
     describe: (profile, evidence) =>
-      `You keep ${profile.name} buildable, shippable, and observable: CI, containers, and deploy paths.${stackLine(profile)} Your turf shows up as ${evidence.join(", ")}. Prefer boring, reproducible steps over clever ones.`,
+      `You keep ${profile.name} buildable, shippable, and observable: CI, containers, and deploy paths.${stackLine(profile)} Your turf shows up as ${evidence.join(', ')}. Prefer boring, reproducible steps over clever ones.`,
   },
   docs: {
-    name: "Quill",
-    title: "Docs Writer",
-    color: "purple",
+    name: 'Quill',
+    title: 'Docs Writer',
+    color: 'purple',
     describe: (profile, evidence) =>
-      `You keep the documentation of ${profile.name} truthful and current.${stackLine(profile)} Your turf shows up as ${evidence.join(", ")}. When code and docs disagree, you chase down which one is lying.`,
+      `You keep the documentation of ${profile.name} truthful and current.${stackLine(profile)} Your turf shows up as ${evidence.join(', ')}. When code and docs disagree, you chase down which one is lying.`,
   },
 };
 
 const LEAD: RoleTemplate = {
-  name: "Compass",
-  title: "Project Lead",
-  color: "yellow",
+  name: 'Compass',
+  title: 'Project Lead',
+  color: 'yellow',
   describe: (profile) =>
-    `You coordinate work on ${profile.name}: break briefs into tasks for the team, keep the room's bulletin current, and review results before they count as done.${stackLine(profile)}${profile.summary ? ` The project, in its own words: ${profile.summary}` : ""}`,
+    `You coordinate work on ${profile.name}: break briefs into tasks for the team, keep the room's bulletin current, and review results before they count as done.${stackLine(profile)}${profile.summary ? ` The project, in its own words: ${profile.summary}` : ''}`,
 };
 
 const MAX_SUGGESTED_SPECIALISTS = 5;
 
 export function suggestTeam(profile: ProjectProfile): TeamSuggestion {
   const reasons: Record<string, string> = {
-    lead: "Every project room needs one member who briefs, splits, and reviews.",
+    lead: 'Every project room needs one member who briefs, splits, and reviews.',
   };
   const members: TeamManifestMember[] = [
     {
-      key: "lead",
+      key: 'lead',
       name: LEAD.name,
       title: LEAD.title,
       description: LEAD.describe(profile, []),
@@ -312,17 +335,17 @@ export function suggestTeam(profile: ProjectProfile): TeamSuggestion {
       description: template.describe(profile, signal.evidence),
       appearance: { color: template.color },
     });
-    reasons[signal.role] = `Detected via ${signal.evidence.join(", ")}.`;
+    reasons[signal.role] = `Detected via ${signal.evidence.join(', ')}.`;
   }
   if (members.length === 1) {
     members.push({
-      key: "builder",
-      name: "Wrench",
-      title: "Builder",
+      key: 'builder',
+      name: 'Wrench',
+      title: 'Builder',
       description: `You do the hands-on work in ${profile.name}: read the folder, make the change, show the result.${stackLine(profile)}`,
-      appearance: { color: "blue" },
+      appearance: { color: 'blue' },
     });
-    reasons.builder = "No specific stack detected — a generalist covers the ground.";
+    reasons.builder = 'No specific stack detected — a generalist covers the ground.';
   }
 
   const manifest: TeamManifestV2 = {

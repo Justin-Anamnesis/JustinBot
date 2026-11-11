@@ -1,19 +1,19 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from 'react';
 
 /** Same length as `--animate-pop-in` in styles.css. */
 export const MENU_MOTION_MS = 200;
 
 function reducedMotion(): boolean {
-  if (typeof document === "undefined") return false;
-  if (document.documentElement.dataset.reducedMotion === "true") return true;
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (typeof document === 'undefined') return false;
+  if (document.documentElement.dataset.reducedMotion === 'true') return true;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
 export interface MenuMotion {
   shown: boolean;
   closing: boolean;
   className: string;
-  exitProps: { inert?: boolean; "aria-hidden"?: boolean };
+  exitProps: { inert?: boolean; 'aria-hidden'?: boolean };
 }
 
 export function useMenuMotion(open: boolean): MenuMotion {
@@ -39,8 +39,8 @@ export function useMenuMotion(open: boolean): MenuMotion {
   return {
     shown: open || mounted,
     closing,
-    className: closing ? "animate-pop-out pointer-events-none" : "animate-pop-in",
-    exitProps: closing ? { inert: true, "aria-hidden": true } : {},
+    className: closing ? 'animate-pop-out pointer-events-none' : 'animate-pop-in',
+    exitProps: closing ? { inert: true, 'aria-hidden': true } : {},
   };
 }
 

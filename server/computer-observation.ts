@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 
 export interface ObservationMetrics {
   screenshotsCaptured: number;
@@ -48,10 +48,8 @@ export class ObservationCoordinator {
    * returned to the model is cropped. A boat-provided full-frame hash works. */
   observeFrame(canonicalFrame: string | null, crop: CropRegion | null) {
     this.metrics.screenshotsCaptured += 1;
-    const hash = canonicalFrame
-      ? createHash("sha256").update(canonicalFrame).digest("hex")
-      : null;
-    const view = crop ? `${crop.x},${crop.y},${crop.width},${crop.height}` : "full";
+    const hash = canonicalFrame ? createHash('sha256').update(canonicalFrame).digest('hex') : null;
+    const view = crop ? `${crop.x},${crop.y},${crop.width},${crop.height}` : 'full';
     const signature = hash ? `${hash}:${view}` : null;
     // No full-frame hash: fail open and send the image; suppressing a possibly new crop would be worse.
     const changed = signature === null || signature !== this.lastObservation;

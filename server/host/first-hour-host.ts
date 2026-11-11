@@ -1,16 +1,22 @@
 // Wires a new Cloud's first hour into the server (server/host/README.md): the counts every personal Cloud keeps, the
 // hooks the brief and the read-and-draft fence call before the first hour exists, and the first hour itself once its
 // Chief and services are up.
-import { CLOUD_WELCOME_DONE } from "../../shared/cloud-hints.ts";
-import type { Notification } from "../../shared/notification.ts";
-import type { RuntimeEvent } from "../../shared/runtime-events.ts";
-import type { AppConfig } from "../config.ts";
-import type { RoutineManager } from "../routines.ts";
-import type { BotRecord, Store } from "../store.ts";
-import { createFirstHour, LOOK_APPS, type FirstHour, type FirstHourDeps, type LookApp } from "./first-hour.ts";
-import type { Proactive } from "./proactive.ts";
-import { proactiveOwner } from "./proactive-owner.ts";
-import { createValueLedger, valueReport, type ValueKind } from "./value-ledger.ts";
+import { CLOUD_WELCOME_DONE } from '../../shared/cloud-hints.ts';
+import type { Notification } from '../../shared/notification.ts';
+import type { RuntimeEvent } from '../../shared/runtime-events.ts';
+import type { AppConfig } from '../config.ts';
+import type { RoutineManager } from '../routines.ts';
+import type { BotRecord, Store } from '../store.ts';
+import {
+  createFirstHour,
+  LOOK_APPS,
+  type FirstHour,
+  type FirstHourDeps,
+  type LookApp,
+} from './first-hour.ts';
+import type { Proactive } from './proactive.ts';
+import { proactiveOwner } from './proactive-owner.ts';
+import { createValueLedger, valueReport, type ValueKind } from './value-ledger.ts';
 
 /** Made before the proactive Chief, on a personal Cloud: the first hour attaches to it later. */
 export function createFirstHourHooks(options: { dataDir: string; personal: boolean }) {
@@ -25,16 +31,21 @@ export function createFirstHourHooks(options: { dataDir: string; personal: boole
       morning: {
         at: () => current?.morningAt(),
         push: (summary: string) => current?.morningPush(summary) ?? summary,
-        overnight: (since: number) => (ledger ? current?.overnight(ledger.since(since)) : undefined),
+        overnight: (since: number) =>
+          ledger ? current?.overnight(ledger.since(since)) : undefined,
       },
     },
-    attach(firstHour: FirstHour): void { current = firstHour; },
+    attach(firstHour: FirstHour): void {
+      current = firstHour;
+    },
     /** The first day's words for the Chief's own chat, or nothing. */
-    prompt: (botId: string, threadId: string): string => current?.prompt(botId, threadId) ?? "",
+    prompt: (botId: string, threadId: string): string => current?.prompt(botId, threadId) ?? '',
     arrived: (): void => current?.arrived(),
     health: () => ({
       ...(current?.health() ? { firstHour: current.health() } : {}),
-      ...(ledger ? { value: valueReport(current?.tally() ?? { ...ledger.totals(), routines: 0 }) } : {}),
+      ...(ledger
+        ? { value: valueReport(current?.tally() ?? { ...ledger.totals(), routines: 0 }) }
+        : {}),
     }),
   };
 }
@@ -49,7 +60,7 @@ export interface FirstHourHostDeps {
   bus: { subscribe(listener: (event: RuntimeEvent) => void): unknown };
   cfg: AppConfig;
   dataDir: string;
-  proactive: Pick<Proactive, "brief">;
+  proactive: Pick<Proactive, 'brief'>;
   /** The brief is on: the proactive bot's briefing routine. */
   briefOn(): boolean;
   ensureBrief(): void;
@@ -58,12 +69,14 @@ export interface FirstHourHostDeps {
     connectedServices(cfg: AppConfig): Promise<Record<string, { connected: boolean }>>;
     toolkitCard(cfg: AppConfig, slug: string): Promise<{ label: string; blurb?: string }>;
   };
-  sessions: { list(): ReadonlyArray<{ owner?: string; email?: string; scopes: readonly string[] }> };
+  sessions: {
+    list(): ReadonlyArray<{ owner?: string; email?: string; scopes: readonly string[] }>;
+  };
   phones(): number;
   routines(): RoutineManager | null;
   mainThread(botId: string): string | undefined;
   threadBusy(botId: string, threadId: string): boolean;
-  startTurn: FirstHourDeps["startTurn"];
+  startTurn: FirstHourDeps['startTurn'];
   notify(notification: Notification | null): void;
   wrote(bot: BotRecord, threadId: string): void;
   welcomeDone(): void;
@@ -76,12 +89,16 @@ export function startFirstHour(deps: FirstHourHostDeps): FirstHour | null {
   if (!deps.hooks.ledger) return null;
   const { store, cfg, composio } = deps;
   const firstHour = createFirstHour({
-    store, dataDir: deps.dataDir,
+    store,
+    dataDir: deps.dataDir,
     chief: () => proactiveOwner(store),
-    mainThread: deps.mainThread, threadBusy: deps.threadBusy,
+    mainThread: deps.mainThread,
+    threadBusy: deps.threadBusy,
     person: () => {
       const name = cfg.profile?.name?.trim();
-      const email = deps.sessions.list().find((session) => session.scopes.includes("admin") && session.owner)?.owner;
+      const email = deps.sessions
+        .list()
+        .find((session) => session.scopes.includes('admin') && session.owner)?.owner;
       return { ...(name ? { name } : {}), ...(email ? { email } : {}) };
     },
     language: () => deps.proactive.brief.language(),
@@ -91,18 +108,33 @@ export function startFirstHour(deps: FirstHourHostDeps): FirstHour | null {
       connected: async () => {
         if (!composio.configured(cfg)) return null;
         const services = await composio.connectedServices(cfg);
-        return Object.fromEntries(LOOK_APPS.map((app) => [app, services[app]?.connected === true])) as Record<LookApp, boolean>;
+        return Object.fromEntries(
+          LOOK_APPS.map((app) => [app, services[app]?.connected === true]),
+        ) as Record<LookApp, boolean>;
       },
       card: async (slug) => {
         const card = await composio.toolkitCard(cfg, slug);
-        return { label: card.label, description: card.blurb ?? "" };
+        return { label: card.label, description: card.blurb ?? '' };
       },
     },
     briefOn: deps.briefOn,
     ensureBrief: deps.ensureBrief,
     phones: deps.phones,
     startTurn: deps.startTurn,
-    notify: (bot, threadId, body) => deps.notify(bot.notifications === false ? null : { kind: "brief", botId: bot.id, botName: bot.name, threadId, title: bot.name, body, ...(bot.avatarUrl ? { avatarUrl: bot.avatarUrl } : {}) }),
+    notify: (bot, threadId, body) =>
+      deps.notify(
+        bot.notifications === false
+          ? null
+          : {
+              kind: 'brief',
+              botId: bot.id,
+              botName: bot.name,
+              threadId,
+              title: bot.name,
+              body,
+              ...(bot.avatarUrl ? { avatarUrl: bot.avatarUrl } : {}),
+            },
+      ),
     wrote: deps.wrote,
     welcomeDone: deps.welcomeDone,
     runs: () => deps.routines()?.listRuns() ?? [],
@@ -112,17 +144,22 @@ export function startFirstHour(deps: FirstHourHostDeps): FirstHour | null {
   if (!firstHour.active()) return null;
   deps.hooks.attach(firstHour);
   store.onChange((change) => {
-    if (change.type === "message") firstHour.message(change.threadId, change.message);
-    else if (change.type === "message.patch") firstHour.patched(change.threadId, change.message);
+    if (change.type === 'message') firstHour.message(change.threadId, change.message);
+    else if (change.type === 'message.patch') firstHour.patched(change.threadId, change.message);
   });
   deps.bus.subscribe((event) => {
-    if (event.type === "turn.completed" && !deps.stale(event)) firstHour.turnCompleted(event.threadId, event.ok);
+    if (event.type === 'turn.completed' && !deps.stale(event))
+      firstHour.turnCompleted(event.threadId, event.ok);
   });
   firstHour.start();
   return firstHour;
 }
 
 /** The config patch that ends a new Cloud's welcome steps: it opens on its Chief's chat. */
-export function welcomeDonePatch(onboarding: AppConfig["onboarding"]): { onboarding: { hintsSeen: string[] } } {
-  return { onboarding: { hintsSeen: [...new Set([...(onboarding?.hintsSeen ?? []), CLOUD_WELCOME_DONE])] } };
+export function welcomeDonePatch(onboarding: AppConfig['onboarding']): {
+  onboarding: { hintsSeen: string[] };
+} {
+  return {
+    onboarding: { hintsSeen: [...new Set([...(onboarding?.hintsSeen ?? []), CLOUD_WELCOME_DONE])] },
+  };
 }

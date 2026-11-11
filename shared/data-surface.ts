@@ -2,7 +2,13 @@
 // DuckDB runs in the OMB server, one database per bot.
 
 /** The five tools a bot gets, in the order the catalog lists them. */
-export const DATA_TOOL_NAMES = ["data_load", "data_describe", "data_sql", "data_show", "data_export"] as const;
+export const DATA_TOOL_NAMES = [
+  'data_load',
+  'data_describe',
+  'data_sql',
+  'data_show',
+  'data_export',
+] as const;
 export type DataToolName = (typeof DATA_TOOL_NAMES)[number];
 
 /** Bounds. Every result is capped by rows AND bytes; the gate's own trimming
@@ -33,21 +39,21 @@ export const DATA_LIMITS = {
 
 /** Where materialised results live inside a bot's database. DuckDB temp tables
  * are per connection; a real schema is visible to both and survives a restart. */
-export const DATA_RESULTS_SCHEMA = "omb_results";
+export const DATA_RESULTS_SCHEMA = 'omb_results';
 
 export type DataErrorCode =
-  | "invalid_input"
-  | "source_not_found"
-  | "source_unsupported"
-  | "sql_error"
-  | "write_refused"
-  | "table_not_found"
-  | "spec_invalid"
-  | "card_not_found"
-  | "output_too_large"
-  | "timeout"
-  | "cancelled"
-  | "engine_unavailable";
+  | 'invalid_input'
+  | 'source_not_found'
+  | 'source_unsupported'
+  | 'sql_error'
+  | 'write_refused'
+  | 'table_not_found'
+  | 'spec_invalid'
+  | 'card_not_found'
+  | 'output_too_large'
+  | 'timeout'
+  | 'cancelled'
+  | 'engine_unavailable';
 
 /** The structured failure every tool and route returns. `line` is DuckDB's
  * own 1-based line in `sql`; `message` is DuckDB's text, never reworded. */
@@ -88,7 +94,19 @@ export interface DataSource {
   name: string;
   /** A quoted identifier ready to paste into SQL; name remains the source identity. */
   sqlName?: string;
-  kind: "csv" | "parquet" | "json" | "xlsx" | "folder" | "url" | "postgres" | "mysql" | "sqlite" | "gsheet" | "connector" | "sql";
+  kind:
+    | 'csv'
+    | 'parquet'
+    | 'json'
+    | 'xlsx'
+    | 'folder'
+    | 'url'
+    | 'postgres'
+    | 'mysql'
+    | 'sqlite'
+    | 'gsheet'
+    | 'connector'
+    | 'sql';
   /** The path, URL or connection the table came from, with credentials removed. */
   source: string;
   options?: Record<string, string | number | boolean>;
@@ -101,7 +119,7 @@ export interface DataSource {
  * compiles it to SQL (with the reduction) and to Vega-Lite, so the model
  * never writes a chart grammar. */
 export interface OmbChartSpec {
-  type: "bar" | "line" | "area" | "scatter" | "histogram" | "pie" | "heatmap";
+  type: 'bar' | 'line' | 'area' | 'scatter' | 'histogram' | 'pie' | 'heatmap';
   /** Column for the x axis (the category, the time, or the value to bin). */
   x: string;
   /** Column for the y axis. Absent means count. */
@@ -109,14 +127,14 @@ export interface OmbChartSpec {
   /** Column to colour by (series, stack segments, heatmap cells). */
   color?: string;
   /** How y is aggregated per x (and colour). Default: sum when y is set, else count. */
-  agg?: "count" | "sum" | "avg" | "min" | "max" | "median";
+  agg?: 'count' | 'sum' | 'avg' | 'min' | 'max' | 'median';
   /** Order of categories. Default: by x. */
-  sort?: "x" | "-x" | "y" | "-y";
+  sort?: 'x' | '-x' | 'y' | '-y';
   /** Categories to keep (the rest fold into "other"). Default 20 for categorical x. */
   limit?: number;
   stack?: boolean;
   /** Bucket a date or timestamp x. Default: chosen from the x range. */
-  timeUnit?: "hour" | "day" | "week" | "month" | "quarter" | "year";
+  timeUnit?: 'hour' | 'day' | 'week' | 'month' | 'quarter' | 'year';
   /** Histogram bins. Default 30. */
   bins?: number;
   /** Column for mark size (scatter). */
@@ -125,13 +143,13 @@ export interface OmbChartSpec {
 
 /** How the compiler shrank the data before charting, shown on the card. */
 export interface DataReduction {
-  method: "group" | "bins" | "topN" | "timeBucket" | "m4" | "sample" | "none";
+  method: 'group' | 'bins' | 'topN' | 'timeBucket' | 'm4' | 'sample' | 'none';
   inputRows: number;
   outputRows: number;
   note?: string;
 }
 
-export type DataCardKind = "table" | "chart" | "text";
+export type DataCardKind = 'table' | 'chart' | 'text';
 
 /** One card on the sheet. The SQL is always kept so Refresh re-runs it; the
  * result table is `${DATA_RESULTS_SCHEMA}.${result}` while it exists. */
@@ -153,10 +171,10 @@ export interface DataCard {
   reduction?: DataReduction;
   /** Text cards: Markdown. */
   text?: string;
-  status: "running" | "ready" | "failed";
+  status: 'running' | 'ready' | 'failed';
   error?: DataError;
   /** Who made or last changed it: the bot (tool) or the person (panel). */
-  by: "bot" | "person";
+  by: 'bot' | 'person';
   pinned?: boolean;
   createdAt: string;
   updatedAt: string;
@@ -175,7 +193,7 @@ export interface DataSheet {
 /** Server → client. One message carries the whole sheet (sheets hold no rows).
  * The database's catalog is not on it: GET /api/bots/:id/data reads it fresh. */
 export interface DataBroadcast {
-  kind: "data";
+  kind: 'data';
   botId: string;
   sheet: DataSheet;
 }
@@ -188,7 +206,7 @@ export interface DataPageRequest {
   cardId?: string;
   offset: number;
   limit: number;
-  sort?: { column: string; direction: "asc" | "desc" };
+  sort?: { column: string; direction: 'asc' | 'desc' };
   /** Case-insensitive literal text matching, across all columns unless filterColumn is set. */
   filter?: string;
   /** Exact column name to search; values are cast to text. */
@@ -228,7 +246,7 @@ export interface DataHistogram {
   bins: Array<{ label: string; count: number }>;
 }
 
-export type DataExportFormat = "csv" | "parquet" | "xlsx" | "png" | "svg";
+export type DataExportFormat = 'csv' | 'parquet' | 'xlsx' | 'png' | 'svg';
 
 export interface DataExportRequest {
   cardId?: string;
@@ -241,14 +259,17 @@ export const DATA_ROUTES = {
   page: (botId: string) => `/api/bots/${encodeURIComponent(botId)}/data/page`,
   run: (botId: string) => `/api/bots/${encodeURIComponent(botId)}/data/run`,
   cancel: (botId: string) => `/api/bots/${encodeURIComponent(botId)}/data/cancel`,
-  card: (botId: string, cardId: string) => `/api/bots/${encodeURIComponent(botId)}/data/cards/${encodeURIComponent(cardId)}`,
-  stats: (botId: string, table: string) => `/api/bots/${encodeURIComponent(botId)}/data/tables/${encodeURIComponent(table)}/stats`,
+  card: (botId: string, cardId: string) =>
+    `/api/bots/${encodeURIComponent(botId)}/data/cards/${encodeURIComponent(cardId)}`,
+  stats: (botId: string, table: string) =>
+    `/api/bots/${encodeURIComponent(botId)}/data/tables/${encodeURIComponent(table)}/stats`,
   histogram: (botId: string, table: string, column: string) =>
     `/api/bots/${encodeURIComponent(botId)}/data/tables/${encodeURIComponent(table)}/histogram?column=${encodeURIComponent(column)}`,
   export: (botId: string) => `/api/bots/${encodeURIComponent(botId)}/data/export`,
   /** Server-rendered chart image for phones, Slack and email. */
-  image: (botId: string, cardId: string) => `/api/bots/${encodeURIComponent(botId)}/data/cards/${encodeURIComponent(cardId)}/image`,
+  image: (botId: string, cardId: string) =>
+    `/api/bots/${encodeURIComponent(botId)}/data/cards/${encodeURIComponent(cardId)}/image`,
 } as const;
 
 /** The tab's id in the Computer panel and the storage key suffix. */
-export const DATA_PANEL_VIEW = "data" as const;
+export const DATA_PANEL_VIEW = 'data' as const;

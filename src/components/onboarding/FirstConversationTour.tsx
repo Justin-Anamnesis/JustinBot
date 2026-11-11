@@ -1,18 +1,36 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { hintSeenPatch, welcomeDue } from "@/lib/onboarding";
-import { useAdvancedMode } from "@/lib/interface-mode";
-import { emailGateDone } from "@/lib/analytics";
-import { anchorFor, cardAnswered, nextSpotlight, placementFor, tourComplete, type ChatObservation, type SpotlightId } from "@/lib/first-conversation";
-import { t } from "@/lib/i18n";
-import type { MausState } from "@/lib/mascot";
-import { api, useStore } from "@/state/store";
-import { Spotlight } from "./Spotlight";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { hintSeenPatch, welcomeDue } from '@/lib/onboarding';
+import { useAdvancedMode } from '@/lib/interface-mode';
+import { emailGateDone } from '@/lib/analytics';
+import {
+  anchorFor,
+  cardAnswered,
+  nextSpotlight,
+  placementFor,
+  tourComplete,
+  type ChatObservation,
+  type SpotlightId,
+} from '@/lib/first-conversation';
+import { t } from '@/lib/i18n';
+import type { MausState } from '@/lib/mascot';
+import { api, useStore } from '@/state/store';
+import { Spotlight } from './Spotlight';
 
-const COPY: Record<SpotlightId, { key: "onboarding.spot.composer" | "onboarding.spot.model" | "onboarding.spot.approval" | "onboarding.spot.connector"; mascot: MausState }> = {
-  "spot.composer": { key: "onboarding.spot.composer", mascot: "happy" },
-  "spot.model": { key: "onboarding.spot.model", mascot: "curious" },
-  "spot.approval": { key: "onboarding.spot.approval", mascot: "suspicious" },
-  "spot.connector": { key: "onboarding.spot.connector", mascot: "curious" },
+const COPY: Record<
+  SpotlightId,
+  {
+    key:
+      | 'onboarding.spot.composer'
+      | 'onboarding.spot.model'
+      | 'onboarding.spot.approval'
+      | 'onboarding.spot.connector';
+    mascot: MausState;
+  }
+> = {
+  'spot.composer': { key: 'onboarding.spot.composer', mascot: 'happy' },
+  'spot.model': { key: 'onboarding.spot.model', mascot: 'curious' },
+  'spot.approval': { key: 'onboarding.spot.approval', mascot: 'suspicious' },
+  'spot.connector': { key: 'onboarding.spot.connector', mascot: 'curious' },
 };
 
 /** Spotlights on the first chat, in Advanced mode only: Simple mode's cards carry a one-line hint instead. */
@@ -22,7 +40,10 @@ export function FirstConversationTour({ quiet = false }: { quiet?: boolean }) {
   const remoteClient = window.ogb?.remoteClient?.active === true;
   const record = state.config?.onboarding;
   const [dismissed, setDismissed] = useState<string[]>([]);
-  const seen = useMemo(() => [...(record?.hintsSeen ?? []), ...dismissed, "spot.composer", "spot.model"], [record?.hintsSeen, dismissed]);
+  const seen = useMemo(
+    () => [...(record?.hintsSeen ?? []), ...dismissed, 'spot.composer', 'spot.model'],
+    [record?.hintsSeen, dismissed],
+  );
   const [active, setActive] = useState<SpotlightId | null>(null);
   const [replyFinished, setReplyFinished] = useState(false);
   const sawBusy = useRef(false);
@@ -49,10 +70,23 @@ export function FirstConversationTour({ quiet = false }: { quiet?: boolean }) {
     replyStarted: busy,
     replyFinished,
     approvalVisible: Boolean(
-      bot?.messages.some((m) => m.kind === "options" && m.card?.requestId && m.card.tool && !m.card.answered && !m.card.dismissed),
+      bot?.messages.some(
+        (m) =>
+          m.kind === 'options' &&
+          m.card?.requestId &&
+          m.card.tool &&
+          !m.card.answered &&
+          !m.card.dismissed,
+      ),
     ),
     connectorVisible: Boolean(
-      bot?.messages.some((m) => m.kind === "connector" && m.connector && !m.connector.dismissed && m.connector.status !== "connected"),
+      bot?.messages.some(
+        (m) =>
+          m.kind === 'connector' &&
+          m.connector &&
+          !m.connector.dismissed &&
+          m.connector.status !== 'connected',
+      ),
     ),
   };
 
@@ -63,8 +97,8 @@ export function FirstConversationTour({ quiet = false }: { quiet?: boolean }) {
     setActive(null);
     const patch = hintSeenPatch(record, id);
     if (!patch) return;
-    void api("/api/config", { method: "PUT", body: JSON.stringify(patch) })
-      .then((config) => dispatch({ type: "configStatus", config }))
+    void api('/api/config', { method: 'PUT', body: JSON.stringify(patch) })
+      .then((config) => dispatch({ type: 'configStatus', config }))
       .catch(() => {});
   }, [active, record, dispatch]);
 
@@ -76,8 +110,18 @@ export function FirstConversationTour({ quiet = false }: { quiet?: boolean }) {
     }
     const next = nextSpotlight(observation, seen, active);
     if (next !== active) setActive(next);
+    // prettier-ignore
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [eligible, seen, active, dismiss, observation.replyStarted, observation.replyFinished, observation.approvalVisible, observation.connectorVisible]);
+  }, [
+    eligible,
+    seen,
+    active,
+    dismiss,
+    observation.replyStarted,
+    observation.replyFinished,
+    observation.approvalVisible,
+    observation.connectorVisible,
+  ]);
 
   if (!eligible || !active || !bot || cardAnswered(active, observation)) return null;
   const copy = COPY[active];
@@ -87,9 +131,8 @@ export function FirstConversationTour({ quiet = false }: { quiet?: boolean }) {
       anchor={anchorFor(active)}
       placement={placementFor(active)}
       mascot={copy.mascot}
-      primary={{ label: t("onboarding.spot.gotIt"), onClick: dismiss }}
-      onDone={dismiss}
-    >
+      primary={{ label: t('onboarding.spot.gotIt'), onClick: dismiss }}
+      onDone={dismiss}>
       {t(copy.key)}
     </Spotlight>
   );

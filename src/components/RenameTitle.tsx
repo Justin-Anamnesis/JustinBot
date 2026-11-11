@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { t } from "@/lib/i18n";
-import { Pencil } from "lucide-react";
+import { useEffect, useRef, useState } from 'react';
+import { t } from '@/lib/i18n';
+import { Pencil } from 'lucide-react';
 
-import { nextRename } from "@/lib/rename";
-import { cn } from "@/lib/cn";
-import { BOT_PROFILE_LIMITS } from "../../shared/bot-profile";
+import { nextRename } from '@/lib/rename';
+import { cn } from '@/lib/cn';
+import { BOT_PROFILE_LIMITS } from '../../shared/bot-profile';
 
 export function RenameTitle({
   value,
@@ -63,24 +63,24 @@ export function RenameTitle({
         autoFocus
         value={draft}
         maxLength={BOT_PROFILE_LIMITS.name}
-        aria-label={t("rename.aria")}
+        aria-label={t('rename.aria')}
         onFocus={(event) => event.currentTarget.select()}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={() => finish(true)}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
-          if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+          if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
             event.preventDefault();
             event.stopPropagation();
             finish(true);
           }
-          if (event.key === "Escape") {
+          if (event.key === 'Escape') {
             event.preventDefault();
             event.stopPropagation();
             finish(false);
           }
         }}
-        className={cn("min-w-0 bg-transparent text-ink focus:outline-none", inputClassName)}
+        className={cn('min-w-0 bg-transparent text-ink focus:outline-none', inputClassName)}
       />
     );
   }
@@ -94,27 +94,28 @@ export function RenameTitle({
 
   if (showEditButton) {
     return (
-      <span className="flex min-w-0 items-center gap-0.5">
+      <span className='flex min-w-0 items-center gap-0.5'>
         {onActivate ? (
           <button
-            type="button"
+            type='button'
             onClick={onActivate}
-            aria-label={t("chat.openProfileAria", { name: value })}
-            className={cn("min-w-0 truncate text-left", className)}
-            title={t("chat.openProfile")}
-          >
+            aria-label={t('chat.openProfileAria', { name: value })}
+            className={cn('min-w-0 truncate text-left', className)}
+            title={t('chat.openProfile')}>
             {value}
           </button>
         ) : (
-          <span className={cn("min-w-0 truncate", className)}>{value}</span>
+          <span className={cn('min-w-0 truncate', className)}>{value}</span>
         )}
         <button
-          type="button"
+          type='button'
           onClick={startRename}
-          aria-label={t("rename.named", { name: value })}
-          title={t("rename.agent")}
-          className={cn("flex size-10 shrink-0 items-center justify-center rounded text-ink-secondary opacity-70 hover:bg-raised hover:text-ink hover:opacity-100", editButtonClassName)}
-        >
+          aria-label={t('rename.named', { name: value })}
+          title={t('rename.agent')}
+          className={cn(
+            'flex size-10 shrink-0 items-center justify-center rounded text-ink-secondary opacity-70 hover:bg-raised hover:text-ink hover:opacity-100',
+            editButtonClassName,
+          )}>
           <Pencil size={12} />
         </button>
       </span>
@@ -123,18 +124,17 @@ export function RenameTitle({
 
   return (
     <span
-      className={cn("cursor-text", className)}
-      title={title ?? t("rename.doubleClick")}
+      className={cn('cursor-text', className)}
+      title={title ?? t('rename.doubleClick')}
       tabIndex={0}
-      role="button"
-      aria-label={t("rename.named", { name: value })}
+      role='button'
+      aria-label={t('rename.named', { name: value })}
       onDoubleClick={startRename}
       onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
+        if (event.key === 'Enter' || event.key === ' ') {
           startRename(event);
         }
-      }}
-    >
+      }}>
       {value}
     </span>
   );

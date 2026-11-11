@@ -1,10 +1,10 @@
-import { z } from "zod";
-import type { EndpointAccount } from "./config";
-import { tunnelActivity, type TunnelActivity } from "./tunnel-activity";
+import { z } from 'zod';
+import type { EndpointAccount } from './config';
+import { tunnelActivity, type TunnelActivity } from './tunnel-activity';
 
-export const MANAGED_COMPANION_ORIGIN_URL = "http://127.0.0.1:8812";
+export const MANAGED_COMPANION_ORIGIN_URL = 'http://127.0.0.1:8812';
 
-const API_BASE = "https://api.cloudflare.com/client/v4/";
+const API_BASE = 'https://api.cloudflare.com/client/v4/';
 const API_TIMEOUT_MS = 5_000;
 const MAX_RESPONSE_BYTES = 512 * 1024;
 
@@ -23,7 +23,7 @@ const tunnelActivityFields = {
 const tunnelSchema = z.object({
   id: z.uuid(),
   name: z.string().min(1).max(256),
-  config_src: z.literal("cloudflare"),
+  config_src: z.literal('cloudflare'),
   deleted_at: z.string().nullable().optional(),
   ...tunnelActivityFields,
 });
@@ -39,12 +39,14 @@ const scannedTunnelSchema = z.object({
   ...tunnelActivityFields,
 });
 
-const resultInfoSchema = z.object({
-  count: z.number().int().min(0).optional(),
-  page: z.number().int().min(0).optional(),
-  per_page: z.number().int().min(0).optional(),
-  total_count: z.number().int().min(0).optional(),
-}).optional();
+const resultInfoSchema = z
+  .object({
+    count: z.number().int().min(0).optional(),
+    page: z.number().int().min(0).optional(),
+    per_page: z.number().int().min(0).optional(),
+    total_count: z.number().int().min(0).optional(),
+  })
+  .optional();
 
 const dnsRecordSchema = z.object({
   id: z.string().min(1).max(64),
@@ -60,10 +62,14 @@ const deleteDNSRecordResultSchema = z.object({
 
 const configurationSchema = z.object({
   config: z.object({
-    ingress: z.array(z.object({
-      hostname: z.string().optional(),
-      service: z.string(),
-    })).min(1),
+    ingress: z
+      .array(
+        z.object({
+          hostname: z.string().optional(),
+          service: z.string(),
+        }),
+      )
+      .min(1),
   }),
 });
 
@@ -72,12 +78,13 @@ const errorEnvelopeSchema = z.object({
   success: z.boolean().optional(),
 });
 
-const connectorTokenSchema = z.string().min(20).max(4_096).regex(/^[\x21-\x7e]+$/);
+const connectorTokenSchema = z
+  .string()
+  .min(20)
+  .max(4_096)
+  .regex(/^[\x21-\x7e]+$/);
 
-export type CloudflareFetch = (
-  input: RequestInfo | URL,
-  init?: RequestInit,
-) => Promise<Response>;
+export type CloudflareFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 export interface CloudflareTunnel {
   /** Connection state, when the provider returned it. */
@@ -112,29 +119,31 @@ export class CloudflareAPIError extends Error {
     public readonly retryAfterSeconds: number | null = null,
   ) {
     super(code);
-    this.name = "CloudflareAPIError";
+    this.name = 'CloudflareAPIError';
   }
 }
 
 /** Cloudflare's refusal to delete a tunnel that still has active connections. */
-const TUNNEL_CONNECTED_PROVIDER_CODE = "cf_api_1022";
+const TUNNEL_CONNECTED_PROVIDER_CODE = 'cf_api_1022';
 /** `deleteTunnel`'s name for it: the tunnel's connector is up. */
-export const TUNNEL_CONNECTED_CODE = "cf_tunnel_connected";
+export const TUNNEL_CONNECTED_CODE = 'cf_tunnel_connected';
 
 function isNotFound(error: unknown): boolean {
-  return error instanceof CloudflareAPIError
-    && (error.status === 404 || error.code === "cf_http_404" || error.code === "cf_api_81044");
+  return (
+    error instanceof CloudflareAPIError &&
+    (error.status === 404 || error.code === 'cf_http_404' || error.code === 'cf_api_81044')
+  );
 }
 
 async function boundedResponseText(response: Response): Promise<string> {
-  const declaredLength = response.headers.get("content-length");
+  const declaredLength = response.headers.get('content-length');
   if (declaredLength !== null) {
     const parsed = Number(declaredLength);
     if (!Number.isSafeInteger(parsed) || parsed < 0 || parsed > MAX_RESPONSE_BYTES) {
-      throw new CloudflareAPIError("cf_invalid_response");
+      throw new CloudflareAPIError('cf_invalid_response');
     }
   }
-  if (!response.body) return "";
+  if (!response.body) return '';
 
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
@@ -146,7 +155,7 @@ async function boundedResponseText(response: Response): Promise<string> {
       length += value.byteLength;
       if (length > MAX_RESPONSE_BYTES) {
         await reader.cancel();
-        throw new CloudflareAPIError("cf_invalid_response");
+        throw new CloudflareAPIError('cf_invalid_response');
       }
       chunks.push(value);
     }
@@ -161,9 +170,9 @@ async function boundedResponseText(response: Response): Promise<string> {
     offset += chunk.byteLength;
   }
   try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
-    throw new CloudflareAPIError("cf_invalid_response");
+    throw new CloudflareAPIError('cf_invalid_response');
   }
 }
 
@@ -181,7 +190,7 @@ function providerErrorCode(value: unknown, status: number): string {
 /** One account's API: its tunnels, and the DNS records of its one zone. */
 export class CloudflareAPI {
   constructor(
-    private readonly config: Pick<EndpointAccount, "accountId" | "apiToken" | "zoneId">,
+    private readonly config: Pick<EndpointAccount, 'accountId' | 'apiToken' | 'zoneId'>,
     private readonly fetcher: CloudflareFetch,
   ) {}
 
@@ -199,12 +208,12 @@ export class CloudflareAPI {
     init: { acceptResultOnlySuccess?: boolean; body?: unknown; method?: string } = {},
   ): Promise<{ result: T; totalCount: number | null }> {
     const headers = new Headers({
-      accept: "application/json",
+      accept: 'application/json',
       authorization: `Bearer ${this.config.apiToken}`,
     });
     let body: string | undefined;
     if (init.body !== undefined) {
-      headers.set("content-type", "application/json");
+      headers.set('content-type', 'application/json');
       body = JSON.stringify(init.body);
     }
 
@@ -217,36 +226,39 @@ export class CloudflareAPI {
       response = await fetcher(new URL(path, API_BASE), {
         body,
         headers,
-        method: init.method ?? "GET",
+        method: init.method ?? 'GET',
         // Workers only implements `follow` and `manual`. Keep redirects manual
         // so the bearer token is never forwarded to a redirect destination;
         // the non-2xx response checks below reject the 3xx response.
-        redirect: "manual",
+        redirect: 'manual',
         signal: AbortSignal.timeout(API_TIMEOUT_MS),
       });
     } catch (error) {
-      if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) {
-        throw new CloudflareAPIError("cf_timeout");
+      if (
+        error instanceof DOMException &&
+        (error.name === 'TimeoutError' || error.name === 'AbortError')
+      ) {
+        throw new CloudflareAPIError('cf_timeout');
       }
-      throw new CloudflareAPIError("cf_network");
+      throw new CloudflareAPIError('cf_network');
     }
 
     if (response.status === 429) {
       // Cloudflare API limits are per user token and shared by every request
       // this Worker makes. A distinct code lets the cron stop early.
-      const retryAfter = response.headers.get("retry-after")?.trim() ?? "";
+      const retryAfter = response.headers.get('retry-after')?.trim() ?? '';
       await response.body?.cancel();
       throw new CloudflareAPIError(
-        "cf_rate_limited",
+        'cf_rate_limited',
         429,
         /^[0-9]{1,6}$/.test(retryAfter) ? Number(retryAfter) : null,
       );
     }
 
-    const mediaType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
-    if (mediaType !== "application/json") {
+    const mediaType = response.headers.get('content-type')?.split(';', 1)[0].trim().toLowerCase();
+    if (mediaType !== 'application/json') {
       if (!response.ok) throw new CloudflareAPIError(`cf_http_${response.status}`, response.status);
-      throw new CloudflareAPIError("cf_invalid_response");
+      throw new CloudflareAPIError('cf_invalid_response');
     }
 
     const text = await boundedResponseText(response);
@@ -255,31 +267,32 @@ export class CloudflareAPI {
       value = JSON.parse(text);
     } catch {
       throw new CloudflareAPIError(
-        response.ok ? "cf_invalid_response" : `cf_http_${response.status}`,
+        response.ok ? 'cf_invalid_response' : `cf_http_${response.status}`,
         response.status,
       );
     }
 
     const envelope = errorEnvelopeSchema.safeParse(value);
-    const resultOnlySuccess = init.acceptResultOnlySuccess === true
-      && response.ok
-      && envelope.success
-      && envelope.data.success === undefined
-      && (envelope.data.errors?.length ?? 0) === 0;
+    const resultOnlySuccess =
+      init.acceptResultOnlySuccess === true &&
+      response.ok &&
+      envelope.success &&
+      envelope.data.success === undefined &&
+      (envelope.data.errors?.length ?? 0) === 0;
     if (
-      !response.ok
-      || !envelope.success
-      || (envelope.data.success !== true && !resultOnlySuccess)
+      !response.ok ||
+      !envelope.success ||
+      (envelope.data.success !== true && !resultOnlySuccess)
     ) {
       throw new CloudflareAPIError(providerErrorCode(value, response.status), response.status);
     }
-    if (!value || typeof value !== "object" || !("result" in value)) {
-      throw new CloudflareAPIError("cf_invalid_response");
+    if (!value || typeof value !== 'object' || !('result' in value)) {
+      throw new CloudflareAPIError('cf_invalid_response');
     }
     const result = schema.safeParse(value.result);
-    if (!result.success) throw new CloudflareAPIError("cf_invalid_response");
-    const info = "result_info" in value ? resultInfoSchema.safeParse(value.result_info) : null;
-    const totalCount = info?.success ? info.data?.total_count ?? null : null;
+    if (!result.success) throw new CloudflareAPIError('cf_invalid_response');
+    const info = 'result_info' in value ? resultInfoSchema.safeParse(value.result_info) : null;
+    const totalCount = info?.success ? (info.data?.total_count ?? null) : null;
     return { result: result.data, totalCount };
   }
 
@@ -288,7 +301,7 @@ export class CloudflareAPI {
    * count that the provider quota applies to. */
   async listTunnelPage(page: number, perPage: number): Promise<CloudflareTunnelPage> {
     const query = new URLSearchParams({
-      is_deleted: "false",
+      is_deleted: 'false',
       page: String(page),
       per_page: String(perPage),
     });
@@ -296,7 +309,7 @@ export class CloudflareAPI {
       `accounts/${encodeURIComponent(this.config.accountId)}/cfd_tunnel?${query}`,
       z.array(z.unknown()).max(1_000),
     );
-    const tunnels: CloudflareTunnelPage["tunnels"] = [];
+    const tunnels: CloudflareTunnelPage['tunnels'] = [];
     let skipped = 0;
     for (const item of result) {
       const parsed = scannedTunnelSchema.safeParse(item);
@@ -307,7 +320,7 @@ export class CloudflareAPI {
       tunnels.push({
         activity: tunnelActivity(parsed.data),
         id: parsed.data.id,
-        managedConfig: parsed.data.config_src === "cloudflare",
+        managedConfig: parsed.data.config_src === 'cloudflare',
         name: parsed.data.name,
       });
     }
@@ -321,7 +334,7 @@ export class CloudflareAPI {
 
   /** Total DNS records in the zone, for the record-quota alert. */
   async countDNSRecords(): Promise<number | null> {
-    const query = new URLSearchParams({ page: "1", per_page: "1" });
+    const query = new URLSearchParams({ page: '1', per_page: '1' });
     const { totalCount } = await this.requestEnvelope(
       `zones/${encodeURIComponent(this.config.zoneId)}/dns_records?${query}`,
       z.array(z.unknown()).max(1),
@@ -330,7 +343,7 @@ export class CloudflareAPI {
   }
 
   async listTunnels(name: string): Promise<CloudflareTunnel[]> {
-    const query = new URLSearchParams({ is_deleted: "false", name, per_page: "2" });
+    const query = new URLSearchParams({ is_deleted: 'false', name, per_page: '2' });
     const tunnels = await this.request(
       `accounts/${encodeURIComponent(this.config.accountId)}/cfd_tunnel?${query}`,
       z.array(tunnelSchema),
@@ -345,7 +358,7 @@ export class CloudflareAPI {
         `accounts/${encodeURIComponent(this.config.accountId)}/cfd_tunnel/${encodeURIComponent(tunnelId)}`,
         tunnelSchema,
       );
-      if (tunnel.id !== tunnelId) throw new CloudflareAPIError("cf_invalid_response");
+      if (tunnel.id !== tunnelId) throw new CloudflareAPIError('cf_invalid_response');
       if (tunnel.deleted_at != null) return null;
       return { activity: tunnelActivity(tunnel), id: tunnel.id, name: tunnel.name };
     } catch (error) {
@@ -358,10 +371,10 @@ export class CloudflareAPI {
     const tunnel = await this.request(
       `accounts/${encodeURIComponent(this.config.accountId)}/cfd_tunnel`,
       tunnelSchema,
-      { body: { config_src: "cloudflare", name }, method: "POST" },
+      { body: { config_src: 'cloudflare', name }, method: 'POST' },
     );
     if (tunnel.name !== name) {
-      throw new CloudflareAPIError("cf_invalid_response");
+      throw new CloudflareAPIError('cf_invalid_response');
     }
     return { id: tunnel.id, name: tunnel.name };
   }
@@ -375,37 +388,37 @@ export class CloudflareAPI {
           config: {
             ingress: [
               { hostname, service: MANAGED_COMPANION_ORIGIN_URL },
-              { service: "http_status:404" },
+              { service: 'http_status:404' },
             ],
           },
         },
-        method: "PUT",
+        method: 'PUT',
       },
     );
     const ingress = result.config.ingress;
     if (
-      ingress.length !== 2
-      || ingress[0]?.hostname !== hostname
-      || ingress[0]?.service !== MANAGED_COMPANION_ORIGIN_URL
-      || ingress[1]?.hostname !== undefined
-      || ingress[1]?.service !== "http_status:404"
+      ingress.length !== 2 ||
+      ingress[0]?.hostname !== hostname ||
+      ingress[0]?.service !== MANAGED_COMPANION_ORIGIN_URL ||
+      ingress[1]?.hostname !== undefined ||
+      ingress[1]?.service !== 'http_status:404'
     ) {
-      throw new CloudflareAPIError("cf_invalid_response");
+      throw new CloudflareAPIError('cf_invalid_response');
     }
   }
 
   async listDNSRecords(hostname: string): Promise<CloudflareDNSRecord[]> {
     const query = new URLSearchParams({
-      "name.exact": hostname,
-      per_page: "2",
-      type: "CNAME",
+      'name.exact': hostname,
+      per_page: '2',
+      type: 'CNAME',
     });
     const records = await this.request(
       `zones/${encodeURIComponent(this.config.zoneId)}/dns_records?${query}`,
       z.array(dnsRecordSchema),
     );
     return records
-      .filter((record) => record.type === "CNAME" && record.name.toLowerCase() === hostname)
+      .filter((record) => record.type === 'CNAME' && record.name.toLowerCase() === hostname)
       .map(({ content, id, name, proxied, type }) => ({ content, id, name, proxied, type }));
   }
 
@@ -415,7 +428,7 @@ export class CloudflareAPI {
         `zones/${encodeURIComponent(this.config.zoneId)}/dns_records/${encodeURIComponent(recordId)}`,
         dnsRecordSchema,
       );
-      if (record.id !== recordId) throw new CloudflareAPIError("cf_invalid_response");
+      if (record.id !== recordId) throw new CloudflareAPIError('cf_invalid_response');
       return {
         content: record.content,
         id: record.id,
@@ -430,36 +443,40 @@ export class CloudflareAPI {
   }
 
   async createDNSRecord(hostname: string, tunnelId: string): Promise<CloudflareDNSRecord> {
-    return this.writeDNSRecord("POST", hostname, tunnelId);
+    return this.writeDNSRecord('POST', hostname, tunnelId);
   }
 
-  async updateDNSRecord(recordId: string, hostname: string, tunnelId: string): Promise<CloudflareDNSRecord> {
-    return this.writeDNSRecord("PATCH", hostname, tunnelId, recordId);
+  async updateDNSRecord(
+    recordId: string,
+    hostname: string,
+    tunnelId: string,
+  ): Promise<CloudflareDNSRecord> {
+    return this.writeDNSRecord('PATCH', hostname, tunnelId, recordId);
   }
 
   private async writeDNSRecord(
-    method: "PATCH" | "POST",
+    method: 'PATCH' | 'POST',
     hostname: string,
     tunnelId: string,
     recordId?: string,
   ): Promise<CloudflareDNSRecord> {
     const target = `${tunnelId}.cfargotunnel.com`;
-    const suffix = recordId ? `/${encodeURIComponent(recordId)}` : "";
+    const suffix = recordId ? `/${encodeURIComponent(recordId)}` : '';
     const record = await this.request(
       `zones/${encodeURIComponent(this.config.zoneId)}/dns_records${suffix}`,
       dnsRecordSchema,
       {
-        body: { content: target, name: hostname, proxied: true, ttl: 1, type: "CNAME" },
+        body: { content: target, name: hostname, proxied: true, ttl: 1, type: 'CNAME' },
         method,
       },
     );
     if (
-      record.name.toLowerCase() !== hostname
-      || record.type !== "CNAME"
-      || record.content.toLowerCase() !== target
-      || !record.proxied
+      record.name.toLowerCase() !== hostname ||
+      record.type !== 'CNAME' ||
+      record.content.toLowerCase() !== target ||
+      !record.proxied
     ) {
-      throw new CloudflareAPIError("cf_invalid_response");
+      throw new CloudflareAPIError('cf_invalid_response');
     }
     return {
       content: record.content,
@@ -482,9 +499,9 @@ export class CloudflareAPI {
       const result = await this.request(
         `zones/${encodeURIComponent(this.config.zoneId)}/dns_records/${encodeURIComponent(recordId)}`,
         deleteDNSRecordResultSchema,
-        { acceptResultOnlySuccess: true, method: "DELETE" },
+        { acceptResultOnlySuccess: true, method: 'DELETE' },
       );
-      if (result.id !== recordId) throw new CloudflareAPIError("cf_invalid_response");
+      if (result.id !== recordId) throw new CloudflareAPIError('cf_invalid_response');
     } catch (error) {
       if (!isNotFound(error)) throw error;
     }
@@ -492,12 +509,15 @@ export class CloudflareAPI {
 
   /** `cascade` is what `cloudflared tunnel delete --force` sends; the public
    * API reference lists no such option, so a caller must not depend on it. */
-  async deleteTunnel(tunnelId: string, { cascade = false }: { cascade?: boolean } = {}): Promise<void> {
+  async deleteTunnel(
+    tunnelId: string,
+    { cascade = false }: { cascade?: boolean } = {},
+  ): Promise<void> {
     try {
       await this.request(
-        `accounts/${encodeURIComponent(this.config.accountId)}/cfd_tunnel/${encodeURIComponent(tunnelId)}${cascade ? "?cascade=true" : ""}`,
+        `accounts/${encodeURIComponent(this.config.accountId)}/cfd_tunnel/${encodeURIComponent(tunnelId)}${cascade ? '?cascade=true' : ''}`,
         z.unknown(),
-        { method: "DELETE" },
+        { method: 'DELETE' },
       );
     } catch (error) {
       if (isNotFound(error)) return;
@@ -516,7 +536,7 @@ export class CloudflareAPI {
       await this.request(
         `accounts/${encodeURIComponent(this.config.accountId)}/cfd_tunnel/${encodeURIComponent(tunnelId)}/connections`,
         z.unknown(),
-        { method: "DELETE" },
+        { method: 'DELETE' },
       );
     } catch (error) {
       if (!isNotFound(error)) throw error;

@@ -1,8 +1,8 @@
 // A person's hold of a bot's browser as its viewers share it on the new engine. The hold is the person's: every view of
 // theirs sees it, any of them may take it over or hand it back, and their next view carries on with it when the view it
 // was used from went. Input runs only from that one view. How long it lasts unasked is in ../hold.ts.
-import { HoldClock } from "../hold.ts";
-import type { HubHost, Viewer } from "./core.ts";
+import { HoldClock } from '../hold.ts';
+import type { HubHost, Viewer } from './core.ts';
 
 export class ViewerHold {
   readonly #host: HubHost;
@@ -66,7 +66,11 @@ export class ViewerHold {
 
   /** Their view carries on with their hold when no view of theirs uses it, once what the last one pressed is let go. */
   async carryOn(viewer: Viewer): Promise<void> {
-    const free = () => !viewer.closed && viewer.options.canOperate && this.owns(viewer) && (this.#driver === null || !this.#viewers.has(this.#driver));
+    const free = () =>
+      !viewer.closed &&
+      viewer.options.canOperate &&
+      this.owns(viewer) &&
+      (this.#driver === null || !this.#viewers.has(this.#driver));
     if (!free()) return;
     await this.#letGo;
     if (free()) this.#driver = viewer;
@@ -76,7 +80,8 @@ export class ViewerHold {
   async took(viewer: Viewer): Promise<void> {
     const person = viewer.options.person;
     const before = this.#driver;
-    if (before && before !== viewer && this.#viewers.has(before)) await this.#host.control.letGo(person, () => before.releaseInput());
+    if (before && before !== viewer && this.#viewers.has(before))
+      await this.#host.control.letGo(person, () => before.releaseInput());
     await this.#letGo;
     if (viewer.closed || !this.owns(viewer)) return;
     this.#driver = viewer;
@@ -103,7 +108,8 @@ export class ViewerHold {
     } else {
       await viewer.releaseInput();
     }
-    if (!this.owns(viewer) || [...this.#viewers].some((other) => other.options.person === person)) return;
+    if (!this.owns(viewer) || [...this.#viewers].some((other) => other.options.person === person))
+      return;
     if (dropped) this.#clock.watched(false);
     else await this.#end(person).catch(() => undefined);
   }
@@ -118,6 +124,8 @@ export class ViewerHold {
   /** The person's hold ends as a hand-back does: what their views pressed is let go once their queued input has run. */
   async #end(person: string): Promise<void> {
     const views = [...this.#viewers].filter((viewer) => viewer.options.person === person);
-    await this.#host.release(person, async () => (await Promise.all(views.map((viewer) => viewer.releaseInput()))).every(Boolean));
+    await this.#host.release(person, async () =>
+      (await Promise.all(views.map((viewer) => viewer.releaseInput()))).every(Boolean),
+    );
   }
 }

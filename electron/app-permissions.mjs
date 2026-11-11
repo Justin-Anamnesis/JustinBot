@@ -2,18 +2,18 @@
 // and the allow-list applies only to the verified renderer origin.
 
 const ALLOWED_APP_PERMISSIONS = new Set([
-  "notifications",
-  "clipboard-read",
-  "clipboard-sanitized-write",
-  "fullscreen",
+  'notifications',
+  'clipboard-read',
+  'clipboard-sanitized-write',
+  'fullscreen',
 ]);
 
 // Opaque origins (data:, about:blank) serialise as "null"; never let two of them match.
 function webOrigin(value) {
-  if (typeof value !== "string") return null;
+  if (typeof value !== 'string') return null;
   try {
     const origin = new URL(value).origin;
-    return origin === "null" ? null : origin;
+    return origin === 'null' ? null : origin;
   } catch {
     return null;
   }
@@ -26,26 +26,34 @@ function webOrigin(value) {
  * @param {{ mediaTypes?: string[], mediaType?: string }} [details]
  * @returns {boolean}
  */
-export function appPermissionAllowed(permission, requestingUrlOrOrigin, rendererOrigin, details = {}) {
+export function appPermissionAllowed(
+  permission,
+  requestingUrlOrOrigin,
+  rendererOrigin,
+  details = {},
+) {
   const requesting = webOrigin(requestingUrlOrOrigin);
   const allowed = webOrigin(rendererOrigin);
   if (!requesting || !allowed || requesting !== allowed) return false;
 
   // Electron 43 routes getDisplayMedia through "media" with mediaTypes: [] before selecting display media.
-  if (permission === "media") {
-    if (details?.mediaType !== undefined && details.mediaType !== "audio") return false;
+  if (permission === 'media') {
+    if (details?.mediaType !== undefined && details.mediaType !== 'audio') return false;
     if (details?.mediaTypes !== undefined) {
-      return Array.isArray(details.mediaTypes) && details.mediaTypes.every((type) => type === "audio");
+      return (
+        Array.isArray(details.mediaTypes) && details.mediaTypes.every((type) => type === 'audio')
+      );
     }
-    return details?.mediaType === "audio";
+    return details?.mediaType === 'audio';
   }
 
   return ALLOWED_APP_PERMISSIONS.has(permission);
 }
 
 function mainFrameMicrophoneAllowed(permission, requestingUrlOrOrigin, trustedOrigin, details) {
-  if (permission !== "media" || details?.isMainFrame !== true || details.mediaTypes?.length === 0) return false;
-  return appPermissionAllowed("media", requestingUrlOrOrigin, trustedOrigin ?? null, details);
+  if (permission !== 'media' || details?.isMainFrame !== true || details.mediaTypes?.length === 0)
+    return false;
+  return appPermissionAllowed('media', requestingUrlOrOrigin, trustedOrigin ?? null, details);
 }
 
 /**
@@ -58,8 +66,13 @@ function mainFrameMicrophoneAllowed(permission, requestingUrlOrOrigin, trustedOr
  * @param {{ isMainFrame?: boolean }} [details]
  * @returns {boolean}
  */
-export function remoteClipboardWriteAllowed(permission, requestingUrlOrOrigin, activeRemoteOrigin, details = {}) {
-  if (permission !== "clipboard-sanitized-write") return false;
+export function remoteClipboardWriteAllowed(
+  permission,
+  requestingUrlOrOrigin,
+  activeRemoteOrigin,
+  details = {},
+) {
+  if (permission !== 'clipboard-sanitized-write') return false;
   if (details?.isMainFrame !== true) return false;
   const requesting = webOrigin(requestingUrlOrOrigin);
   const active = webOrigin(activeRemoteOrigin);
@@ -75,77 +88,108 @@ export function remoteClipboardWriteAllowed(permission, requestingUrlOrOrigin, a
  *   once the person's bots moved there (home-window.mjs), whose page alone may show notifications besides this
  *   computer's and the active remote server's.
  */
-export function appPermissionHandlers({ rendererOrigin, mainContents, cloudHomeOrigin, cloudHomeRestoring = () => null, activeRemoteOrigin = () => null,
-  activeRemoteMicrophone = () => false, askRemoteMicrophone = () => null, homeOrigin = () => null }) {
+export function appPermissionHandlers({
+  rendererOrigin,
+  mainContents,
+  cloudHomeOrigin,
+  cloudHomeRestoring = () => null,
+  activeRemoteOrigin = () => null,
+  activeRemoteMicrophone = () => false,
+  askRemoteMicrophone = () => null,
+  homeOrigin = () => null,
+}) {
   // Notifications for the main window's main frame on `origin`: My Cloud as home, or the remote server the person
   // switched to (Settings → Notifications there has no browser site settings to fall back on).
   // Fullscreen too, so a chat video's own fullscreen button works there (it still needs the person's click).
   const notifiesAs = (origin, contents, permission, requesting, details) => {
     const page = webOrigin(origin);
-    return (permission === "notifications" || permission === "fullscreen") && Boolean(page) && Boolean(contents) &&
-      contents === mainContents() && details?.isMainFrame === true && webOrigin(requesting) === page;
+    return (
+      (permission === 'notifications' || permission === 'fullscreen') &&
+      Boolean(page) &&
+      Boolean(contents) &&
+      contents === mainContents() &&
+      details?.isMainFrame === true &&
+      webOrigin(requesting) === page
+    );
   };
   const asksAsCloud = (contents, permission, requesting, details) =>
-    Boolean(contents) && contents === mainContents() && mainFrameMicrophoneAllowed(permission, requesting, requesting, details);
+    Boolean(contents) &&
+    contents === mainContents() &&
+    mainFrameMicrophoneAllowed(permission, requesting, requesting, details);
   const asksAsRemote = (contents, permission, requesting, details) =>
-    Boolean(contents) && contents === mainContents() && mainFrameMicrophoneAllowed(permission, requesting, activeRemoteOrigin(), details);
+    Boolean(contents) &&
+    contents === mainContents() &&
+    mainFrameMicrophoneAllowed(permission, requesting, activeRemoteOrigin(), details);
   const clipboardWrite = (contents, permission, requesting, details) =>
-    Boolean(contents) && contents === mainContents() &&
+    Boolean(contents) &&
+    contents === mainContents() &&
     (remoteClipboardWriteAllowed(permission, requesting, activeRemoteOrigin(), details) ||
       remoteClipboardWriteAllowed(permission, requesting, cloudHomeOrigin(), details));
   const allowed = (contents, permission, requesting, details) =>
     appPermissionAllowed(permission, requesting, rendererOrigin(), details) ||
-    (asksAsCloud(contents, permission, requesting, details) && mainFrameMicrophoneAllowed(permission, requesting, cloudHomeOrigin(), details)) ||
-    (asksAsRemote(contents, permission, requesting, details) && activeRemoteMicrophone() === true) ||
+    (asksAsCloud(contents, permission, requesting, details) &&
+      mainFrameMicrophoneAllowed(permission, requesting, cloudHomeOrigin(), details)) ||
+    (asksAsRemote(contents, permission, requesting, details) &&
+      activeRemoteMicrophone() === true) ||
     clipboardWrite(contents, permission, requesting, details) ||
     notifiesAs(homeOrigin(), contents, permission, requesting, details) ||
     notifiesAs(activeRemoteOrigin(), contents, permission, requesting, details);
   return {
     // Only a request may wait (Electron answers through the callback); the rule runs again after any wait.
     request: (contents, permission, callback, details) => {
-      const requesting = details?.requestingUrl ?? contents?.getURL?.() ?? "";
+      const requesting = details?.requestingUrl ?? contents?.getURL?.() ?? '';
       const decide = () => allowed(contents, permission, requesting, details);
       const settle = (waiting) => Promise.resolve(waiting).catch(() => {});
       const decideOrAsk = () => {
         if (decide()) return true;
-        const asking = asksAsRemote(contents, permission, requesting, details) ? askRemoteMicrophone(activeRemoteOrigin()) : null;
+        const asking = asksAsRemote(contents, permission, requesting, details)
+          ? askRemoteMicrophone(activeRemoteOrigin())
+          : null;
         return asking ? settle(asking).then(decide) : false;
       };
-      const restoring = !decide() && asksAsCloud(contents, permission, requesting, details) ? cloudHomeRestoring() : null;
+      const restoring =
+        !decide() && asksAsCloud(contents, permission, requesting, details)
+          ? cloudHomeRestoring()
+          : null;
       const answer = restoring ? settle(restoring).then(decideOrAsk) : decideOrAsk();
-      if (typeof answer === "boolean") return callback(answer);
+      if (typeof answer === 'boolean') return callback(answer);
       void answer.then(callback);
     },
     check: (contents, permission, requestingOrigin, details) =>
-      allowed(contents, permission, requestingOrigin || contents?.getURL?.() || "", details),
+      allowed(contents, permission, requestingOrigin || contents?.getURL?.() || '', details),
     pageMicrophone: (event) => {
       const contents = event?.sender;
       const frame = event?.senderFrame;
       const isMainFrame = Boolean(frame) && frame === contents?.mainFrame;
-      return allowed(contents, "media", frame?.url ?? "", { isMainFrame, mediaTypes: ["audio"] }) ? "allowed" : "refused";
+      return allowed(contents, 'media', frame?.url ?? '', { isMainFrame, mediaTypes: ['audio'] })
+        ? 'allowed'
+        : 'refused';
     },
   };
 }
 
 // Both explicit IPC links and window.open use this one policy: a web link, or an email draft the person sends themselves.
 export function externalLinkUrl(rawUrl) {
-  return typeof rawUrl === "string" && /^\s*mailto:/i.test(rawUrl) ? emailDraftUrl(rawUrl) : externalWebUrl(rawUrl);
+  return typeof rawUrl === 'string' && /^\s*mailto:/i.test(rawUrl)
+    ? emailDraftUrl(rawUrl)
+    : externalWebUrl(rawUrl);
 }
 
 export function externalWebUrl(rawUrl) {
-  if (typeof rawUrl !== "string") throw new Error("A web address is required");
+  if (typeof rawUrl !== 'string') throw new Error('A web address is required');
   let url;
   try {
     url = new URL(rawUrl);
   } catch {
-    throw new Error("That web address is invalid");
+    throw new Error('That web address is invalid');
   }
-  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("Only web links can be opened");
-  if (url.username || url.password) throw new Error("Web links must not include user credentials");
+  if (url.protocol !== 'https:' && url.protocol !== 'http:')
+    throw new Error('Only web links can be opened');
+  if (url.username || url.password) throw new Error('Web links must not include user credentials');
   return url.toString();
 }
 
-const EMAIL_DRAFT_FIELDS = new Set(["subject", "body"]);
+const EMAIL_DRAFT_FIELDS = new Set(['subject', 'body']);
 
 /** Security: one address, and only a subject and a body, so a link can add no recipient and attach no file (some mail
  * clients honour an `attach` field). */
@@ -155,12 +199,12 @@ export function emailDraftUrl(rawUrl) {
     url = new URL(rawUrl);
     address = decodeURIComponent(url.pathname);
   } catch {
-    throw new Error("That email link is invalid");
+    throw new Error('That email link is invalid');
   }
-  if (url.protocol !== "mailto:") throw new Error("Only email links can be drafted");
-  if (!/^[^\s@,;]+@[^\s@,;]+$/.test(address)) throw new Error("An email link names one address");
-  if ([...url.searchParams.keys()].some(field => !EMAIL_DRAFT_FIELDS.has(field.toLowerCase()))) {
-    throw new Error("An email link carries only a subject and a body");
+  if (url.protocol !== 'mailto:') throw new Error('Only email links can be drafted');
+  if (!/^[^\s@,;]+@[^\s@,;]+$/.test(address)) throw new Error('An email link names one address');
+  if ([...url.searchParams.keys()].some((field) => !EMAIL_DRAFT_FIELDS.has(field.toLowerCase()))) {
+    throw new Error('An email link carries only a subject and a body');
   }
   return url.toString();
 }

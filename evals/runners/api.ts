@@ -1,4 +1,4 @@
-import type { ApiClient } from "./api-types.ts";
+import type { ApiClient } from './api-types.ts';
 
 export interface ApiResponse {
   status: number;
@@ -9,31 +9,35 @@ export async function makeClient(base: string): Promise<ApiClient> {
   const request = async (method: string, path: string, body?: unknown): Promise<ApiResponse> => {
     const response = await fetch(base + path, {
       method,
-      headers: body === undefined ? undefined : { "content-type": "application/json" },
+      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     return { status: response.status, body: await response.json().catch(() => null) };
   };
   return {
-    get: (path) => request("GET", path),
-    post: (path, body) => request("POST", path, body),
-    patch: (path, body) => request("PATCH", path, body),
-    put: (path, body) => request("PUT", path, body),
-    del: (path) => request("DELETE", path),
+    get: (path) => request('GET', path),
+    post: (path, body) => request('POST', path, body),
+    patch: (path, body) => request('PATCH', path, body),
+    put: (path, body) => request('PUT', path, body),
+    del: (path) => request('DELETE', path),
   };
 }
 
 /** One read, bounded by the wait's own deadline: a request that connects
  * but never completes would otherwise park the loop forever and the
  * deadline check below would never run. */
-async function readWithDeadline<T>(read: () => Promise<T>, what: string, deadline: number): Promise<T> {
+async function readWithDeadline<T>(
+  read: () => Promise<T>,
+  what: string,
+  deadline: number,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       read(),
       new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new Error(what + " timed out: a read never completed")),
+          () => reject(new Error(what + ' timed out: a read never completed')),
           Math.max(deadline - Date.now(), 1),
         );
       }),
@@ -55,7 +59,8 @@ export async function waitUntil<T>(
   for (;;) {
     const value = await readWithDeadline(read, what, deadline);
     if (accept(value)) return value;
-    if (Date.now() > deadline) throw new Error(what + " (waited " + timeoutMs + "ms); last value: " + JSON.stringify(value));
+    if (Date.now() > deadline)
+      throw new Error(what + ' (waited ' + timeoutMs + 'ms); last value: ' + JSON.stringify(value));
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
 }

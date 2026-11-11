@@ -1,9 +1,15 @@
-import { parseBotPackage, type BotPackageDefinition, type BotPackagePlaybook, type BotPackageSkill, type ParsedBotPackage } from "./bot-package.ts";
-import type { DefaultsPreset, PublishedLibrary } from "./presets.ts";
-import type { PublishedTeam } from "./published-teams.ts";
-import { nextPatchRelease } from "./published-teams.ts";
-import type { Routine } from "./routines.ts";
-import type { BotRecord, GroupRecord, InstalledPlaybook } from "./store.ts";
+import {
+  parseBotPackage,
+  type BotPackageDefinition,
+  type BotPackagePlaybook,
+  type BotPackageSkill,
+  type ParsedBotPackage,
+} from './bot-package.ts';
+import type { DefaultsPreset, PublishedLibrary } from './presets.ts';
+import type { PublishedTeam } from './published-teams.ts';
+import { nextPatchRelease } from './published-teams.ts';
+import type { Routine } from './routines.ts';
+import type { BotRecord, GroupRecord, InstalledPlaybook } from './store.ts';
 import {
   AGENT_MAX_SKILLS,
   AVATAR_MAX_BYTES,
@@ -28,18 +34,19 @@ import {
   type PackageRoom,
   type PackageRoutine,
   type PackageRoutineSchedule,
-} from "../shared/package-format.ts";
-import type { ServerTextParams } from "../shared/server-text.ts";
-import { USER_ERROR, userError, type UserErrorKey } from "./user-errors.ts";
+} from '../shared/package-format.ts';
+import type { ServerTextParams } from '../shared/server-text.ts';
+import { USER_ERROR, userError, type UserErrorKey } from './user-errors.ts';
 
 function portableKey(value: string, fallback: string, used: Set<string>): string {
-  const stem = value
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 48) || fallback;
+  const stem =
+    value
+      .normalize('NFKD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 48) || fallback;
   let key = stem;
   for (let suffix = 2; used.has(key); suffix++) key = `${stem}-${suffix}`;
   used.add(key);
@@ -48,33 +55,43 @@ function portableKey(value: string, fallback: string, used: Set<string>): string
 
 /** An Auto room is written as its lead: older apps refuse a package with an `auto` kind. */
 function packageRoomResponder(
-  responder: GroupRecord["defaultResponder"],
+  responder: GroupRecord['defaultResponder'],
   keys: ReadonlyMap<string, string>,
   members: readonly string[],
-): { kind: "agent"; agent: string } | { kind: "everyone" } | { kind: "mentions" } {
-  if (responder.kind === "member" && keys.has(responder.botId)) return { kind: "agent", agent: keys.get(responder.botId)! };
-  if (responder.kind === "everyone") return { kind: "everyone" };
-  if (responder.kind === "auto") {
+): { kind: 'agent'; agent: string } | { kind: 'everyone' } | { kind: 'mentions' } {
+  if (responder.kind === 'member' && keys.has(responder.botId))
+    return { kind: 'agent', agent: keys.get(responder.botId)! };
+  if (responder.kind === 'everyone') return { kind: 'everyone' };
+  if (responder.kind === 'auto') {
     const lead = responder.fallbackBotId ? keys.get(responder.fallbackBotId) : undefined;
-    return { kind: "agent", agent: lead ?? members[0]! };
+    return { kind: 'agent', agent: lead ?? members[0]! };
   }
-  return { kind: "mentions" };
+  return { kind: 'mentions' };
 }
 
 function samePlaybook(a: InstalledPlaybook, b: BotPackagePlaybook): boolean {
-  return a.name === b.name && a.summary === b.summary && a.instructions === b.instructions &&
-    a.triggers.join("\n") === b.triggers.join("\n");
+  return (
+    a.name === b.name &&
+    a.summary === b.summary &&
+    a.instructions === b.instructions &&
+    a.triggers.join('\n') === b.triggers.join('\n')
+  );
 }
 
-export interface ExportablePackageSkill extends Omit<BotPackageSkill, "name" | "description"> {
+export interface ExportablePackageSkill extends Omit<BotPackageSkill, 'name' | 'description'> {
   name: string;
   description: string;
   enabled?: boolean;
 }
 
 function sameSkill(a: ExportablePackageSkill, b: ExportablePackageSkill): boolean {
-  return a.instructions === b.instructions && a.description === b.description &&
-    a.source === b.source && a.license === b.license && a.compatibility === b.compatibility;
+  return (
+    a.instructions === b.instructions &&
+    a.description === b.description &&
+    a.source === b.source &&
+    a.license === b.license &&
+    a.compatibility === b.compatibility
+  );
 }
 
 function assignPlaybooks(bots: readonly BotRecord[], idToKey: ReadonlyMap<string, string>) {
@@ -93,7 +110,8 @@ function assignPlaybooks(bots: readonly BotRecord[], idToKey: ReadonlyMap<string
       let key = playbook.key;
       if (existing) key = `${agentKey}-${playbook.key}`;
       key = portableKey(key, `${agentKey}-playbook`, playbookKeys);
-      if (!playbooks.some((candidate) => candidate.key === key)) playbooks.push({ ...playbook, key });
+      if (!playbooks.some((candidate) => candidate.key === key))
+        playbooks.push({ ...playbook, key });
       assigned.push(key);
     }
     agentPlaybooks.set(bot.id, assigned);
@@ -101,7 +119,10 @@ function assignPlaybooks(bots: readonly BotRecord[], idToKey: ReadonlyMap<string
   return { playbooks, agentPlaybooks };
 }
 
-function assignSkills(bots: readonly BotRecord[], skillsByBot?: ReadonlyMap<string, readonly ExportablePackageSkill[]>) {
+function assignSkills(
+  bots: readonly BotRecord[],
+  skillsByBot?: ReadonlyMap<string, readonly ExportablePackageSkill[]>,
+) {
   const packageSkills = new Map<string, ExportablePackageSkill>();
   const agentSkills = new Map<string, string[]>();
   for (const bot of bots) {
@@ -123,7 +144,10 @@ function assignSkills(bots: readonly BotRecord[], skillsByBot?: ReadonlyMap<stri
 }
 
 function requiredApps(bots: readonly BotRecord[]) {
-  const requirements = new Map<string, { slug: string; label: string; reason: string; optional?: boolean }>();
+  const requirements = new Map<
+    string,
+    { slug: string; label: string; reason: string; optional?: boolean }
+  >();
   for (const bot of bots) {
     for (const app of bot.installedPackage?.requiredApps ?? []) {
       if (!requirements.has(app.slug)) requirements.set(app.slug, { ...app });
@@ -133,15 +157,15 @@ function requiredApps(bots: readonly BotRecord[]) {
 }
 
 /** A limit-reset schedule waits for this computer's engine sign-in, so it never travels in a package. */
-const portable = (routine: Routine) => routine.schedule.type !== "limit_reset";
+const portable = (routine: Routine) => routine.schedule.type !== 'limit_reset';
 
-function portableSchedule(schedule: Routine["schedule"]): PackageRoutineSchedule {
-  if (schedule.type === "limit_reset") throw new Error("A limit-reset schedule is not portable");
-  if (schedule.type === "once") return { type: "once", at: schedule.at };
-  if (schedule.type === "cron") return { ...schedule };
-  if (schedule.type === "interval") {
+function portableSchedule(schedule: Routine['schedule']): PackageRoutineSchedule {
+  if (schedule.type === 'limit_reset') throw new Error('A limit-reset schedule is not portable');
+  if (schedule.type === 'once') return { type: 'once', at: schedule.at };
+  if (schedule.type === 'cron') return { ...schedule };
+  if (schedule.type === 'interval') {
     return {
-      type: "interval",
+      type: 'interval',
       everyMinutes: schedule.everyMinutes,
       anchorAt: schedule.anchorAt,
       ...(schedule.weekdays === undefined ? {} : { weekdays: [...schedule.weekdays] }),
@@ -149,7 +173,7 @@ function portableSchedule(schedule: Routine["schedule"]): PackageRoutineSchedule
       ...(schedule.endsAt === undefined ? {} : { endsAt: schedule.endsAt }),
     };
   }
-  return { type: "daily", time: schedule.time, weekdays: [...schedule.weekdays] };
+  return { type: 'daily', time: schedule.time, weekdays: [...schedule.weekdays] };
 }
 
 /** A workspace definition, never runtime state: no grants, credentials, approvals, transcripts, memory, paths or engines. */
@@ -162,7 +186,7 @@ export function createBotPackageExport(input: {
   skillsByBot?: ReadonlyMap<string, readonly ExportablePackageSkill[]>;
 }): ParsedBotPackage {
   const bots = input.bots.filter((bot) => !bot.hidden);
-  if (!bots.length) throw new Error("Create a bot before exporting your package");
+  if (!bots.length) throw new Error('Create a bot before exporting your package');
 
   const packageKeys = new Set<string>();
   const idToKey = new Map<string, string>();
@@ -175,9 +199,9 @@ export function createBotPackageExport(input: {
   const requirements = requiredApps(bots);
 
   const roomKeys = new Set<string>();
-  const rooms: NonNullable<BotPackageDefinition["rooms"]> = [];
+  const rooms: NonNullable<BotPackageDefinition['rooms']> = [];
   for (const [index, group] of input.groups.filter((group) => !group.dm).entries()) {
-    const members = group.memberIds.flatMap((id) => idToKey.has(id) ? [idToKey.get(id)!] : []);
+    const members = group.memberIds.flatMap((id) => (idToKey.has(id) ? [idToKey.get(id)!] : []));
     if (!members.length) continue;
     const defaultResponder = packageRoomResponder(group.defaultResponder, idToKey, members);
     rooms.push({
@@ -190,30 +214,36 @@ export function createBotPackageExport(input: {
   }
 
   const routineKeys = new Set<string>();
-  const routines: NonNullable<BotPackageDefinition["routines"]> = input.routines.flatMap((routine, index) => {
-    if (routine.target === "room-goal" || !portable(routine)) return [];
-    const agent = idToKey.get(routine.botId);
-    if (!agent) return [];
-    return [{
-      key: portableKey(routine.name, `routine-${index + 1}`, routineKeys),
-      name: routine.name,
-      agent,
-      prompt: routine.prompt,
-      runOn: routine.runOn,
-      schedule: portableSchedule(routine.schedule),
-      durationMinutes: routine.durationMinutes,
-      ...(routine.timeoutMinutes === undefined ? {} : { timeoutMinutes: routine.timeoutMinutes }),
-      ...(routine.overlap === "queue" ? { overlap: "queue" as const } : {}),
-      enabledAfterInstall: false as const,
-    }];
-  });
+  const routines: NonNullable<BotPackageDefinition['routines']> = input.routines.flatMap(
+    (routine, index) => {
+      if (routine.target === 'room-goal' || !portable(routine)) return [];
+      const agent = idToKey.get(routine.botId);
+      if (!agent) return [];
+      return [
+        {
+          key: portableKey(routine.name, `routine-${index + 1}`, routineKeys),
+          name: routine.name,
+          agent,
+          prompt: routine.prompt,
+          runOn: routine.runOn,
+          schedule: portableSchedule(routine.schedule),
+          durationMinutes: routine.durationMinutes,
+          ...(routine.timeoutMinutes === undefined
+            ? {}
+            : { timeoutMinutes: routine.timeoutMinutes }),
+          ...(routine.overlap === 'queue' ? { overlap: 'queue' as const } : {}),
+          enabledAfterInstall: false as const,
+        },
+      ];
+    },
+  );
 
-  const id = portableKey(input.name, "openmaus-package", new Set());
-  const agents: BotPackageDefinition["agents"] = bots.map((bot) => {
-    const appearance: BotPackageDefinition["agents"][number]["appearance"] = { color: bot.color };
+  const id = portableKey(input.name, 'openmaus-package', new Set());
+  const agents: BotPackageDefinition['agents'] = bots.map((bot) => {
+    const appearance: BotPackageDefinition['agents'][number]['appearance'] = { color: bot.color };
     if (bot.mascotExpression) appearance.mascotExpression = bot.mascotExpression;
     if (bot.mascotBody) appearance.mascotBody = bot.mascotBody;
-    const agent: BotPackageDefinition["agents"][number] = {
+    const agent: BotPackageDefinition['agents'][number] = {
       key: idToKey.get(bot.id)!,
       name: bot.name,
       title: bot.title,
@@ -229,14 +259,15 @@ export function createBotPackageExport(input: {
   });
   const definition: BotPackageDefinition = {
     id,
-    release: "1.0.0",
+    release: '1.0.0',
     name: input.name,
-    tagline: `A portable OpenMausBot setup with ${bots.length} ${bots.length === 1 ? "bot" : "bots"}.`,
-    summary: "Exported from OpenMausBot. Review the roles, rooms, playbooks, connector requirements, and paused routines before sharing or publishing.",
-    category: "Community",
-    author: { name: input.authorName?.trim() || "OpenMausBot user" },
-    license: "Unspecified",
-    outcomes: ["Recreate this bot setup without copying private runtime state."],
+    tagline: `A portable OpenMausBot setup with ${bots.length} ${bots.length === 1 ? 'bot' : 'bots'}.`,
+    summary:
+      'Exported from OpenMausBot. Review the roles, rooms, playbooks, connector requirements, and paused routines before sharing or publishing.',
+    category: 'Community',
+    author: { name: input.authorName?.trim() || 'OpenMausBot user' },
+    license: 'Unspecified',
+    outcomes: ['Recreate this bot setup without copying private runtime state.'],
     setupMinutes: Math.min(240, Math.max(2, bots.length + requirements.size * 2)),
     requirements: { apps: [...requirements.values()], capabilities: [] },
     agents,
@@ -253,28 +284,31 @@ export function createBotPackageExport(input: {
     };
   }
   return parseBotPackage({
-    format: "openmaus.package",
+    format: 'openmaus.package',
     version: 1,
     package: definition,
   });
 }
 
 export type TeamExportSkipReason =
-  | "picture_too_large"
-  | "picture_invalid"
-  | "stdio_server"
-  | "insecure_address"
-  | "files_not_shared"
-  | "lead_not_in_group_chat"
-  | "notes_too_large"
-  | "skill_changed"
-  | "skill_conflict"
-  | "bot_skill_limit"
-  | "team_skill_limit"
-  | "preset_empty"
-  | "preset_skill_conflict";
+  | 'picture_too_large'
+  | 'picture_invalid'
+  | 'stdio_server'
+  | 'insecure_address'
+  | 'files_not_shared'
+  | 'lead_not_in_group_chat'
+  | 'notes_too_large'
+  | 'skill_changed'
+  | 'skill_conflict'
+  | 'bot_skill_limit'
+  | 'team_skill_limit'
+  | 'preset_empty'
+  | 'preset_skill_conflict';
 
-export interface TeamExportSkip { part: string; reason: TeamExportSkipReason }
+export interface TeamExportSkip {
+  part: string;
+  reason: TeamExportSkipReason;
+}
 
 export class TeamExportError extends Error {
   readonly status = 400;
@@ -285,7 +319,7 @@ function teamExportRefusal(key: UserErrorKey, params?: ServerTextParams): TeamEx
   return Object.assign(new TeamExportError(error), fields);
 }
 
-export const TEAM_TOO_LARGE_MESSAGE = USER_ERROR["serverError.department.shareTooLarge"];
+export const TEAM_TOO_LARGE_MESSAGE = USER_ERROR['serverError.department.shareTooLarge'];
 
 export interface TeamExportInput {
   team: string;
@@ -301,7 +335,7 @@ export interface TeamExportInput {
   brief?: string;
   published: PublishedTeam | null;
   skillsByBot?: ReadonlyMap<string, readonly ExportablePackageSkill[]>;
-  skillSelection?: "all" | "chosen";
+  skillSelection?: 'all' | 'chosen';
   memoryByBot?: ReadonlyMap<string, ReadonlyArray<{ path: string; text: string }>>;
   avatars?: Readonly<Record<string, unknown>>;
   mcpServers?: Readonly<Record<string, unknown>>;
@@ -322,7 +356,7 @@ const CONNECTION_KEY = /^[a-z][a-z0-9_-]{0,27}$/;
 const SEMVER = /^(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})\.(0|[1-9]\d{0,5})$/;
 const DATA_URL = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/;
 
-const teamOf = (section?: string) => section?.trim() ?? "";
+const teamOf = (section?: string) => section?.trim() ?? '';
 
 function stableKeys<T extends { id: string; name: string }>(
   records: readonly T[],
@@ -333,7 +367,8 @@ function stableKeys<T extends { id: string; name: string }>(
   const used = new Set<string>();
   const keys = new Map<string, string>();
   const claim = (record: T, key: string | undefined) => {
-    if (keys.has(record.id) || !key || key.length > 64 || !KEY_PATTERN.test(key) || used.has(key)) return;
+    if (keys.has(record.id) || !key || key.length > 64 || !KEY_PATTERN.test(key) || used.has(key))
+      return;
     keys.set(record.id, key);
     used.add(key);
   };
@@ -341,33 +376,54 @@ function stableKeys<T extends { id: string; name: string }>(
   for (const record of records) claim(record, installed(record));
   const taken = new Set([...used, ...Object.values(recorded ?? {})]);
   for (const [index, record] of records.entries()) {
-    if (!keys.has(record.id)) keys.set(record.id, portableKey(record.name, `${fallback}-${index + 1}`, taken));
+    if (!keys.has(record.id))
+      keys.set(record.id, portableKey(record.name, `${fallback}-${index + 1}`, taken));
   }
   return keys;
 }
 
-export function picture(value: unknown): { mime: "image/png" | "image/jpeg" | "image/webp"; data: string } | "picture_invalid" | "picture_too_large" {
-  const match = typeof value === "string" ? DATA_URL.exec(value) : null;
-  if (!match) return "picture_invalid";
+export function picture(
+  value: unknown,
+):
+  | { mime: 'image/png' | 'image/jpeg' | 'image/webp'; data: string }
+  | 'picture_invalid'
+  | 'picture_too_large' {
+  const match = typeof value === 'string' ? DATA_URL.exec(value) : null;
+  if (!match) return 'picture_invalid';
   const bytes = decodeBase64(match[2]!);
-  if (!bytes) return "picture_invalid";
-  if (bytes.length > AVATAR_MAX_BYTES) return "picture_too_large";
-  if (!pictureMatchesMime(bytes, match[1]!)) return "picture_invalid";
-  return { mime: match[1] as "image/png" | "image/jpeg" | "image/webp", data: match[2]! };
+  if (!bytes) return 'picture_invalid';
+  if (bytes.length > AVATAR_MAX_BYTES) return 'picture_too_large';
+  if (!pictureMatchesMime(bytes, match[1]!)) return 'picture_invalid';
+  return { mime: match[1] as 'image/png' | 'image/jpeg' | 'image/webp', data: match[2]! };
 }
 
-function remoteServer(raw: unknown): { transport: "http" | "sse"; url: string; valueNames: string[] } | "stdio" | null {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+function remoteServer(
+  raw: unknown,
+): { transport: 'http' | 'sse'; url: string; valueNames: string[] } | 'stdio' | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const server = raw as { url?: unknown; type?: unknown; headers?: unknown; command?: unknown };
-  if (typeof server.url !== "string") return typeof server.command === "string" ? "stdio" : null;
-  const headers = server.headers && typeof server.headers === "object" && !Array.isArray(server.headers) ? Object.keys(server.headers) : [];
-  return { transport: server.type === "sse" ? "sse" : "http", url: server.url, valueNames: headers };
+  if (typeof server.url !== 'string') return typeof server.command === 'string' ? 'stdio' : null;
+  const headers =
+    server.headers && typeof server.headers === 'object' && !Array.isArray(server.headers)
+      ? Object.keys(server.headers)
+      : [];
+  return {
+    transport: server.type === 'sse' ? 'sse' : 'http',
+    url: server.url,
+    valueNames: headers,
+  };
 }
 
 function sharableAddress(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || (url.protocol === "http:" && (url.hostname === "localhost" || url.hostname === "[::1]" || /^127(?:\.\d{1,3}){3}$/.test(url.hostname)));
+    return (
+      url.protocol === 'https:' ||
+      (url.protocol === 'http:' &&
+        (url.hostname === 'localhost' ||
+          url.hostname === '[::1]' ||
+          /^127(?:\.\d{1,3}){3}$/.test(url.hostname)))
+    );
   } catch {
     return false;
   }
@@ -380,8 +436,7 @@ function keyShaped(piece: string): boolean {
   let text = piece;
   try {
     text = decodeURIComponent(piece);
-  } catch {
-  }
+  } catch {}
   return (text.match(TOKEN_RUN) ?? []).some((run) => {
     if (/[A-Za-z]{24,}|\d{24,}/.test(run)) return true;
     if (!/[A-Za-z]/.test(run) || !/\d/.test(run)) return false;
@@ -390,13 +445,15 @@ function keyShaped(piece: string): boolean {
   });
 }
 
-export const ADDRESS_KEY_PLACEHOLDER = "redacted";
+export const ADDRESS_KEY_PLACEHOLDER = 'redacted';
 
 /** A segment with a key-shaped part is replaced whole, so no piece of a key split by ":" or ";" is left behind. */
 function shareableSegment(segment: string): string {
-  const parts = segment.split(";");
-  if (parts.some((part) => keyShaped(part.split("=")[0]!))) return ADDRESS_KEY_PLACEHOLDER;
-  return parts.map((part) => (part.includes("=") ? `${part.slice(0, part.indexOf("="))}=` : part)).join(";");
+  const parts = segment.split(';');
+  if (parts.some((part) => keyShaped(part.split('=')[0]!))) return ADDRESS_KEY_PLACEHOLDER;
+  return parts
+    .map((part) => (part.includes('=') ? `${part.slice(0, part.indexOf('='))}=` : part))
+    .join(';');
 }
 
 /** Hosted MCP servers often carry their credential in the address, where text redaction does not look. */
@@ -409,30 +466,32 @@ export function shareableAddress(value: string): { url: string; changed: boolean
   }
   let changed = false;
   if (url.username || url.password) {
-    url.username = "";
-    url.password = "";
+    url.username = '';
+    url.password = '';
     changed = true;
   }
   if (url.hash) {
-    url.hash = "";
+    url.hash = '';
     changed = true;
   }
-  const labels = url.hostname.split(".");
-  const hostLabels = labels.map((label, index) => (index < labels.length - 2 && keyShaped(label) ? ADDRESS_KEY_PLACEHOLDER : label));
+  const labels = url.hostname.split('.');
+  const hostLabels = labels.map((label, index) =>
+    index < labels.length - 2 && keyShaped(label) ? ADDRESS_KEY_PLACEHOLDER : label,
+  );
   if (hostLabels.some((label, index) => label !== labels[index])) {
-    url.hostname = hostLabels.join(".");
+    url.hostname = hostLabels.join('.');
     changed = true;
   }
   const params = [...url.searchParams];
   const names = params.map(([name]) => (keyShaped(name) ? ADDRESS_KEY_PLACEHOLDER : name));
   if (params.some(([name, value], index) => value || names[index] !== name)) {
-    url.search = new URLSearchParams(names.map((name) => [name, ""])).toString();
+    url.search = new URLSearchParams(names.map((name) => [name, ''])).toString();
     changed = true;
   }
-  const segments = url.pathname.split("/");
+  const segments = url.pathname.split('/');
   const shareable = segments.map(shareableSegment);
   if (shareable.some((segment, index) => segment !== segments[index])) {
-    url.pathname = shareable.join("/");
+    url.pathname = shareable.join('/');
     changed = true;
   }
   return changed ? { url: url.toString(), changed } : { url: value, changed };
@@ -453,39 +512,58 @@ function fitSkills(
       else if (!sameSkill(first, skill)) conflicted.add(skill.name);
     }
   }
-  for (const name of [...conflicted].sort()) skipped.push({ part: `skills[${name}]`, reason: "skill_conflict" });
+  for (const name of [...conflicted].sort())
+    skipped.push({ part: `skills[${name}]`, reason: 'skill_conflict' });
   const on = (skill: ExportablePackageSkill) => skill.enabled !== false;
   const fitted = new Map<string, ExportablePackageSkill[]>();
   for (const bot of bots) {
     const own = (skillsByBot?.get(bot.id) ?? []).filter((skill) => !conflicted.has(skill.name));
-    const ranked = [...own].sort((a, b) => Number(on(b)) - Number(on(a)) || a.name.localeCompare(b.name));
+    const ranked = [...own].sort(
+      (a, b) => Number(on(b)) - Number(on(a)) || a.name.localeCompare(b.name),
+    );
     for (const skill of ranked.slice(AGENT_MAX_SKILLS)) {
-      skipped.push({ part: `agents[${botKeys.get(bot.id)}].skills[${skill.name}]`, reason: "bot_skill_limit" });
+      skipped.push({
+        part: `agents[${botKeys.get(bot.id)}].skills[${skill.name}]`,
+        reason: 'bot_skill_limit',
+      });
     }
     const kept = new Set(ranked.slice(0, AGENT_MAX_SKILLS).map((skill) => skill.name));
-    fitted.set(bot.id, own.filter((skill) => kept.has(skill.name)));
+    fitted.set(
+      bot.id,
+      own.filter((skill) => kept.has(skill.name)),
+    );
   }
   const names = new Map<string, boolean>();
   for (const list of fitted.values()) {
     for (const skill of list) names.set(skill.name, names.get(skill.name) === true || on(skill));
   }
   if (names.size > PACKAGE_MAX_SKILLS) {
-    const ranked = [...names].sort(([a, aOn], [b, bOn]) => Number(bOn) - Number(aOn) || a.localeCompare(b));
+    const ranked = [...names].sort(
+      ([a, aOn], [b, bOn]) => Number(bOn) - Number(aOn) || a.localeCompare(b),
+    );
     const left = new Set(ranked.slice(PACKAGE_MAX_SKILLS).map(([name]) => name));
-    for (const name of [...left].sort()) skipped.push({ part: `skills[${name}]`, reason: "team_skill_limit" });
-    for (const [id, list] of fitted) fitted.set(id, list.filter((skill) => !left.has(skill.name)));
+    for (const name of [...left].sort())
+      skipped.push({ part: `skills[${name}]`, reason: 'team_skill_limit' });
+    for (const [id, list] of fitted)
+      fitted.set(
+        id,
+        list.filter((skill) => !left.has(skill.name)),
+      );
   }
   return fitted;
 }
 
-function refuseSkillConflicts(bots: readonly BotRecord[], skillsByBot: ReadonlyMap<string, readonly ExportablePackageSkill[]> | undefined) {
+function refuseSkillConflicts(
+  bots: readonly BotRecord[],
+  skillsByBot: ReadonlyMap<string, readonly ExportablePackageSkill[]> | undefined,
+) {
   const firstByName = new Map<string, ExportablePackageSkill>();
   for (const bot of bots) {
     for (const skill of skillsByBot?.get(bot.id) ?? []) {
       const first = firstByName.get(skill.name);
       if (!first) firstByName.set(skill.name, skill);
       else if (!sameSkill(first, skill)) {
-        throw teamExportRefusal("serverError.department.shareSkillClash", { skill: skill.name });
+        throw teamExportRefusal('serverError.department.shareSkillClash', { skill: skill.name });
       }
     }
   }
@@ -495,32 +573,44 @@ function refuseSkillConflicts(bots: readonly BotRecord[], skillsByBot: ReadonlyM
 export function createTeamPackageExport(input: TeamExportInput): TeamExportResult {
   const team = teamOf(input.team);
   const bots = input.bots.filter((bot) => !bot.hidden && teamOf(bot.section) === team);
-  if (!bots.length) throw teamExportRefusal("serverError.department.shareNoBots");
+  if (!bots.length) throw teamExportRefusal('serverError.department.shareNoBots');
   const skipped: TeamExportSkip[] = [...(input.skipped ?? [])];
 
   const release = input.release?.trim() || nextPatchRelease(input.published?.lastRelease);
-  if (!SEMVER.test(release)) throw teamExportRefusal("serverError.share.version");
+  if (!SEMVER.test(release)) throw teamExportRefusal('serverError.share.version');
   const notes = input.notes?.trim();
-  if (notes && notes.length > RELEASE_NOTES_MAX) throw new TeamExportError(`Release notes must be at most ${RELEASE_NOTES_MAX} characters.`);
-  const displayName = input.name?.trim() || team || "General";
+  if (notes && notes.length > RELEASE_NOTES_MAX)
+    throw new TeamExportError(`Release notes must be at most ${RELEASE_NOTES_MAX} characters.`);
+  const displayName = input.name?.trim() || team || 'General';
 
   const installedIds = new Set(bots.map((bot) => bot.installedPackage?.id));
   const inherited = installedIds.size === 1 ? [...installedIds][0] : undefined;
-  const packageId = input.published?.packageId ?? inherited ?? portableKey(team || displayName, "team", new Set());
+  const packageId =
+    input.published?.packageId ?? inherited ?? portableKey(team || displayName, 'team', new Set());
   const recorded = input.published?.packageId === packageId ? input.published.keys : undefined;
 
-  const botKeys = stableKeys(bots, recorded?.bots,
-    (bot) => (bot.installedPackage?.id === packageId ? bot.installedPackage.agentKey : undefined), "bot");
+  const botKeys = stableKeys(
+    bots,
+    recorded?.bots,
+    (bot) => (bot.installedPackage?.id === packageId ? bot.installedPackage.agentKey : undefined),
+    'bot',
+  );
   const { playbooks, agentPlaybooks } = assignPlaybooks(bots, botKeys);
   let skillsByBot = input.skillsByBot;
-  if (input.skillSelection === "all") skillsByBot = fitSkills(bots, botKeys, skillsByBot, skipped);
+  if (input.skillSelection === 'all') skillsByBot = fitSkills(bots, botKeys, skillsByBot, skipped);
   else refuseSkillConflicts(bots, skillsByBot);
   const { packageSkills, agentSkills } = assignSkills(bots, skillsByBot);
   if (packageSkills.size > PACKAGE_MAX_SKILLS) {
-    throw teamExportRefusal("serverError.department.shareSkillLimit", { count: PACKAGE_MAX_SKILLS });
+    throw teamExportRefusal('serverError.department.shareSkillLimit', {
+      count: PACKAGE_MAX_SKILLS,
+    });
   }
   const crowded = bots.find((bot) => (agentSkills.get(bot.id)?.length ?? 0) > AGENT_MAX_SKILLS);
-  if (crowded) throw teamExportRefusal("serverError.department.shareBotSkillLimit", { name: crowded.name, count: String(AGENT_MAX_SKILLS) });
+  if (crowded)
+    throw teamExportRefusal('serverError.department.shareBotSkillLimit', {
+      name: crowded.name,
+      count: String(AGENT_MAX_SKILLS),
+    });
   const requirements = requiredApps(bots);
 
   // Addresses and header names only; values stay on this computer.
@@ -537,15 +627,21 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
         const server = remoteServer(input.mcpServers?.[name]);
         if (!server) continue;
         const part = `connections[${name}]`;
-        if (server === "stdio") {
-          if (!skipped.some((skip) => skip.part === part)) skipped.push({ part, reason: "stdio_server" });
+        if (server === 'stdio') {
+          if (!skipped.some((skip) => skip.part === part))
+            skipped.push({ part, reason: 'stdio_server' });
           continue;
         }
         if (!sharableAddress(server.url)) {
-          if (!skipped.some((skip) => skip.part === part)) skipped.push({ part, reason: "insecure_address" });
+          if (!skipped.some((skip) => skip.part === part))
+            skipped.push({ part, reason: 'insecure_address' });
           continue;
         }
-        let key = CONNECTION_KEY.test(name) ? name : portableKey(name, "connection", new Set()).replace(/^[^a-z]+/, "").slice(0, 28) || "connection";
+        let key = CONNECTION_KEY.test(name)
+          ? name
+          : portableKey(name, 'connection', new Set())
+              .replace(/^[^a-z]+/, '')
+              .slice(0, 28) || 'connection';
         const stem = key.slice(0, 25);
         for (let suffix = 2; connectionKeys.has(key); suffix++) key = `${stem}-${suffix}`;
         connectionKeys.add(key);
@@ -555,7 +651,7 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
         connections.push({
           key,
           label: name.slice(0, 100),
-          reason: "",
+          reason: '',
           mcp: { transport: server.transport, url: address.url, valueNames: server.valueNames },
         });
       }
@@ -567,19 +663,22 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
     agentConnections.set(bot.id, assigned);
   }
   for (const connection of connections) {
-    connection.reason = `Used by ${[...new Set(connectionUsers.get(connection.key) ?? [])].join(", ")}`.slice(0, 240);
+    connection.reason =
+      `Used by ${[...new Set(connectionUsers.get(connection.key) ?? [])].join(', ')}`.slice(0, 240);
   }
 
   const agents: PackageAgent[] = bots.map((bot) => {
     const key = botKeys.get(bot.id)!;
-    const appearance: PackageAgent["appearance"] = { color: bot.color };
+    const appearance: PackageAgent['appearance'] = { color: bot.color };
     if (bot.mascotExpression) appearance.mascotExpression = bot.mascotExpression;
     if (bot.mascotBody) appearance.mascotBody = bot.mascotBody;
     const offered = input.avatars?.[bot.id];
     if (offered !== undefined) {
-      const crop = bot.avatarCrop === "rounded" || bot.avatarCrop === "square" ? bot.avatarCrop : "circle";
+      const crop =
+        bot.avatarCrop === 'rounded' || bot.avatarCrop === 'square' ? bot.avatarCrop : 'circle';
       const prepared = picture(offered);
-      if (typeof prepared === "string") skipped.push({ part: `agents[${key}].appearance.avatar`, reason: prepared });
+      if (typeof prepared === 'string')
+        skipped.push({ part: `agents[${key}].appearance.avatar`, reason: prepared });
       else appearance.avatar = { ...prepared, crop };
     }
     const agent: PackageAgent = {
@@ -603,8 +702,15 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
     for (const note of input.memoryByBot?.get(bot.id) ?? []) {
       if (!note.text.trim()) continue;
       const bytes = utf8Bytes(note.text);
-      if (bytes > SEED_FILE_MAX_BYTES || files >= SEED_MAX_FILES || total + bytes > SEED_MAX_BYTES) {
-        skipped.push({ part: `agents[${key}].seed.memory[${JSON.stringify(note.path)}]`, reason: "notes_too_large" });
+      if (
+        bytes > SEED_FILE_MAX_BYTES ||
+        files >= SEED_MAX_FILES ||
+        total + bytes > SEED_MAX_BYTES
+      ) {
+        skipped.push({
+          part: `agents[${key}].seed.memory[${JSON.stringify(note.path)}]`,
+          reason: 'notes_too_large',
+        });
         continue;
       }
       memory[note.path] = note.text;
@@ -616,45 +722,59 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
   });
 
   const groups = input.groups.filter((group) => !group.dm && teamOf(group.section) === team);
-  const roomKeys = stableKeys(groups, recorded?.rooms, () => undefined, "group-chat");
+  const roomKeys = stableKeys(groups, recorded?.rooms, () => undefined, 'group-chat');
   const rooms: PackageRoom[] = [];
   const roomMembers = new Map<string, Set<string>>();
   for (const group of groups) {
-    const members = group.memberIds.flatMap((id) => botKeys.has(id) ? [botKeys.get(id)!] : []);
+    const members = group.memberIds.flatMap((id) => (botKeys.has(id) ? [botKeys.get(id)!] : []));
     if (!members.length) continue;
     const defaultResponder = packageRoomResponder(group.defaultResponder, botKeys, members);
     const key = roomKeys.get(group.id)!;
-    rooms.push({ key, name: group.name, members, ...(group.bulletin ? { bulletin: group.bulletin } : {}), defaultResponder });
+    rooms.push({
+      key,
+      name: group.name,
+      members,
+      ...(group.bulletin ? { bulletin: group.bulletin } : {}),
+      defaultResponder,
+    });
     roomMembers.set(group.id, new Set(members));
   }
 
-  const owned = input.routines.filter((routine) => botKeys.has(routine.botId) && portable(routine) &&
-    (routine.target !== "room-goal" || (routine.groupId !== undefined && roomMembers.has(routine.groupId))));
-  const routineKeys = stableKeys(owned, recorded?.routines, () => undefined, "routine");
+  const owned = input.routines.filter(
+    (routine) =>
+      botKeys.has(routine.botId) &&
+      portable(routine) &&
+      (routine.target !== 'room-goal' ||
+        (routine.groupId !== undefined && roomMembers.has(routine.groupId))),
+  );
+  const routineKeys = stableKeys(owned, recorded?.routines, () => undefined, 'routine');
   const routines: PackageRoutine[] = owned.flatMap((routine) => {
     const key = routineKeys.get(routine.id)!;
     const agent = botKeys.get(routine.botId)!;
-    const goal = routine.target === "room-goal";
+    const goal = routine.target === 'room-goal';
     if (goal && !roomMembers.get(routine.groupId!)!.has(agent)) {
-      skipped.push({ part: `routines[${key}]`, reason: "lead_not_in_group_chat" });
+      skipped.push({ part: `routines[${key}]`, reason: 'lead_not_in_group_chat' });
       return [];
     }
-    if (routine.attachments?.length) skipped.push({ part: `routines[${key}].attachments`, reason: "files_not_shared" });
-    return [{
-      key,
-      name: routine.name,
-      agent,
-      ...(goal ? { room: roomKeys.get(routine.groupId!)! } : {}),
-      prompt: routine.prompt,
-      runOn: goal ? "maus" as const : routine.runOn,
-      schedule: portableSchedule(routine.schedule),
-      durationMinutes: routine.durationMinutes,
-      ...(routine.timeoutMinutes === undefined ? {} : { timeoutMinutes: routine.timeoutMinutes }),
-      ...(routine.overlap === "queue" ? { overlap: "queue" as const } : {}),
-      ...(!goal && routine.continuity ? { continuity: true } : {}),
-      ...(routine.runOnStartup ? { runOnStartup: true } : {}),
-      enabledAfterInstall: routine.enabled,
-    }];
+    if (routine.attachments?.length)
+      skipped.push({ part: `routines[${key}].attachments`, reason: 'files_not_shared' });
+    return [
+      {
+        key,
+        name: routine.name,
+        agent,
+        ...(goal ? { room: roomKeys.get(routine.groupId!)! } : {}),
+        prompt: routine.prompt,
+        runOn: goal ? ('maus' as const) : routine.runOn,
+        schedule: portableSchedule(routine.schedule),
+        durationMinutes: routine.durationMinutes,
+        ...(routine.timeoutMinutes === undefined ? {} : { timeoutMinutes: routine.timeoutMinutes }),
+        ...(routine.overlap === 'queue' ? { overlap: 'queue' as const } : {}),
+        ...(!goal && routine.continuity ? { continuity: true } : {}),
+        ...(routine.runOnStartup ? { runOnStartup: true } : {}),
+        enabledAfterInstall: routine.enabled,
+      },
+    ];
   });
 
   const chief = bots.find((bot) => bot.chiefOfStaff);
@@ -663,15 +783,21 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
     id: packageId,
     release,
     name: displayName,
-    tagline: input.tagline?.trim() || `A portable OpenMausBot team with ${bots.length} ${bots.length === 1 ? "bot" : "bots"}.`,
-    summary: input.summary?.trim() ||
-      "Shared from OpenMausBot. Bots, skills, group chats and routines arrive as new copies; routines start paused and chat history never travels.",
+    tagline:
+      input.tagline?.trim() ||
+      `A portable OpenMausBot team with ${bots.length} ${bots.length === 1 ? 'bot' : 'bots'}.`,
+    summary:
+      input.summary?.trim() ||
+      'Shared from OpenMausBot. Bots, skills, group chats and routines arrive as new copies; routines start paused and chat history never travels.',
     ...(notes ? { notes } : {}),
-    category: "Community",
-    author: { name: input.authorName?.trim() || "OpenMausBot user" },
-    license: "Unspecified",
-    outcomes: ["Recreate this team without copying chat history or private settings."],
-    setupMinutes: Math.min(240, Math.max(2, bots.length + requirements.size * 2 + connections.length * 2)),
+    category: 'Community',
+    author: { name: input.authorName?.trim() || 'OpenMausBot user' },
+    license: 'Unspecified',
+    outcomes: ['Recreate this team without copying chat history or private settings.'],
+    setupMinutes: Math.min(
+      240,
+      Math.max(2, bots.length + requirements.size * 2 + connections.length * 2),
+    ),
     requirements: { apps: [...requirements.values()], capabilities: [] },
     team: {
       name: (team || displayName).slice(0, 60).trim(),
@@ -684,18 +810,27 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
   if (routines.length) definition.routines = routines;
   if (playbooks.length) definition.playbooks = playbooks;
   if (input.preset) definition.presets = [withPresetSkills(input.preset, packageSkills, skipped)];
-  if (packageSkills.size) definition.skills = { version: 1, entries: [...packageSkills.values()].map((skill) => ({ ...skill })) };
+  if (packageSkills.size)
+    definition.skills = {
+      version: 1,
+      entries: [...packageSkills.values()].map((skill) => ({ ...skill })),
+    };
   if (connections.length) definition.connections = connections;
 
   const { document: redactedDocument, redacted } = redactPackageSecrets({
-    format: PACKAGE_FORMAT, version: PACKAGE_VERSION, package: definition,
+    format: PACKAGE_FORMAT,
+    version: PACKAGE_VERSION,
+    package: definition,
   } as PackageDocument);
   let document: PackageDocument;
   try {
-    document = parsePackageDocument(redactedDocument, { trust: "file" });
+    document = parsePackageDocument(redactedDocument, { trust: 'file' });
   } catch (error) {
-    if (error instanceof PackageFormatError && error.code === "too_large") throw teamExportRefusal("serverError.department.shareTooLarge");
-    throw new TeamExportError(error instanceof Error ? error.message : "This department could not be shared.");
+    if (error instanceof PackageFormatError && error.code === 'too_large')
+      throw teamExportRefusal('serverError.department.shareTooLarge');
+    throw new TeamExportError(
+      error instanceof Error ? error.message : 'This department could not be shared.',
+    );
   }
   const toRecord = (keys: ReadonlyMap<string, string>, include: (id: string) => boolean) =>
     Object.fromEntries([...keys].filter(([id]) => include(id)));
@@ -711,8 +846,14 @@ export function createTeamPackageExport(input: TeamExportInput): TeamExportResul
       lastRelease: release,
       keys: {
         bots: { ...recorded?.bots, ...toRecord(botKeys, () => true) },
-        rooms: { ...recorded?.rooms, ...toRecord(roomKeys, (id) => exportedRooms.has(roomKeys.get(id)!)) },
-        routines: { ...recorded?.routines, ...toRecord(routineKeys, (id) => exportedRoutines.has(routineKeys.get(id)!)) },
+        rooms: {
+          ...recorded?.rooms,
+          ...toRecord(roomKeys, (id) => exportedRooms.has(roomKeys.get(id)!)),
+        },
+        routines: {
+          ...recorded?.routines,
+          ...toRecord(routineKeys, (id) => exportedRoutines.has(routineKeys.get(id)!)),
+        },
       },
     },
   };
@@ -730,11 +871,11 @@ function withPresetSkills(
     const existing = packageSkills.get(skill.name);
     if (existing) {
       if (sameSkill(existing, skill)) kept.push(skill.name);
-      else skipped.push({ part, reason: "preset_skill_conflict" });
+      else skipped.push({ part, reason: 'preset_skill_conflict' });
       continue;
     }
     if (packageSkills.size >= PACKAGE_MAX_SKILLS) {
-      skipped.push({ part, reason: "team_skill_limit" });
+      skipped.push({ part, reason: 'team_skill_limit' });
       continue;
     }
     const { enabled: _enabled, ...entry } = skill;
@@ -745,7 +886,7 @@ function withPresetSkills(
   return { ...preset, ...(kept.length ? { skills: kept } : {}) };
 }
 
-export const PRESET_TOO_LARGE_MESSAGE = USER_ERROR["serverError.preset.tooLarge"];
+export const PRESET_TOO_LARGE_MESSAGE = USER_ERROR['serverError.preset.tooLarge'];
 
 export interface LibraryExportInput {
   name?: string;
@@ -768,14 +909,15 @@ export interface LibraryExportResult {
 }
 
 export function createLibraryPackageExport(input: LibraryExportInput): LibraryExportResult {
-  if (!input.preset) throw teamExportRefusal("serverError.preset.empty");
+  if (!input.preset) throw teamExportRefusal('serverError.preset.empty');
   const skipped: TeamExportSkip[] = [...(input.skipped ?? [])];
   const release = input.release?.trim() || nextPatchRelease(input.published?.lastRelease);
-  if (!SEMVER.test(release)) throw teamExportRefusal("serverError.share.version");
+  if (!SEMVER.test(release)) throw teamExportRefusal('serverError.share.version');
   const notes = input.notes?.trim();
-  if (notes && notes.length > RELEASE_NOTES_MAX) throw new TeamExportError(`Release notes must be at most ${RELEASE_NOTES_MAX} characters.`);
+  if (notes && notes.length > RELEASE_NOTES_MAX)
+    throw new TeamExportError(`Release notes must be at most ${RELEASE_NOTES_MAX} characters.`);
   const displayName = (input.name?.trim() || input.preset.preset.name).slice(0, 100).trim();
-  const packageId = input.published?.packageId ?? portableKey(displayName, "preset", new Set());
+  const packageId = input.published?.packageId ?? portableKey(displayName, 'preset', new Set());
   const packageSkills = new Map<string, ExportablePackageSkill>();
   const preset = withPresetSkills(input.preset, packageSkills, skipped);
   const definition: PackageDefinition = {
@@ -783,28 +925,38 @@ export function createLibraryPackageExport(input: LibraryExportInput): LibraryEx
     release,
     name: displayName,
     tagline: input.tagline?.trim() || "A preset bot for OpenMausBot's New bot dialog.",
-    summary: input.summary?.trim() ||
-      "Shared from OpenMausBot. Adds a preset bot to New bot. Its skills arrive switched off; model choices, computers, approval levels and connected apps never travel.",
+    summary:
+      input.summary?.trim() ||
+      'Shared from OpenMausBot. Adds a preset bot to New bot. Its skills arrive switched off; model choices, computers, approval levels and connected apps never travel.',
     ...(notes ? { notes } : {}),
-    category: "Community",
-    author: { name: input.authorName?.trim() || "OpenMausBot user" },
-    license: "Unspecified",
-    outcomes: ["Start new bots from a shared preset."],
+    category: 'Community',
+    author: { name: input.authorName?.trim() || 'OpenMausBot user' },
+    license: 'Unspecified',
+    outcomes: ['Start new bots from a shared preset.'],
     setupMinutes: 2,
     requirements: { apps: [], capabilities: [] },
     agents: [],
     presets: [preset],
   };
-  if (packageSkills.size) definition.skills = { version: 1, entries: [...packageSkills.values()].map((skill) => ({ ...skill })) };
+  if (packageSkills.size)
+    definition.skills = {
+      version: 1,
+      entries: [...packageSkills.values()].map((skill) => ({ ...skill })),
+    };
   const { document: redactedDocument, redacted } = redactPackageSecrets({
-    format: PACKAGE_FORMAT, version: PACKAGE_VERSION, package: definition,
+    format: PACKAGE_FORMAT,
+    version: PACKAGE_VERSION,
+    package: definition,
   } as PackageDocument);
   let document: PackageDocument;
   try {
-    document = parsePackageDocument(redactedDocument, { trust: "file" });
+    document = parsePackageDocument(redactedDocument, { trust: 'file' });
   } catch (error) {
-    if (error instanceof PackageFormatError && error.code === "too_large") throw teamExportRefusal("serverError.preset.tooLarge");
-    throw new TeamExportError(error instanceof Error ? error.message : "This preset could not be shared.");
+    if (error instanceof PackageFormatError && error.code === 'too_large')
+      throw teamExportRefusal('serverError.preset.tooLarge');
+    throw new TeamExportError(
+      error instanceof Error ? error.message : 'This preset could not be shared.',
+    );
   }
   return {
     document,

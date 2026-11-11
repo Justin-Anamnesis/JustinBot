@@ -1,4 +1,4 @@
-export { HEADLESS_VERBS as HEADLESS_VERB_NAMES } from "./headless/args.ts";
+export { HEADLESS_VERBS as HEADLESS_VERB_NAMES } from './headless/args.ts';
 
 export const HEADLESS_USAGE = `Drive a running workspace (scripts, CI, other agents):
   openmausbot doctor                    check the server answers and an engine is ready
@@ -22,8 +22,10 @@ export const HEADLESS_USAGE = `Drive a running workspace (scripts, CI, other age
   progress goes to stderr (--quiet drops it). openmausbot help VERB for the details.`;
 
 /** The usage text, its commands written the way this CLI was started (`npx openmausbot …`). */
-export function usage(prefix = "openmausbot"): string {
-  return USAGE.split("\n").map((line) => line.replace(/^(\s+)openmausbot(?= )/, `$1${prefix}`)).join("\n");
+export function usage(prefix = 'openmausbot'): string {
+  return USAGE.split('\n')
+    .map((line) => line.replace(/^(\s+)openmausbot(?= )/, `$1${prefix}`))
+    .join('\n');
 }
 
 export const USAGE = `openmausbot — your team of AI bots, ready in a few steps

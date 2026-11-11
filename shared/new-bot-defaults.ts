@@ -1,16 +1,38 @@
-import type { WireBot } from "./wire";
-import type { RoutineInput } from "./routines";
-import type { ToolScope } from "./tool-scope";
+import type { WireBot } from './wire';
+import type { RoutineInput } from './routines';
+import type { ToolScope } from './tool-scope';
 
 /** Data shared by the default template and an individual creation draft. */
-export type BotDefaultsProfile = Partial<Pick<WireBot,
-  "name" | "title" | "description" | "soul" | "notifications" | "avatarUrl" | "avatarCrop" |
-  "mascotBody" | "mascotFaceColor" | "color" | "voice" | "speakReplies" | "section" | "modelSelection" |
-  "cloudBackend" | "autoStartVps" | "approvalMode" | "alwaysAllow" | "chiefOfStaff" |
-  "managedSections" | "composio" | "browser" | "voiceNotes"
->> & {
+export type BotDefaultsProfile = Partial<
+  Pick<
+    WireBot,
+    | 'name'
+    | 'title'
+    | 'description'
+    | 'soul'
+    | 'notifications'
+    | 'avatarUrl'
+    | 'avatarCrop'
+    | 'mascotBody'
+    | 'mascotFaceColor'
+    | 'color'
+    | 'voice'
+    | 'speakReplies'
+    | 'section'
+    | 'modelSelection'
+    | 'cloudBackend'
+    | 'autoStartVps'
+    | 'approvalMode'
+    | 'alwaysAllow'
+    | 'chiefOfStaff'
+    | 'managedSections'
+    | 'composio'
+    | 'browser'
+    | 'voiceNotes'
+  >
+> & {
   mascotExpression?: string | null;
-  computer?: WireBot["computer"] | null;
+  computer?: WireBot['computer'] | null;
   cwd?: string | null;
   browserProfile?: string | null;
   mcpServers?: string[] | null;
@@ -21,7 +43,10 @@ export type BotDefaultsProfile = Partial<Pick<WireBot,
   voiceNoteEveryReply?: boolean | null;
 };
 
-export type BotRoutineTemplate = Omit<RoutineInput, "botId" | "target" | "groupId" | "resultsThreadId">;
+export type BotRoutineTemplate = Omit<
+  RoutineInput,
+  'botId' | 'target' | 'groupId' | 'resultsThreadId'
+>;
 export interface BotSkillTemplate {
   name: string;
   description: string;

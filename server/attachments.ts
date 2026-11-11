@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from 'node:crypto';
 import {
   createReadStream,
   linkSync,
@@ -9,15 +9,15 @@ import {
   statSync,
   unlinkSync,
   writeFileSync,
-} from "node:fs";
-import { link, open, unlink } from "node:fs/promises";
-import { basename, dirname, extname, join, resolve } from "node:path";
-import { FILE_MAX_BYTES, PREVIEW_MAX_BYTES } from "../shared/upload-limits.ts";
-import { DATA_DIR } from "./config.ts";
-import { boxUploadsDir } from "./bot-box/plan.ts";
+} from 'node:fs';
+import { link, open, unlink } from 'node:fs/promises';
+import { basename, dirname, extname, join, resolve } from 'node:path';
+import { FILE_MAX_BYTES, PREVIEW_MAX_BYTES } from '../shared/upload-limits.ts';
+import { DATA_DIR } from './config.ts';
+import { boxUploadsDir } from './bot-box/plan.ts';
 
-export { FILE_MAX_BYTES, PREVIEW_MAX_BYTES } from "../shared/upload-limits.ts";
-export const ATTACHMENTS_DIR = join(DATA_DIR, "attachments");
+export { FILE_MAX_BYTES, PREVIEW_MAX_BYTES } from '../shared/upload-limits.ts';
+export const ATTACHMENTS_DIR = join(DATA_DIR, 'attachments');
 
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -30,7 +30,9 @@ export function attachmentsMaxBytes(env: NodeJS.ProcessEnv = process.env): numbe
   const raw = env.OMB_ATTACHMENTS_MAX_BYTES?.trim();
   const parsed = raw ? Number(raw) : NaN;
   if (Number.isSafeInteger(parsed) && parsed > 0) return parsed;
-  return env.OMB_CLOUD_ROLE === "home" || env.OMB_CLOUD_ROLE === "team" ? CLOUD_HOME_ATTACHMENTS_MAX_BYTES : DEFAULT_ATTACHMENTS_MAX_BYTES;
+  return env.OMB_CLOUD_ROLE === 'home' || env.OMB_CLOUD_ROLE === 'team'
+    ? CLOUD_HOME_ATTACHMENTS_MAX_BYTES
+    : DEFAULT_ATTACHMENTS_MAX_BYTES;
 }
 
 /** Never evict: prompts refer to attachment paths, so at this ceiling a new upload gets an explicit 507. */
@@ -63,51 +65,51 @@ function invalidateAttachmentAccounting(): void {
 
 /** No sniffing: a lying mime only changes the filename. */
 const IMAGE_MIMES: Record<string, string> = {
-  "image/png": ".png",
-  "image/jpeg": ".jpg",
-  "image/gif": ".gif",
-  "image/webp": ".webp",
+  'image/png': '.png',
+  'image/jpeg': '.jpg',
+  'image/gif': '.gif',
+  'image/webp': '.webp',
 };
 
 /** No archives, binaries, HTML, SVG or scripts. The claimed mime picks the extension; an attacker's filename never does. */
 const FILE_MIMES: Readonly<Record<string, string>> = {
-  "video/mp4": ".mp4",
-  "video/webm": ".webm",
-  "video/quicktime": ".mov",
-  "audio/opus": ".opus",
-  "audio/ogg": ".ogg",
-  "audio/mpeg": ".mp3",
-  "audio/mp4": ".m4a",
-  "audio/x-m4a": ".m4a",
-  "audio/aac": ".aac",
-  "audio/wav": ".wav",
-  "audio/x-wav": ".wav",
-  "audio/wave": ".wav",
-  "audio/flac": ".flac",
-  "audio/x-flac": ".flac",
-  "audio/webm": ".webm",
-  "text/plain": ".txt",
-  "text/markdown": ".md",
-  "text/csv": ".csv",
-  "text/tab-separated-values": ".tsv",
-  "application/json": ".json",
-  "application/pdf": ".pdf",
-  "application/rtf": ".rtf",
-  "text/rtf": ".rtf",
-  "application/msword": ".doc",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
-  "application/vnd.ms-excel": ".xls",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
-  "application/vnd.ms-powerpoint": ".ppt",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
-  "application/vnd.oasis.opendocument.text": ".odt",
-  "application/vnd.oasis.opendocument.spreadsheet": ".ods",
-  "application/vnd.oasis.opendocument.presentation": ".odp",
+  'video/mp4': '.mp4',
+  'video/webm': '.webm',
+  'video/quicktime': '.mov',
+  'audio/opus': '.opus',
+  'audio/ogg': '.ogg',
+  'audio/mpeg': '.mp3',
+  'audio/mp4': '.m4a',
+  'audio/x-m4a': '.m4a',
+  'audio/aac': '.aac',
+  'audio/wav': '.wav',
+  'audio/x-wav': '.wav',
+  'audio/wave': '.wav',
+  'audio/flac': '.flac',
+  'audio/x-flac': '.flac',
+  'audio/webm': '.webm',
+  'text/plain': '.txt',
+  'text/markdown': '.md',
+  'text/csv': '.csv',
+  'text/tab-separated-values': '.tsv',
+  'application/json': '.json',
+  'application/pdf': '.pdf',
+  'application/rtf': '.rtf',
+  'text/rtf': '.rtf',
+  'application/msword': '.doc',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+  'application/vnd.ms-excel': '.xls',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+  'application/vnd.ms-powerpoint': '.ppt',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
+  'application/vnd.oasis.opendocument.text': '.odt',
+  'application/vnd.oasis.opendocument.spreadsheet': '.ods',
+  'application/vnd.oasis.opendocument.presentation': '.odp',
 };
 
 export function extensionForMime(mime: string | undefined): string | null {
   if (!mime) return null;
-  return IMAGE_MIMES[mime.split(";")[0]!.trim().toLowerCase()] ?? null;
+  return IMAGE_MIMES[mime.split(';')[0]!.trim().toLowerCase()] ?? null;
 }
 
 export function ensureAttachmentsDir(): void {
@@ -118,7 +120,7 @@ export function validateAttachmentUploadId(value: string | undefined): string | 
   if (value === undefined) return undefined;
   const normalized = value.trim().toLowerCase();
   if (!UPLOAD_ID.test(normalized)) {
-    throw statusError(400, "uploadId must be a UUID");
+    throw statusError(400, 'uploadId must be a UUID');
   }
   return normalized;
 }
@@ -140,8 +142,7 @@ function scanAttachmentUsageAndCleanup(now = Date.now()): { bytes: number; remov
       } else {
         bytes += stat.size;
       }
-    } catch {
-    }
+    } catch {}
   }
   return { bytes, removed };
 }
@@ -175,12 +176,22 @@ export function cleanupStaleAttachmentPartials(now = Date.now()): number {
  * can still read it and its space comes back. */
 function dropBoxUploadCopies(names: readonly string[], dataDir = DATA_DIR): void {
   if (!names.length) return;
-  const root = join(dataDir, "box-uploads");
-  const dirs = (path: string) => { try { return readdirSync(path); } catch { return []; } };
+  const root = join(dataDir, 'box-uploads');
+  const dirs = (path: string) => {
+    try {
+      return readdirSync(path);
+    } catch {
+      return [];
+    }
+  };
   for (const bot of dirs(root)) {
     for (const thread of dirs(join(root, bot))) {
       for (const name of names) {
-        try { rmSync(join(boxUploadsDir(dataDir, bot, thread), name), { force: true }); } catch { /* best effort: a file still in use stays */ }
+        try {
+          rmSync(join(boxUploadsDir(dataDir, bot, thread), name), { force: true });
+        } catch {
+          /* best effort: a file still in use stays */
+        }
       }
     }
   }
@@ -196,7 +207,7 @@ export function deleteAttachment(path: string): void {
     }
   } catch (error) {
     // An upload still on disk (a busy file on Windows) keeps its box copies; one already gone loses them.
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") return;
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return;
   }
   if (resolve(dirname(path)) === resolve(ATTACHMENTS_DIR)) dropBoxUploadCopies([basename(path)]);
 }
@@ -209,11 +220,15 @@ export function attachmentStorageUsage(): { usedBytes: number; maxBytes: number 
 
 /** What a Settings clear leaves, as stored names: pictures given by their /api/attachments/ url (bot and profile
  * pictures), and files given by their path or bare name (the banner, routines' files). */
-export function keptAttachmentNames(urls: ReadonlyArray<string | null | undefined>, paths: ReadonlyArray<string | undefined>): Set<string> {
+export function keptAttachmentNames(
+  urls: ReadonlyArray<string | null | undefined>,
+  paths: ReadonlyArray<string | undefined>,
+): Set<string> {
   const kept = new Set<string>();
-  for (const url of urls) if (url?.startsWith("/api/attachments/")) kept.add(url.slice("/api/attachments/".length));
+  for (const url of urls)
+    if (url?.startsWith('/api/attachments/')) kept.add(url.slice('/api/attachments/'.length));
   for (const path of paths) {
-    const name = path?.replaceAll("\\", "/").split("/").pop();
+    const name = path?.replaceAll('\\', '/').split('/').pop();
     if (name) kept.add(name);
   }
   return kept;
@@ -230,7 +245,10 @@ export const ATTACHMENT_CLEAR_MIN_AGE_MS = 10 * 60 * 1000;
 
 /** The person's Clear in Settings: every stored file older than a few minutes goes, except the ones `kept` holds
  * (pictures, routine files). A message that showed a removed file shows it missing. */
-export function clearAttachments(kept: ReadonlySet<string>, now = Date.now()): { removed: number; freedBytes: number; failed: number } {
+export function clearAttachments(
+  kept: ReadonlySet<string>,
+  now = Date.now(),
+): { removed: number; freedBytes: number; failed: number } {
   ensureAttachmentsDir();
   let removed = 0;
   let freedBytes = 0;
@@ -248,7 +266,7 @@ export function clearAttachments(kept: ReadonlySet<string>, now = Date.now()): {
       freedBytes += size;
     } catch (error) {
       // Gone already is fine; anything else (permissions, a busy file on Windows) the person is told about.
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") failed += 1;
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') failed += 1;
     }
   }
   dropBoxUploadCopies(gone);
@@ -265,7 +283,8 @@ function cleanupAttachmentPartialsForUpload(uploadId: string): void {
   ensureAttachmentsDir();
   const prefix = `.openmaus-upload-${uploadId}-`;
   for (const entry of readdirSync(ATTACHMENTS_DIR, { withFileTypes: true })) {
-    if (!entry.isFile() || !entry.name.startsWith(prefix) || !PARTIAL_NAME.test(entry.name)) continue;
+    if (!entry.isFile() || !entry.name.startsWith(prefix) || !PARTIAL_NAME.test(entry.name))
+      continue;
     const path = join(ATTACHMENTS_DIR, entry.name);
     if (activePartials.has(path)) continue;
     try {
@@ -274,8 +293,7 @@ function cleanupAttachmentPartialsForUpload(uploadId: string): void {
       if (committedAttachmentBytes !== null) {
         committedAttachmentBytes = Math.max(0, committedAttachmentBytes - size);
       }
-    } catch {
-    }
+    } catch {}
   }
 }
 
@@ -298,7 +316,7 @@ class AttachmentReservation {
     if (available < required) {
       throw statusError(
         507,
-        `attachments storage is full (${formatStoreLimit(ATTACHMENTS_MAX_BYTES)} limit)${clearOffered ? ". Clear old attachments in Settings → General." : ""}`,
+        `attachments storage is full (${formatStoreLimit(ATTACHMENTS_MAX_BYTES)} limit)${clearOffered ? '. Clear old attachments in Settings → General.' : ''}`,
       );
     }
     const granted = Math.min(preferred, available);
@@ -325,7 +343,10 @@ class AttachmentReservation {
   }
 }
 
-async function withUploadLock<T>(uploadId: string | undefined, operation: () => Promise<T>): Promise<T> {
+async function withUploadLock<T>(
+  uploadId: string | undefined,
+  operation: () => Promise<T>,
+): Promise<T> {
   if (!uploadId) return operation();
   const previous = uploadLocks.get(uploadId) ?? Promise.resolve();
   let release!: () => void;
@@ -363,16 +384,16 @@ function committedPathForUpload(uploadId: string, extension: string): string | n
   for (const other of KNOWN_ATTACHMENT_EXTENSIONS) {
     if (other === extension) continue;
     if (statSizeIfFile(join(ATTACHMENTS_DIR, `${uploadId}${other}`)) !== null) {
-      throw statusError(409, "uploadId was already used for another content type");
+      throw statusError(409, 'uploadId was already used for another content type');
     }
   }
   return null;
 }
 
 async function digestFile(path: string): Promise<string> {
-  const hash = createHash("sha256");
+  const hash = createHash('sha256');
   for await (const chunk of createReadStream(path)) hash.update(chunk);
-  return hash.digest("hex");
+  return hash.digest('hex');
 }
 
 export interface SavedAttachment {
@@ -390,40 +411,40 @@ function statusError(status: number, message: string): Error & { status: number 
 }
 
 function normalizedMime(mime: string | undefined): string | null {
-  const value = mime?.split(";")[0]?.trim().toLowerCase();
+  const value = mime?.split(';')[0]?.trim().toLowerCase();
   return value || null;
 }
 
 export function extensionForFileMime(mime: string | undefined): string | null {
   const value = normalizedMime(mime);
-  return value ? FILE_MIMES[value] ?? null : null;
+  return value ? (FILE_MIMES[value] ?? null) : null;
 }
 
 /** Separators and encoded separators are rejected, not massaged, so traversal attempts stay visible as bad requests. */
 export function sanitizeSharedFileName(name: string, mime: string): string {
   const extension = extensionForFileMime(mime);
-  if (!extension) throw statusError(400, "content-type must be a supported document or audio type");
+  if (!extension) throw statusError(400, 'content-type must be a supported document or audio type');
 
-  const normalized = name.normalize("NFKC").trim();
-  if (!normalized) throw statusError(400, "name is required");
-  if (normalized.length > 512) throw statusError(400, "name is too long");
+  const normalized = name.normalize('NFKC').trim();
+  if (!normalized) throw statusError(400, 'name is required');
+  if (normalized.length > 512) throw statusError(400, 'name is too long');
   if (/[\\/]/.test(normalized) || /%(?:00|2f|5c)/i.test(normalized)) {
-    throw statusError(400, "name must be a filename, not a path");
+    throw statusError(400, 'name must be a filename, not a path');
   }
 
-  const dot = normalized.lastIndexOf(".");
+  const dot = normalized.lastIndexOf('.');
   const withoutExtension = dot > 0 ? normalized.slice(0, dot) : normalized;
   const safeCharacters = Array.from(withoutExtension, (character) => {
     const code = character.charCodeAt(0);
-    return code <= 31 || code === 127 || "<>:\"|?*".includes(character) ? "_" : character;
-  }).join("");
+    return code <= 31 || code === 127 || '<>:"|?*'.includes(character) ? '_' : character;
+  }).join('');
   const stem = safeCharacters
-    .replace(/^\.+/, "")
-    .replace(/[.\s]+$/, "")
-    .replace(/\s+/g, " ")
+    .replace(/^\.+/, '')
+    .replace(/[.\s]+$/, '')
+    .replace(/\s+/g, ' ')
     .trim();
-  const boundedStem = Array.from(stem).slice(0, 180).join("");
-  if (!boundedStem) throw statusError(400, "name must contain visible characters");
+  const boundedStem = Array.from(stem).slice(0, 180).join('');
+  if (!boundedStem) throw statusError(400, 'name must contain visible characters');
   return `${boundedStem}${extension}`;
 }
 
@@ -436,14 +457,14 @@ export async function saveFile(
 ): Promise<SavedFile> {
   const normalized = normalizedMime(mime);
   if (!normalized || !extensionForFileMime(normalized)) {
-    throw statusError(400, "content-type must be a supported document or audio type");
+    throw statusError(400, 'content-type must be a supported document or audio type');
   }
   const name = sanitizeSharedFileName(originalName, normalized);
   const extension = extensionForFileMime(normalized)!;
   const uploadId = validateAttachmentUploadId(options.uploadId);
   const expectedBytes = options.expectedBytes;
   if (expectedBytes !== undefined && (!Number.isSafeInteger(expectedBytes) || expectedBytes < 0)) {
-    throw statusError(400, "content-length must be a non-negative integer");
+    throw statusError(400, 'content-length must be a non-negative integer');
   }
   if (expectedBytes !== undefined && expectedBytes > FILE_MAX_BYTES) {
     throw statusError(413, `file exceeds ${FILE_MAX_BYTES} bytes`);
@@ -454,7 +475,7 @@ export async function saveFile(
     if (uploadId) cleanupAttachmentPartialsForUpload(uploadId);
     const existing = uploadId ? committedPathForUpload(uploadId, extension) : null;
     if (existing) {
-      const incomingHash = createHash("sha256");
+      const incomingHash = createHash('sha256');
       let bytes = 0;
       for await (const value of chunks) {
         const chunk = Buffer.isBuffer(value)
@@ -467,9 +488,12 @@ export async function saveFile(
         incomingHash.update(chunk);
         bytes += chunk.byteLength;
       }
-      if (bytes === 0) throw statusError(400, "empty file");
-      if (statSync(existing).size !== bytes || await digestFile(existing) !== incomingHash.digest("hex")) {
-        throw statusError(409, "uploadId was already used for different file bytes");
+      if (bytes === 0) throw statusError(400, 'empty file');
+      if (
+        statSync(existing).size !== bytes ||
+        (await digestFile(existing)) !== incomingHash.digest('hex')
+      ) {
+        throw statusError(409, 'uploadId was already used for different file bytes');
       }
       return { path: existing, name, mime: normalized, bytes };
     }
@@ -486,7 +510,7 @@ export async function saveFile(
     let partialCleanupFailed = false;
 
     try {
-      file = await open(partialPath, "wx", 0o600);
+      file = await open(partialPath, 'wx', 0o600);
       for await (const value of chunks) {
         const chunk = Buffer.isBuffer(value)
           ? value
@@ -499,12 +523,12 @@ export async function saveFile(
         let offset = 0;
         while (offset < chunk.byteLength) {
           const result = await file.write(chunk, offset, chunk.byteLength - offset, null);
-          if (result.bytesWritten === 0) throw new Error("file write made no progress");
+          if (result.bytesWritten === 0) throw new Error('file write made no progress');
           offset += result.bytesWritten;
         }
         bytes += chunk.byteLength;
       }
-      if (bytes === 0) throw statusError(400, "empty file");
+      if (bytes === 0) throw statusError(400, 'empty file');
       await file.close();
       closed = true;
       try {
@@ -513,16 +537,21 @@ export async function saveFile(
         addCommittedBytes(bytes, accountingVersion);
         await unlink(partialPath);
       } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
-        if (statSync(path).size !== bytes || await digestFile(path) !== await digestFile(partialPath)) {
-          throw statusError(409, "uploadId was already used for different file bytes");
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+        if (
+          statSync(path).size !== bytes ||
+          (await digestFile(path)) !== (await digestFile(partialPath))
+        ) {
+          throw statusError(409, 'uploadId was already used for different file bytes');
         }
         await unlink(partialPath);
       }
       return { path, name, mime: normalized, bytes };
     } catch (error) {
       if (file && !closed) await file.close().catch(() => undefined);
-      await unlink(partialPath).catch(() => { partialCleanupFailed = true; });
+      await unlink(partialPath).catch(() => {
+        partialCleanupFailed = true;
+      });
       throw error;
     } finally {
       activePartials.delete(partialPath);
@@ -536,22 +565,33 @@ export async function saveFile(
 /** An attachment another computer's chats name, kept under that name: counted against the store's limit like any
  * upload (507 when it is full), written under a partial name cleanup knows, never over a file already here, and never
  * leaving a partial file behind. `stored`: false when the same file was here already. */
-export async function saveNamedAttachment(name: string, chunks: AsyncIterable<Uint8Array>, expectedBytes?: number): Promise<{ stored: boolean }> {
-  if (expectedBytes !== undefined && expectedBytes > FILE_MAX_BYTES) throw statusError(413, `attachments are limited to ${FILE_MAX_BYTES} bytes`);
+export async function saveNamedAttachment(
+  name: string,
+  chunks: AsyncIterable<Uint8Array>,
+  expectedBytes?: number,
+): Promise<{ stored: boolean }> {
+  if (expectedBytes !== undefined && expectedBytes > FILE_MAX_BYTES)
+    throw statusError(413, `attachments are limited to ${FILE_MAX_BYTES} bytes`);
   ensureAttachmentsDir();
   const path = join(ATTACHMENTS_DIR, name);
-  const partialPath = join(ATTACHMENTS_DIR, `.openmaus-upload-${randomUUID()}-${randomUUID()}.partial`);
+  const partialPath = join(
+    ATTACHMENTS_DIR,
+    `.openmaus-upload-${randomUUID()}-${randomUUID()}.partial`,
+  );
   const reservation = new AttachmentReservation();
   activePartials.add(partialPath);
   let file: Awaited<ReturnType<typeof open>> | undefined;
   let partialCleanupFailed = false;
   try {
     if (expectedBytes) reservation.reserve(expectedBytes);
-    file = await open(partialPath, "wx", 0o600);
+    file = await open(partialPath, 'wx', 0o600);
     let bytes = 0;
     for await (const value of chunks) {
-      const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-      if (bytes + chunk.byteLength > FILE_MAX_BYTES) throw statusError(413, `attachments are limited to ${FILE_MAX_BYTES} bytes`);
+      const chunk = Buffer.isBuffer(value)
+        ? value
+        : Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+      if (bytes + chunk.byteLength > FILE_MAX_BYTES)
+        throw statusError(413, `attachments are limited to ${FILE_MAX_BYTES} bytes`);
       reservation.ensure(bytes + chunk.byteLength);
       await file.write(chunk);
       bytes += chunk.byteLength;
@@ -559,16 +599,19 @@ export async function saveNamedAttachment(name: string, chunks: AsyncIterable<Ui
     await file.close();
     file = undefined;
     const accountingVersion = attachmentAccountingVersion;
-    try { await link(partialPath, path); }
-    catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "EEXIST") return { stored: false };
+    try {
+      await link(partialPath, path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') return { stored: false };
       throw error;
     }
     addCommittedBytes(bytes, accountingVersion);
     return { stored: true };
   } finally {
     if (file) await file.close().catch(() => undefined);
-    await unlink(partialPath).catch(() => { partialCleanupFailed = true; });
+    await unlink(partialPath).catch(() => {
+      partialCleanupFailed = true;
+    });
     activePartials.delete(partialPath);
     if (partialCleanupFailed) invalidateAttachmentAccounting();
     reservation.release();
@@ -576,10 +619,14 @@ export async function saveNamedAttachment(name: string, chunks: AsyncIterable<Ui
 }
 
 /** The UUID filename is never attacker-controlled and never collides. */
-export function saveImage(bytes: Buffer, mime: string, requestedUploadId?: string): SavedAttachment {
+export function saveImage(
+  bytes: Buffer,
+  mime: string,
+  requestedUploadId?: string,
+): SavedAttachment {
   const ext = extensionForMime(mime);
-  if (!ext) throw Object.assign(new Error("unsupported image type"), { status: 400 });
-  if (bytes.byteLength === 0) throw Object.assign(new Error("empty image"), { status: 400 });
+  if (!ext) throw Object.assign(new Error('unsupported image type'), { status: 400 });
+  if (bytes.byteLength === 0) throw Object.assign(new Error('empty image'), { status: 400 });
   if (bytes.byteLength > IMAGE_MAX_BYTES) {
     throw Object.assign(new Error(`image exceeds ${IMAGE_MAX_BYTES} bytes`), { status: 413 });
   }
@@ -589,9 +636,13 @@ export function saveImage(bytes: Buffer, mime: string, requestedUploadId?: strin
   if (existing) {
     const saved = readFileSync(existing);
     if (!saved.equals(bytes)) {
-      throw statusError(409, "uploadId was already used for different image bytes");
+      throw statusError(409, 'uploadId was already used for different image bytes');
     }
-    return { path: existing, mime: mime.split(";")[0]!.trim().toLowerCase(), bytes: bytes.byteLength };
+    return {
+      path: existing,
+      mime: mime.split(';')[0]!.trim().toLowerCase(),
+      bytes: bytes.byteLength,
+    };
   }
 
   const reservation = new AttachmentReservation();
@@ -603,19 +654,19 @@ export function saveImage(bytes: Buffer, mime: string, requestedUploadId?: strin
   activePartials.add(partialPath);
   let partialCleanupFailed = false;
   try {
-    writeFileSync(partialPath, bytes, { mode: 0o600, flag: "wx" });
+    writeFileSync(partialPath, bytes, { mode: 0o600, flag: 'wx' });
     try {
       linkSync(partialPath, path);
       addCommittedBytes(bytes.byteLength);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       const saved = readFileSync(path);
       if (!saved.equals(bytes)) {
-        throw statusError(409, "uploadId was already used for different image bytes");
+        throw statusError(409, 'uploadId was already used for different image bytes');
       }
     }
     unlinkSync(partialPath);
-    return { path, mime: mime.split(";")[0]!.trim().toLowerCase(), bytes: bytes.byteLength };
+    return { path, mime: mime.split(';')[0]!.trim().toLowerCase(), bytes: bytes.byteLength };
   } catch (error) {
     try {
       unlinkSync(partialPath);
@@ -632,18 +683,18 @@ export function saveImage(bytes: Buffer, mime: string, requestedUploadId?: strin
 
 /** Cloud voices answer in MP3; the built-in Mac voices (`say`) and Chatterbox answer in WAV. */
 const AUDIO_MIMES: Readonly<Record<string, { mime: string; ext: string }>> = {
-  "audio/mpeg": { mime: "audio/mpeg", ext: ".mp3" },
-  "audio/wav": { mime: "audio/wav", ext: ".wav" },
-  "audio/x-wav": { mime: "audio/wav", ext: ".wav" },
-  "audio/wave": { mime: "audio/wav", ext: ".wav" },
+  'audio/mpeg': { mime: 'audio/mpeg', ext: '.mp3' },
+  'audio/wav': { mime: 'audio/wav', ext: '.wav' },
+  'audio/x-wav': { mime: 'audio/wav', ext: '.wav' },
+  'audio/wave': { mime: 'audio/wav', ext: '.wav' },
 };
 
 export function saveAudio(bytes: Buffer, mime: string): SavedAttachment {
-  const format = AUDIO_MIMES[mime.split(";")[0]!.trim().toLowerCase()];
+  const format = AUDIO_MIMES[mime.split(';')[0]!.trim().toLowerCase()];
   if (!format) {
-    throw Object.assign(new Error("unsupported audio type"), { status: 400 });
+    throw Object.assign(new Error('unsupported audio type'), { status: 400 });
   }
-  if (bytes.byteLength === 0) throw Object.assign(new Error("empty audio"), { status: 400 });
+  if (bytes.byteLength === 0) throw Object.assign(new Error('empty audio'), { status: 400 });
   // Saved from memory and served whole by readAttachment, so held to the preview size, not the streamed store limit.
   if (bytes.byteLength > PREVIEW_MAX_BYTES) {
     throw Object.assign(new Error(`audio exceeds ${PREVIEW_MAX_BYTES} bytes`), { status: 413 });
@@ -658,15 +709,17 @@ export function saveAudio(bytes: Buffer, mime: string): SavedAttachment {
   activePartials.add(partialPath);
   let partialCleanupFailed = false;
   try {
-    writeFileSync(partialPath, bytes, { mode: 0o600, flag: "wx" });
+    writeFileSync(partialPath, bytes, { mode: 0o600, flag: 'wx' });
     try {
       linkSync(partialPath, path);
       addCommittedBytes(bytes.byteLength);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       const saved = readFileSync(path);
       if (!saved.equals(bytes)) {
-        throw Object.assign(new Error("audio destination already exists with different bytes"), { status: 409 });
+        throw Object.assign(new Error('audio destination already exists with different bytes'), {
+          status: 409,
+        });
       }
     }
     unlinkSync(partialPath);
@@ -711,7 +764,7 @@ export function attachmentExists(name: string): boolean {
 export function readAttachment(name: string): { bytes: Buffer; mime: string } | null {
   if (!/^[A-Za-z0-9-]+\.(png|jpg|jpeg|gif|webp|mp3|wav)$/.test(name)) return null;
   const path = join(ATTACHMENTS_DIR, name);
-  if (extname(path) === ".jpeg") return null;
+  if (extname(path) === '.jpeg') return null;
   try {
     return { bytes: readFileSync(path), mime: mimeForExt(extname(path)) };
   } catch {
@@ -721,48 +774,46 @@ export function readAttachment(name: string): { bytes: Buffer; mime: string } | 
 
 function mimeForExt(ext: string): string {
   switch (ext) {
-    case ".png":
-      return "image/png";
-    case ".jpg":
-      return "image/jpeg";
-    case ".gif":
-      return "image/gif";
-    case ".webp":
-      return "image/webp";
-    case ".mp3":
-      return "audio/mpeg";
-    case ".wav":
-      return "audio/wav";
+    case '.png':
+      return 'image/png';
+    case '.jpg':
+      return 'image/jpeg';
+    case '.gif':
+      return 'image/gif';
+    case '.webp':
+      return 'image/webp';
+    case '.mp3':
+      return 'audio/mpeg';
+    case '.wav':
+      return 'audio/wav';
     default:
-      return "application/octet-stream";
+      return 'application/octet-stream';
   }
 }
 
 /** `none`: answer as if no Range header (absent, malformed, non-bytes, multi-range); `unsatisfiable`: a start at or past EOF, answered 416. */
 export type AudioRange =
-  | { kind: "none" }
-  | { kind: "unsatisfiable" }
-  | { kind: "range"; start: number; end: number };
+  { kind: 'none' } | { kind: 'unsatisfiable' } | { kind: 'range'; start: number; end: number };
 
 /** Honours only `a-b`, `a-` and `-n`; anything else gets the whole file, always a correct answer to a GET. */
 export function parseAudioRange(header: string | undefined, size: number): AudioRange {
   const raw = header?.trim();
-  if (!raw) return { kind: "none" };
+  if (!raw) return { kind: 'none' };
   const m = raw.match(/^bytes=(\d*)-(\d*)$/);
-  if (!m) return { kind: "none" };
+  if (!m) return { kind: 'none' };
   const [, rawStart, rawEnd] = m;
-  if (rawStart === "") {
+  if (rawStart === '') {
     // `bytes=-` is malformed, not a suffix range; `bytes=-0` is unsatisfiable per RFC 9110.
-    if (rawEnd === "") return { kind: "none" };
+    if (rawEnd === '') return { kind: 'none' };
     const suffix = Number(rawEnd);
-    if (!suffix) return { kind: "unsatisfiable" };
-    if (size === 0) return { kind: "unsatisfiable" };
-    return { kind: "range", start: Math.max(0, size - suffix), end: size - 1 };
+    if (!suffix) return { kind: 'unsatisfiable' };
+    if (size === 0) return { kind: 'unsatisfiable' };
+    return { kind: 'range', start: Math.max(0, size - suffix), end: size - 1 };
   }
   const start = Number(rawStart);
-  if (start >= size) return { kind: "unsatisfiable" };
-  if (rawEnd === "") return { kind: "range", start, end: size - 1 };
+  if (start >= size) return { kind: 'unsatisfiable' };
+  if (rawEnd === '') return { kind: 'range', start, end: size - 1 };
   const end = Number(rawEnd);
-  if (end < start) return { kind: "none" };
-  return { kind: "range", start, end: Math.min(end, size - 1) };
+  if (end < start) return { kind: 'none' };
+  return { kind: 'range', start, end: Math.min(end, size - 1) };
 }

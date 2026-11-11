@@ -1,28 +1,28 @@
-import { lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
-import type { Stats } from "node:fs";
-import { dirname, isAbsolute, join } from "node:path";
-import { SPAWNED_PROXIES } from "./proxy-paths.ts";
+import { lstatSync, readFileSync, realpathSync, statSync } from 'node:fs';
+import type { Stats } from 'node:fs';
+import { dirname, isAbsolute, join } from 'node:path';
+import { SPAWNED_PROXIES } from './proxy-paths.ts';
 
-export const REQUIRED_LINUX_TOOLS = ["click", "get_window_state", "list_apps", "type_text"];
+export const REQUIRED_LINUX_TOOLS = ['click', 'get_window_state', 'list_apps', 'type_text'];
 // Keep in sync with DRIVER_FILE_IDENTITY_KEYS in electron/cua-linux.cjs: Electron publishes it, the server revalidates it.
 export const DRIVER_FILE_IDENTITY_KEYS = [
-  "dev",
-  "ino",
-  "uid",
-  "gid",
-  "mode",
-  "size",
-  "mtimeNs",
-  "ctimeNs",
+  'dev',
+  'ino',
+  'uid',
+  'gid',
+  'mode',
+  'size',
+  'mtimeNs',
+  'ctimeNs',
 ] as const;
 
 export type LocalComputerConnection = {
   command: string;
   args: string[];
   env: Record<string, string>;
-  platform: "darwin" | "linux" | "win32";
+  platform: 'darwin' | 'linux' | 'win32';
   generation?: string;
-  scope: "local-computer";
+  scope: 'local-computer';
 };
 
 /** `journal`: the bridge records each computer call for saved steps. */
@@ -34,17 +34,17 @@ export function gatedLocalComputer(
   return {
     ...connection,
     command: process.execPath,
-    args: ["--experimental-strip-types", SPAWNED_PROXIES.localComputer],
+    args: ['--experimental-strip-types', SPAWNED_PROXIES.localComputer],
     env: {
       ...connection.env,
       // Packaged, execPath is Electron: without this the MCP client relaunches OMB instead of the headless gate.
-      ELECTRON_RUN_AS_NODE: "1",
+      ELECTRON_RUN_AS_NODE: '1',
       OMB_CUA_COMMAND: connection.command,
       OMB_CUA_ARGS: JSON.stringify(connection.args),
       OMB_CUA_PLATFORM: connection.platform,
       OMB_CONTROL_URL: control.url,
       OMB_CONTROL_TOKEN: control.token,
-      OMB_COMPUTER_JOURNAL: journal ? "1" : "0",
+      OMB_COMPUTER_JOURNAL: journal ? '1' : '0',
     },
   };
 }
@@ -62,22 +62,27 @@ type LinuxConnectionDescriptor = Record<string, unknown>;
 
 function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
   const expected = new Set(keys);
-  return Object.keys(value).length === expected.size && Object.keys(value).every((key) => expected.has(key));
+  return (
+    Object.keys(value).length === expected.size &&
+    Object.keys(value).every((key) => expected.has(key))
+  );
 }
 
-function legacyPlatform(platform: NodeJS.Platform): "darwin" | "win32" | null {
-  if (platform === "darwin" || platform === "win32") return platform;
+function legacyPlatform(platform: NodeJS.Platform): 'darwin' | 'win32' | null {
+  if (platform === 'darwin' || platform === 'win32') return platform;
   return null;
 }
 
 function validDriverFileIdentity(value: unknown): value is Record<string, string> {
   return (
     Boolean(value) &&
-    typeof value === "object" &&
+    typeof value === 'object' &&
     !Array.isArray(value) &&
     exactKeys(value as Record<string, unknown>, DRIVER_FILE_IDENTITY_KEYS) &&
     DRIVER_FILE_IDENTITY_KEYS.every(
-      (key) => typeof (value as Record<string, unknown>)[key] === "string" && /^\d+$/.test((value as Record<string, string>)[key]),
+      (key) =>
+        typeof (value as Record<string, unknown>)[key] === 'string' &&
+        /^\d+$/.test((value as Record<string, string>)[key]),
     )
   );
 }
@@ -108,78 +113,89 @@ function decodeLegacyDescriptor(
   platform: NodeJS.Platform,
 ): LocalComputerConnection | null {
   const supportedPlatform = legacyPlatform(platform);
-  if (!supportedPlatform || !value ||
-      !(value.mode === "embedded" || (supportedPlatform === "darwin" && value.mode === "standalone")) ||
-      (Object.hasOwn(value, "status") && value.status !== "ready") ||
-      typeof value.socketPath !== "string" || !value.socketPath ||
-      typeof value.mcpCommand !== "string" || !value.mcpCommand.trim()) {
+  if (
+    !supportedPlatform ||
+    !value ||
+    !(
+      value.mode === 'embedded' ||
+      (supportedPlatform === 'darwin' && value.mode === 'standalone')
+    ) ||
+    (Object.hasOwn(value, 'status') && value.status !== 'ready') ||
+    typeof value.socketPath !== 'string' ||
+    !value.socketPath ||
+    typeof value.mcpCommand !== 'string' ||
+    !value.mcpCommand.trim()
+  ) {
     return null;
   }
-  if (!Array.isArray(value.mcpArgs) || value.mcpArgs[0] !== "mcp") return null;
-  if (!value.mcpEnv || typeof value.mcpEnv !== "object" || Array.isArray(value.mcpEnv)) return null;
+  if (!Array.isArray(value.mcpArgs) || value.mcpArgs[0] !== 'mcp') return null;
+  if (!value.mcpEnv || typeof value.mcpEnv !== 'object' || Array.isArray(value.mcpEnv)) return null;
   const args = value.mcpArgs;
-  if (!args.every((arg) => typeof arg === "string")) return null;
+  if (!args.every((arg) => typeof arg === 'string')) return null;
   const env = value.mcpEnv;
-  if (!Object.values(env).every((entry) => typeof entry === "string")) return null;
+  if (!Object.values(env).every((entry) => typeof entry === 'string')) return null;
   return {
     command: value.mcpCommand,
     args,
     env: env as Record<string, string>,
     platform: supportedPlatform,
-    scope: "local-computer",
+    scope: 'local-computer',
   };
 }
 
-const CERTIFIED_LINUX_DRIVER = "0.41.3";
+const CERTIFIED_LINUX_DRIVER = '0.41.3';
 
 /** The certified build from any source; on Omarchy also the package-owned system driver of the same minor line at or
  * above it (electron/cua-linux.cjs `compatibleSystemDriverVersion`). */
 function acceptedDriverVersion(version: unknown, source: unknown, hyprland: boolean): boolean {
-  if (["bundled", "environment", "user-local", "path"].includes(String(source))) return version === CERTIFIED_LINUX_DRIVER;
-  if (source !== "system-package" || !hyprland || typeof version !== "string") return false;
-  const [major, minor, patch] = CERTIFIED_LINUX_DRIVER.split(".").map(Number);
+  if (['bundled', 'environment', 'user-local', 'path'].includes(String(source)))
+    return version === CERTIFIED_LINUX_DRIVER;
+  if (source !== 'system-package' || !hyprland || typeof version !== 'string') return false;
+  const [major, minor, patch] = CERTIFIED_LINUX_DRIVER.split('.').map(Number);
   const found = /^(\d+)\.(\d+)\.(\d+)$/.exec(version)?.slice(1).map(Number);
   return Boolean(found && found[0] === major && found[1] === minor && found[2]! >= patch!);
 }
 
-export function decodeLinuxDescriptor(value: LinuxConnectionDescriptor): LocalComputerConnection | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const x11 = value.mode === "linux-x11-supervised" && value.session === "x11";
+export function decodeLinuxDescriptor(
+  value: LinuxConnectionDescriptor,
+): LocalComputerConnection | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const x11 = value.mode === 'linux-x11-supervised' && value.session === 'x11';
   const hyprland =
-    value.mode === "linux-wayland-hyprland-supervised" &&
-    value.session === "wayland" &&
-    value.compositor === "hyprland";
+    value.mode === 'linux-wayland-hyprland-supervised' &&
+    value.session === 'wayland' &&
+    value.compositor === 'hyprland';
   const wayland =
     hyprland ||
-    (value.mode === "linux-wayland-gnome-supervised" &&
-      value.session === "wayland" &&
-      value.compositor === "gnome-mutter");
+    (value.mode === 'linux-wayland-gnome-supervised' &&
+      value.session === 'wayland' &&
+      value.compositor === 'gnome-mutter');
   const descriptorKeys = [
-    "schemaVersion",
-    "mode",
-    "platform",
-    "session",
-    "enabled",
-    "status",
-    "ownerPid",
-    "generation",
-    "driver",
-    "daemon",
-    "mcp",
-    "toolNames",
-    "doctorWarnings",
-    ...(wayland ? ["compositor"] : []),
+    'schemaVersion',
+    'mode',
+    'platform',
+    'session',
+    'enabled',
+    'status',
+    'ownerPid',
+    'generation',
+    'driver',
+    'daemon',
+    'mcp',
+    'toolNames',
+    'doctorWarnings',
+    ...(wayland ? ['compositor'] : []),
   ];
   if (
     (!x11 && !wayland) ||
     !exactKeys(value, descriptorKeys) ||
     value.schemaVersion !== 1 ||
-    value.platform !== "linux" ||
+    value.platform !== 'linux' ||
     value.enabled !== true ||
-    value.status !== "ready" ||
+    value.status !== 'ready' ||
     !Number.isInteger(value.ownerPid) ||
     (value.ownerPid as number) <= 0 ||
-    typeof value.generation !== "string" ||
+    typeof value.generation !== 'string' ||
     !/^[0-9a-f-]{32,64}$/i.test(value.generation)
   ) {
     return null;
@@ -195,62 +211,62 @@ export function decodeLinuxDescriptor(value: LinuxConnectionDescriptor): LocalCo
     Array.isArray(driver) ||
     Array.isArray(daemon) ||
     Array.isArray(mcp) ||
-    !exactKeys(driver, ["path", "version", "source", "manifestSchema", "fileIdentity"]) ||
+    !exactKeys(driver, ['path', 'version', 'source', 'manifestSchema', 'fileIdentity']) ||
     !exactKeys(daemon, [
-      "socketPath",
-      "pid",
-      "contractVersion",
-      "toolsListSchemaVersion",
-      "capabilityVersion",
-      "mcpProtocolVersion",
+      'socketPath',
+      'pid',
+      'contractVersion',
+      'toolsListSchemaVersion',
+      'capabilityVersion',
+      'mcpProtocolVersion',
     ]) ||
-    !exactKeys(mcp, ["command", "args", "env"])
+    !exactKeys(mcp, ['command', 'args', 'env'])
   ) {
     return null;
   }
   if (
-    typeof driver.path !== "string" ||
+    typeof driver.path !== 'string' ||
     !isAbsolute(driver.path) ||
     !acceptedDriverVersion(driver.version, driver.source, hyprland) ||
-    driver.manifestSchema !== "1" ||
+    driver.manifestSchema !== '1' ||
     !validDriverFileIdentity(driver.fileIdentity) ||
-    typeof daemon.socketPath !== "string" ||
+    typeof daemon.socketPath !== 'string' ||
     !isAbsolute(daemon.socketPath) ||
     !Number.isInteger(daemon.pid) ||
     (daemon.pid as number) <= 0 ||
-    daemon.contractVersion !== "0.8.0" ||
-    daemon.toolsListSchemaVersion !== "1" ||
-    daemon.capabilityVersion !== "1" ||
-    daemon.mcpProtocolVersion !== "2025-06-18" ||
+    daemon.contractVersion !== '0.8.0' ||
+    daemon.toolsListSchemaVersion !== '1' ||
+    daemon.capabilityVersion !== '1' ||
+    daemon.mcpProtocolVersion !== '2025-06-18' ||
     mcp.command !== driver.path ||
     !Array.isArray(mcp.args) ||
     mcp.args.length !== 4 ||
-    mcp.args[0] !== "mcp" ||
-    mcp.args[1] !== "--embedded" ||
-    mcp.args[2] !== "--socket" ||
+    mcp.args[0] !== 'mcp' ||
+    mcp.args[1] !== '--embedded' ||
+    mcp.args[2] !== '--socket' ||
     mcp.args[3] !== daemon.socketPath ||
     !mcp.env ||
-    typeof mcp.env !== "object" ||
+    typeof mcp.env !== 'object' ||
     Array.isArray(mcp.env) ||
     !exactKeys(mcp.env as Record<string, unknown>, [
-      "CUA_DRIVER_EMBEDDED",
-      "CUA_DRIVER_HOST_BUNDLE_ID",
-      "CUA_DRIVER_RS_UPDATE_CHECK",
-      "CUA_DRIVER_RS_TELEMETRY_ENABLED",
-      ...(wayland ? ["CUA_DRIVER_RS_ENABLE_WAYLAND"] : []),
+      'CUA_DRIVER_EMBEDDED',
+      'CUA_DRIVER_HOST_BUNDLE_ID',
+      'CUA_DRIVER_RS_UPDATE_CHECK',
+      'CUA_DRIVER_RS_TELEMETRY_ENABLED',
+      ...(wayland ? ['CUA_DRIVER_RS_ENABLE_WAYLAND'] : []),
     ]) ||
-    (mcp.env as Record<string, unknown>).CUA_DRIVER_EMBEDDED !== "1" ||
-    (mcp.env as Record<string, unknown>).CUA_DRIVER_HOST_BUNDLE_ID !== "com.openmausbot.app" ||
-    (mcp.env as Record<string, unknown>).CUA_DRIVER_RS_UPDATE_CHECK !== "false" ||
-    (mcp.env as Record<string, unknown>).CUA_DRIVER_RS_TELEMETRY_ENABLED !== "false" ||
-    (wayland && (mcp.env as Record<string, unknown>).CUA_DRIVER_RS_ENABLE_WAYLAND !== "1")
+    (mcp.env as Record<string, unknown>).CUA_DRIVER_EMBEDDED !== '1' ||
+    (mcp.env as Record<string, unknown>).CUA_DRIVER_HOST_BUNDLE_ID !== 'com.openmausbot.app' ||
+    (mcp.env as Record<string, unknown>).CUA_DRIVER_RS_UPDATE_CHECK !== 'false' ||
+    (mcp.env as Record<string, unknown>).CUA_DRIVER_RS_TELEMETRY_ENABLED !== 'false' ||
+    (wayland && (mcp.env as Record<string, unknown>).CUA_DRIVER_RS_ENABLE_WAYLAND !== '1')
   ) {
     return null;
   }
 
   if (
     !Array.isArray(value.toolNames) ||
-    value.toolNames.some((name) => typeof name !== "string") ||
+    value.toolNames.some((name) => typeof name !== 'string') ||
     REQUIRED_LINUX_TOOLS.some((name) => !(value.toolNames as string[]).includes(name)) ||
     !Array.isArray(value.doctorWarnings)
   ) {
@@ -259,14 +275,16 @@ export function decodeLinuxDescriptor(value: LinuxConnectionDescriptor): LocalCo
   for (const warning of value.doctorWarnings) {
     if (
       !warning ||
-      typeof warning !== "object" ||
+      typeof warning !== 'object' ||
       Array.isArray(warning) ||
       ![3, 4].includes(Object.keys(warning).length) ||
-      !Object.keys(warning).every((key) => ["label", "status", "message", "detail"].includes(key)) ||
-      typeof warning.label !== "string" ||
-      warning.status !== "warn" ||
-      typeof warning.message !== "string" ||
-      (warning.detail !== undefined && typeof warning.detail !== "string")
+      !Object.keys(warning).every((key) =>
+        ['label', 'status', 'message', 'detail'].includes(key),
+      ) ||
+      typeof warning.label !== 'string' ||
+      warning.status !== 'warn' ||
+      typeof warning.message !== 'string' ||
+      (warning.detail !== undefined && typeof warning.detail !== 'string')
     ) {
       return null;
     }
@@ -276,9 +294,9 @@ export function decodeLinuxDescriptor(value: LinuxConnectionDescriptor): LocalCo
     command: driver.path,
     args: [...(mcp.args as string[])],
     env: { ...(mcp.env as Record<string, string>) },
-    platform: "linux",
+    platform: 'linux',
     generation: value.generation,
-    scope: "local-computer",
+    scope: 'local-computer',
   };
 }
 
@@ -369,7 +387,7 @@ function validateLegacyDescriptorRuntime(
   try {
     const stat = lstatSync(descriptorFile);
     if (!stat.isFile() || stat.isSymbolicLink()) return false;
-    if (platform !== "win32" && (stat.uid !== uid || (stat.mode & 0o022) !== 0)) return false;
+    if (platform !== 'win32' && (stat.uid !== uid || (stat.mode & 0o022) !== 0)) return false;
     return true;
   } catch {
     return false;
@@ -387,8 +405,8 @@ export function decodeCuaConnection(
     validateLinuxRuntime?: (raw: LinuxConnectionDescriptor) => boolean;
   } = {},
 ): LocalComputerConnection | null {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  if (platform === "linux") {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (platform === 'linux') {
     const decoded = decodeLinuxDescriptor(raw as LinuxConnectionDescriptor);
     return decoded && validateLinuxRuntime(raw as LinuxConnectionDescriptor) ? decoded : null;
   }
@@ -396,12 +414,18 @@ export function decodeCuaConnection(
 }
 
 /** Why the driver is not ready, from a macOS/Windows record that says so and says nothing else; never a connection. */
-export function cuaUnavailableReason(raw: unknown, platform: NodeJS.Platform = process.platform): string | null {
-  if (!legacyPlatform(platform) || !raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+export function cuaUnavailableReason(
+  raw: unknown,
+  platform: NodeJS.Platform = process.platform,
+): string | null {
+  if (!legacyPlatform(platform) || !raw || typeof raw !== 'object' || Array.isArray(raw))
+    return null;
   const record = raw as Record<string, unknown>;
-  if (Object.keys(record).length !== 2 || record.mode !== "unavailable") return null;
+  if (Object.keys(record).length !== 2 || record.mode !== 'unavailable') return null;
   const reason = record.reason;
-  return typeof reason === "string" && reason.trim() && reason.length <= 2_000 ? reason.trim() : null;
+  return typeof reason === 'string' && reason.trim() && reason.length <= 2_000
+    ? reason.trim()
+    : null;
 }
 
 /** The desktop app's own record of its driver, read only by the packaging smoke check. No server mounts this computer from
@@ -418,10 +442,14 @@ export function readCuaConnection({
   validateLegacyRuntime?: (file: string, platform: NodeJS.Platform) => boolean;
 }): LocalComputerConnection | null {
   if (!userData) return null;
-  const file = join(userData, "cua-connection.json");
+  const file = join(userData, 'cua-connection.json');
   try {
-    const raw = JSON.parse(readFileSync(file, "utf8"));
-    if (platform === "linux") return decodeCuaConnection(raw, { platform, validateLinuxRuntime: (record) => validateLinuxRuntime(file, record) });
+    const raw = JSON.parse(readFileSync(file, 'utf8'));
+    if (platform === 'linux')
+      return decodeCuaConnection(raw, {
+        platform,
+        validateLinuxRuntime: (record) => validateLinuxRuntime(file, record),
+      });
     return validateLegacyRuntime(file, platform) ? decodeCuaConnection(raw, { platform }) : null;
   } catch {
     return null;

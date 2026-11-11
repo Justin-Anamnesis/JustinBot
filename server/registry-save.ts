@@ -1,6 +1,10 @@
-import { approvalModeFor, approvalModeWidens, type ApprovalFields } from "../shared/approval-mode.ts";
-import { registrySaveFailure, type RegistryFile } from "../shared/registry-save-failure.ts";
-import type { TaskPatch } from "./store.ts";
+import {
+  approvalModeFor,
+  approvalModeWidens,
+  type ApprovalFields,
+} from '../shared/approval-mode.ts';
+import { registrySaveFailure, type RegistryFile } from '../shared/registry-save-failure.ts';
+import type { TaskPatch } from './store.ts';
 
 export class RegistrySaveError extends Error {
   constructor(action: string, file: RegistryFile, cause: unknown) {
@@ -9,15 +13,27 @@ export class RegistrySaveError extends Error {
 }
 
 export function saveRegistryFor(file: RegistryFile, action: string, save: () => void): void {
-  try { save(); } catch (error) { throw new RegistrySaveError(action, file, error); }
+  try {
+    save();
+  } catch (error) {
+    throw new RegistrySaveError(action, file, error);
+  }
 }
 
 /** Memory changes only once the file holds them; a failed save restores the record and its threads in place. */
-export function commitRegistryChange(record: { tasks?: object[] }, file: RegistryFile, action: string, save: () => void,
-  change: () => void, onRollback?: () => void): void {
+export function commitRegistryChange(
+  record: { tasks?: object[] },
+  file: RegistryFile,
+  action: string,
+  save: () => void,
+  change: () => void,
+  onRollback?: () => void,
+): void {
   const rollback = snapshot(record);
   change();
-  try { save(); } catch (error) {
+  try {
+    save();
+  } catch (error) {
     rollback();
     onRollback?.();
     throw new RegistrySaveError(action, file, error);
@@ -43,12 +59,17 @@ function restore(target: object, saved: object): void {
   Object.assign(target, saved);
 }
 
-const PERMISSION_FIELDS = ["approvalMode", "autoApprove", "alwaysAllow"] as const;
+const PERMISSION_FIELDS = ['approvalMode', 'autoApprove', 'alwaysAllow'] as const;
 
-export const touchesPermissions = (patch: TaskPatch): boolean => PERMISSION_FIELDS.some((key) => Object.hasOwn(patch, key));
+export const touchesPermissions = (patch: TaskPatch): boolean =>
+  PERMISSION_FIELDS.some((key) => Object.hasOwn(patch, key));
 
 /** A revocation stays live when its save fails; a widening never does. */
-export function keptRevocation(before: ApprovalFields, after: ApprovalFields, patch: TaskPatch): TaskPatch | undefined {
+export function keptRevocation(
+  before: ApprovalFields,
+  after: ApprovalFields,
+  patch: TaskPatch,
+): TaskPatch | undefined {
   const fields = PERMISSION_FIELDS.filter((key) => Object.hasOwn(patch, key));
   if (!fields.length) return undefined;
   const allowed = before.alwaysAllow ?? [];

@@ -8,9 +8,9 @@
 // everything a pick carries is the page's word: the host keeps only the frame's own window, clips every field, and
 // the server hands it to the model only inside a records block.
 
-export const POINT_METHOD = "mausbot/point";
-export const POINTED_METHOD = "mausbot/pointed";
-export const POINT_ENDED_METHOD = "mausbot/point-ended";
+export const POINT_METHOD = 'mausbot/point';
+export const POINTED_METHOD = 'mausbot/pointed';
+export const POINT_ENDED_METHOD = 'mausbot/point-ended';
 
 export const POINT_LIMITS = {
   text: 200,
@@ -37,23 +37,36 @@ export interface PointedElement extends PointedPart {
   rev: number;
 }
 
-export type PointEvent = { kind: "pointed"; part: PointedPart } | { kind: "ended" };
+export type PointEvent = { kind: 'pointed'; part: PointedPart } | { kind: 'ended' };
 
-export function pointMessage(on: boolean): { jsonrpc: "2.0"; method: string; params: { on: boolean } } {
-  return { jsonrpc: "2.0", method: POINT_METHOD, params: { on } };
+export function pointMessage(on: boolean): {
+  jsonrpc: '2.0';
+  method: string;
+  params: { on: boolean };
+} {
+  return { jsonrpc: '2.0', method: POINT_METHOD, params: { on } };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-const isControl = (code: number) => code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+const isControl = (code: number) =>
+  code < 0x20 || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
 
 function clipped(value: unknown, limit: number): string {
-  if (typeof value !== "string") return "";
-  const flat = Array.from(value, (char) => (isControl(char.codePointAt(0)!) ? " " : char)).join("").replace(/\s+/g, " ").trim();
+  if (typeof value !== 'string') return '';
+  const flat = Array.from(value, (char) => (isControl(char.codePointAt(0)!) ? ' ' : char))
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
   const points = Array.from(flat);
-  return points.length <= limit ? flat : `${points.slice(0, limit - 1).join("").trimEnd()}…`;
+  return points.length <= limit
+    ? flat
+    : `${points
+        .slice(0, limit - 1)
+        .join('')
+        .trimEnd()}…`;
 }
 
 const TAG = /^[a-z][a-z0-9-]{0,40}$/;
@@ -61,26 +74,35 @@ const ROLE = /^[a-z-]{1,40}$/;
 
 /** Security: only a message whose source is the frame's own window counts; any other window, or a malformed pick,
  * is dropped. */
-export function readPointEvent(event: { source: unknown; data: unknown }, frame: unknown): PointEvent | null {
+export function readPointEvent(
+  event: { source: unknown; data: unknown },
+  frame: unknown,
+): PointEvent | null {
   if (frame === null || frame === undefined || event.source !== frame) return null;
   const data = event.data;
-  if (!isRecord(data) || data.jsonrpc !== "2.0" || "id" in data) return null;
-  if (data.method === POINT_ENDED_METHOD) return { kind: "ended" };
+  if (!isRecord(data) || data.jsonrpc !== '2.0' || 'id' in data) return null;
+  if (data.method === POINT_ENDED_METHOD) return { kind: 'ended' };
   if (data.method !== POINTED_METHOD || !isRecord(data.params)) return null;
   const params = data.params;
-  const tag = typeof params.tag === "string" ? params.tag.toLowerCase() : "";
+  const tag = typeof params.tag === 'string' ? params.tag.toLowerCase() : '';
   if (!TAG.test(tag)) return null;
-  const role = typeof params.role === "string" && ROLE.test(params.role) ? params.role : "";
+  const role = typeof params.role === 'string' && ROLE.test(params.role) ? params.role : '';
   const selector = clipped(params.selector, POINT_LIMITS.selector);
   if (!selector) return null;
   return {
-    kind: "pointed",
-    part: { tag, role, text: clipped(params.text, POINT_LIMITS.text), selector, html: clipped(params.html, POINT_LIMITS.html) },
+    kind: 'pointed',
+    part: {
+      tag,
+      role,
+      text: clipped(params.text, POINT_LIMITS.text),
+      selector,
+      html: clipped(params.html, POINT_LIMITS.html),
+    },
   };
 }
 
 /** The chip's words: the part's own text, quoted; null when it has none, so the caller says "a part of the page". */
-export function pointedLabel(part: Pick<PointedPart, "text">): string | null {
+export function pointedLabel(part: Pick<PointedPart, 'text'>): string | null {
   const text = clipped(part.text, POINT_LIMITS.label);
   return text ? `“${text}”` : null;
 }

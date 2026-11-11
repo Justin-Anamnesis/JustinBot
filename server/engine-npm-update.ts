@@ -3,24 +3,43 @@
 // the old one's place by rename (same filesystem) and its commands are moved next to it. npm writes those commands with
 // paths relative to the prefix (POSIX links into ../lib/node_modules, Windows shims through %~dp0), so they work from
 // either prefix. The old folder waits aside until the moved copy has started again, and comes back on any failure.
-import { randomUUID } from "node:crypto";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { lstat, mkdir, readFile, readlink, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
-import { stripVTControlCharacters } from "node:util";
-
-import { DATA_DIR } from "./config.ts";
+import { randomUUID } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import {
-  enginesPrefix, npmBinIn, npmEnvironment, npmInstallArgs, npmModulesIn, NPM_INSTALL_TIMEOUT_MS, oneNpmRunPer, PROBE_TIMEOUT_MS, runNpm, tail,
-} from "./engine-install.ts";
-import { replaceFile } from "./engine-standalone.ts";
-import { resetPathCache } from "./env-path.ts";
-import { execCli } from "./procs.ts";
+  lstat,
+  mkdir,
+  readFile,
+  readlink,
+  rename,
+  rm,
+  symlink,
+  unlink,
+  writeFile,
+} from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
+import { stripVTControlCharacters } from 'node:util';
 
-const STAGING_PREFIX = ".npm-staging-";
-const ASIDE_PREFIX = ".npm-aside-";
-const ASIDE_RECORD = "aside.json";
-const ASIDE_PACKAGE = "package";
+import { DATA_DIR } from './config.ts';
+import {
+  enginesPrefix,
+  npmBinIn,
+  npmEnvironment,
+  npmInstallArgs,
+  npmModulesIn,
+  NPM_INSTALL_TIMEOUT_MS,
+  oneNpmRunPer,
+  PROBE_TIMEOUT_MS,
+  runNpm,
+  tail,
+} from './engine-install.ts';
+import { replaceFile } from './engine-standalone.ts';
+import { resetPathCache } from './env-path.ts';
+import { execCli } from './procs.ts';
+
+const STAGING_PREFIX = '.npm-staging-';
+const ASIDE_PREFIX = '.npm-aside-';
+const ASIDE_RECORD = 'aside.json';
+const ASIDE_PACKAGE = 'package';
 
 export interface StagedNpmUpdate {
   pkg: string;
@@ -44,15 +63,19 @@ function toolsDir(baseDir: string): string {
 }
 
 function packageDir(prefix: string, pkg: string): string {
-  return join(npmModulesIn(prefix), ...pkg.split("/"));
+  return join(npmModulesIn(prefix), ...pkg.split('/'));
 }
 
 /** The commands a package declares, as npm names them. */
 export function npmCommandNames(dir: string, pkg: string): string[] {
   try {
-    const { bin } = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { bin?: unknown };
-    if (typeof bin === "string") return [basename(pkg)];
-    return bin && typeof bin === "object" ? Object.keys(bin).filter((name) => /^[\w.-]+$/u.test(name)) : [];
+    const { bin } = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as {
+      bin?: unknown;
+    };
+    if (typeof bin === 'string') return [basename(pkg)];
+    return bin && typeof bin === 'object'
+      ? Object.keys(bin).filter((name) => /^[\w.-]+$/u.test(name))
+      : [];
   } catch {
     return [];
   }
@@ -60,47 +83,79 @@ export function npmCommandNames(dir: string, pkg: string): string[] {
 
 /** What npm puts in its bin folder for one command: a link on POSIX, three shims on Windows. */
 function commandEntries(name: string): string[] {
-  return process.platform === "win32" ? [name, `${name}.cmd`, `${name}.ps1`] : [name];
+  return process.platform === 'win32' ? [name, `${name}.cmd`, `${name}.ps1`] : [name];
 }
 
 function commandPath(prefix: string, name: string): string {
-  return join(npmBinIn(prefix), process.platform === "win32" ? `${name}.cmd` : name);
+  return join(npmBinIn(prefix), process.platform === 'win32' ? `${name}.cmd` : name);
 }
 
 /** Null when `<command> --version` exits cleanly and names `version`; otherwise what went wrong. */
-export function versionFailure(command: string, version: string, env: NodeJS.ProcessEnv): Promise<string | null> {
+export function versionFailure(
+  command: string,
+  version: string,
+  env: NodeJS.ProcessEnv,
+): Promise<string | null> {
   return new Promise((resolveProbe) => {
-    execCli(command, ["--version"], { env, timeout: PROBE_TIMEOUT_MS, killSignal: "SIGKILL", maxBuffer: 64 * 1024 }, (error, stdout, stderr) => {
-      const lines = stripVTControlCharacters(`${stdout}\n${stderr ?? ""}`).split(/\r?\n/u).map((line) => line.trim()).filter(Boolean);
-      if (error) return resolveProbe((lines.find((line) => /^\w*Error: /u.test(line)) ?? lines[0] ?? error.message).slice(0, 400));
-      if (!lines.some((line) => line.includes(version))) return resolveProbe(`it reported version ${(lines[0] ?? "nothing").slice(0, 80)}, not ${version}`);
-      resolveProbe(null);
-    });
+    execCli(
+      command,
+      ['--version'],
+      { env, timeout: PROBE_TIMEOUT_MS, killSignal: 'SIGKILL', maxBuffer: 64 * 1024 },
+      (error, stdout, stderr) => {
+        const lines = stripVTControlCharacters(`${stdout}\n${stderr ?? ''}`)
+          .split(/\r?\n/u)
+          .map((line) => line.trim())
+          .filter(Boolean);
+        if (error)
+          return resolveProbe(
+            (lines.find((line) => /^\w*Error: /u.test(line)) ?? lines[0] ?? error.message).slice(
+              0,
+              400,
+            ),
+          );
+        if (!lines.some((line) => line.includes(version)))
+          return resolveProbe(
+            `it reported version ${(lines[0] ?? 'nothing').slice(0, 80)}, not ${version}`,
+          );
+        resolveProbe(null);
+      },
+    );
   });
 }
 
-type SavedEntry = { path: string; link: string } | { path: string; data: Buffer } | { path: string; absent: true };
+type SavedEntry =
+  { path: string; link: string } | { path: string; data: Buffer } | { path: string; absent: true };
 
 async function saveEntry(path: string): Promise<SavedEntry> {
   const info = await lstat(path).catch(() => null);
   if (!info) return { path, absent: true };
-  return info.isSymbolicLink() ? { path, link: await readlink(path) } : { path, data: await readFile(path) };
+  return info.isSymbolicLink()
+    ? { path, link: await readlink(path) }
+    : { path, data: await readFile(path) };
 }
 
 async function restoreEntry(entry: SavedEntry): Promise<void> {
   await rm(entry.path, { force: true });
-  if ("link" in entry) await symlink(entry.link, entry.path);
-  else if ("data" in entry) await writeFile(entry.path, entry.data, { mode: 0o755 });
+  if ('link' in entry) await symlink(entry.link, entry.path);
+  else if ('data' in entry) await writeFile(entry.path, entry.data, { mode: 0o755 });
 }
 
 function lockedError(error: unknown): boolean {
   const code = (error as NodeJS.ErrnoException).code;
-  return code === "EPERM" || code === "EACCES" || code === "EBUSY";
+  return code === 'EPERM' || code === 'EACCES' || code === 'EBUSY';
 }
 
 /** Moves the staged package and its commands into the live prefix, keeping the old ones aside until the moved command
  * starts; on Windows a folder holding a running program cannot be renamed, which stops the switch before it begins. */
-async function switchIn(staging: string, pkg: string, version: string, command: string, env: NodeJS.ProcessEnv, baseDir: string, fs: { platform: NodeJS.Platform; rename: typeof rename }): Promise<void> {
+async function switchIn(
+  staging: string,
+  pkg: string,
+  version: string,
+  command: string,
+  env: NodeJS.ProcessEnv,
+  baseDir: string,
+  fs: { platform: NodeJS.Platform; rename: typeof rename },
+): Promise<void> {
   const prefix = enginesPrefix(baseDir);
   const live = packageDir(prefix, pkg);
   const aside = join(toolsDir(baseDir), `${ASIDE_PREFIX}${randomUUID()}`);
@@ -114,7 +169,8 @@ async function switchIn(staging: string, pkg: string, version: string, command: 
       await fs.rename(live, kept);
     } catch (error) {
       await rm(aside, { recursive: true, force: true }).catch(() => {});
-      if (fs.platform === "win32" && lockedError(error)) throw new EngineInUse(`${pkg} is still running`);
+      if (fs.platform === 'win32' && lockedError(error))
+        throw new EngineInUse(`${pkg} is still running`);
       throw error;
     }
   }
@@ -125,7 +181,14 @@ async function switchIn(staging: string, pkg: string, version: string, command: 
   try {
     await fs.rename(packageDir(staging, pkg), live);
   } catch (error) {
-    if (!hadLive || await fs.rename(kept, live).then(() => true, () => false)) await rm(aside, { recursive: true, force: true }).catch(() => {});
+    if (
+      !hadLive ||
+      (await fs.rename(kept, live).then(
+        () => true,
+        () => false,
+      ))
+    )
+      await rm(aside, { recursive: true, force: true }).catch(() => {});
     throw error;
   }
   const saved: SavedEntry[] = [];
@@ -145,7 +208,13 @@ async function switchIn(staging: string, pkg: string, version: string, command: 
   } catch (error) {
     for (const entry of saved.reverse()) await restoreEntry(entry).catch(() => {});
     // Should putting it back fail, the old copy stays aside for the next sweep to restore.
-    if (await putBack().then(() => true, () => false)) await rm(aside, { recursive: true, force: true }).catch(() => {});
+    if (
+      await putBack().then(
+        () => true,
+        () => false,
+      )
+    )
+      await rm(aside, { recursive: true, force: true }).catch(() => {});
     throw error;
   }
   // A file Windows still holds goes at the next sweep.
@@ -164,17 +233,35 @@ async function stagedOnce(options: StagedNpmUpdate, baseDir: string): Promise<vo
   const staging = join(toolsDir(baseDir), `${STAGING_PREFIX}${randomUUID()}`);
   try {
     await mkdir(staging, { recursive: true, mode: 0o700 });
-    const result = await runNpm(npmInstallArgs(staging, pkg, version), env, staging, options.timeoutMs ?? NPM_INSTALL_TIMEOUT_MS);
-    if (result.code !== 0) throw new Error(`npm could not install ${pkg} ${version}.${tail(result.output)}`);
+    const result = await runNpm(
+      npmInstallArgs(staging, pkg, version),
+      env,
+      staging,
+      options.timeoutMs ?? NPM_INSTALL_TIMEOUT_MS,
+    );
+    if (result.code !== 0)
+      throw new Error(`npm could not install ${pkg} ${version}.${tail(result.output)}`);
     const names = npmCommandNames(packageDir(staging, pkg), pkg);
     const command = options.cli && names.includes(options.cli) ? options.cli : names[0];
     if (!command) throw new Error(`${pkg} ${version} has no command to run.`);
-    const failure = await versionFailure(commandPath(staging, command), version, env)
-      ?? await options.beforeSwitch?.(commandPath(staging, command)) ?? null;
+    const failure =
+      (await versionFailure(commandPath(staging, command), version, env)) ??
+      (await options.beforeSwitch?.(commandPath(staging, command))) ??
+      null;
     if (failure) throw new Error(`${pkg} ${version} does not start: ${failure}`);
-    await switchIn(staging, pkg, version, command, env, baseDir, options.host ?? { platform: process.platform, rename });
+    await switchIn(
+      staging,
+      pkg,
+      version,
+      command,
+      env,
+      baseDir,
+      options.host ?? { platform: process.platform, rename },
+    );
   } finally {
-    await rm(staging, { recursive: true, force: true, maxRetries: 4, retryDelay: 250 }).catch(() => {});
+    await rm(staging, { recursive: true, force: true, maxRetries: 4, retryDelay: 250 }).catch(
+      () => {},
+    );
   }
 }
 
@@ -190,16 +277,22 @@ export async function removeNpmCopy(pkg: string, baseDir = DATA_DIR): Promise<vo
     await rename(live, join(aside, ASIDE_PACKAGE));
   } catch (error) {
     await rm(aside, { recursive: true, force: true }).catch(() => {});
-    if (process.platform === "win32" && lockedError(error)) throw new EngineInUse(`${pkg} is still running`);
+    if (process.platform === 'win32' && lockedError(error))
+      throw new EngineInUse(`${pkg} is still running`);
     throw error;
   }
-  const separator = process.platform === "win32" ? "\\" : "/";
-  const marker = ["node_modules", ...pkg.split("/"), ""].join(separator);
+  const separator = process.platform === 'win32' ? '\\' : '/';
+  const marker = ['node_modules', ...pkg.split('/'), ''].join(separator);
   for (const name of names) {
     for (const entry of commandEntries(name)) {
       const path = join(npmBinIn(prefix), entry);
       const saved = await saveEntry(path).catch(() => null);
-      const target = saved && "link" in saved ? saved.link : saved && "data" in saved ? saved.data.toString("utf8") : "";
+      const target =
+        saved && 'link' in saved
+          ? saved.link
+          : saved && 'data' in saved
+            ? saved.data.toString('utf8')
+            : '';
       if (target.includes(marker)) await unlink(path).catch(() => {});
     }
   }
@@ -221,8 +314,10 @@ export async function sweepNpmLeftovers(baseDir = DATA_DIR): Promise<void> {
     const path = join(tools, name);
     if (name.startsWith(ASIDE_PREFIX)) {
       try {
-        const { pkg } = JSON.parse(readFileSync(join(path, ASIDE_RECORD), "utf8")) as { pkg?: unknown };
-        const live = typeof pkg === "string" ? packageDir(enginesPrefix(baseDir), pkg) : null;
+        const { pkg } = JSON.parse(readFileSync(join(path, ASIDE_RECORD), 'utf8')) as {
+          pkg?: unknown;
+        };
+        const live = typeof pkg === 'string' ? packageDir(enginesPrefix(baseDir), pkg) : null;
         if (live && !existsSync(live) && existsSync(join(path, ASIDE_PACKAGE))) {
           await mkdir(dirname(live), { recursive: true });
           await rename(join(path, ASIDE_PACKAGE), live);

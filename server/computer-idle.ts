@@ -12,14 +12,14 @@ export class ComputerIdleTimer {
   private generation = 0;
   private idleMs: number;
   private readonly isBusy: () => boolean;
-  private readonly suspend: () => Promise<void | "busy">;
+  private readonly suspend: () => Promise<void | 'busy'>;
   private readonly onFailure?: (error: unknown, retryInMs: number) => void;
 
   /** `suspend` answers "busy" when work arrived after `isBusy` said no; a throw is retried one window later, then two, four, at most an hour apart. */
   constructor(
     idleMs: number,
     isBusy: () => boolean,
-    suspend: () => Promise<void | "busy">,
+    suspend: () => Promise<void | 'busy'>,
     onFailure?: (error: unknown, retryInMs: number) => void,
   ) {
     this.idleMs = checkedIdleMs(idleMs);
@@ -67,11 +67,14 @@ export class ComputerIdleTimer {
     const generation = this.generation;
     try {
       const outcome = await this.suspend();
-      if (generation === this.generation && outcome === "busy") this.touch();
+      if (generation === this.generation && outcome === 'busy') this.touch();
     } catch (error) {
       if (generation !== this.generation) return;
       this.failures += 1;
-      const retryInMs = Math.min(this.idleMs * 2 ** (this.failures - 1), Math.max(this.idleMs, MAX_RETRY_MS));
+      const retryInMs = Math.min(
+        this.idleMs * 2 ** (this.failures - 1),
+        Math.max(this.idleMs, MAX_RETRY_MS),
+      );
       this.onFailure?.(error, retryInMs);
       this.arm(retryInMs);
     }
@@ -79,6 +82,7 @@ export class ComputerIdleTimer {
 }
 
 function checkedIdleMs(idleMs: number): number {
-  if (!Number.isFinite(idleMs) || idleMs <= 0) throw new Error("A computer idle window must be positive");
+  if (!Number.isFinite(idleMs) || idleMs <= 0)
+    throw new Error('A computer idle window must be positive');
   return idleMs;
 }

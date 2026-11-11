@@ -4,7 +4,9 @@
 
 /** True when the answer to initialize advertises session/delete. */
 export function deletesAcpSessions(initialized: unknown): boolean {
-  const agent = (initialized as { agentCapabilities?: { sessionCapabilities?: { delete?: unknown } } } | null)?.agentCapabilities;
+  const agent = (
+    initialized as { agentCapabilities?: { sessionCapabilities?: { delete?: unknown } } } | null
+  )?.agentCapabilities;
   return Boolean(agent?.sessionCapabilities?.delete);
 }
 
@@ -14,6 +16,8 @@ export async function deleteAcpSessions(
   sessionIds: Iterable<string>,
 ): Promise<string[]> {
   const ids = [...new Set(sessionIds)];
-  const answers = await Promise.allSettled(ids.map((sessionId) => request("session/delete", { sessionId })));
-  return ids.filter((_, index) => answers[index]?.status === "fulfilled");
+  const answers = await Promise.allSettled(
+    ids.map((sessionId) => request('session/delete', { sessionId })),
+  );
+  return ids.filter((_, index) => answers[index]?.status === 'fulfilled');
 }

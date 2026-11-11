@@ -1,8 +1,8 @@
-import { z } from "zod";
+import { z } from 'zod';
 
-import { json } from "./http";
+import { json } from './http';
 
-const OTP_SEND_PATH = "/api/auth/email-otp/send-verification-otp";
+const OTP_SEND_PATH = '/api/auth/email-otp/send-verification-otp';
 const RECIPIENT_WINDOW_MS = 15 * 60 * 1_000;
 const RECIPIENT_MAX_ATTEMPTS = 3;
 const RETENTION_MS = 24 * 60 * 60 * 1_000;
@@ -11,18 +11,18 @@ const recipientSchema = z.object({
 });
 
 function hex(bytes: ArrayBuffer): string {
-  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 async function recipientKey(email: string, secret: string): Promise<string> {
   const key = await crypto.subtle.importKey(
-    "raw",
+    'raw',
     new TextEncoder().encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
+    { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ["sign"],
+    ['sign'],
   );
-  return hex(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(email)));
+  return hex(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(email)));
 }
 
 async function normalizedRecipient(request: Request): Promise<string | null> {
@@ -40,7 +40,7 @@ async function normalizedRecipient(request: Request): Promise<string | null> {
  */
 export async function limitedOTPResponse(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
-  if (request.method !== "POST" || url.pathname !== OTP_SEND_PATH) return null;
+  if (request.method !== 'POST' || url.pathname !== OTP_SEND_PATH) return null;
 
   const email = await normalizedRecipient(request);
   if (!email) return null;
@@ -67,9 +67,9 @@ export async function limitedOTPResponse(request: Request, env: Env): Promise<Re
          updated_at = excluded.updated_at
        WHERE window_started_at <= ? OR attempts < ?`,
     ).bind(key, now, now, windowCutoff, windowCutoff, windowCutoff, RECIPIENT_MAX_ATTEMPTS),
-    env.DB.prepare(
-      "DELETE FROM otp_recipient_rate_limits WHERE updated_at < ?",
-    ).bind(now - RETENTION_MS),
+    env.DB.prepare('DELETE FROM otp_recipient_rate_limits WHERE updated_at < ?').bind(
+      now - RETENTION_MS,
+    ),
   ]);
 
   return result.meta.changes === 0 ? json({ success: true }) : null;

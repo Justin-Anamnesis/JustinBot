@@ -1,10 +1,13 @@
-import type { Notification } from "../../shared/notification";
-import { plainPreviewText } from "../../shared/plain-preview";
-import { finishedNotificationsEnabled, notificationSoundsEnabled } from "./notification-preferences";
+import type { Notification } from '../../shared/notification';
+import { plainPreviewText } from '../../shared/plain-preview';
+import {
+  finishedNotificationsEnabled,
+  notificationSoundsEnabled,
+} from './notification-preferences';
 
 export type NotifyFrame = Notification;
 
-export type NotificationTarget = Pick<NotifyFrame, "botId" | "threadId">;
+export type NotificationTarget = Pick<NotifyFrame, 'botId' | 'threadId'>;
 
 /** On a team's page in the desktop app, its name: notifications then say which place they come from ("Acme · Scout"). */
 let placeName: string | null = null;
@@ -14,9 +17,11 @@ export function setNotificationPlace(name: string | null) {
 
 /** Call from the click: browsers may reject a permission request made later from an SSE frame. Resolves to the permission now in force. */
 export async function requestNotificationPermission(): Promise<NotificationPermission | null> {
-  if (typeof Notification === "undefined") return null;
+  if (typeof Notification === 'undefined') return null;
   try {
-    return Notification.permission === "default" ? await Notification.requestPermission() : Notification.permission;
+    return Notification.permission === 'default'
+      ? await Notification.requestPermission()
+      : Notification.permission;
   } catch {
     return Notification.permission;
   }
@@ -37,11 +42,11 @@ export function showNotification(
   avatarUrl?: string | null,
   visibleThreadId?: string | null,
 ) {
-  if (typeof Notification === "undefined") return;
-  if (frame.kind === "done" && !finishedNotificationsEnabled()) return;
-  const spend = frame.kind === "spend";
+  if (typeof Notification === 'undefined') return;
+  if (frame.kind === 'done' && !finishedNotificationsEnabled()) return;
+  const spend = frame.kind === 'spend';
   if (!spend && document.hasFocus() && visibleThreadId === frame.threadId) return;
-  if (Notification.permission !== "granted") return;
+  if (Notification.permission !== 'granted') return;
 
   const title = placeName ? `${placeName} · ${frame.title}` : frame.title;
   // Entries saved before the harness spoke plain text still carry Markdown.
@@ -49,7 +54,7 @@ export function showNotification(
   const options: NotificationOptions = {
     body,
     ...buildNotificationOptions({ id: frame.botId, avatarUrl }),
-    ...(spend ? { tag: "openmausbot:spend", icon: undefined } : {}),
+    ...(spend ? { tag: 'openmausbot:spend', icon: undefined } : {}),
     ...(notificationSoundsEnabled() ? {} : { silent: true }),
   };
   const shownByPage = () => {
@@ -60,7 +65,17 @@ export function showNotification(
   };
   const desktop = window.ogb?.desktopNotifications;
   if (!desktop) return shownByPage();
-  void desktop.show({
-    title, body, tag: options.tag, silent: options.silent === true, picture: options.icon, botId: frame.botId, threadId: frame.threadId,
-  }).then((shown) => { if (!shown) shownByPage(); }, shownByPage);
+  void desktop
+    .show({
+      title,
+      body,
+      tag: options.tag,
+      silent: options.silent === true,
+      picture: options.icon,
+      botId: frame.botId,
+      threadId: frame.threadId,
+    })
+    .then((shown) => {
+      if (!shown) shownByPage();
+    }, shownByPage);
 }

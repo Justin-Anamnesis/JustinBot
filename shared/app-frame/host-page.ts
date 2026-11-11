@@ -32,8 +32,15 @@
 // The script holds no secret and needs none: the native side checks that
 // every message came from the main frame of this page's origin, and the app
 // frame's opaque origin cannot reach this page's globals.
-import type { AppDocument } from "../app.ts";
-import { APP_FRAME_LIMITS, createAppBridge, type AppBridge, type AppContextUpdate, type AppHostContext, type AppRpcMethod } from "./bridge.ts";
+import type { AppDocument } from '../app.ts';
+import {
+  APP_FRAME_LIMITS,
+  createAppBridge,
+  type AppBridge,
+  type AppContextUpdate,
+  type AppHostContext,
+  type AppRpcMethod,
+} from './bridge.ts';
 
 export const APP_HOST_PROTOCOL_VERSION = 1;
 
@@ -50,25 +57,25 @@ export interface AppHostLoad {
   hostVersion?: string;
 }
 
-export type AppHostCallOp = "rpc" | "message" | "open-link" | "context";
+export type AppHostCallOp = 'rpc' | 'message' | 'open-link' | 'context';
 
 export type AppHostToNative =
-  | { v: 1; type: "ready" }
-  | { v: 1; type: "initialized" }
-  | { v: 1; type: "size"; height: number }
-  | { v: 1; type: "call"; callId: string; op: AppHostCallOp; params: Record<string, unknown> }
-  | { v: 1; type: "teardown-request" }
-  | { v: 1; type: "torn-down" };
+  | { v: 1; type: 'ready' }
+  | { v: 1; type: 'initialized' }
+  | { v: 1; type: 'size'; height: number }
+  | { v: 1; type: 'call'; callId: string; op: AppHostCallOp; params: Record<string, unknown> }
+  | { v: 1; type: 'teardown-request' }
+  | { v: 1; type: 'torn-down' };
 
 export type AppHostReply = { result?: unknown } | { error: { code: number; message: string } };
 
 /** Android's native → page message, as JSON over postWebMessage. */
 export type AppHostFromNative =
-  | { v: 1; call: "load"; args: [AppHostLoad] }
-  | { v: 1; call: "contextChanged"; args: [AppHostContext] }
-  | { v: 1; call: "engaged"; args: [number] }
-  | { v: 1; call: "teardown"; args?: [] }
-  | { v: 1; call: "reply"; args: [string, AppHostReply] };
+  | { v: 1; call: 'load'; args: [AppHostLoad] }
+  | { v: 1; call: 'contextChanged'; args: [AppHostContext] }
+  | { v: 1; call: 'engaged'; args: [number] }
+  | { v: 1; call: 'teardown'; args?: [] }
+  | { v: 1; call: 'reply'; args: [string, AppHostReply] };
 
 export interface AppHostApi {
   load(input: AppHostLoad): void;
@@ -90,19 +97,33 @@ interface AndroidInjected {
 }
 
 export function findAppHostTransport(win: Window): AppHostTransport | null {
-  const webkit = (win as unknown as { webkit?: { messageHandlers?: { appHost?: { postMessage(message: unknown): void } } } }).webkit;
+  const webkit = (
+    win as unknown as {
+      webkit?: { messageHandlers?: { appHost?: { postMessage(message: unknown): void } } };
+    }
+  ).webkit;
   const ios = webkit?.messageHandlers?.appHost;
-  if (ios && typeof ios.postMessage === "function") return { send: (message) => ios.postMessage(message) };
+  if (ios && typeof ios.postMessage === 'function')
+    return { send: (message) => ios.postMessage(message) };
   const android = (win as unknown as { appHost?: AndroidInjected }).appHost;
-  if (android && typeof android.postMessage === "function") {
+  if (android && typeof android.postMessage === 'function') {
     return {
       send: (message) => android.postMessage(JSON.stringify(message)),
       listen: (handler) => {
         android.onmessage = (event) => {
-          if (typeof event.data !== "string") return;
+          if (typeof event.data !== 'string') return;
           let parsed: unknown;
-          try { parsed = JSON.parse(event.data); } catch { return; }
-          if (parsed && typeof parsed === "object" && (parsed as { v?: unknown }).v === APP_HOST_PROTOCOL_VERSION) handler(parsed as AppHostFromNative);
+          try {
+            parsed = JSON.parse(event.data);
+          } catch {
+            return;
+          }
+          if (
+            parsed &&
+            typeof parsed === 'object' &&
+            (parsed as { v?: unknown }).v === APP_HOST_PROTOCOL_VERSION
+          )
+            handler(parsed as AppHostFromNative);
         };
       },
     };
@@ -120,25 +141,33 @@ export function startAppHostPage(win: Window, given?: AppHostTransport): AppHost
   let reportedInitialized = false;
   let seq = 0;
   const calls = new Map<string, { resolve(value: unknown): void; reject(error: unknown): void }>();
-  const send = (message: AppHostToNative) => { try { transport.send(message); } catch { /* native went away */ } };
+  const send = (message: AppHostToNative) => {
+    try {
+      transport.send(message);
+    } catch {
+      /* native went away */
+    }
+  };
 
-  const call = (op: AppHostCallOp, params: Record<string, unknown>) => new Promise<unknown>((resolve, reject) => {
-    const callId = `c${++seq}`;
-    calls.set(callId, { resolve, reject });
-    send({ v: 1, type: "call", callId, op, params });
-  });
+  const call = (op: AppHostCallOp, params: Record<string, unknown>) =>
+    new Promise<unknown>((resolve, reject) => {
+      const callId = `c${++seq}`;
+      calls.set(callId, { resolve, reject });
+      send({ v: 1, type: 'call', callId, op, params });
+    });
 
   const failAll = () => {
-    for (const waiting of calls.values()) waiting.reject({ code: -32000, message: "This app was closed." });
+    for (const waiting of calls.values())
+      waiting.reject({ code: -32000, message: 'This app was closed.' });
     calls.clear();
   };
 
-  win.addEventListener("message", (event: MessageEvent) => {
+  win.addEventListener('message', (event: MessageEvent) => {
     if (!bridge) return;
     bridge.handleMessage({ source: event.source, data: event.data });
     if (!reportedInitialized && bridge.initialized) {
       reportedInitialized = true;
-      send({ v: 1, type: "initialized" });
+      send({ v: 1, type: 'initialized' });
     }
   });
 
@@ -153,34 +182,49 @@ export function startAppHostPage(win: Window, given?: AppHostTransport): AppHost
 
   const api: AppHostApi = {
     load(input) {
-      if (!input || input.v !== APP_HOST_PROTOCOL_VERSION || !input.doc || typeof input.doc.srcdoc !== "string") return;
+      if (
+        !input ||
+        input.v !== APP_HOST_PROTOCOL_VERSION ||
+        !input.doc ||
+        typeof input.doc.srcdoc !== 'string'
+      )
+        return;
       unmount();
-      if (typeof input.engagedAt === "number") engagedAt = input.engagedAt;
-      const element = doc.createElement("iframe");
+      if (typeof input.engagedAt === 'number') engagedAt = input.engagedAt;
+      const element = doc.createElement('iframe');
       // Exactly these two sandbox tokens, and no `allow` attribute.
-      element.setAttribute("sandbox", "allow-scripts allow-forms");
-      element.setAttribute("referrerpolicy", "no-referrer");
-      element.setAttribute("title", "App");
-      const height = Math.max(APP_FRAME_LIMITS.minHeight, Math.round(input.limits?.height ?? APP_FRAME_LIMITS.defaultHeight));
+      element.setAttribute('sandbox', 'allow-scripts allow-forms');
+      element.setAttribute('referrerpolicy', 'no-referrer');
+      element.setAttribute('title', 'App');
+      const height = Math.max(
+        APP_FRAME_LIMITS.minHeight,
+        Math.round(input.limits?.height ?? APP_FRAME_LIMITS.defaultHeight),
+      );
       element.style.height = `${height}px`;
       const current = createAppBridge({
         doc: input.doc,
         hostContext: input.hostContext ?? {},
-        hostVersion: input.hostVersion ?? "phone",
+        hostVersion: input.hostVersion ?? 'phone',
         ...(input.limits?.maxHeight ? { limits: { maxHeight: input.limits.maxHeight } } : {}),
         source: () => element.contentWindow,
         adapter: {
-          post: (message) => element.contentWindow?.postMessage(message, "*"),
-          callRpc: (method: AppRpcMethod, params) => call("rpc", { method, params }),
-          sendMessage: async (text) => { await call("message", { text }); },
-          openLink: async (url) => { await call("open-link", { url }); },
-          setContext: async (update: AppContextUpdate) => { await call("context", { ...update }); },
+          post: (message) => element.contentWindow?.postMessage(message, '*'),
+          callRpc: (method: AppRpcMethod, params) => call('rpc', { method, params }),
+          sendMessage: async (text) => {
+            await call('message', { text });
+          },
+          openLink: async (url) => {
+            await call('open-link', { url });
+          },
+          setContext: async (update: AppContextUpdate) => {
+            await call('context', { ...update });
+          },
           resize: (next) => {
             element.style.height = `${next}px`;
-            send({ v: 1, type: "size", height: next });
+            send({ v: 1, type: 'size', height: next });
           },
           engaged: () => Date.now() - engagedAt <= APP_FRAME_LIMITS.engagedTouchMs,
-          teardownRequested: () => send({ v: 1, type: "teardown-request" }),
+          teardownRequested: () => send({ v: 1, type: 'teardown-request' }),
           now: () => Date.now(),
         },
       });
@@ -194,42 +238,48 @@ export function startAppHostPage(win: Window, given?: AppHostTransport): AppHost
       bridge?.contextChanged(partial ?? {});
     },
     engaged(atMs) {
-      if (typeof atMs === "number" && Number.isFinite(atMs)) engagedAt = Math.max(engagedAt, atMs);
+      if (typeof atMs === 'number' && Number.isFinite(atMs)) engagedAt = Math.max(engagedAt, atMs);
     },
     async teardown() {
       if (bridge) await bridge.teardown();
       unmount();
-      send({ v: 1, type: "torn-down" });
+      send({ v: 1, type: 'torn-down' });
     },
     reply(callId, reply) {
       const waiting = calls.get(callId);
       if (!waiting) return;
       calls.delete(callId);
-      if (reply && "error" in reply && reply.error) waiting.reject(reply.error);
-      else waiting.resolve(reply && "result" in reply ? reply.result : undefined);
+      if (reply && 'error' in reply && reply.error) waiting.reject(reply.error);
+      else waiting.resolve(reply && 'result' in reply ? reply.result : undefined);
     },
   };
 
   transport.listen?.((message) => {
     switch (message.call) {
-      case "load": return api.load(message.args[0]);
-      case "contextChanged": return api.contextChanged(message.args[0]);
-      case "engaged": return api.engaged(message.args[0]);
-      case "teardown": return void api.teardown();
-      case "reply": return api.reply(message.args[0], message.args[1]);
+      case 'load':
+        return api.load(message.args[0]);
+      case 'contextChanged':
+        return api.contextChanged(message.args[0]);
+      case 'engaged':
+        return api.engaged(message.args[0]);
+      case 'teardown':
+        return void api.teardown();
+      case 'reply':
+        return api.reply(message.args[0], message.args[1]);
     }
   });
   const globals = win as unknown as { appHost?: unknown; mausbotAppHost?: unknown };
   // Android's injected object owns the name `appHost` there; native reaches
   // the page through it, so it is left alone.
-  if (!(globals.appHost && typeof (globals.appHost as AndroidInjected).postMessage === "function")) globals.appHost = api;
+  if (!(globals.appHost && typeof (globals.appHost as AndroidInjected).postMessage === 'function'))
+    globals.appHost = api;
   globals.mausbotAppHost = api;
-  send({ v: 1, type: "ready" });
+  send({ v: 1, type: 'ready' });
   return api;
 }
 
 /** On iOS the copy that runs in the page world finds no handler (it lives in the host content world) and
  * stays idle. */
 export function bootAppHostPage(): void {
-  if (typeof window !== "undefined") startAppHostPage(window);
+  if (typeof window !== 'undefined') startAppHostPage(window);
 }

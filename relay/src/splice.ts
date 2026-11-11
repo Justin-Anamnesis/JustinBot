@@ -1,10 +1,10 @@
-import { randomBytes } from "node:crypto";
-import { WebSocket } from "ws";
-import type { Context } from "./context.ts";
-import type { HostEntry } from "./hosts.ts";
-import { TokenBucket } from "./limits.ts";
-import { closeWith, sendJson } from "./socket.ts";
-import { Close, PASS_THROUGH_CODES } from "./wire.ts";
+import { randomBytes } from 'node:crypto';
+import { WebSocket } from 'ws';
+import type { Context } from './context.ts';
+import type { HostEntry } from './hosts.ts';
+import { TokenBucket } from './limits.ts';
+import { closeWith, sendJson } from './socket.ts';
+import { Close, PASS_THROUGH_CODES } from './wire.ts';
 
 const BACKPRESSURE = 1;
 const THROTTLE = 2;
@@ -54,16 +54,16 @@ interface Direction {
   sent: (error?: Error) => void;
 }
 
-export type SessionState = "pending" | "spliced" | "closed";
+export type SessionState = 'pending' | 'spliced' | 'closed';
 
 /**
  * A phone waiting for its host's data socket, then the two sockets spliced. The relay forwards whole binary messages
  * and never drops one: when the destination falls behind it stops reading the source.
  */
 export class Session {
-  readonly sid = randomBytes(16).toString("base64url");
+  readonly sid = randomBytes(16).toString('base64url');
   readonly admHash: Buffer;
-  state: SessionState = "pending";
+  state: SessionState = 'pending';
   up = 0;
   down = 0;
   private readonly ctx: Context;
@@ -86,55 +86,67 @@ export class Session {
     this.started = ctx.now();
     entry.sessions.set(this.sid, this);
     this.openTimer = setTimeout(() => this.end(Close.NoDataSocket), ctx.limits.openDeadlineMs);
-    phone.once("close", (code) => this.closed(phone, code));
+    phone.once('close', (code) => this.closed(phone, code));
   }
 
   /** The host's data socket arrived for this `sid`: splice, then tell the phone it may start its handshake. */
   splice(data: WebSocket): void {
-    this.state = "spliced";
+    this.state = 'spliced';
     this.data = data;
     clearTimeout(this.openTimer);
     const now = this.ctx.now();
-    this.meter = new HeavyMeter(this.ctx.limits.heavyWindowMs, this.ctx.limits.heavyBitsPerSecond, now);
+    this.meter = new HeavyMeter(
+      this.ctx.limits.heavyWindowMs,
+      this.ctx.limits.heavyBitsPerSecond,
+      now,
+    );
     this.toHost = this.direction(this.phone, data, now);
     this.toPhone = this.direction(data, this.phone, now);
-    data.once("close", (code) => this.closed(data, code));
+    data.once('close', (code) => this.closed(data, code));
     this.ctx.heartbeat.track(this.phone);
     this.ctx.heartbeat.track(data);
-    this.ctx.metrics.inc("relay_sessions_total");
-    this.ctx.metrics.peak("sessions_spliced", (this.ctx.hosts.spliced += 1));
-    sendJson(this.phone, { t: "ready" });
+    this.ctx.metrics.inc('relay_sessions_total');
+    this.ctx.metrics.peak('sessions_spliced', (this.ctx.hosts.spliced += 1));
+    sendJson(this.phone, { t: 'ready' });
   }
 
   fromPhone(data: Buffer, isBinary: boolean): void {
-    if (this.state !== "spliced" || !isBinary) return this.end(Close.Malformed);
+    if (this.state !== 'spliced' || !isBinary) return this.end(Close.Malformed);
     this.up += data.length;
-    this.ctx.metrics.inc("relay_bytes_total", "up", data.length);
+    this.ctx.metrics.inc('relay_bytes_total', 'up', data.length);
     this.forward(this.toHost!, data);
   }
 
   fromHost(data: Buffer, isBinary: boolean): void {
-    if (this.state !== "spliced" || !isBinary) return this.end(Close.Malformed);
+    if (this.state !== 'spliced' || !isBinary) return this.end(Close.Malformed);
     this.down += data.length;
-    this.ctx.metrics.inc("relay_bytes_total", "down", data.length);
+    this.ctx.metrics.inc('relay_bytes_total', 'down', data.length);
     this.forward(this.toPhone!, data);
   }
 
   /** The relay ends the session: both sockets close with `code`. */
   end(code: number, reason?: string): void {
-    if (this.state === "closed") return;
+    if (this.state === 'closed') return;
     this.finish(code);
     closeWith(this.ctx, this.phone, code, reason);
     if (this.data) closeWith(this.ctx, this.data, code, reason);
   }
 
   private direction(src: WebSocket, dst: WebSocket, now: number): Direction {
-    const dir: Direction = { src, dst, paused: 0, lastProgress: now, wedge: undefined, sent: () => {} };
+    const dir: Direction = {
+      src,
+      dst,
+      paused: 0,
+      lastProgress: now,
+      wedge: undefined,
+      sent: () => {},
+    };
     dir.sent = (error) => {
       if (error) return;
       dir.lastProgress = this.ctx.now();
       this.ctx.heartbeat.mark(dst);
-      if (dir.paused & BACKPRESSURE && dst.bufferedAmount <= this.ctx.limits.lowWaterBytes) this.resume(dir, BACKPRESSURE);
+      if (dir.paused & BACKPRESSURE && dst.bufferedAmount <= this.ctx.limits.lowWaterBytes)
+        this.resume(dir, BACKPRESSURE);
     };
     return dir;
   }
@@ -143,14 +155,18 @@ export class Session {
     const { limits } = this.ctx;
     this.ctx.heartbeat.mark(dir.src);
     dir.dst.send(data, { binary: true }, dir.sent);
-    if (this.state !== "spliced") return;
+    if (this.state !== 'spliced') return;
     if (this.ctx.budgets.add(this.entry.hidText, data.length)) return this.overBudget();
     const now = this.ctx.now();
     if (!this.throttle && this.meter!.add(data.length, now)) {
       const perMs = limits.throttleBitsPerSecond / 8 / 1000;
-      this.throttle = new TokenBucket(Math.max(limits.maxPayloadBytes, perMs * 100), perMs, this.ctx.now);
-      this.ctx.metrics.inc("relay_throttled_sessions_total");
-      this.ctx.log({ ev: "throttle", hid8: this.entry.hid8 });
+      this.throttle = new TokenBucket(
+        Math.max(limits.maxPayloadBytes, perMs * 100),
+        perMs,
+        this.ctx.now,
+      );
+      this.ctx.metrics.inc('relay_throttled_sessions_total');
+      this.ctx.log({ ev: 'throttle', hid8: this.entry.hid8 });
     }
     if (this.throttle) {
       const waitMs = this.throttle.spend(data.length);
@@ -164,7 +180,7 @@ export class Session {
       }
     }
     if (dir.dst.bufferedAmount > limits.highWaterBytes && !(dir.paused & BACKPRESSURE)) {
-      this.ctx.metrics.inc("relay_backpressure_pauses_total");
+      this.ctx.metrics.inc('relay_backpressure_pauses_total');
       dir.lastProgress = now;
       this.pause(dir, BACKPRESSURE);
       this.watchWedge(dir, limits.wedgeMs);
@@ -176,7 +192,7 @@ export class Session {
     clearTimeout(dir.wedge);
     dir.wedge = setTimeout(() => {
       dir.wedge = undefined;
-      if (!(dir.paused & BACKPRESSURE) || this.state !== "spliced") return;
+      if (!(dir.paused & BACKPRESSURE) || this.state !== 'spliced') return;
       const idle = this.ctx.now() - dir.lastProgress;
       if (idle >= this.ctx.limits.wedgeMs) this.end(Close.Limited);
       else this.watchWedge(dir, this.ctx.limits.wedgeMs - idle);
@@ -192,26 +208,26 @@ export class Session {
     if (!(dir.paused & reason)) return;
     dir.paused &= ~reason;
     if (reason === BACKPRESSURE) clearTimeout(dir.wedge);
-    if (dir.paused === 0 && this.state === "spliced") dir.src.resume();
+    if (dir.paused === 0 && this.state === 'spliced') dir.src.resume();
   }
 
   private overBudget(): void {
-    this.ctx.metrics.inc("relay_host_budget_exceeded_total");
-    this.ctx.log({ ev: "budget", hid8: this.entry.hid8 });
+    this.ctx.metrics.inc('relay_host_budget_exceeded_total');
+    this.ctx.log({ ev: 'budget', hid8: this.entry.hid8 });
     for (const session of this.entry.sessions.values()) session.end(Close.Limited);
   }
 
   /** One of the two sockets closed: the other gets the same code when it is one the ends use with each other. */
   private closed(socket: WebSocket, code: number): void {
-    if (this.state === "closed") return;
+    if (this.state === 'closed') return;
     this.finish(code);
     const other = socket === this.phone ? this.data : this.phone;
     if (other) closeWith(this.ctx, other, PASS_THROUGH_CODES.has(code) ? code : 1001);
   }
 
   private finish(code: number): void {
-    if (this.state === "spliced") this.ctx.hosts.spliced -= 1;
-    this.state = "closed";
+    if (this.state === 'spliced') this.ctx.hosts.spliced -= 1;
+    this.state = 'closed';
     clearTimeout(this.openTimer);
     for (const dir of [this.toHost, this.toPhone]) clearTimeout(dir?.wedge);
     for (const timer of this.throttleTimers) clearTimeout(timer);
@@ -219,7 +235,7 @@ export class Session {
     this.entry.sessions.delete(this.sid);
     this.ctx.hosts.release(this.entry);
     this.ctx.log({
-      ev: "session",
+      ev: 'session',
       hid8: this.entry.hid8,
       dur_s: Math.round((this.ctx.now() - this.started) / 1000),
       up: this.up,

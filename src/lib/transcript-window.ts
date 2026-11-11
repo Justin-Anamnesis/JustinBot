@@ -21,12 +21,15 @@ export function followWindowStart(messages: readonly { role?: string }[], start:
   const tail = tailWindowStart(messages.length);
   const oldest = Math.max(start, tail - TRANSCRIPT_WINDOW_SIZE);
   for (let index = messages.length - 1; index >= oldest; index--) {
-    if (messages[index].role === "user") return Math.min(tail, index);
+    if (messages[index].role === 'user') return Math.min(tail, index);
   }
   return tail;
 }
 
-export function expandWindowStart(startIndex: number, size: number = TRANSCRIPT_WINDOW_SIZE): number {
+export function expandWindowStart(
+  startIndex: number,
+  size: number = TRANSCRIPT_WINDOW_SIZE,
+): number {
   return Math.max(0, startIndex - size);
 }
 
@@ -38,7 +41,10 @@ export function focusWindowRange(
   const safeTotal = Math.max(0, total);
   const safeSize = Math.max(1, size);
   const target = Math.max(0, Math.min(targetIndex, Math.max(0, safeTotal - 1)));
-  const start = Math.max(0, Math.min(target - Math.floor(safeSize / 2), Math.max(0, safeTotal - safeSize)));
+  const start = Math.max(
+    0,
+    Math.min(target - Math.floor(safeSize / 2), Math.max(0, safeTotal - safeSize)),
+  );
   return { start, end: Math.min(safeTotal, start + safeSize) };
 }
 
@@ -48,7 +54,8 @@ export function resolveTranscriptWindow<T>(
   size: number = TRANSCRIPT_WINDOW_SIZE,
   endIndex: number | null = null,
 ): TranscriptWindow<T> {
-  const requestedEnd = endIndex === null ? messages.length : Math.max(0, Math.min(messages.length, endIndex));
+  const requestedEnd =
+    endIndex === null ? messages.length : Math.max(0, Math.min(messages.length, endIndex));
   const invalidFiniteWindow = endIndex !== null && startIndex >= requestedEnd;
   const start =
     startIndex >= messages.length || invalidFiniteWindow

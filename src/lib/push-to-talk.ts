@@ -1,19 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from 'react';
 
-import { currentCall } from "./call";
-import { isMacPlatform } from "./keyboard-shortcuts";
-import { speechBridge } from "./speech";
+import { currentCall } from './call';
+import { isMacPlatform } from './keyboard-shortcuts';
+import { speechBridge } from './speech';
 
-type ModifierEvent = Pick<KeyboardEvent, "altKey" | "ctrlKey" | "code" | "repeat">;
+type ModifierEvent = Pick<KeyboardEvent, 'altKey' | 'ctrlKey' | 'code' | 'repeat'>;
 
-export const pushToTalkKeys = () => (isMacPlatform() ? "Control + Option" : "Ctrl + Alt");
+export const pushToTalkKeys = () => (isMacPlatform() ? 'Control + Option' : 'Ctrl + Alt');
 
 export function isPushToTalkPress(event: ModifierEvent): boolean {
   const modifier =
-    event.code === "AltLeft" ||
-    event.code === "AltRight" ||
-    event.code === "ControlLeft" ||
-    event.code === "ControlRight";
+    event.code === 'AltLeft' ||
+    event.code === 'AltRight' ||
+    event.code === 'ControlLeft' ||
+    event.code === 'ControlRight';
   return modifier && event.altKey && event.ctrlKey && !event.repeat;
 }
 
@@ -66,13 +66,13 @@ export function usePushToTalk(targetId: string, enabled: boolean, onError: () =>
     };
     const onBlur = () => finish();
 
-    window.addEventListener("keydown", onKeyDown);
-    window.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", onBlur);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
-      window.removeEventListener("keydown", onKeyDown);
-      window.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", onBlur);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
       held.current = false;
     };
   }, [targetId]);

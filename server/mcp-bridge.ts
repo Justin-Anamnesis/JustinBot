@@ -1,12 +1,19 @@
-import { spawn } from "node:child_process";
-import { StringDecoder } from "node:string_decoder";
+import { spawn } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
 
-import { CONTROL_ACT_WITHIN_MS, CONTROL_UNCONFIRMED, CONTROL_WAITED, controlRefusal, createControlClient, type ControlState } from "./control-client.ts";
-import { augmentedPath, resolveCliSpawn } from "./env-path.ts";
-import { textOnlyErrorResultLine } from "./mcp-error-result.ts";
-import { createToolListNormalizer } from "./mcp-tool-schema.ts";
-import { createJournalTap, postJournal } from "./saved-steps/journal-tap.ts";
-import { toolSchemaProfileFromEnv } from "./tool-schema-profile.ts";
+import {
+  CONTROL_ACT_WITHIN_MS,
+  CONTROL_UNCONFIRMED,
+  CONTROL_WAITED,
+  controlRefusal,
+  createControlClient,
+  type ControlState,
+} from './control-client.ts';
+import { augmentedPath, resolveCliSpawn } from './env-path.ts';
+import { textOnlyErrorResultLine } from './mcp-error-result.ts';
+import { createToolListNormalizer } from './mcp-tool-schema.ts';
+import { createJournalTap, postJournal } from './saved-steps/journal-tap.ts';
+import { toolSchemaProfileFromEnv } from './tool-schema-profile.ts';
 
 export const BRIDGE_INACTIVITY_MS = 45_000;
 const PROBE_TIMEOUT_MS = 10_000;
@@ -16,23 +23,27 @@ export interface BridgeLiveness {
   args: string[];
 }
 
-export function runLivenessProbe(probe: BridgeLiveness, timeoutMs = PROBE_TIMEOUT_MS, env?: NodeJS.ProcessEnv): Promise<boolean> {
+export function runLivenessProbe(
+  probe: BridgeLiveness,
+  timeoutMs = PROBE_TIMEOUT_MS,
+  env?: NodeJS.ProcessEnv,
+): Promise<boolean> {
   return new Promise((resolve) => {
     const child = spawn(probe.command, probe.args, {
       shell: false,
       env: env ?? { ...process.env, PATH: augmentedPath() },
-      stdio: ["ignore", "ignore", "ignore"],
+      stdio: ['ignore', 'ignore', 'ignore'],
     });
     const timer = setTimeout(() => {
-      child.kill("SIGKILL");
+      child.kill('SIGKILL');
       resolve(false);
     }, timeoutMs);
     timer.unref?.();
-    child.on("error", () => {
+    child.on('error', () => {
       clearTimeout(timer);
       resolve(false);
     });
-    child.on("close", (code) => {
+    child.on('close', (code) => {
       clearTimeout(timer);
       resolve(code === 0);
     });
@@ -128,13 +139,13 @@ export function createLineSplitter(onLine: (line: string) => void): {
   push: (chunk: Buffer | string) => void;
   flush: () => void;
 } {
-  let pending = "";
-  const decoder = new StringDecoder("utf8");
+  let pending = '';
+  const decoder = new StringDecoder('utf8');
   return {
     push(chunk) {
-      pending += typeof chunk === "string" ? chunk : decoder.write(chunk);
+      pending += typeof chunk === 'string' ? chunk : decoder.write(chunk);
       let newline: number;
-      while ((newline = pending.indexOf("\n")) !== -1) {
+      while ((newline = pending.indexOf('\n')) !== -1) {
         const line = pending.slice(0, newline);
         pending = pending.slice(newline + 1);
         onLine(line);
@@ -143,7 +154,7 @@ export function createLineSplitter(onLine: (line: string) => void): {
     flush() {
       pending += decoder.end();
       if (pending) onLine(pending);
-      pending = "";
+      pending = '';
     },
   };
 }
@@ -163,13 +174,16 @@ export function createGateInterceptor(options: {
       let frame: any = null;
       try {
         frame = JSON.parse(line);
-      } catch {
-      }
-      if (!frame || frame.method !== "tools/call") {
+      } catch {}
+      if (!frame || frame.method !== 'tools/call') {
         await options.forward(line);
         return;
       }
-      const state = await options.check(frame).catch((): ControlState => ({ held: true, helpOpen: false, blockedReason: CONTROL_UNCONFIRMED }));
+      const state = await options.check(frame).catch((): ControlState => ({
+        held: true,
+        helpOpen: false,
+        blockedReason: CONTROL_UNCONFIRMED,
+      }));
       if (!state.held && Date.now() - arrivedAt <= actWithinMs) {
         // A relayed call is checked once, when it arrives; the next frame's check waits until it has acted.
         await options.forward(line);
@@ -177,9 +191,12 @@ export function createGateInterceptor(options: {
       }
       options.refuse(
         JSON.stringify({
-          jsonrpc: "2.0",
+          jsonrpc: '2.0',
           id: frame.id ?? null,
-          result: completeFor(frame.params?._meta, { content: [{ type: "text", text: state.held ? controlRefusal(state) : CONTROL_WAITED }], isError: true }),
+          result: completeFor(frame.params?._meta, {
+            content: [{ type: 'text', text: state.held ? controlRefusal(state) : CONTROL_WAITED }],
+            isError: true,
+          }),
         }),
       );
     });
@@ -198,18 +215,27 @@ export function createMcpBridgeInterceptor(
   options: McpBridgeInterceptorOptions,
 ): (line: string) => void | Promise<void> {
   const afterPing = options.gate
-    ? createGateInterceptor({ check: options.gate.check, forward: options.forward, refuse: options.answer })
+    ? createGateInterceptor({
+        check: options.gate.check,
+        forward: options.forward,
+        refuse: options.answer,
+      })
     : (line: string) => options.forward(line);
   return (line: string) => {
     let frame: any = null;
     try {
       frame = JSON.parse(line);
-    } catch {
-    }
-    if (frame && frame.method === "ping") {
+    } catch {}
+    if (frame && frame.method === 'ping') {
       // Notifications have no `id` and require no response.
       if (frame.id !== undefined) {
-        options.answer(JSON.stringify({ jsonrpc: "2.0", id: frame.id, result: completeFor(frame.params?._meta, {}) }));
+        options.answer(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: frame.id,
+            result: completeFor(frame.params?._meta, {}),
+          }),
+        );
       }
       return;
     }
@@ -235,25 +261,31 @@ export function createReplyQueue(
   };
 }
 
-const OWN_ID = "omb-bridge-";
-const SERVER_INFO_META = "io.modelcontextprotocol/serverInfo";
+const OWN_ID = 'omb-bridge-';
+const SERVER_INFO_META = 'io.modelcontextprotocol/serverInfo';
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function failed(text: string): Record<string, unknown> {
-  return { content: [{ type: "text", text }], isError: true };
+  return { content: [{ type: 'text', text }], isError: true };
 }
 
-const PROTOCOL_VERSION_META = "io.modelcontextprotocol/protocolVersion";
+const PROTOCOL_VERSION_META = 'io.modelcontextprotocol/protocolVersion';
 
 /** A client on protocol revision 2026-07-28 or later rejects a result without resultType (the driver sends one), so an
  * answer the bridge writes itself says it is complete. Older clients get the result as it was. */
 export function completeFor(meta: unknown, result: unknown): unknown {
   const version = isObject(meta) ? meta[PROTOCOL_VERSION_META] : undefined;
-  if (typeof version !== "string" || version < "2026-07-28" || !isObject(result) || "resultType" in result) return result;
-  return { ...result, resultType: "complete" };
+  if (
+    typeof version !== 'string' ||
+    version < '2026-07-28' ||
+    !isObject(result) ||
+    'resultType' in result
+  )
+    return result;
+  return { ...result, resultType: 'complete' };
 }
 
 /** A tools/call request the agent waits on, as a relay sees it; anything else is not the relay's to answer. */
@@ -264,13 +296,23 @@ function relayableCall(line: string): { id: unknown; call: ToolCall; meta: unkno
   } catch {
     return null;
   }
-  const params = frame?.method === "tools/call" && frame.id !== undefined && frame.id !== null ? frame.params : null;
-  if (!isObject(params) || typeof params.name !== "string") return null;
-  return { id: frame.id, call: { name: params.name, arguments: isObject(params.arguments) ? params.arguments : {} }, meta: params._meta };
+  const params =
+    frame?.method === 'tools/call' && frame.id !== undefined && frame.id !== null
+      ? frame.params
+      : null;
+  if (!isObject(params) || typeof params.name !== 'string') return null;
+  return {
+    id: frame.id,
+    call: { name: params.name, arguments: isObject(params.arguments) ? params.arguments : {} },
+    meta: params._meta,
+  };
 }
 
 /** The bridge's own calls on the child, under ids the agent never sees. */
-export function createChildCalls(write: (line: string) => void, closedText = "Computer-control transport closed") {
+export function createChildCalls(
+  write: (line: string) => void,
+  closedText = 'Computer-control transport closed',
+) {
   let sequence = 0;
   let driverVersion: string | undefined;
   let closed = false;
@@ -284,7 +326,14 @@ export function createChildCalls(write: (line: string) => void, closedText = "Co
           const id = `${OWN_ID}${++sequence}`;
           return new Promise((resolve) => {
             waiting.set(id, resolve);
-            write(JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name, arguments: args, ...(meta === undefined ? {} : { _meta: meta }) } }));
+            write(
+              JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                method: 'tools/call',
+                params: { name, arguments: args, ...(meta === undefined ? {} : { _meta: meta }) },
+              }),
+            );
           });
         },
         get driverVersion() {
@@ -294,7 +343,7 @@ export function createChildCalls(write: (line: string) => void, closedText = "Co
     },
     /** Notes the driver's version, and keeps an answer to one of the bridge's calls from the agent (true when it did). */
     take(line: string): boolean {
-      const versioned = driverVersion === undefined && line.includes("serverInfo");
+      const versioned = driverVersion === undefined && line.includes('serverInfo');
       const ours = waiting.size > 0 && line.includes(OWN_ID);
       if (!versioned && !ours) return false;
       let frame: any = null;
@@ -303,12 +352,17 @@ export function createChildCalls(write: (line: string) => void, closedText = "Co
       } catch {
         return false;
       }
-      const version = frame?.result?.serverInfo?.version ?? frame?.result?._meta?.[SERVER_INFO_META]?.version;
-      if (versioned && typeof version === "string") driverVersion = version;
-      const resolve = ours && typeof frame?.id === "string" ? waiting.get(frame.id) : undefined;
+      const version =
+        frame?.result?.serverInfo?.version ?? frame?.result?._meta?.[SERVER_INFO_META]?.version;
+      if (versioned && typeof version === 'string') driverVersion = version;
+      const resolve = ours && typeof frame?.id === 'string' ? waiting.get(frame.id) : undefined;
       if (!resolve) return false;
       waiting.delete(frame.id);
-      resolve(isObject(frame.result) ? frame.result : failed(String(frame.error?.message ?? "Computer control returned no result")));
+      resolve(
+        isObject(frame.result)
+          ? frame.result
+          : failed(String(frame.error?.message ?? 'Computer control returned no result')),
+      );
       return true;
     },
     /** The child is gone: every call still waiting, and any made later, ends as a failure. */
@@ -332,10 +386,10 @@ export function runMcpBridge(options: BridgeOptions): void {
     const proc = spawn(command, args, {
       shell: false,
       env,
-      stdio: ["pipe", "pipe", "pipe"],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
     // docker may exit before it drains stdin; pipe() leaves this error unhandled.
-    proc.stdin.on("error", () => {});
+    proc.stdin.on('error', () => {});
     proc.stderr.pipe(process.stderr, { end: false });
     return proc;
   };
@@ -348,13 +402,17 @@ export function runMcpBridge(options: BridgeOptions): void {
   const tap = options.journal
     ? createJournalTap({ post: postJournal(options.journal.url, options.journal.token) })
     : null;
-  const reply = createReplyQueue(tap, (written) => process.stdout.write(written + "\n"));
+  const reply = createReplyQueue(tap, (written) => process.stdout.write(written + '\n'));
   const answer = (line: string) => reply(line, line);
-  const toolLists = createToolListNormalizer(toolSchemaProfileFromEnv(), (line) => process.stderr.write(`${options.label}: ${line}\n`));
+  const toolLists = createToolListNormalizer(toolSchemaProfileFromEnv(), (line) =>
+    process.stderr.write(`${options.label}: ${line}\n`),
+  );
   // Injected responses must never land inside one of the child's half-written frames.
   const rewrite = options.rewriteResponse ?? ((line: string) => line);
-  const respond = (line: string) => reply(line, textOnlyErrorResultLine(rewrite(toolLists.rewriteResponse(line))));
-  const newChildCalls = () => createChildCalls((line) => child.stdin.write(line + "\n"), respawn?.stopped);
+  const respond = (line: string) =>
+    reply(line, textOnlyErrorResultLine(rewrite(toolLists.rewriteResponse(line))));
+  const newChildCalls = () =>
+    createChildCalls((line) => child.stdin.write(line + '\n'), respawn?.stopped);
   let children = newChildCalls();
 
   let childGone = false;
@@ -365,9 +423,13 @@ export function runMcpBridge(options: BridgeOptions): void {
 
   const answerStopped = (id: unknown, method: unknown, meta: unknown, text: string) => {
     if (id === undefined || id === null) return;
-    answer(JSON.stringify(method === "tools/call"
-      ? { jsonrpc: "2.0", id, result: completeFor(meta, failed(text)) }
-      : { jsonrpc: "2.0", id, error: { code: -32000, message: text } }));
+    answer(
+      JSON.stringify(
+        method === 'tools/call'
+          ? { jsonrpc: '2.0', id, result: completeFor(meta, failed(text)) }
+          : { jsonrpc: '2.0', id, error: { code: -32000, message: text } },
+      ),
+    );
   };
   const noteRequest = (line: string) => {
     let frame: any = null;
@@ -376,9 +438,13 @@ export function runMcpBridge(options: BridgeOptions): void {
     } catch {
       return null;
     }
-    if (frame?.method === "initialize") initializeParams = frame.params;
+    if (frame?.method === 'initialize') initializeParams = frame.params;
     if (frame?.id !== undefined && frame.id !== null && frame.method) {
-      waitingOnChild.set(JSON.stringify(frame.id), { id: frame.id, method: frame.method, meta: frame.params?._meta });
+      waitingOnChild.set(JSON.stringify(frame.id), {
+        id: frame.id,
+        method: frame.method,
+        meta: frame.params?._meta,
+      });
     }
     return frame;
   };
@@ -391,41 +457,49 @@ export function runMcpBridge(options: BridgeOptions): void {
   };
 
   /** A new child, past its initialize handshake (the proxy refuses calls before it), or false when it did not come up. */
-  const startChild = () => new Promise<boolean>((resolve) => {
-    const proc = spawnChild();
-    const handshake = `${OWN_ID}init-${Date.now()}`;
-    let settled = false;
-    const finish = (up: boolean) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (!up) proc.kill("SIGKILL");
-      resolve(up);
-    };
-    const timer = setTimeout(() => finish(false), RESPAWN_INITIALIZE_MS);
-    timer.unref?.();
-    const adopt = () => {
-      child = proc;
-      children = newChildCalls();
-      childGone = false;
-      watchChild(proc);
-      finish(true);
-    };
-    proc.once("error", () => finish(false));
-    proc.once("close", () => finish(false));
-    wireChildOutput(proc, (line) => {
-      if (!line.includes(handshake)) return false;
-      proc.stdin.write('{"jsonrpc":"2.0","method":"notifications/initialized"}\n');
-      adopt();
-      children.take(line);
-      return true;
+  const startChild = () =>
+    new Promise<boolean>((resolve) => {
+      const proc = spawnChild();
+      const handshake = `${OWN_ID}init-${Date.now()}`;
+      let settled = false;
+      const finish = (up: boolean) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (!up) proc.kill('SIGKILL');
+        resolve(up);
+      };
+      const timer = setTimeout(() => finish(false), RESPAWN_INITIALIZE_MS);
+      timer.unref?.();
+      const adopt = () => {
+        child = proc;
+        children = newChildCalls();
+        childGone = false;
+        watchChild(proc);
+        finish(true);
+      };
+      proc.once('error', () => finish(false));
+      proc.once('close', () => finish(false));
+      wireChildOutput(proc, (line) => {
+        if (!line.includes(handshake)) return false;
+        proc.stdin.write('{"jsonrpc":"2.0","method":"notifications/initialized"}\n');
+        adopt();
+        children.take(line);
+        return true;
+      });
+      if (initializeParams === undefined) {
+        adopt();
+        return;
+      }
+      proc.stdin.write(
+        JSON.stringify({
+          jsonrpc: '2.0',
+          id: handshake,
+          method: 'initialize',
+          params: initializeParams,
+        }) + '\n',
+      );
     });
-    if (initializeParams === undefined) {
-      adopt();
-      return;
-    }
-    proc.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: handshake, method: "initialize", params: initializeParams }) + "\n");
-  });
 
   const reviveChild = async () => {
     for (const wait of RESPAWN_WAITS_MS) {
@@ -435,7 +509,12 @@ export function runMcpBridge(options: BridgeOptions): void {
     return false;
   };
   /** Waits for a dead child to come back. Frames are sent one at a time, so at most one revival runs. */
-  const childAlive = () => (childGone ? (revival ??= reviveChild().finally(() => { revival = null; })) : Promise.resolve(true));
+  const childAlive = () =>
+    childGone
+      ? (revival ??= reviveChild().finally(() => {
+          revival = null;
+        }))
+      : Promise.resolve(true);
 
   const send = async (line: string) => {
     if (respawn && !(await childAlive())) {
@@ -448,19 +527,24 @@ export function runMcpBridge(options: BridgeOptions): void {
     const relayed = frame && options.relay?.(frame.call, children.forCall(frame.meta));
     if (!frame || !relayed) {
       if (respawn) noteRequest(line);
-      child.stdin.write(line + "\n");
+      child.stdin.write(line + '\n');
       return;
     }
     // Fail-closed: a relayed answer is the bridge's, never the driver's, so it is not journalled. The gate check the call
     // passed is then left without an entry, which keeps its request's journal incomplete, and an incomplete one never saves.
     tap?.leaveOut(frame.id);
-    const result = completeFor(frame.meta, await relayed.catch((error: unknown) => failed(error instanceof Error ? error.message : String(error))));
-    respond(JSON.stringify({ jsonrpc: "2.0", id: frame.id, result }));
+    const result = completeFor(
+      frame.meta,
+      await relayed.catch((error: unknown) =>
+        failed(error instanceof Error ? error.message : String(error)),
+      ),
+    );
+    respond(JSON.stringify({ jsonrpc: '2.0', id: frame.id, result }));
   };
   let sending: Promise<void> = Promise.resolve();
   const forward = (line: string): void | Promise<void> => {
     if (!options.relay && !respawn) {
-      child.stdin.write(line + "\n");
+      child.stdin.write(line + '\n');
       return;
     }
     sending = sending.then(() => send(line)).catch(() => {});
@@ -469,7 +553,9 @@ export function runMcpBridge(options: BridgeOptions): void {
   const intercept = createMcpBridgeInterceptor({
     answer,
     forward,
-    ...(client ? { gate: { check: (frame: unknown) => client.state(true, options.gate?.describe?.(frame)) } } : {}),
+    ...(client
+      ? { gate: { check: (frame: unknown) => client.state(true, options.gate?.describe?.(frame)) } }
+      : {}),
   });
   let pendingInput = Promise.resolve();
   const inbound = createLineSplitter((line) => {
@@ -480,8 +566,8 @@ export function runMcpBridge(options: BridgeOptions): void {
   });
 
   const onStdin = (chunk: Buffer) => inbound.push(chunk);
-  process.stdin.on("data", onStdin);
-  process.stdin.on("end", () => {
+  process.stdin.on('data', onStdin);
+  process.stdin.on('end', () => {
     inbound.flush();
     // A final tools/call may still await the gate: close the far end only after it is forwarded.
     void pendingInput.finally(() => child.stdin.end());
@@ -493,13 +579,13 @@ export function runMcpBridge(options: BridgeOptions): void {
       if (respawn) noteResponse(line);
       respond(line);
     });
-    proc.stdout.on("data", (chunk) => outbound.push(chunk));
-    proc.stdout.on("end", () => outbound.flush());
+    proc.stdout.on('data', (chunk) => outbound.push(chunk));
+    proc.stdout.on('end', () => outbound.flush());
   };
   wireChildOutput(child, () => false);
 
   const detach = () => {
-    process.stdin.off("data", onStdin);
+    process.stdin.off('data', onStdin);
     process.stdin.pause();
   };
 
@@ -515,29 +601,32 @@ export function runMcpBridge(options: BridgeOptions): void {
         );
         process.exitCode = 1;
         detach();
-        child.kill("SIGKILL");
+        child.kill('SIGKILL');
         // A docker wedged on a dead ssh link may never deliver close; after 45 quiet seconds nothing is buffered to truncate.
         const failsafe = setTimeout(() => process.exit(1), 2_000);
         failsafe.unref?.();
       },
     });
     const touch = () => watchdog?.touch();
-    process.stdin.on("data", touch);
-    child.stdout.on("data", touch);
-    child.stderr.on("data", touch);
+    process.stdin.on('data', touch);
+    child.stdout.on('data', touch);
+    child.stderr.on('data', touch);
   }
 
   const childLost = (proc: typeof child) => {
     if (!respawn || proc !== child) return;
     childGone = true;
     children.close();
-    for (const { id, method, meta } of waitingOnChild.values()) answerStopped(id, method, meta, respawn.stopped);
+    for (const { id, method, meta } of waitingOnChild.values())
+      answerStopped(id, method, meta, respawn.stopped);
     waitingOnChild.clear();
-    process.stderr.write(`${options.label}: its helper stopped; a new one starts on the next call\n`);
+    process.stderr.write(
+      `${options.label}: its helper stopped; a new one starts on the next call\n`,
+    );
     if (stopping) detach();
   };
   function watchChild(proc: typeof child) {
-    proc.on("error", (error) => {
+    proc.on('error', (error) => {
       process.stderr.write(`could not connect to ${options.label}: ${error.message}\n`);
       if (respawn) {
         childLost(proc);
@@ -548,7 +637,7 @@ export function runMcpBridge(options: BridgeOptions): void {
       children.close();
       detach();
     });
-    proc.on("close", (code, signal) => {
+    proc.on('close', (code, signal) => {
       if (respawn) {
         childLost(proc);
         return;
@@ -563,7 +652,7 @@ export function runMcpBridge(options: BridgeOptions): void {
   }
   watchChild(child);
 
-  for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.on(signal, () => {
       stopping = true;
       if (childGone) process.exit(0);

@@ -15,28 +15,45 @@ export interface XIncludedUsage {
  * `included`: this server holds a MausBot Cloud plan's included X calls. `unavailable`: the Admin said this desktop's
  * paid sign-in gets none. `usage`: the included calls this month, when the relay answered. */
 export interface XConnectorStatus {
-  using: "own" | "included" | null;
+  using: 'own' | 'included' | null;
   ownKey: boolean;
   included: boolean;
   unavailable?: true;
   usage?: XIncludedUsage;
 }
 
-const count = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-const isoTime = (value: unknown): value is string => typeof value === "string" && value.length <= 40 && !Number.isNaN(Date.parse(value));
+const count = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+const isoTime = (value: unknown): value is string =>
+  typeof value === 'string' && value.length <= 40 && !Number.isNaN(Date.parse(value));
 
 /** The relay's answer as XIncludedUsage, or null for anything else. Every call used reads as used up. */
 export function parseXIncludedUsage(value: unknown): XIncludedUsage | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const { calls, max, usedUp, resetsAt, trialEndsAt } = value as Record<string, unknown>;
-  if (!count(calls) || !count(max) || !isoTime(resetsAt) || (trialEndsAt !== undefined && !isoTime(trialEndsAt))) return null;
-  return { calls: Math.min(calls, max), max, ...(usedUp === true || calls >= max ? { usedUp: true as const } : {}), resetsAt, ...(trialEndsAt !== undefined ? { trialEndsAt } : {}) };
+  if (
+    !count(calls) ||
+    !count(max) ||
+    !isoTime(resetsAt) ||
+    (trialEndsAt !== undefined && !isoTime(trialEndsAt))
+  )
+    return null;
+  return {
+    calls: Math.min(calls, max),
+    max,
+    ...(usedUp === true || calls >= max ? { usedUp: true as const } : {}),
+    resetsAt,
+    ...(trialEndsAt !== undefined ? { trialEndsAt } : {}),
+  };
 }
 
 export function isXConnectorStatus(value: unknown): value is XConnectorStatus {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const status = value as Record<string, unknown>;
-  return (status.using === "own" || status.using === "included" || status.using === null)
-    && typeof status.ownKey === "boolean" && typeof status.included === "boolean"
-    && (status.usage === undefined || parseXIncludedUsage(status.usage) !== null);
+  return (
+    (status.using === 'own' || status.using === 'included' || status.using === null) &&
+    typeof status.ownKey === 'boolean' &&
+    typeof status.included === 'boolean' &&
+    (status.usage === undefined || parseXIncludedUsage(status.usage) !== null)
+  );
 }

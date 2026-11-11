@@ -4,32 +4,39 @@
 // conversation marked as waiting (on its task, so a reload or another device sees it); the person's next line there
 // then runs as setup. Anything else the person writes runs as typed, and the card settles. Setup stays explicit: only
 // a pick, the line after Something else, or a typed /setup ever starts it.
-import { dataContextPrompt } from "../shared/data-context.ts";
-import type { ResolvedSender } from "../shared/wire.ts";
-import { linePersonKey } from "./host/thread-person.ts";
-import { setupRequestLine } from "./initial-greeting.ts";
-import type { RequestAuth } from "./request-auth.ts";
-import { parseSetupCommand } from "./setup-mode.ts";
-import type { BotRecord, Message, Store } from "./store.ts";
-import { extractTurnImages } from "./turn-images.ts";
-import { userError, type UserError } from "./user-errors.ts";
+import { dataContextPrompt } from '../shared/data-context.ts';
+import type { ResolvedSender } from '../shared/wire.ts';
+import { linePersonKey } from './host/thread-person.ts';
+import { setupRequestLine } from './initial-greeting.ts';
+import type { RequestAuth } from './request-auth.ts';
+import { parseSetupCommand } from './setup-mode.ts';
+import type { BotRecord, Message, Store } from './store.ts';
+import { extractTurnImages } from './turn-images.ts';
+import { userError, type UserError } from './user-errors.ts';
 
-export type SetupRequestStore = Pick<Store, "bots" | "bot" | "taskByThread" | "messagesFor" | "patchMessage" | "appendMessage" | "patchTask">;
+export type SetupRequestStore = Pick<
+  Store,
+  'bots' | 'bot' | 'taskByThread' | 'messagesFor' | 'patchMessage' | 'appendMessage' | 'patchTask'
+>;
 
 /** No role or instructions yet: what the New bot form calls Description and Instructions are empty. */
-export function blankBot(bot: Pick<BotRecord, "soul" | "description">): boolean {
+export function blankBot(bot: Pick<BotRecord, 'soul' | 'description'>): boolean {
   return !bot.soul?.trim() && !bot.description?.trim();
 }
 
 /** The greeting whose setup card is open in this conversation: its first line, while the bot is blank and nothing has
  * been written there yet, by anyone. */
-export function openSetupOffer(store: SetupRequestStore, botId: string, threadId: string): Message | null {
+export function openSetupOffer(
+  store: SetupRequestStore,
+  botId: string,
+  threadId: string,
+): Message | null {
   const bot = store.bot(botId);
   if (!bot || !blankBot(bot) || !store.taskByThread(botId, threadId)) return null;
   const thread = store.messagesFor(threadId);
   const greeting = thread[0];
-  if (thread.some((message) => message.role === "user")) return null;
-  return greeting?.setupOffer === true && greeting.role === "bot" ? greeting : null;
+  if (thread.some((message) => message.role === 'user')) return null;
+  return greeting?.setupOffer === true && greeting.role === 'bot' ? greeting : null;
 }
 
 export type SetupAsk =
@@ -40,43 +47,72 @@ export type SetupAsk =
 
 /** Who presses, recorded only where several people share the place, and only for a signed-in person whose lines carry
  * them as their sender (`sender`, as the send route stores it): anyone else could never take their own mark. */
-export function setupPresser(shared: boolean, auth: RequestAuth, sender: ResolvedSender | undefined): string | undefined {
-  return shared && auth.kind === "session" ? sender?.id : undefined;
+export function setupPresser(
+  shared: boolean,
+  auth: RequestAuth,
+  sender: ResolvedSender | undefined,
+): string | undefined {
+  return shared && auth.kind === 'session' ? sender?.id : undefined;
 }
 
 /** The press. A second press by the same person while the conversation waits changes nothing, so a double click says
  * the line once; anyone else's is refused. `by`: who pressed (setupPresser); only their next line takes the mark.
  * `picked`: a choice on the card, whose words the caller sends next, so the bot's own line is not said. */
-export function askForSetup(store: SetupRequestStore, botId: string, threadId: string, language: string | undefined, by?: string,
-  picked = false): SetupAsk {
+export function askForSetup(
+  store: SetupRequestStore,
+  botId: string,
+  threadId: string,
+  language: string | undefined,
+  by?: string,
+  picked = false,
+): SetupAsk {
   const bot = store.bot(botId);
   const task = bot ? store.taskByThread(botId, threadId) : null;
-  if (!bot || !task) return { ok: false, status: 404, ...userError("serverError.setup.missingConversation") };
+  if (!bot || !task)
+    return { ok: false, status: 404, ...userError('serverError.setup.missingConversation') };
   if (task.setupRequest) {
-    return task.setupRequest.by && task.setupRequest.by !== by ? { ok: false, status: 409, ...userError("serverError.setup.someoneElse") } : { ok: true, already: true };
+    return task.setupRequest.by && task.setupRequest.by !== by
+      ? { ok: false, status: 409, ...userError('serverError.setup.someoneElse') }
+      : { ok: true, already: true };
   }
   const offer = openSetupOffer(store, botId, threadId);
-  if (!offer) return { ok: false, status: 409, ...userError(blankBot(bot) ? "serverError.setup.started" : "serverError.setup.hasInstructions") };
+  if (!offer)
+    return {
+      ok: false,
+      status: 409,
+      ...userError(
+        blankBot(bot) ? 'serverError.setup.started' : 'serverError.setup.hasInstructions',
+      ),
+    };
   if (picked) {
     store.patchTask(botId, threadId, { setupRequest: { at: Date.now(), ...(by ? { by } : {}) } });
     return { ok: true, picked: true };
   }
-  const message = store.appendMessage(threadId, { role: "bot", kind: "text", text: setupRequestLine(language) });
+  const message = store.appendMessage(threadId, {
+    role: 'bot',
+    kind: 'text',
+    text: setupRequestLine(language),
+  });
   store.patchTask(botId, threadId, { setupRequest: { at: message.at, ...(by ? { by } : {}) } });
   return { ok: true, message };
 }
 
 /** The x on the chip or on the card: the conversation stops waiting and the card closes, so lines run as typed. Where
  * a presser is recorded, only they or an owner or admin may. */
-export function cancelSetupRequest(store: SetupRequestStore, botId: string, threadId: string, by?: string,
-  options: { admin?: boolean } = {}): "cleared" | "refused" | "unknown" {
+export function cancelSetupRequest(
+  store: SetupRequestStore,
+  botId: string,
+  threadId: string,
+  by?: string,
+  options: { admin?: boolean } = {},
+): 'cleared' | 'refused' | 'unknown' {
   const task = store.bot(botId) ? store.taskByThread(botId, threadId) : null;
-  if (!task) return "unknown";
-  if (task.setupRequest?.by && task.setupRequest.by !== by && !options.admin) return "refused";
+  if (!task) return 'unknown';
+  if (task.setupRequest?.by && task.setupRequest.by !== by && !options.admin) return 'refused';
   if (task.setupRequest) store.patchTask(botId, threadId, { setupRequest: undefined });
   const greeting = store.messagesFor(threadId)[0];
   if (greeting?.setupOffer) store.patchMessage(threadId, greeting.id, { setupOffer: undefined });
-  return "cleared";
+  return 'cleared';
 }
 
 /** A person left the team: every request they pressed stops waiting. How many. */
@@ -105,20 +141,25 @@ export interface SetupTurn {
   mounted: boolean;
 }
 
-const command = (line: Message): boolean => (line.text ?? "").trimStart().startsWith("/");
+const command = (line: Message): boolean => (line.text ?? '').trimStart().startsWith('/');
 
 /** The stored line, marked, when this turn is a setup request; null when it runs as typed. Called by startTurn once the
  * line is stored, which keeps the returned copy: a retry on the backup AI, a computer pick or an edit of it then stays
  * a setup request. */
 export function takeSetupRequest(store: SetupRequestStore, turn: SetupTurn): Message | null {
   const { botId, threadId, line } = turn;
-  if (line.role !== "user" || line.peerAsk) return null;
+  if (line.role !== 'user' || line.peerAsk) return null;
   if (line.setupRequest) return turn.mounted ? line : null;
-  const edited = turn.editedFrom ? store.messagesFor(threadId).find((message) => message.id === turn.editedFrom) : undefined;
+  const edited = turn.editedFrom
+    ? store.messagesFor(threadId).find((message) => message.id === turn.editedFrom)
+    : undefined;
   if (edited?.setupRequest) {
     // Someone else's edit of the presser's line (a Team Cloud stores both senders) runs as typed.
-    const author = linePersonKey(edited), editor = linePersonKey(line);
-    return command(line) || (author && editor && author !== editor) ? null : mark(store, threadId, line, turn.mounted);
+    const author = linePersonKey(edited),
+      editor = linePersonKey(line);
+    return command(line) || (author && editor && author !== editor)
+      ? null
+      : mark(store, threadId, line, turn.mounted);
   }
   if (!turn.person || line.relayed) return null;
   const waiting = store.taskByThread(botId, threadId)?.setupRequest;
@@ -133,9 +174,16 @@ export function takeSetupRequest(store: SetupRequestStore, turn: SetupTurn): Mes
   return mark(store, threadId, line, turn.mounted);
 }
 
-function mark(store: SetupRequestStore, threadId: string, line: Message, mounted: boolean): Message | null {
+function mark(
+  store: SetupRequestStore,
+  threadId: string,
+  line: Message,
+  mounted: boolean,
+): Message | null {
   if (!mounted) return null;
-  return store.patchMessage(threadId, line.id, { setupRequest: true }) ?? { ...line, setupRequest: true };
+  return (
+    store.patchMessage(threadId, line.id, { setupRequest: true }) ?? { ...line, setupRequest: true }
+  );
 }
 
 /** The person's words as a typed /setup. */
@@ -147,7 +195,7 @@ export function setupCommandText(text: string): string {
  * read alike: its words as a typed /setup (the command must come first to be read as one), then what the person was
  * looking at in the Data tab. `nativeImages`: the AI takes the line's pictures as images, not as their tags. */
 export function setupTurnText(line: Message, nativeImages: boolean): string {
-  const words = nativeImages ? extractTurnImages(line.text ?? "").text : line.text ?? "";
+  const words = nativeImages ? extractTurnImages(line.text ?? '').text : (line.text ?? '');
   const request = setupCommandText(words);
   return line.dataContext ? `${request}\n\n${dataContextPrompt(line.dataContext)}` : request;
 }

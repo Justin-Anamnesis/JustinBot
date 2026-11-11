@@ -1,5 +1,5 @@
-import { processAlive } from "./browser-processes.ts";
-import type { ProviderAdapter, RuntimeEvent } from "./contracts.ts";
+import { processAlive } from './browser-processes.ts';
+import type { ProviderAdapter, RuntimeEvent } from './contracts.ts';
 
 // A turn whose thread emits nothing for stallMs is wedged; waiting on a person or a computer is not a stall unless the
 // turn's engine is known to have no process left. Drivers report a tool only when it starts and when it ends, so a turn
@@ -22,7 +22,11 @@ export function stallLimitMs(raw: string | undefined, fallback: number): number 
 
 /** The engine is known to run no process for the thread's turn: its driver tracks one and has none, or the one it names has
  * exited. A driver that tracks no process proves nothing, so this is false for it. */
-export function engineProcessGone(adapter: Pick<ProviderAdapter, "enginePid"> | null | undefined, threadId: string, alive = processAlive): boolean {
+export function engineProcessGone(
+  adapter: Pick<ProviderAdapter, 'enginePid'> | null | undefined,
+  threadId: string,
+  alive = processAlive,
+): boolean {
   if (!adapter?.enginePid) return false;
   const pid = adapter.enginePid(threadId);
   return pid === undefined || !alive(pid);
@@ -44,7 +48,10 @@ export interface TurnWatchdogOptions {
   onStall: (turn: WatchedTurn, silentMs: number) => void;
   /** The conversations shown working that nothing holds but a watched turn (no dispatch, engine or settling turn): one no
    * watched turn holds either is freed once it has stayed so for stallMs. */
-  unheld?: { threads(): Iterable<{ threadId: string; botId: string }>; free(threadId: string, botId: string): void };
+  unheld?: {
+    threads(): Iterable<{ threadId: string; botId: string }>;
+    free(threadId: string, botId: string): void;
+  };
   now?: () => number;
 }
 
@@ -86,16 +93,28 @@ export class TurnWatchdog {
 
   watch(threadId: string, botId: string): void {
     const at = this.now();
-    this.turns.set(threadId, { threadId, botId, startedAt: at, lastEventAt: at, waitingOnHuman: false, waitingOnComputer: false,
-      runningTools: new Set() });
+    this.turns.set(threadId, {
+      threadId,
+      botId,
+      startedAt: at,
+      lastEventAt: at,
+      waitingOnHuman: false,
+      waitingOnComputer: false,
+      runningTools: new Set(),
+    });
   }
 
   observe(event: RuntimeEvent): void {
     const turn = this.turns.get(event.threadId);
     if (!turn) return;
     turn.lastEventAt = this.now();
-    if ((event.type !== "item.started" && event.type !== "item.completed") || event.itemType !== "tool" || !event.itemId) return;
-    if (event.type === "item.completed") turn.runningTools.delete(event.itemId);
+    if (
+      (event.type !== 'item.started' && event.type !== 'item.completed') ||
+      event.itemType !== 'tool' ||
+      !event.itemId
+    )
+      return;
+    if (event.type === 'item.completed') turn.runningTools.delete(event.itemId);
     else turn.runningTools.add(event.itemId);
   }
 
@@ -159,7 +178,9 @@ export class TurnWatchdog {
   /** null: the turn may wait on, parked while its engine is not known to be gone. */
   private silenceLimit(turn: WatchedTurn): number | null {
     if (parked(turn)) return this.opts.engineGone?.(turn) ? this.opts.parkedStallMs : null;
-    return turn.runningTools.size > 0 ? Math.max(this.opts.stallMs, this.opts.toolStallMs) : this.opts.stallMs;
+    return turn.runningTools.size > 0
+      ? Math.max(this.opts.stallMs, this.opts.toolStallMs)
+      : this.opts.stallMs;
   }
 
   private freeUnheld(at: number): void {

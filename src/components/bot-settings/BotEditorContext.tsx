@@ -1,5 +1,5 @@
-import { createContext, useContext } from "react";
-import { api } from "@/state/store";
+import { createContext, useContext } from 'react';
+import { api } from '@/state/store';
 
 /** A creation editor supplies a scoped draft transport; it never replaces fetch or another editor's API. */
 export const BotEditorContext = createContext<{
@@ -8,4 +8,6 @@ export const BotEditorContext = createContext<{
   uploadAvatar?: (file: File) => Promise<string>;
 }>({ request: api });
 
-export function useBotEditor() { return useContext(BotEditorContext); }
+export function useBotEditor() {
+  return useContext(BotEditorContext);
+}

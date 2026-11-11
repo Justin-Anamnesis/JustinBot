@@ -1,9 +1,9 @@
-import { EventEmitter } from "node:events";
-import { createServer as createHttpServer, request as httpRequest } from "node:http";
-import { createConnection } from "node:net";
-import fs from "node:fs";
-import path from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { EventEmitter } from 'node:events';
+import { createServer as createHttpServer, request as httpRequest } from 'node:http';
+import { createConnection } from 'node:net';
+import fs from 'node:fs';
+import path from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   cleanupCompanionOriginEndpoint,
@@ -11,7 +11,7 @@ import {
   createCompanionOriginEndpoint,
   createCompanionOriginGateway,
   validCompanionOriginTarget,
-} from "./companion-origin-gateway.mjs";
+} from './companion-origin-gateway.mjs';
 
 const allocations = [];
 const servers = [];
@@ -19,9 +19,9 @@ const sockets = [];
 
 const listen = (server, options) =>
   new Promise((resolve, reject) => {
-    server.once("error", reject);
+    server.once('error', reject);
     server.listen(options, () => {
-      server.off("error", reject);
+      server.off('error', reject);
       resolve(server.address());
     });
   });
@@ -46,50 +46,52 @@ afterEach(async () => {
   for (const allocated of allocations.splice(0)) cleanupCompanionOriginEndpoint(allocated);
 });
 
-describe("managed Companion origin endpoint", () => {
-  it("allocates a private generation-specific UDS or named pipe", () => {
+describe('managed Companion origin endpoint', () => {
+  it('allocates a private generation-specific UDS or named pipe', () => {
     const first = endpoint();
     const second = endpoint();
     expect(first.socketPath).not.toBe(second.socketPath);
     expect(validCompanionOriginTarget(first)).toBe(true);
-    expect(validCompanionOriginTarget({ pid: process.pid, socketPath: "http://127.0.0.1:8810" })).toBe(false);
-    if (process.platform !== "win32") {
+    expect(
+      validCompanionOriginTarget({ pid: process.pid, socketPath: 'http://127.0.0.1:8810' }),
+    ).toBe(false);
+    if (process.platform !== 'win32') {
       expect(fs.statSync(first.directory).mode & 0o777).toBe(0o700);
       expect(path.dirname(first.socketPath)).toBe(first.directory);
-      expect(path.dirname(first.directory)).toBe(fs.realpathSync("/tmp"));
+      expect(path.dirname(first.directory)).toBe(fs.realpathSync('/tmp'));
     }
   });
 
-  it("cleans only the exact endpoint it allocated", () => {
+  it('cleans only the exact endpoint it allocated', () => {
     const allocated = endpoint();
-    if (process.platform === "win32") return;
-    const foreign = path.join(allocated.directory, "keep-me");
-    fs.writeFileSync(foreign, "safe");
+    if (process.platform === 'win32') return;
+    const foreign = path.join(allocated.directory, 'keep-me');
+    fs.writeFileSync(foreign, 'safe');
     cleanupCompanionOriginEndpoint(allocated);
-    expect(fs.readFileSync(foreign, "utf8")).toBe("safe");
+    expect(fs.readFileSync(foreign, 'utf8')).toBe('safe');
     fs.unlinkSync(foreign);
   });
 
-  it("settles an origin health probe when its request times out or closes", async () => {
+  it('settles an origin health probe when its request times out or closes', async () => {
     const probe = (terminalEvent) => {
       const outgoing = new EventEmitter();
       outgoing.destroy = () => {};
       outgoing.end = () => queueMicrotask(() => outgoing.emit(terminalEvent));
       return companionOriginHealth(
-        { socketPath: "/unused/private-origin.sock" },
+        { socketPath: '/unused/private-origin.sock' },
         { request: () => outgoing, timeoutMs: 10 },
       );
     };
 
-    await expect(probe("timeout")).resolves.toBe(false);
-    await expect(probe("close")).resolves.toBe(false);
+    await expect(probe('timeout')).resolves.toBe(false);
+    await expect(probe('close')).resolves.toBe(false);
   });
 
-  it("accepts the exact identity from a healthy private origin", async () => {
+  it('accepts the exact identity from a healthy private origin', async () => {
     const allocated = endpoint();
     const target = createHttpServer((_request, response) => {
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ app: "openmausbot" }));
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify({ app: 'openmausbot' }));
     });
     servers.push(target);
     await listen(target, allocated.socketPath);
@@ -98,24 +100,26 @@ describe("managed Companion origin endpoint", () => {
   });
 });
 
-describe("managed Companion loopback gateway", () => {
-  it("forwards only to the closed-over private socket and strips hop-by-hop headers", async () => {
+describe('managed Companion loopback gateway', () => {
+  it('forwards only to the closed-over private socket and strips hop-by-hop headers', async () => {
     const allocated = endpoint();
     const target = createHttpServer((request, response) => {
       const chunks = [];
-      request.on("data", (chunk) => chunks.push(chunk));
-      request.on("end", () => {
+      request.on('data', (chunk) => chunks.push(chunk));
+      request.on('end', () => {
         response.writeHead(200, {
-          "content-type": "application/json",
-          connection: "x-private-hop",
-          "x-private-hop": "remove-me",
+          'content-type': 'application/json',
+          connection: 'x-private-hop',
+          'x-private-hop': 'remove-me',
         });
-        response.end(JSON.stringify({
-          authorization: request.headers.authorization,
-          body: Buffer.concat(chunks).toString("utf8"),
-          path: request.url,
-          privateHop: request.headers["x-private-hop"],
-        }));
+        response.end(
+          JSON.stringify({
+            authorization: request.headers.authorization,
+            body: Buffer.concat(chunks).toString('utf8'),
+            path: request.url,
+            privateHop: request.headers['x-private-hop'],
+          }),
+        );
       });
     });
     servers.push(target);
@@ -127,42 +131,47 @@ describe("managed Companion loopback gateway", () => {
     });
     const address = await gateway.start();
     const response = await new Promise((resolve, reject) => {
-      const outgoing = httpRequest({
-        host: "127.0.0.1",
-        port: address.port,
-        path: "/echo?one=1",
-        method: "POST",
-        headers: {
-          authorization: "Bearer paired-device",
-          connection: "x-private-hop",
-          "content-length": 7,
-          "x-private-hop": "remove-me",
+      const outgoing = httpRequest(
+        {
+          host: '127.0.0.1',
+          port: address.port,
+          path: '/echo?one=1',
+          method: 'POST',
+          headers: {
+            authorization: 'Bearer paired-device',
+            connection: 'x-private-hop',
+            'content-length': 7,
+            'x-private-hop': 'remove-me',
+          },
         },
-      }, (incoming) => {
-        const chunks = [];
-        incoming.on("data", (chunk) => chunks.push(chunk));
-        incoming.on("end", () => resolve({
-          body: JSON.parse(Buffer.concat(chunks).toString("utf8")),
-          headers: incoming.headers,
-        }));
-      });
-      outgoing.once("error", reject);
-      outgoing.end("payload");
+        (incoming) => {
+          const chunks = [];
+          incoming.on('data', (chunk) => chunks.push(chunk));
+          incoming.on('end', () =>
+            resolve({
+              body: JSON.parse(Buffer.concat(chunks).toString('utf8')),
+              headers: incoming.headers,
+            }),
+          );
+        },
+      );
+      outgoing.once('error', reject);
+      outgoing.end('payload');
     });
     expect(response.body).toEqual({
-      authorization: "Bearer paired-device",
-      body: "payload",
-      path: "/echo?one=1",
+      authorization: 'Bearer paired-device',
+      body: 'payload',
+      path: '/echo?one=1',
     });
-    expect(response.headers["x-private-hop"]).toBeUndefined();
+    expect(response.headers['x-private-hop']).toBeUndefined();
     await gateway.close();
   });
 
-  it("carries an authenticated viewer WebSocket to the private companion origin", async () => {
+  it('carries an authenticated viewer WebSocket to the private companion origin', async () => {
     const allocated = endpoint();
     let received = null;
     const target = createHttpServer();
-    target.on("upgrade", (request, socket) => {
+    target.on('upgrade', (request, socket) => {
       sockets.push(socket);
       received = {
         authorization: request.headers.authorization,
@@ -170,11 +179,11 @@ describe("managed Companion loopback gateway", () => {
         upgrade: request.headers.upgrade,
       };
       socket.write(
-        "HTTP/1.1 101 Switching Protocols\r\n"
-          + "Upgrade: websocket\r\n"
-          + "Connection: Upgrade\r\n"
-          + "Sec-WebSocket-Accept: test\r\n\r\n"
-          + "private-origin-ready",
+        'HTTP/1.1 101 Switching Protocols\r\n' +
+          'Upgrade: websocket\r\n' +
+          'Connection: Upgrade\r\n' +
+          'Sec-WebSocket-Accept: test\r\n\r\n' +
+          'private-origin-ready',
       );
     });
     servers.push(target);
@@ -186,45 +195,49 @@ describe("managed Companion loopback gateway", () => {
     });
     const address = await gateway.start();
     const response = await new Promise((resolve, reject) => {
-      const socket = createConnection({ host: "127.0.0.1", port: address.port });
+      const socket = createConnection({ host: '127.0.0.1', port: address.port });
       sockets.push(socket);
-      let text = "";
-      socket.setEncoding("utf8");
-      socket.once("connect", () => socket.write(
-        "GET /vps-viewer/session/websockify HTTP/1.1\r\n"
-          + `Host: 127.0.0.1:${address.port}\r\n`
-          + "Authorization: Bearer paired-device\r\n"
-          + "Connection: Upgrade\r\n"
-          + "Upgrade: websocket\r\n"
-          + "Sec-WebSocket-Key: dGVzdA==\r\n"
-          + "Sec-WebSocket-Version: 13\r\n\r\n",
-      ));
-      socket.on("data", (chunk) => {
+      let text = '';
+      socket.setEncoding('utf8');
+      socket.once('connect', () =>
+        socket.write(
+          'GET /vps-viewer/session/websockify HTTP/1.1\r\n' +
+            `Host: 127.0.0.1:${address.port}\r\n` +
+            'Authorization: Bearer paired-device\r\n' +
+            'Connection: Upgrade\r\n' +
+            'Upgrade: websocket\r\n' +
+            'Sec-WebSocket-Key: dGVzdA==\r\n' +
+            'Sec-WebSocket-Version: 13\r\n\r\n',
+        ),
+      );
+      socket.on('data', (chunk) => {
         text += chunk;
-        if (text.includes("private-origin-ready")) resolve(text);
+        if (text.includes('private-origin-ready')) resolve(text);
       });
-      socket.once("error", reject);
-      socket.setTimeout(2_000, () => reject(new Error("managed viewer WebSocket timed out")));
+      socket.once('error', reject);
+      socket.setTimeout(2_000, () => reject(new Error('managed viewer WebSocket timed out')));
     });
 
-    expect(response).toContain("101 Switching Protocols");
+    expect(response).toContain('101 Switching Protocols');
     expect(received).toEqual({
-      authorization: "Bearer paired-device",
-      path: "/vps-viewer/session/websockify",
-      upgrade: "websocket",
+      authorization: 'Bearer paired-device',
+      path: '/vps-viewer/session/websockify',
+      upgrade: 'websocket',
     });
     await gateway.close();
   });
 
-  it("survives a phone resetting its viewer WebSocket and closes the private end", async () => {
+  it('survives a phone resetting its viewer WebSocket and closes the private end', async () => {
     const allocated = endpoint();
     let originSocket;
     const target = createHttpServer();
-    target.on("upgrade", (_request, socket) => {
+    target.on('upgrade', (_request, socket) => {
       sockets.push(socket);
-      socket.on("error", () => {});
+      socket.on('error', () => {});
       originSocket = socket;
-      socket.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\nready");
+      socket.write(
+        'HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\nready',
+      );
     });
     servers.push(target);
     await listen(target, allocated.socketPath);
@@ -233,43 +246,49 @@ describe("managed Companion loopback gateway", () => {
       originPort: 0,
     });
     const address = await gateway.start();
-    const phone = createConnection({ host: "127.0.0.1", port: address.port });
+    const phone = createConnection({ host: '127.0.0.1', port: address.port });
     sockets.push(phone);
-    phone.on("error", () => {});
+    phone.on('error', () => {});
     await new Promise((resolve) => {
-      let text = "";
-      phone.setEncoding("utf8");
-      phone.on("data", (chunk) => {
+      let text = '';
+      phone.setEncoding('utf8');
+      phone.on('data', (chunk) => {
         text += chunk;
-        if (text.includes("ready")) resolve();
+        if (text.includes('ready')) resolve();
       });
-      phone.once("connect", () => phone.write(
-        "GET /vps-viewer/session/websockify HTTP/1.1\r\n"
-          + `Host: 127.0.0.1:${address.port}\r\n`
-          + "Connection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
-      ));
+      phone.once('connect', () =>
+        phone.write(
+          'GET /vps-viewer/session/websockify HTTP/1.1\r\n' +
+            `Host: 127.0.0.1:${address.port}\r\n` +
+            'Connection: Upgrade\r\nUpgrade: websocket\r\n\r\n',
+        ),
+      );
     });
     // The origin's server socket is half-open by default: its peer going away shows as `end`.
     const closed = new Promise((resolve) => {
-      originSocket.once("end", resolve);
-      originSocket.once("close", resolve);
+      originSocket.once('end', resolve);
+      originSocket.once('close', resolve);
     });
     phone.resetAndDestroy();
-    await expect(Promise.race([
-      closed,
-      new Promise((_, fail) => setTimeout(() => fail(new Error("phone reset left the private end open")), 2_000)),
-    ])).resolves.not.toBe("timeout");
+    await expect(
+      Promise.race([
+        closed,
+        new Promise((_, fail) =>
+          setTimeout(() => fail(new Error('phone reset left the private end open')), 2_000),
+        ),
+      ]),
+    ).resolves.not.toBe('timeout');
     await gateway.close();
   });
 
-  it("invalidates a viewer socket while its upstream upgrade is still pending", async () => {
+  it('invalidates a viewer socket while its upstream upgrade is still pending', async () => {
     const allocated = endpoint();
     let receivedUpgrade;
     const receivedUpgradePromise = new Promise((resolve) => {
       receivedUpgrade = resolve;
     });
     const target = createHttpServer();
-    target.on("upgrade", (_request, socket) => {
+    target.on('upgrade', (_request, socket) => {
       sockets.push(socket);
       receivedUpgrade();
     });
@@ -282,30 +301,36 @@ describe("managed Companion loopback gateway", () => {
       upstreamTimeoutMs: 2_000,
     });
     const address = await gateway.start();
-    const socket = createConnection({ host: "127.0.0.1", port: address.port });
+    const socket = createConnection({ host: '127.0.0.1', port: address.port });
     sockets.push(socket);
-    const closed = new Promise((resolve) => socket.once("close", resolve));
-    socket.once("connect", () => socket.write(
-      "GET /vps-viewer/session/websockify HTTP/1.1\r\n"
-        + `Host: 127.0.0.1:${address.port}\r\n`
-        + "Connection: Upgrade\r\n"
-        + "Upgrade: websocket\r\n"
-        + "Sec-WebSocket-Key: dGVzdA==\r\n"
-        + "Sec-WebSocket-Version: 13\r\n\r\n",
-    ));
+    const closed = new Promise((resolve) => socket.once('close', resolve));
+    socket.once('connect', () =>
+      socket.write(
+        'GET /vps-viewer/session/websockify HTTP/1.1\r\n' +
+          `Host: 127.0.0.1:${address.port}\r\n` +
+          'Connection: Upgrade\r\n' +
+          'Upgrade: websocket\r\n' +
+          'Sec-WebSocket-Key: dGVzdA==\r\n' +
+          'Sec-WebSocket-Version: 13\r\n\r\n',
+      ),
+    );
     await receivedUpgradePromise;
 
     gateway.invalidate();
-    await expect(Promise.race([
-      closed,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("pending viewer socket stayed open")), 2_000)),
-    ])).resolves.not.toBe("timeout");
+    await expect(
+      Promise.race([
+        closed,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('pending viewer socket stayed open')), 2_000),
+        ),
+      ]),
+    ).resolves.not.toBe('timeout');
     await gateway.close();
   });
 
-  it("fails closed when the exact sidecar pid is no longer alive", async () => {
+  it('fails closed when the exact sidecar pid is no longer alive', async () => {
     const allocated = endpoint();
-    const target = createHttpServer((_request, response) => response.end("must not be reached"));
+    const target = createHttpServer((_request, response) => response.end('must not be reached'));
     servers.push(target);
     await listen(target, allocated.socketPath);
     const gateway = createCompanionOriginGateway({
@@ -319,11 +344,11 @@ describe("managed Companion loopback gateway", () => {
     await gateway.close();
   });
 
-  it("invalidates live traffic while retaining its loopback port until close", async () => {
+  it('invalidates live traffic while retaining its loopback port until close', async () => {
     const allocated = endpoint();
     const target = createHttpServer((_request, response) => {
-      response.writeHead(200, { "content-type": "text/event-stream" });
-      response.write("data: first\n\n");
+      response.writeHead(200, { 'content-type': 'text/event-stream' });
+      response.write('data: first\n\n');
     });
     servers.push(target);
     await listen(target, allocated.socketPath);
@@ -341,21 +366,23 @@ describe("managed Companion loopback gateway", () => {
 
     const competitor = createHttpServer();
     servers.push(competitor);
-    await expect(listen(competitor, { host: "127.0.0.1", port: address.port })).rejects.toMatchObject({
-      code: "EADDRINUSE",
+    await expect(
+      listen(competitor, { host: '127.0.0.1', port: address.port }),
+    ).rejects.toMatchObject({
+      code: 'EADDRINUSE',
     });
 
     await gateway.close();
-    const rebound = await listen(competitor, { host: "127.0.0.1", port: address.port });
+    const rebound = await listen(competitor, { host: '127.0.0.1', port: address.port });
     expect(rebound.port).toBe(address.port);
   });
 
-  it("ends downstream traffic when the private origin closes mid-response", async () => {
+  it('ends downstream traffic when the private origin closes mid-response', async () => {
     const allocated = endpoint();
     const target = createHttpServer((_request, response) => {
       response.writeHead(200, {
-        "content-length": "100000",
-        "content-type": "application/octet-stream",
+        'content-length': '100000',
+        'content-type': 'application/octet-stream',
       });
       response.write(Buffer.alloc(1000, 1));
       setTimeout(() => response.socket?.destroy(), 20);
@@ -370,20 +397,20 @@ describe("managed Companion loopback gateway", () => {
     const address = await gateway.start();
     const outcome = await Promise.race([
       new Promise((resolve) => {
-        const outgoing = httpRequest({ host: "127.0.0.1", port: address.port }, (incoming) => {
+        const outgoing = httpRequest({ host: '127.0.0.1', port: address.port }, (incoming) => {
           incoming.resume();
-          incoming.once("aborted", () => resolve("aborted"));
-          incoming.once("error", () => resolve("error"));
-          incoming.once("end", () => resolve("ended"));
-          incoming.once("close", () => resolve("closed"));
+          incoming.once('aborted', () => resolve('aborted'));
+          incoming.once('error', () => resolve('error'));
+          incoming.once('end', () => resolve('ended'));
+          incoming.once('close', () => resolve('closed'));
         });
-        outgoing.once("error", () => resolve("request-error"));
+        outgoing.once('error', () => resolve('request-error'));
         outgoing.end();
       }),
-      new Promise((resolve) => setTimeout(() => resolve("hung"), 2_000)),
+      new Promise((resolve) => setTimeout(() => resolve('hung'), 2_000)),
     ]);
 
-    expect(outcome).not.toBe("hung");
+    expect(outcome).not.toBe('hung');
     await gateway.close();
   });
 });

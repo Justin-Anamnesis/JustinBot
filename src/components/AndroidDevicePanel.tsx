@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Circle, Loader2, RotateCcw, ShieldCheck, Smartphone, Usb } from "lucide-react";
-import { usePageVisible } from "@/lib/page-visible";
-import { t } from "@/lib/i18n";
-import { Select } from "./Select";
-import type { AndroidDeviceInput, AndroidDeviceStatus, AndroidUsbDevice } from "@/types/ogb";
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Circle, Loader2, RotateCcw, ShieldCheck, Smartphone, Usb } from 'lucide-react';
+import { usePageVisible } from '@/lib/page-visible';
+import { t } from '@/lib/i18n';
+import { Select } from './Select';
+import type { AndroidDeviceInput, AndroidDeviceStatus, AndroidUsbDevice } from '@/types/ogb';
 
 type UnitPoint = { x: number; y: number };
 
@@ -46,7 +46,7 @@ export function useAndroidUsbDevices(): AndroidUsbDevicesStatus {
           setStatus({
             available: false,
             devices: [],
-            reasonCode: "adb-failed",
+            reasonCode: 'adb-failed',
             message: cause instanceof Error ? cause.message : String(cause),
           });
         }
@@ -66,14 +66,14 @@ export function useAndroidUsbDevices(): AndroidUsbDevicesStatus {
 }
 
 function deviceLabel(device: AndroidUsbDevice) {
-  return device.model === "Android device" ? device.serial : device.model;
+  return device.model === 'Android device' ? device.serial : device.model;
 }
 
 export function AndroidDevicePanel({ status }: { status: AndroidDeviceStatus }) {
   const bridge = window.ogb?.androidDevice;
   const pageVisible = usePageVisible();
-  const authorized = status.devices.filter((device) => device.state === "device");
-  const [serial, setSerial] = useState(authorized[0]?.serial ?? status.devices[0]?.serial ?? "");
+  const authorized = status.devices.filter((device) => device.state === 'device');
+  const [serial, setSerial] = useState(authorized[0]?.serial ?? status.devices[0]?.serial ?? '');
   const [frame, setFrame] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [error, setError] = useState<string | null>(null);
@@ -91,12 +91,12 @@ export function AndroidDevicePanel({ status }: { status: AndroidDeviceStatus }) 
   useEffect(() => {
     if (!selected && status.devices[0]) setSerial(status.devices[0].serial);
     if (selected && !status.devices.some((device) => device.serial === selected.serial)) {
-      setSerial(status.devices[0]?.serial ?? "");
+      setSerial(status.devices[0]?.serial ?? '');
     }
   }, [selected, status.devices]);
 
   useEffect(() => {
-    if (!bridge || !selectedSerial || selectedState !== "device" || !pageVisible) {
+    if (!bridge || !selectedSerial || selectedState !== 'device' || !pageVisible) {
       if (!pageVisible) return;
       setFrame(null);
       return;
@@ -131,7 +131,7 @@ export function AndroidDevicePanel({ status }: { status: AndroidDeviceStatus }) 
   );
 
   const send = (payload: AndroidDeviceInput) => {
-    if (!bridge || !selected || selected.state !== "device") return;
+    if (!bridge || !selected || selected.state !== 'device') return;
     void bridge.input(selected.serial, payload).catch((cause) => {
       setError(cause instanceof Error ? cause.message : String(cause));
     });
@@ -160,22 +160,22 @@ export function AndroidDevicePanel({ status }: { status: AndroidDeviceStatus }) 
   const keyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.metaKey || event.ctrlKey || event.altKey) return;
     const named: Record<string, string> = {
-      ArrowDown: "down",
-      ArrowLeft: "left",
-      ArrowRight: "right",
-      ArrowUp: "up",
-      Backspace: "delete",
-      Delete: "delete",
-      Enter: "enter",
-      Escape: "back",
-      Tab: "tab",
+      ArrowDown: 'down',
+      ArrowLeft: 'left',
+      ArrowRight: 'right',
+      ArrowUp: 'up',
+      Backspace: 'delete',
+      Delete: 'delete',
+      Enter: 'enter',
+      Escape: 'back',
+      Tab: 'tab',
     };
     if (named[event.key]) {
       event.preventDefault();
-      send({ type: "key", key: named[event.key] });
+      send({ type: 'key', key: named[event.key] });
     } else if (/^[A-Za-z0-9 _.,@-]$/.test(event.key)) {
       event.preventDefault();
-      send({ type: "text", text: event.key });
+      send({ type: 'text', text: event.key });
     }
   };
 
@@ -200,7 +200,7 @@ export function AndroidDevicePanel({ status }: { status: AndroidDeviceStatus }) 
         ? { x: from.x + direction * distance, y: from.y }
         : { x: from.x, y: from.y + direction * distance };
       send({
-        type: "swipe",
+        type: 'swipe',
         fromX: from.x,
         fromY: from.y,
         toX: to.x,
@@ -213,30 +213,29 @@ export function AndroidDevicePanel({ status }: { status: AndroidDeviceStatus }) 
   };
 
   if (!selected) return null;
-  const ready = selected.state === "device";
+  const ready = selected.state === 'device';
 
   return (
-    <div className="space-y-3 pb-5">
-      <div className="rounded-xl bg-card p-4">
-        <div className="flex items-start justify-between gap-3">
+    <div className='space-y-3 pb-5'>
+      <div className='rounded-xl bg-card p-4'>
+        <div className='flex items-start justify-between gap-3'>
           <div>
-            <div className="flex items-center gap-2 text-[15px] font-medium text-ink">
-              <Smartphone size={16} className="text-success" /> {deviceLabel(selected)}
+            <div className='flex items-center gap-2 text-[15px] font-medium text-ink'>
+              <Smartphone size={16} className='text-success' /> {deviceLabel(selected)}
             </div>
-            <div className="mt-1 text-[12px] leading-relaxed text-ink-secondary">
-              {t("computer.android.usbSubtitle")}
+            <div className='mt-1 text-[12px] leading-relaxed text-ink-secondary'>
+              {t('computer.android.usbSubtitle')}
             </div>
           </div>
-          <span className="flex shrink-0 items-center gap-1 text-[11px] text-success">
-            <ShieldCheck size={12} /> {t("computer.android.usb")}
+          <span className='flex shrink-0 items-center gap-1 text-[11px] text-success'>
+            <ShieldCheck size={12} /> {t('computer.android.usb')}
           </span>
         </div>
         {status.devices.length > 1 && (
           <Select
             value={selected.serial}
             onChange={(event) => setSerial(event.target.value)}
-            className="mt-3 w-full"
-          >
+            className='mt-3 w-full'>
             {status.devices.map((device) => (
               <option key={device.serial} value={device.serial}>
                 {deviceLabel(device)} · {device.state}
@@ -247,16 +246,16 @@ export function AndroidDevicePanel({ status }: { status: AndroidDeviceStatus }) 
       </div>
 
       {!ready ? (
-        <div className="rounded-xl border border-warning/25 bg-warning/10 p-4 text-[12px] leading-relaxed text-warning">
-          {selected.state === "unauthorized"
-            ? t("computer.android.unauthorized")
-            : t("computer.android.badState", { state: selected.state })}
+        <div className='rounded-xl border border-warning/25 bg-warning/10 p-4 text-[12px] leading-relaxed text-warning'>
+          {selected.state === 'unauthorized'
+            ? t('computer.android.unauthorized')
+            : t('computer.android.badState', { state: selected.state })}
         </div>
       ) : (
         <>
           <div
-            role="application"
-            aria-label={t("computer.android.screenAria", { name: deviceLabel(selected) })}
+            role='application'
+            aria-label={t('computer.android.screenAria', { name: deviceLabel(selected) })}
             tabIndex={0}
             onKeyDown={keyDown}
             onWheel={wheel}
@@ -273,10 +272,10 @@ export function AndroidDevicePanel({ status }: { status: AndroidDeviceStatus }) 
               if (!start || !end) return;
               const distance = Math.hypot(end.x - start.point.x, end.y - start.point.y);
               if (distance < 0.012) {
-                send({ type: "tap", ...end, ...dimensions });
+                send({ type: 'tap', ...end, ...dimensions });
               } else {
                 send({
-                  type: "swipe",
+                  type: 'swipe',
                   fromX: start.point.x,
                   fromY: start.point.y,
                   toX: end.x,
@@ -290,13 +289,12 @@ export function AndroidDevicePanel({ status }: { status: AndroidDeviceStatus }) 
             onPointerCancel={() => {
               pointerRef.current = null;
             }}
-            className="mx-auto flex h-[520px] w-full touch-none cursor-pointer items-center justify-center overflow-hidden overscroll-none rounded-[28px] bg-black outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-accent"
-          >
+            className='mx-auto flex h-[520px] w-full touch-none cursor-pointer items-center justify-center overflow-hidden overscroll-none rounded-[28px] bg-black outline-none ring-1 ring-white/10 focus:ring-2 focus:ring-accent'>
             {frame ? (
               <img
                 ref={imageRef}
                 src={frame}
-                alt={t("computer.android.screenAlt", { name: deviceLabel(selected) })}
+                alt={t('computer.android.screenAlt', { name: deviceLabel(selected) })}
                 draggable={false}
                 onLoad={(event) => {
                   setDimensions({
@@ -304,68 +302,75 @@ export function AndroidDevicePanel({ status }: { status: AndroidDeviceStatus }) 
                     height: event.currentTarget.naturalHeight,
                   });
                 }}
-                className="pointer-events-none h-full w-full select-none object-contain"
+                className='pointer-events-none h-full w-full select-none object-contain'
               />
             ) : (
-              <Loader2 size={20} className="animate-spin text-ink-secondary" />
+              <Loader2 size={20} className='animate-spin text-ink-secondary' />
             )}
           </div>
-          <div className="grid grid-cols-3 gap-2">
+          <div className='grid grid-cols-3 gap-2'>
             <button
-              onClick={() => send({ type: "key", key: "back" })}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-raised py-2 text-[12px] text-ink hover:bg-raised-hover"
-            >
-              <ArrowLeft size={13} /> {t("computer.android.back")}
+              onClick={() => send({ type: 'key', key: 'back' })}
+              className='flex items-center justify-center gap-1.5 rounded-lg bg-raised py-2 text-[12px] text-ink hover:bg-raised-hover'>
+              <ArrowLeft size={13} /> {t('computer.android.back')}
             </button>
             <button
-              onClick={() => send({ type: "key", key: "home" })}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-raised py-2 text-[12px] text-ink hover:bg-raised-hover"
-            >
-              <Circle size={12} /> {t("computer.android.home")}
+              onClick={() => send({ type: 'key', key: 'home' })}
+              className='flex items-center justify-center gap-1.5 rounded-lg bg-raised py-2 text-[12px] text-ink hover:bg-raised-hover'>
+              <Circle size={12} /> {t('computer.android.home')}
             </button>
             <button
-              onClick={() => send({ type: "key", key: "recent" })}
-              className="flex items-center justify-center gap-1.5 rounded-lg bg-raised py-2 text-[12px] text-ink hover:bg-raised-hover"
-            >
-              <RotateCcw size={13} /> {t("computer.android.recent")}
+              onClick={() => send({ type: 'key', key: 'recent' })}
+              className='flex items-center justify-center gap-1.5 rounded-lg bg-raised py-2 text-[12px] text-ink hover:bg-raised-hover'>
+              <RotateCcw size={13} /> {t('computer.android.recent')}
             </button>
           </div>
-          <div className="text-center text-[11px] leading-relaxed text-ink-secondary">
-            {t("computer.android.hint")}
+          <div className='text-center text-[11px] leading-relaxed text-ink-secondary'>
+            {t('computer.android.hint')}
           </div>
         </>
       )}
 
       {error && (
-        <div className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger">
+        <div className='rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-[12px] text-danger'>
           {error}
         </div>
       )}
 
-      <div className="rounded-xl bg-card p-4">
-        <div className="flex items-center gap-2 text-[13px] font-medium text-ink">
-          <Usb size={15} className="text-accent" /> {t("computer.android.setupTitle")}
+      <div className='rounded-xl bg-card p-4'>
+        <div className='flex items-center gap-2 text-[13px] font-medium text-ink'>
+          <Usb size={15} className='text-accent' /> {t('computer.android.setupTitle')}
         </div>
-        <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-[12px] leading-relaxed text-ink-secondary">
-          <li>{t("computer.android.step1")}</li>
+        <ol className='mt-2 list-decimal space-y-1.5 pl-4 text-[12px] leading-relaxed text-ink-secondary'>
+          <li>{t('computer.android.step1')}</li>
           <li>
-            {t("computer.android.step2").split(/(\{buildNumber\}|\{usbDebugging\})/).map((part, index) =>
-              part === "{buildNumber}" || part === "{usbDebugging}"
-                ? <span key={index} className="text-ink">{t(part === "{buildNumber}" ? "computer.android.buildNumber" : "computer.android.usbDebugging")}</span>
-                : part,
-            )}
+            {t('computer.android.step2')
+              .split(/(\{buildNumber\}|\{usbDebugging\})/)
+              .map((part, index) =>
+                part === '{buildNumber}' || part === '{usbDebugging}' ? (
+                  <span key={index} className='text-ink'>
+                    {t(
+                      part === '{buildNumber}'
+                        ? 'computer.android.buildNumber'
+                        : 'computer.android.usbDebugging',
+                    )}
+                  </span>
+                ) : (
+                  part
+                ),
+              )}
           </li>
           <li>
-            {t("computer.android.step3a")}{" "}
-            <span className="text-ink">{t("computer.android.allowUsbDebugging")}</span>{" "}
-            {t("computer.android.step3b")}
+            {t('computer.android.step3a')}{' '}
+            <span className='text-ink'>{t('computer.android.allowUsbDebugging')}</span>{' '}
+            {t('computer.android.step3b')}
           </li>
         </ol>
-        <div className="mt-2 text-[11px] leading-relaxed text-ink-secondary">
-          {t("computer.android.agentNote")}
+        <div className='mt-2 text-[11px] leading-relaxed text-ink-secondary'>
+          {t('computer.android.agentNote')}
         </div>
-        <div className="mt-2 rounded-lg bg-inset px-3 py-2 text-[11px] leading-relaxed text-ink-secondary">
-          {t("computer.android.harnessNote")}
+        <div className='mt-2 rounded-lg bg-inset px-3 py-2 text-[11px] leading-relaxed text-ink-secondary'>
+          {t('computer.android.harnessNote')}
         </div>
       </div>
     </div>

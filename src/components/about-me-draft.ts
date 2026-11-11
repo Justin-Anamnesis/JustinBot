@@ -1,7 +1,7 @@
-type Status = "idle" | "saving" | "saved" | "error";
+type Status = 'idle' | 'saving' | 'saved' | 'error';
 
 export function createAboutMeDraft(initial: string, save: (value: string) => Promise<void>) {
-  let snapshot = { value: initial, status: "idle" as Status };
+  let snapshot = { value: initial, status: 'idle' as Status };
   let dirty = false;
   let running: Promise<void> | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -14,7 +14,7 @@ export function createAboutMeDraft(initial: string, save: (value: string) => Pro
     clearTimeout(timer);
     if (running) return running;
     if (!dirty) return Promise.resolve();
-    update(snapshot.value, "saving");
+    update(snapshot.value, 'saving');
     running = (async () => {
       try {
         while (dirty) {
@@ -22,22 +22,29 @@ export function createAboutMeDraft(initial: string, save: (value: string) => Pro
           await save(sent);
           dirty = snapshot.value !== sent;
         }
-        update(snapshot.value, "saved");
+        update(snapshot.value, 'saved');
       } catch {
-        update(snapshot.value, "error");
+        update(snapshot.value, 'error');
       }
-    })().finally(() => { running = undefined; });
+    })().finally(() => {
+      running = undefined;
+    });
     return running;
   };
   return {
     getSnapshot: () => snapshot,
-    subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    subscribe(listener: () => void) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
     confirm(value: string) {
-      if (!dirty && !running && value !== snapshot.value) update(value, "idle");
+      if (!dirty && !running && value !== snapshot.value) update(value, 'idle');
     },
     edit(value: string) {
       dirty = true;
-      update(value, "idle");
+      update(value, 'idle');
       clearTimeout(timer);
       timer = setTimeout(() => void flush(), 600);
     },

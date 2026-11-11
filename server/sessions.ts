@@ -1,10 +1,18 @@
 // Pairing codes (60-bit, single use, 10 min unless asked for up to a day), sessions (256-bit, only the sha256 stored) and stream tickets (EventSource cannot set headers).
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, unlinkSync } from "node:fs";
-import { dirname } from "node:path";
-import { z } from "zod";
-import { writeFileAtomic } from "./atomic.ts";
-import { teamSessionExpiresAt, type TeamMember, type TeamRole } from "./cloud-team.ts";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+} from 'node:fs';
+import { dirname } from 'node:path';
+import { z } from 'zod';
+import { writeFileAtomic } from './atomic.ts';
+import { teamSessionExpiresAt, type TeamMember, type TeamRole } from './cloud-team.ts';
 import {
   formatPairingCode,
   normalizePairingCode,
@@ -13,13 +21,19 @@ import {
   PAIRING_CREDENTIAL_PREFIX,
   PAIRING_INPUT_PROBLEM_KEY,
   readPairingInput,
-} from "../shared/pairing-code.ts";
-import { userError, type UserError } from "./user-errors.ts";
+} from '../shared/pairing-code.ts';
+import { userError, type UserError } from './user-errors.ts';
 
-export type Scope = "admin" | "client";
-export const SCOPES: readonly Scope[] = ["admin", "client"];
+export type Scope = 'admin' | 'client';
+export const SCOPES: readonly Scope[] = ['admin', 'client'];
 
-export { formatPairingCode, normalizePairingCode, PAIRING_CODE_ALPHABET, PAIRING_CODE_LENGTH, PAIRING_CREDENTIAL_PREFIX };
+export {
+  formatPairingCode,
+  normalizePairingCode,
+  PAIRING_CODE_ALPHABET,
+  PAIRING_CODE_LENGTH,
+  PAIRING_CREDENTIAL_PREFIX,
+};
 export const PAIRING_CODE_TTL_MS = 10 * 60_000;
 export const PAIRING_CODE_MAX_TTL_MS = 24 * 3_600_000;
 /** Not clamped: an invalid value falls back to the default, so a typo never becomes a policy. */
@@ -48,16 +62,16 @@ export const LOCKOUT: Lockout = { failures: 10, windowMs: 60_000, lockMs: 60_000
 type Failures = Map<string, { count: number; windowStart: number; lockedUntil: number }>;
 /** Behind a proxy that names no client, every visitor arrives as loopback (or over IPC, "unknown"). Locking that address
  * would let a stranger lock the owner out, so their wrong codes burn the open codes instead and a new one is made. */
-const UNNAMED_SOURCES = "unnamed sources";
+const UNNAMED_SOURCES = 'unnamed sources';
 function unnamedSource(source: string): boolean {
-  return source === "unknown" || source === "::1" || /^(?:::ffff:)?127\./.test(source);
+  return source === 'unknown' || source === '::1' || /^(?:::ffff:)?127\./.test(source);
 }
 /** A consumed code re-presented with the same client-made attempt id gets the same answer; sharing an address is not enough. */
 export const EXCHANGE_REPLAY_MS = 60_000;
 export const MAX_STREAM_TICKETS_PER_SESSION = 5;
 const LAST_SEEN_WRITE_INTERVAL_MS = 60_000;
 
-const scopeSchema = z.enum(["admin", "client"]);
+const scopeSchema = z.enum(['admin', 'client']);
 
 const sessionSchema = z.object({
   id: z.string().min(1),
@@ -71,9 +85,9 @@ const sessionSchema = z.object({
   email: z.string().max(320).optional(),
   /** `portal`: set only by the internal verified-portal issuance path. `team`: the Admin's signed member claim on a
    * Team Cloud. Never by email or pairing input. */
-  membershipAuthority: z.enum(["portal", "team"]).optional(),
+  membershipAuthority: z.enum(['portal', 'team']).optional(),
   /** A Team Cloud session's role in the team, from the Admin's claim. */
-  teamRole: z.enum(["owner", "admin", "member"]).optional(),
+  teamRole: z.enum(['owner', 'admin', 'member']).optional(),
   /** A team session opened with a code its member made (their phone): when the Admin last vouched for that member. The
    * session ends within the hour of it; each new Admin-signed pairing of the same member, in the same role, moves it. */
   memberCheckedAt: z.number().optional(),
@@ -84,7 +98,10 @@ const sessionSchema = z.object({
   cookieOnly: z.literal(true).optional(),
   owner: z.string().max(254).optional(),
   /** A Team Cloud's sign-in for moving one bot in (server/team-move-in.ts): it reaches that bot's move routes only. */
-  moveIn: z.string().regex(/^[\w-]{1,128}$/).optional(),
+  moveIn: z
+    .string()
+    .regex(/^[\w-]{1,128}$/)
+    .optional(),
   /** An access token for a script (`openmausbot token create`): it ends at expiresAt and never renews. */
   token: z.literal(true).optional(),
 });
@@ -138,24 +155,24 @@ export type ExchangeResult =
   | { ok: true; token: string; session: PublicSession }
   | ({ ok: false; status: 400 | 401 | 403 | 429 } & UserError);
 
-const sha256 = (value: string) => createHash("sha256").update(value).digest("hex");
+const sha256 = (value: string) => createHash('sha256').update(value).digest('hex');
 /** The English fallback's clock; a client words `until` in its own time zone. */
 const utcClock = (at: number) => `${new Date(at).toISOString().slice(11, 16)} UTC`;
 
 function deviceLabel(value: string | undefined): string {
-  return (value ?? "").replace(/[\p{Cc}\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu, "").trim();
+  return (value ?? '').replace(/[\p{Cc}\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/gu, '').trim();
 }
 
 function sameDigest(a: string, b: string): boolean {
-  const left = Buffer.from(a, "hex");
-  const right = Buffer.from(b, "hex");
+  const left = Buffer.from(a, 'hex');
+  const right = Buffer.from(b, 'hex');
   return left.length === right.length && timingSafeEqual(left, right);
 }
 
 /** 12 symbols, rejection-sampled so every symbol is equally likely. */
 export function generatePairingCode(): string {
   const limit = Math.floor(256 / PAIRING_CODE_ALPHABET.length) * PAIRING_CODE_ALPHABET.length;
-  let code = "";
+  let code = '';
   while (code.length < PAIRING_CODE_LENGTH) {
     for (const byte of randomBytes(PAIRING_CODE_LENGTH)) {
       if (byte >= limit) continue;
@@ -168,7 +185,7 @@ export function generatePairingCode(): string {
 
 /** 9 + 43 characters: the Android companion checks that length exactly. */
 export function generatePairingCredential(): string {
-  return `${PAIRING_CREDENTIAL_PREFIX}${randomBytes(32).toString("base64url")}`;
+  return `${PAIRING_CREDENTIAL_PREFIX}${randomBytes(32).toString('base64url')}`;
 }
 
 export function isPairingCredential(value: string): boolean {
@@ -200,20 +217,33 @@ export interface PairingRequest {
 
 const DAY_MS = 24 * 3_600_000;
 const within = (value: unknown, min: number, max: number): number | null | undefined =>
-  value === undefined ? undefined : typeof value === "number" && Number.isInteger(value) && value >= min && value <= max ? value : null;
+  value === undefined
+    ? undefined
+    : typeof value === 'number' && Number.isInteger(value) && value >= min && value <= max
+      ? value
+      : null;
 
 /** POST /api/auth/pairing's body: `ttlMs` keeps the code open up to a day; `tokenTtlMs` makes the session it opens an
  * access token, bounded by OMB_SESSION_MAX_DAYS like every session. */
 export function pairingRequest(body: unknown): PairingRequest | { error: string } {
-  const record: Record<string, unknown> = body && typeof body === "object" && !Array.isArray(body) ? Object(body) : {};
+  const record: Record<string, unknown> =
+    body && typeof body === 'object' && !Array.isArray(body) ? Object(body) : {};
   const ttlMs = within(record.ttlMs, 60_000, PAIRING_CODE_MAX_TTL_MS);
-  if (ttlMs === null) return { error: "ttlMs must be a whole number of milliseconds, from one minute to 24 hours" };
+  if (ttlMs === null)
+    return { error: 'ttlMs must be a whole number of milliseconds, from one minute to 24 hours' };
   const tokenTtlMs = within(record.tokenTtlMs, 60_000, SESSION_MAX_AGE_MS);
-  if (tokenTtlMs === null) return { error: `a token lasts from one minute to ${Math.floor(SESSION_MAX_AGE_MS / DAY_MS)} days on this server (OMB_SESSION_MAX_DAYS)` };
-  const scopes = Array.isArray(record.scopes) ? record.scopes.filter((v): v is Scope => v === "admin" || v === "client") : undefined;
+  if (tokenTtlMs === null)
+    return {
+      error: `a token lasts from one minute to ${Math.floor(SESSION_MAX_AGE_MS / DAY_MS)} days on this server (OMB_SESSION_MAX_DAYS)`,
+    };
+  const scopes = Array.isArray(record.scopes)
+    ? record.scopes.filter((v): v is Scope => v === 'admin' || v === 'client')
+    : undefined;
   return {
-    ...(typeof record.label === "string" ? { label: record.label } : {}), ...(scopes ? { scopes } : {}),
-    ...(ttlMs !== undefined ? { ttlMs } : {}), ...(tokenTtlMs !== undefined ? { tokenTtlMs } : {}),
+    ...(typeof record.label === 'string' ? { label: record.label } : {}),
+    ...(scopes ? { scopes } : {}),
+    ...(ttlMs !== undefined ? { ttlMs } : {}),
+    ...(tokenTtlMs !== undefined ? { tokenTtlMs } : {}),
   };
 }
 
@@ -235,9 +265,19 @@ export class SessionRegistry {
   private tickets = new Map<string, { sessionId: string; expiresAt: number }>();
   private failures: Failures = new Map();
   private codeFailures: Failures = new Map();
-  private replays: Array<{ codeHash: string; attemptId: string; browser: boolean; result: ExchangeResult; expiresAt: number }> = [];
+  private replays: Array<{
+    codeHash: string;
+    attemptId: string;
+    browser: boolean;
+    result: ExchangeResult;
+    expiresAt: number;
+  }> = [];
   private readonly onRevoked = new Set<(sessionId: string) => void>();
-  private readonly onIssued = new Set<(session: Pick<SessionRecord, "id" | "scopes" | "email" | "teamRole" | "membershipAuthority">) => void>();
+  private readonly onIssued = new Set<
+    (
+      session: Pick<SessionRecord, 'id' | 'scopes' | 'email' | 'teamRole' | 'membershipAuthority'>,
+    ) => void
+  >();
   private lastSeenWrites = new Map<string, number>();
   private readonly now: () => number;
   private readonly options: SessionStoreOptions;
@@ -255,10 +295,10 @@ export class SessionRegistry {
     try {
       mkdirSync(dirname(options.file), { recursive: true, mode: 0o700 });
       // Write the guard before accepting any persisted bearer, so an unclean restart sees it.
-      writeFileAtomic(this.openMarker, "Session registry is open.\n", { mode: 0o600 });
+      writeFileAtomic(this.openMarker, 'Session registry is open.\n', { mode: 0o600 });
       this.syncDirectory();
     } catch {
-      throw new Error("Could not establish safe session storage.");
+      throw new Error('Could not establish safe session storage.');
     }
     this.load(!unclean);
     this.revalidateEmailSessions();
@@ -268,27 +308,39 @@ export class SessionRegistry {
     if (!existsSync(this.options.file)) return;
     let raw: unknown;
     try {
-      raw = JSON.parse(readFileSync(this.options.file, "utf8"));
+      raw = JSON.parse(readFileSync(this.options.file, 'utf8'));
     } catch {
       return;
     }
     const parsed = fileSchema.safeParse(raw);
-    if (parsed.success) this.sessions = parsed.data.sessions.filter(session => restoreAccounts || (session.email === undefined && session.userId === undefined));
+    if (parsed.success)
+      this.sessions = parsed.data.sessions.filter(
+        (session) =>
+          restoreAccounts || (session.email === undefined && session.userId === undefined),
+      );
   }
 
   private syncDirectory(): void {
     // Windows exposes no directory fsync: no power-loss guarantee is claimed there.
-    if (process.platform === "win32") return;
-    const fd = openSync(dirname(this.options.file), "r");
-    try { fsyncSync(fd); } finally { closeSync(fd); }
+    if (process.platform === 'win32') return;
+    const fd = openSync(dirname(this.options.file), 'r');
+    try {
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
   }
 
   /** Atomic write, owner-only, directory owner-only. */
   private persist(): void {
-    if (this.closed) throw new Error("Session registry is closed.");
+    if (this.closed) throw new Error('Session registry is closed.');
     const dir = dirname(this.options.file);
     mkdirSync(dir, { recursive: true, mode: 0o700 });
-    writeFileAtomic(this.options.file, JSON.stringify({ version: 1, sessions: this.sessions }, null, 2) + "\n", { mode: 0o600 });
+    writeFileAtomic(
+      this.options.file,
+      JSON.stringify({ version: 1, sessions: this.sessions }, null, 2) + '\n',
+      { mode: 0o600 },
+    );
     this.syncDirectory();
   }
 
@@ -301,7 +353,7 @@ export class SessionRegistry {
       unlinkSync(this.openMarker);
       this.closed = true;
     } catch {
-      throw new Error("Could not safely close session storage.");
+      throw new Error('Could not safely close session storage.');
     }
   }
 
@@ -310,10 +362,15 @@ export class SessionRegistry {
     const now = this.now();
     this.pairings = this.pairings.filter((p) => p.expiresAt > now);
     this.replays = this.replays.filter((r) => r.expiresAt > now);
-    for (const [hash, ticket] of this.tickets) if (ticket.expiresAt <= now) this.tickets.delete(hash);
-    for (const [failures, policy] of [[this.failures, LOCKOUT], [this.codeFailures, PAIRING_LOCKOUT]] as const) {
+    for (const [hash, ticket] of this.tickets)
+      if (ticket.expiresAt <= now) this.tickets.delete(hash);
+    for (const [failures, policy] of [
+      [this.failures, LOCKOUT],
+      [this.codeFailures, PAIRING_LOCKOUT],
+    ] as const) {
       for (const [source, entry] of failures) {
-        if (entry.lockedUntil <= now && now - entry.windowStart > policy.windowMs) failures.delete(source);
+        if (entry.lockedUntil <= now && now - entry.windowStart > policy.windowMs)
+          failures.delete(source);
       }
     }
     const expired = this.sessions.filter((s) => s.expiresAt <= now);
@@ -324,13 +381,17 @@ export class SessionRegistry {
         this.persist();
       } catch {
         // The heartbeat reaches prune() through isLive(), where an escaping write failure would exit the process.
-        console.error("Could not persist session pruning.");
+        console.error('Could not persist session pruning.');
       }
     }
   }
 
   /** Every session opened from now on, by pairing or sign-in. */
-  onSessionIssued(listener: (session: Pick<SessionRecord, "id" | "scopes" | "email" | "teamRole" | "membershipAuthority">) => void): () => void {
+  onSessionIssued(
+    listener: (
+      session: Pick<SessionRecord, 'id' | 'scopes' | 'email' | 'teamRole' | 'membershipAuthority'>,
+    ) => void,
+  ): () => void {
     this.onIssued.add(listener);
     return () => this.onIssued.delete(listener);
   }
@@ -342,7 +403,8 @@ export class SessionRegistry {
 
   private forget(sessionId: string): void {
     this.lastSeenWrites.delete(sessionId);
-    for (const [hash, ticket] of this.tickets) if (ticket.sessionId === sessionId) this.tickets.delete(hash);
+    for (const [hash, ticket] of this.tickets)
+      if (ticket.sessionId === sessionId) this.tickets.delete(hash);
     for (const listener of this.onRevoked) listener(sessionId);
   }
 
@@ -352,17 +414,28 @@ export class SessionRegistry {
   }
 
   private personal(scopes: readonly Scope[]): boolean {
-    return this.adminOnly !== null && !scopes.includes("admin");
+    return this.adminOnly !== null && !scopes.includes('admin');
   }
 
   private refusePersonal(scopes: readonly Scope[]): void {
     if (this.personal(scopes)) {
       const { error, ...fields } = this.adminOnly!;
-      throw Object.assign(new Error(error), { status: 403, code: "cloud_personal", ...fields });
+      throw Object.assign(new Error(error), { status: 403, code: 'cloud_personal', ...fields });
     }
   }
 
-  openPairing(input: { scopes?: Scope[]; label?: string; ttlMs?: number; tokenTtlMs?: number; browser?: boolean; owner?: string; member?: TeamMember; memberCheckedAt?: number } = {}): { id: string; code: string; credential: string; expiresAt: number } {
+  openPairing(
+    input: {
+      scopes?: Scope[];
+      label?: string;
+      ttlMs?: number;
+      tokenTtlMs?: number;
+      browser?: boolean;
+      owner?: string;
+      member?: TeamMember;
+      memberCheckedAt?: number;
+    } = {},
+  ): { id: string; code: string; credential: string; expiresAt: number } {
     this.prune();
     const now = this.now();
     const code = generatePairingCode();
@@ -374,12 +447,23 @@ export class SessionRegistry {
       codeHash: sha256(code),
       credentialHash: sha256(credential),
       scopes,
-      label: (input.label ?? "").trim().slice(0, 80),
+      label: (input.label ?? '').trim().slice(0, 80),
       createdAt: now,
       expiresAt: now + (input.ttlMs ?? PAIRING_CODE_TTL_MS),
-      ...(input.browser ? { browser: true as const, ...(input.owner ? { owner: input.owner } : {}) } : {}),
-      ...(input.member ? { member: input.member, ...(input.memberCheckedAt !== undefined ? { memberCheckedAt: input.memberCheckedAt } : {}) } : {}),
-      ...(input.tokenTtlMs !== undefined && !input.browser && !input.member ? { tokenTtlMs: input.tokenTtlMs } : {}),
+      ...(input.browser
+        ? { browser: true as const, ...(input.owner ? { owner: input.owner } : {}) }
+        : {}),
+      ...(input.member
+        ? {
+            member: input.member,
+            ...(input.memberCheckedAt !== undefined
+              ? { memberCheckedAt: input.memberCheckedAt }
+              : {}),
+          }
+        : {}),
+      ...(input.tokenTtlMs !== undefined && !input.browser && !input.member
+        ? { tokenTtlMs: input.tokenTtlMs }
+        : {}),
     };
     this.pairings.push(pairing);
     return { id: pairing.id, code, credential, expiresAt: pairing.expiresAt };
@@ -387,7 +471,13 @@ export class SessionRegistry {
 
   openPairings(): PublicPairing[] {
     this.prune();
-    return this.pairings.map((p) => ({ id: p.id, label: p.label, scopes: [...p.scopes], createdAt: p.createdAt, expiresAt: p.expiresAt }));
+    return this.pairings.map((p) => ({
+      id: p.id,
+      label: p.label,
+      scopes: [...p.scopes],
+      createdAt: p.createdAt,
+      expiresAt: p.expiresAt,
+    }));
   }
 
   /** Only a browser sign-in's 256-bit credential matches, so this consumes nothing and counts toward no lockout. */
@@ -395,7 +485,9 @@ export class SessionRegistry {
     this.prune();
     if (!isPairingCredential(credential)) return null;
     const presented = sha256(credential);
-    const pairing = this.pairings.find((p) => p.browser === true && sameDigest(p.credentialHash, presented));
+    const pairing = this.pairings.find(
+      (p) => p.browser === true && sameDigest(p.credentialHash, presented),
+    );
     return pairing ? { owner: pairing.owner ?? null, expiresAt: pairing.expiresAt } : null;
   }
 
@@ -442,55 +534,116 @@ export class SessionRegistry {
     this.codeFailures.delete(UNNAMED_SOURCES);
   }
 
-  exchange(input: { code: string; label: string; source: string; fallbackLabel?: string; attemptId?: string; browser?: boolean }): ExchangeResult {
+  exchange(input: {
+    code: string;
+    label: string;
+    source: string;
+    fallbackLabel?: string;
+    attemptId?: string;
+    browser?: boolean;
+  }): ExchangeResult {
     this.prune();
     const now = this.now();
     const read = readPairingInput(input.code);
-    if (read.kind === "wrong" && read.problem !== "notACode") return { ok: false, status: 400, ...userError(PAIRING_INPUT_PROBLEM_KEY[read.problem]) };
+    if (read.kind === 'wrong' && read.problem !== 'notACode')
+      return { ok: false, status: 400, ...userError(PAIRING_INPUT_PROBLEM_KEY[read.problem]) };
     // A credential is hashed as presented: normalizePairingCode folds 0 to O and 1 to I, which would merge distinct secrets.
-    const presented = sha256(read.kind === "credential" ? read.credential : read.kind === "code" ? read.code : normalizePairingCode(input.code));
+    const presented = sha256(
+      read.kind === 'credential'
+        ? read.credential
+        : read.kind === 'code'
+          ? read.code
+          : normalizePairingCode(input.code),
+    );
     const browser = input.browser === true;
-    const attemptId = typeof input.attemptId === "string" && /^[\w-]{8,64}$/.test(input.attemptId) ? input.attemptId : null;
-    const replay = attemptId ? this.replays.find((r) => r.attemptId === attemptId && r.browser === browser && sameDigest(r.codeHash, presented)) : undefined;
+    const attemptId =
+      typeof input.attemptId === 'string' && /^[\w-]{8,64}$/.test(input.attemptId)
+        ? input.attemptId
+        : null;
+    const replay = attemptId
+      ? this.replays.find(
+          (r) =>
+            r.attemptId === attemptId && r.browser === browser && sameDigest(r.codeHash, presented),
+        )
+      : undefined;
     if (replay) return replay.result;
     const unnamed = unnamedSource(input.source);
-    const lock = unnamed ? { locked: false, retryAfterMs: 0 } : this.lockState(this.codeFailures, input.source);
+    const lock = unnamed
+      ? { locked: false, retryAfterMs: 0 }
+      : this.lockState(this.codeFailures, input.source);
     if (lock.locked) {
       const until = now + lock.retryAfterMs;
-      return { ok: false, status: 429, ...userError("serverError.pair.tooMany", { seconds: Math.ceil(lock.retryAfterMs / 1000), until, time: utcClock(until) }) };
+      return {
+        ok: false,
+        status: 429,
+        ...userError('serverError.pair.tooMany', {
+          seconds: Math.ceil(lock.retryAfterMs / 1000),
+          until,
+          time: utcClock(until),
+        }),
+      };
     }
-    const index = this.pairings.findIndex((p) => (p.browser === true) === browser &&
-      (sameDigest(p.credentialHash, presented) || (!p.browser && sameDigest(p.codeHash, presented))));
+    const index = this.pairings.findIndex(
+      (p) =>
+        (p.browser === true) === browser &&
+        (sameDigest(p.credentialHash, presented) ||
+          (!p.browser && sameDigest(p.codeHash, presented))),
+    );
     if (index < 0) {
       if (unnamed) this.wrongFromUnnamed();
       else this.recordFailure(this.codeFailures, PAIRING_LOCKOUT, input.source);
-      return { ok: false, status: 401, ...userError("serverError.pair.codeWrong") };
+      return { ok: false, status: 401, ...userError('serverError.pair.codeWrong') };
     }
     const [pairing] = this.pairings.splice(index, 1);
     this.codeFailures.delete(input.source);
     if (this.personal(pairing.scopes)) return { ok: false, status: 403, ...this.adminOnly! };
-    const token = `omb_sess_${randomBytes(32).toString("base64url")}`;
+    const token = `omb_sess_${randomBytes(32).toString('base64url')}`;
     const checkedAt = pairing.memberCheckedAt ?? now;
     const record: SessionRecord = {
       id: randomUUID(),
       tokenHash: sha256(token),
-      label: (deviceLabel(input.label) || deviceLabel(pairing.label) || deviceLabel(input.fallbackLabel) || "Unnamed device").slice(0, 80),
+      label: (
+        deviceLabel(input.label) ||
+        deviceLabel(pairing.label) ||
+        deviceLabel(input.fallbackLabel) ||
+        'Unnamed device'
+      ).slice(0, 80),
       scopes: [...pairing.scopes],
       createdAt: now,
       lastSeenAt: now,
-      expiresAt: pairing.member ? teamSessionExpiresAt(checkedAt, now + SESSION_TTL_MS) : now + Math.min(pairing.tokenTtlMs ?? SESSION_TTL_MS, SESSION_MAX_AGE_MS),
+      expiresAt: pairing.member
+        ? teamSessionExpiresAt(checkedAt, now + SESSION_TTL_MS)
+        : now + Math.min(pairing.tokenTtlMs ?? SESSION_TTL_MS, SESSION_MAX_AGE_MS),
       ...(pairing.tokenTtlMs !== undefined ? { token: true as const } : {}),
-      ...(pairing.browser ? { cookieOnly: true as const, ...(pairing.owner ? { owner: pairing.owner } : {}) } : {}),
-      ...(pairing.member ? { email: pairing.member.email, teamRole: pairing.member.role, membershipAuthority: "team" as const } : {}),
-      ...(pairing.member && pairing.memberCheckedAt !== undefined ? { memberCheckedAt: pairing.memberCheckedAt } : {}),
+      ...(pairing.browser
+        ? { cookieOnly: true as const, ...(pairing.owner ? { owner: pairing.owner } : {}) }
+        : {}),
+      ...(pairing.member
+        ? {
+            email: pairing.member.email,
+            teamRole: pairing.member.role,
+            membershipAuthority: 'team' as const,
+          }
+        : {}),
+      ...(pairing.member && pairing.memberCheckedAt !== undefined
+        ? { memberCheckedAt: pairing.memberCheckedAt }
+        : {}),
     };
-    if (pairing.member && pairing.memberCheckedAt === undefined) this.memberChecked(pairing.member, now);
+    if (pairing.member && pairing.memberCheckedAt === undefined)
+      this.memberChecked(pairing.member, now);
     this.sessions.push(record);
     this.lastSeenWrites.set(record.id, now);
     this.persist();
     for (const listener of this.onIssued) listener(record);
     const result: ExchangeResult = { ok: true, token, session: publicSession(record) };
-    if (attemptId) this.replays.push({ codeHash: presented, attemptId, browser, result, expiresAt: now + EXCHANGE_REPLAY_MS });
+    if (attemptId)
+      this.replays.push({
+        codeHash: presented,
+        attemptId,
+        browser,
+        result,
+        expiresAt: now + EXCHANGE_REPLAY_MS,
+      });
     return result;
   }
 
@@ -498,9 +651,22 @@ export class SessionRegistry {
    * One whose role changed since is left to end. */
   private memberChecked(member: TeamMember, now: number): void {
     for (const session of this.sessions) {
-      if (session.memberCheckedAt === undefined || session.membershipAuthority !== "team" || session.email !== member.email || session.teamRole !== member.role || session.expiresAt <= now) continue;
+      if (
+        session.memberCheckedAt === undefined ||
+        session.membershipAuthority !== 'team' ||
+        session.email !== member.email ||
+        session.teamRole !== member.role ||
+        session.expiresAt <= now
+      )
+        continue;
       session.memberCheckedAt = now;
-      session.expiresAt = Math.max(session.expiresAt, teamSessionExpiresAt(now, Math.min(now + SESSION_TTL_MS, session.createdAt + SESSION_MAX_AGE_MS)));
+      session.expiresAt = Math.max(
+        session.expiresAt,
+        teamSessionExpiresAt(
+          now,
+          Math.min(now + SESSION_TTL_MS, session.createdAt + SESSION_MAX_AGE_MS),
+        ),
+      );
     }
   }
 
@@ -508,18 +674,31 @@ export class SessionRegistry {
    * or a move-in sign-in, which end as they were made to). At most `max` people, the soonest to end first. */
   membersToVouch(max: number): string[] {
     this.prune();
-    const now = this.now(), soonest = new Map<string, number>();
+    const now = this.now(),
+      soonest = new Map<string, number>();
     for (const session of this.sessions) {
       if (!this.vouchable(session, now)) continue;
-      soonest.set(session.email!, Math.min(soonest.get(session.email!) ?? Infinity, session.expiresAt));
+      soonest.set(
+        session.email!,
+        Math.min(soonest.get(session.email!) ?? Infinity, session.expiresAt),
+      );
     }
-    return [...soonest].sort((a, b) => a[1] - b[1]).slice(0, max).map(([email]) => email);
+    return [...soonest]
+      .sort((a, b) => a[1] - b[1])
+      .slice(0, max)
+      .map(([email]) => email);
   }
 
   /** A team session the roster check may keep: live, used within the last hour, and not a token or a move-in sign-in. */
   private vouchable(session: SessionRecord, now: number): boolean {
-    return session.membershipAuthority === "team" && Boolean(session.email) && !session.token && !session.moveIn
-      && session.expiresAt > now && now - session.lastSeenAt <= TEAM_ACTIVE_MS;
+    return (
+      session.membershipAuthority === 'team' &&
+      Boolean(session.email) &&
+      !session.token &&
+      !session.moveIn &&
+      session.expiresAt > now &&
+      now - session.lastSeenAt <= TEAM_ACTIVE_MS
+    );
   }
 
   /** The Admin's roster check found this member in the team at `role` just now. Their sessions at another role end (a role
@@ -527,32 +706,58 @@ export class SessionRegistry {
    * the hour, phones included, ends no later than an hour after its last use: an idle one, left on another computer, still
    * ends on schedule however much the person uses another device. */
   vouchMember(email: string, role: TeamRole): void {
-    const address = email.trim().toLowerCase(), now = this.now();
+    const address = email.trim().toLowerCase(),
+      now = this.now();
     this.revokeMember(address, role);
     let changed = false;
     for (const session of this.sessions) {
-      if (session.email !== address || session.teamRole !== role || !this.vouchable(session, now)) continue;
-      if (session.memberCheckedAt !== undefined) session.memberCheckedAt = now; else session.vouchedAt = now;
-      const next = Math.min(teamSessionExpiresAt(now, Math.min(now + SESSION_TTL_MS, session.createdAt + SESSION_MAX_AGE_MS)), session.lastSeenAt + TEAM_ACTIVE_MS);
-      if (next > session.expiresAt) { session.expiresAt = next; changed = true; }
+      if (session.email !== address || session.teamRole !== role || !this.vouchable(session, now))
+        continue;
+      if (session.memberCheckedAt !== undefined) session.memberCheckedAt = now;
+      else session.vouchedAt = now;
+      const next = Math.min(
+        teamSessionExpiresAt(
+          now,
+          Math.min(now + SESSION_TTL_MS, session.createdAt + SESSION_MAX_AGE_MS),
+        ),
+        session.lastSeenAt + TEAM_ACTIVE_MS,
+      );
+      if (next > session.expiresAt) {
+        session.expiresAt = next;
+        changed = true;
+      }
     }
     if (changed) this.persist();
   }
 
-  issue(input: { label: string; scopes: Scope[]; userId?: string; email?: string }): { token: string; session: PublicSession } {
+  issue(input: { label: string; scopes: Scope[]; userId?: string; email?: string }): {
+    token: string;
+    session: PublicSession;
+  } {
     return this.issueAccount(input);
   }
 
   /** The one sign-in that moves `bot` in for this team member, as long-lived as their own team session. Only the caller's
    * own team session may ask for it (server/team-move-in.ts). */
-  issueMoveIn(input: { label: string; email: string; teamRole: TeamRole; bot: string }): { token: string; session: PublicSession } {
+  issueMoveIn(input: { label: string; email: string; teamRole: TeamRole; bot: string }): {
+    token: string;
+    session: PublicSession;
+  } {
     this.prune();
     const now = this.now();
-    const token = `omb_sess_${randomBytes(32).toString("base64url")}`;
+    const token = `omb_sess_${randomBytes(32).toString('base64url')}`;
     const record: SessionRecord = {
-      id: randomUUID(), tokenHash: sha256(token), label: (deviceLabel(input.label) || "Moving a bot in").slice(0, 80), scopes: ["admin", "client"],
-      createdAt: now, lastSeenAt: now, expiresAt: teamSessionExpiresAt(now, now + SESSION_TTL_MS),
-      email: input.email, teamRole: input.teamRole, membershipAuthority: "team", moveIn: input.bot,
+      id: randomUUID(),
+      tokenHash: sha256(token),
+      label: (deviceLabel(input.label) || 'Moving a bot in').slice(0, 80),
+      scopes: ['admin', 'client'],
+      createdAt: now,
+      lastSeenAt: now,
+      expiresAt: teamSessionExpiresAt(now, now + SESSION_TTL_MS),
+      email: input.email,
+      teamRole: input.teamRole,
+      membershipAuthority: 'team',
+      moveIn: input.bot,
     };
     this.sessions.push(record);
     this.lastSeenWrites.set(record.id, now);
@@ -572,20 +777,35 @@ export class SessionRegistry {
   }
 
   /** Call only after consuming a verified, workspace-bound PKCE grant; no HTTP route accepts this marker as input. */
-  issuePortal(input: { email: string; grant: string; scopes: Scope[] }): { token: string; session: PublicSession } {
-    if (!/^[A-Za-z0-9_-]{43}$/.test(input.grant) || !input.email) throw new Error("A verified portal identity is required");
-    return this.issueAccount({ label: "Hosted workspace", email: input.email, userId: `portal:${input.grant}`, scopes: input.scopes }, "portal");
+  issuePortal(input: { email: string; grant: string; scopes: Scope[] }): {
+    token: string;
+    session: PublicSession;
+  } {
+    if (!/^[A-Za-z0-9_-]{43}$/.test(input.grant) || !input.email)
+      throw new Error('A verified portal identity is required');
+    return this.issueAccount(
+      {
+        label: 'Hosted workspace',
+        email: input.email,
+        userId: `portal:${input.grant}`,
+        scopes: input.scopes,
+      },
+      'portal',
+    );
   }
 
-  private issueAccount(input: { label: string; scopes: Scope[]; userId?: string; email?: string }, membershipAuthority?: "portal"): { token: string; session: PublicSession } {
+  private issueAccount(
+    input: { label: string; scopes: Scope[]; userId?: string; email?: string },
+    membershipAuthority?: 'portal',
+  ): { token: string; session: PublicSession } {
     this.refusePersonal(input.scopes);
     this.prune();
     const now = this.now();
-    const token = `omb_sess_${randomBytes(32).toString("base64url")}`;
+    const token = `omb_sess_${randomBytes(32).toString('base64url')}`;
     const record: SessionRecord = {
       id: randomUUID(),
       tokenHash: sha256(token),
-      label: (deviceLabel(input.label) || "Unnamed device").slice(0, 80),
+      label: (deviceLabel(input.label) || 'Unnamed device').slice(0, 80),
       scopes: [...new Set(input.scopes)],
       createdAt: now,
       lastSeenAt: now,
@@ -627,10 +847,15 @@ export class SessionRegistry {
 
   /** Email membership is live: losing any scope revokes the token and its streams; promotions never widen existing credentials. */
   revalidateEmailSessions(): void {
-    if (this.closed) throw new Error("Session registry is closed.");
+    if (this.closed) throw new Error('Session registry is closed.');
     this.membershipCheckedAt = this.now();
     // A team session's membership is the Admin's signed claim, checked at each pairing (cloud-team.ts), never the sign-in list.
-    const eligible = this.sessions.filter(session => session.email !== undefined && session.membershipAuthority !== "team" && !(this.options.portalMembership && session.membershipAuthority === "portal"));
+    const eligible = this.sessions.filter(
+      (session) =>
+        session.email !== undefined &&
+        session.membershipAuthority !== 'team' &&
+        !(this.options.portalMembership && session.membershipAuthority === 'portal'),
+    );
     if (!eligible.length) return;
     let resolveScopes = this.options.emailScopes;
     try {
@@ -654,7 +879,7 @@ export class SessionRegistry {
       this.persist();
     } catch {
       // Revocation holds in memory and streams close; the boot marker stops old bearers reviving after an unclean restart.
-      console.error("Could not persist email session revocation.");
+      console.error('Could not persist email session revocation.');
     }
   }
 
@@ -682,7 +907,13 @@ export class SessionRegistry {
     if (!record || record.expiresAt <= now || record.token) return false;
     if (record.expiresAt - now > SESSION_RENEW_WHEN_LEFT_MS) return false;
     const proposed = Math.min(now + SESSION_TTL_MS, record.createdAt + SESSION_MAX_AGE_MS);
-    const next = record.membershipAuthority === "team" ? teamSessionExpiresAt(Math.max(record.memberCheckedAt ?? record.createdAt, record.vouchedAt ?? 0), proposed) : proposed;
+    const next =
+      record.membershipAuthority === 'team'
+        ? teamSessionExpiresAt(
+            Math.max(record.memberCheckedAt ?? record.createdAt, record.vouchedAt ?? 0),
+            proposed,
+          )
+        : proposed;
     if (next <= record.expiresAt) return false;
     record.expiresAt = next;
     record.lastSeenAt = now;
@@ -704,24 +935,34 @@ export class SessionRegistry {
   /** The stored digest of each live bearer session among `ids`: the phone relay derives a phone's keys from it. */
   bearerDigests(ids: ReadonlySet<string>): Array<{ id: string; tokenHash: string }> {
     this.prune();
-    return this.sessions.filter((s) => ids.has(s.id) && !s.cookieOnly && !this.personal(s.scopes)).map((s) => ({ id: s.id, tokenHash: s.tokenHash }));
+    return this.sessions
+      .filter((s) => ids.has(s.id) && !s.cookieOnly && !this.personal(s.scopes))
+      .map((s) => ({ id: s.id, tokenHash: s.tokenHash }));
   }
 
   /** The credential digests of the newest open pairing windows a device may redeem (never a browser sign-in's). */
   pairingDigests(max: number): string[] {
     this.prune();
-    return this.pairings.filter((p) => !p.browser).sort((a, b) => b.createdAt - a.createdAt).slice(0, max).map((p) => p.credentialHash);
+    return this.pairings
+      .filter((p) => !p.browser)
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, max)
+      .map((p) => p.credentialHash);
   }
 
   /** The live sessions a Team Cloud member's own codes opened: their phones. Never an Admin-signed pairing (an app). */
   memberPhones(): PublicSession[] {
     this.prune();
-    return this.sessions.filter((s) => s.membershipAuthority === "team" && s.memberCheckedAt !== undefined).map(publicSession);
+    return this.sessions
+      .filter((s) => s.membershipAuthority === 'team' && s.memberCheckedAt !== undefined)
+      .map(publicSession);
   }
 
   /** Every code a member made for a phone stops working, and every phone such a code opened signs out. Never an Admin-signed pairing (an app). */
   closeMemberPhones(): number {
-    this.pairings = this.pairings.filter((pairing) => !(pairing.member && pairing.memberCheckedAt !== undefined));
+    this.pairings = this.pairings.filter(
+      (pairing) => !(pairing.member && pairing.memberCheckedAt !== undefined),
+    );
     return this.memberPhones().filter((phone) => this.revoke(phone.id)).length;
   }
 
@@ -732,7 +973,12 @@ export class SessionRegistry {
     const now = this.now();
     for (const [hash, until] of this.left) if (until <= now) this.left.delete(hash);
     for (const session of this.sessions) {
-      if (session.membershipAuthority === "team" && session.email?.toLowerCase() === address && this.left.size < 5_000) this.left.set(session.tokenHash, now + 86_400_000);
+      if (
+        session.membershipAuthority === 'team' &&
+        session.email?.toLowerCase() === address &&
+        this.left.size < 5_000
+      )
+        this.left.set(session.tokenHash, now + 86_400_000);
     }
   }
   /** Whether this credential's session ended because its person is no longer in the team. */
@@ -744,7 +990,14 @@ export class SessionRegistry {
   /** Remote access turned off on a Team Cloud: every User's browser sign-in signs out. An Owner's and an Admin's stay. */
   closeMemberBrowsers(): number {
     this.prune();
-    return this.sessions.filter((session) => session.membershipAuthority === "team" && session.cookieOnly && session.teamRole === "member").map((session) => session.id)
+    return this.sessions
+      .filter(
+        (session) =>
+          session.membershipAuthority === 'team' &&
+          session.cookieOnly &&
+          session.teamRole === 'member',
+      )
+      .map((session) => session.id)
       .filter((id) => this.revoke(id)).length;
   }
 
@@ -754,8 +1007,16 @@ export class SessionRegistry {
   revokeMember(email: string, keepRole?: TeamRole): number {
     const address = email.trim().toLowerCase();
     if (keepRole === undefined) this.noteLeft(address);
-    this.pairings = this.pairings.filter((pairing) => pairing.member?.email.toLowerCase() !== address || pairing.member.role === keepRole);
-    const ended = this.sessions.filter((session) => session.membershipAuthority === "team" && session.email?.toLowerCase() === address && (keepRole === undefined || session.teamRole !== keepRole));
+    this.pairings = this.pairings.filter(
+      (pairing) =>
+        pairing.member?.email.toLowerCase() !== address || pairing.member.role === keepRole,
+    );
+    const ended = this.sessions.filter(
+      (session) =>
+        session.membershipAuthority === 'team' &&
+        session.email?.toLowerCase() === address &&
+        (keepRole === undefined || session.teamRole !== keepRole),
+    );
     for (const session of ended) this.revoke(session.id);
     return ended.length;
   }
@@ -771,9 +1032,15 @@ export class SessionRegistry {
 
   issueStreamTicket(sessionId: string): { ticket: string; expiresAt: number } {
     this.prune();
-    const mine = [...this.tickets].filter(([, t]) => t.sessionId === sessionId).sort((a, b) => a[1].expiresAt - b[1].expiresAt);
-    for (const [hash] of mine.slice(0, Math.max(0, mine.length - (MAX_STREAM_TICKETS_PER_SESSION - 1)))) this.tickets.delete(hash);
-    const ticket = `omb_tick_${randomBytes(24).toString("base64url")}`;
+    const mine = [...this.tickets]
+      .filter(([, t]) => t.sessionId === sessionId)
+      .sort((a, b) => a[1].expiresAt - b[1].expiresAt);
+    for (const [hash] of mine.slice(
+      0,
+      Math.max(0, mine.length - (MAX_STREAM_TICKETS_PER_SESSION - 1)),
+    ))
+      this.tickets.delete(hash);
+    const ticket = `omb_tick_${randomBytes(24).toString('base64url')}`;
     const expiresAt = this.now() + STREAM_TICKET_TTL_MS;
     this.tickets.set(sha256(ticket), { sessionId, expiresAt });
     return { ticket, expiresAt };

@@ -10,12 +10,14 @@ export class LocalVmLease {
   private readonly ttlMs: number;
 
   constructor(ttlMs: number) {
-    if (!Number.isFinite(ttlMs) || ttlMs <= 0) throw new Error("Local VM lease TTL must be positive");
+    if (!Number.isFinite(ttlMs) || ttlMs <= 0)
+      throw new Error('Local VM lease TTL must be positive');
     this.ttlMs = ttlMs;
   }
 
   current(isBotBusy: (botId: string) => boolean, now = Date.now()): LocalVmLeaseRecord | null {
-    if (this.record && (this.record.expiresAt <= now || !isBotBusy(this.record.botId))) this.record = null;
+    if (this.record && (this.record.expiresAt <= now || !isBotBusy(this.record.botId)))
+      this.record = null;
     return this.record ? { ...this.record } : null;
   }
 
@@ -49,7 +51,8 @@ export class LocalVmLeasePool {
   private readonly ttlMs: number;
 
   constructor(ttlMs: number) {
-    if (!Number.isFinite(ttlMs) || ttlMs <= 0) throw new Error("Local VM lease TTL must be positive");
+    if (!Number.isFinite(ttlMs) || ttlMs <= 0)
+      throw new Error('Local VM lease TTL must be positive');
     this.ttlMs = ttlMs;
   }
 

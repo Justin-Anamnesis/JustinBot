@@ -1,17 +1,26 @@
 // One ACP agent process (JSON-RPC 2.0 over stdio) and the threads whose sessions it runs. An agent may run several
 // sessions in one process (ACP keys every session request and update by sessionId), so a sharing driver links many
 // threads to one host; every other driver links exactly one.
-import type { ChildProcessWithoutNullStreams } from "node:child_process";
+import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 
-import { engineMemory } from "../../engine-memory.ts";
-import { appendNative } from "../native.ts";
-import { StderrTail } from "./exit-report.ts";
-import { acpRpcError } from "./rpc-error.ts";
+import { engineMemory } from '../../engine-memory.ts';
+import { appendNative } from '../native.ts';
+import { StderrTail } from './exit-report.ts';
+import { acpRpcError } from './rpc-error.ts';
 
 /** A catalog can contain credential-bearing native configuration, including late replies. */
-export function acpNativeIncomingLogMessage(message: any, privateResponses: ReadonlySet<number>): unknown {
+export function acpNativeIncomingLogMessage(
+  message: any,
+  privateResponses: ReadonlySet<number>,
+): unknown {
   if (!privateResponses.has(message?.id)) return message;
-  return { jsonrpc: message.jsonrpc, id: message.id, ...(message.error !== undefined ? { error: "[MCP catalog error omitted]" } : { result: "[MCP catalog omitted]" }) };
+  return {
+    jsonrpc: message.jsonrpc,
+    id: message.id,
+    ...(message.error !== undefined
+      ? { error: '[MCP catalog error omitted]' }
+      : { result: '[MCP catalog omitted]' }),
+  };
 }
 
 export interface AcpConnection {
@@ -73,7 +82,9 @@ export class AcpLink implements AcpConnection {
     this.threadId = threadId;
   }
 
-  get lastInboundAt(): number { return this.#lastInboundAt; }
+  get lastInboundAt(): number {
+    return this.#lastInboundAt;
+  }
 
   heard(): void {
     this.#lastInboundAt = Date.now();
@@ -82,22 +93,33 @@ export class AcpLink implements AcpConnection {
 
   send(obj: unknown): void {
     const message = obj as { id?: unknown; result?: unknown; error?: unknown };
-    if (message.id !== undefined && (message.result !== undefined || message.error !== undefined)) this.touch();
+    if (message.id !== undefined && (message.result !== undefined || message.error !== undefined))
+      this.touch();
     this.host.write(obj, this.threadId);
   }
 
-  request(method: string, params: unknown, timeoutMs?: number, receive?: (result: any) => void, idleMs?: number,
-    idleMessage?: string | (() => string)): Promise<any> {
+  request(
+    method: string,
+    params: unknown,
+    timeoutMs?: number,
+    receive?: (result: any) => void,
+    idleMs?: number,
+    idleMessage?: string | (() => string),
+  ): Promise<any> {
     return this.host.request(this, method, params, timeoutMs, receive, idleMs, idleMessage);
   }
 
-  touch(): void { this.host.touch(this); }
+  touch(): void {
+    this.host.touch(this);
+  }
 
-  failAll(error: Error): void { this.host.failAll(this, error); }
+  failAll(error: Error): void {
+    this.host.failAll(this, error);
+  }
 
   close(): void {
     if (this.closed) return;
-    this.failAll(new Error("session closed"));
+    this.failAll(new Error('session closed'));
     this.closed = true;
     this.host.unlink(this);
   }
@@ -135,14 +157,14 @@ export class AcpHost {
     this.child = child;
     this.key = key;
     this.options = options;
-    let buf = "";
+    let buf = '';
     // decode as UTF-8 across chunk boundaries — a raw `buf += chunk` splits
     // multibyte characters that straddle two reads and corrupts the text
-    child.stdout.setEncoding("utf8");
-    child.stdout.on("data", (chunk: string) => {
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk: string) => {
       buf += chunk;
       let nl;
-      while ((nl = buf.indexOf("\n")) !== -1) {
+      while ((nl = buf.indexOf('\n')) !== -1) {
         const line = buf.slice(0, nl);
         buf = buf.slice(nl + 1);
         if (!line.trim()) continue;
@@ -155,13 +177,13 @@ export class AcpHost {
         this.#receive(msg);
       }
     });
-    child.stderr.setEncoding("utf8");
-    child.stderr.on("data", (chunk: string) => this.stderrTail.write(chunk));
-    child.on("error", (error) => {
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk: string) => this.stderrTail.write(chunk));
+    child.on('error', (error) => {
       this.dead = true;
       for (const link of this.#listening()) link.inbound?.error(error);
     });
-    child.on("close", (code, signal) => {
+    child.on('close', (code, signal) => {
       this.dead = true;
       this.stderrTail.flush();
       for (const link of this.#listening()) link.inbound?.exit(code, signal);
@@ -172,8 +194,14 @@ export class AcpHost {
    * no other thread has had a session in that folder here. */
   accepts(limit: number, lifetime: number, threadId: string, folder: string): boolean {
     const owner = this.#folders.get(folder);
-    return !this.dead && !this.draining && this.child.exitCode === null && this.links.size < limit && this.opened < lifetime &&
-      (owner === undefined || owner === threadId);
+    return (
+      !this.dead &&
+      !this.draining &&
+      this.child.exitCode === null &&
+      this.links.size < limit &&
+      this.opened < lifetime &&
+      (owner === undefined || owner === threadId)
+    );
   }
 
   link(threadId: string, folder: string): AcpLink {
@@ -188,7 +216,8 @@ export class AcpHost {
   unlink(link: AcpLink): void {
     if (!this.links.delete(link)) return;
     if (!this.links.size) this.#lastOut = link;
-    if (![...this.links].some((other) => other.threadId === link.threadId)) engineMemory.detach(this.child, link.threadId);
+    if (![...this.links].some((other) => other.threadId === link.threadId))
+      engineMemory.detach(this.child, link.threadId);
   }
 
   #listening(): AcpLink[] {
@@ -202,23 +231,37 @@ export class AcpHost {
     if (!running) {
       running = start();
       this.#once.set(name, running);
-      running.catch(() => { if (this.#once.get(name) === running) this.#once.delete(name); });
+      running.catch(() => {
+        if (this.#once.get(name) === running) this.#once.delete(name);
+      });
     }
     return running;
   }
 
   write(obj: unknown, threadId: string | null): void {
     try {
-      this.child.stdin.write(JSON.stringify(obj) + "\n");
+      this.child.stdin.write(JSON.stringify(obj) + '\n');
     } catch {}
-    if (threadId !== null) appendNative(threadId, { dir: "out", source: this.options.source, msg: this.options.logMessage(obj) });
+    if (threadId !== null)
+      appendNative(threadId, {
+        dir: 'out',
+        source: this.options.source,
+        msg: this.options.logMessage(obj),
+      });
   }
 
-  request(link: AcpLink | null, method: string, params: unknown, timeoutMs?: number, receive?: (result: any) => void,
-    idleMs?: number, idleMessage?: string | (() => string)): Promise<any> {
+  request(
+    link: AcpLink | null,
+    method: string,
+    params: unknown,
+    timeoutMs?: number,
+    receive?: (result: any) => void,
+    idleMs?: number,
+    idleMessage?: string | (() => string),
+  ): Promise<any> {
     return new Promise<any>((resolve, reject) => {
       const id = this.#nextId++;
-      if (method === "_x.ai/mcp/list") this.#privateResponses.add(id);
+      if (method === '_x.ai/mcp/list') this.#privateResponses.add(id);
       let timer: ReturnType<typeof setTimeout> | null = null;
       if (timeoutMs) {
         timer = setTimeout(() => {
@@ -232,9 +275,15 @@ export class AcpHost {
         if (!(idleMs && idleMs > 0)) return;
         if (idleTimer) clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
-          if (link?.inbound?.busy()) { armIdle(); return; }
+          if (link?.inbound?.busy()) {
+            armIdle();
+            return;
+          }
           this.#pending.delete(id);
-          const error = new Error((typeof idleMessage === "function" ? idleMessage() : idleMessage) ?? `${method} stopped responding`);
+          const error = new Error(
+            (typeof idleMessage === 'function' ? idleMessage() : idleMessage) ??
+              `${method} stopped responding`,
+          );
           Object.assign(error, { acpPromptStall: true });
           reject(error);
         }, idleMs);
@@ -245,13 +294,18 @@ export class AcpHost {
         link,
         method,
         // Wire order: an update following this response may arrive before the awaiting continuation resumes.
-        resolve: (result) => { receive?.(result); resolve(result); },
+        resolve: (result) => {
+          receive?.(result);
+          resolve(result);
+        },
         reject,
         timer,
-        get idleTimer() { return idleTimer; },
+        get idleTimer() {
+          return idleTimer;
+        },
         armIdle,
       });
-      this.write({ jsonrpc: "2.0", id, method, params }, link?.threadId ?? null);
+      this.write({ jsonrpc: '2.0', id, method, params }, link?.threadId ?? null);
     });
   }
 
@@ -272,9 +326,10 @@ export class AcpHost {
   /** The session's own traffic goes to the thread holding it; with one thread linked, everything does. */
   #route(msg: any): AcpLink | null {
     const only = this.links.size === 1 ? this.links.values().next().value! : null;
-    if (msg.id !== undefined && msg.method === undefined) return this.#pending.get(msg.id)?.link ?? only;
+    if (msg.id !== undefined && msg.method === undefined)
+      return this.#pending.get(msg.id)?.link ?? only;
     const sessionId = msg.params?.sessionId;
-    if (typeof sessionId === "string") {
+    if (typeof sessionId === 'string') {
       for (const link of this.links) if (link.sessionId === sessionId) return link;
       // A shared process never hands one session's traffic to another thread, such as a closed session's late update.
       if (this.key !== null) return only?.sessionId === null ? only : null;
@@ -285,8 +340,11 @@ export class AcpHost {
   #receive(msg: any): void {
     const link = this.#route(msg);
     if (link) {
-      appendNative(link.threadId, { dir: "in", source: this.options.source,
-        msg: this.options.logMessage(acpNativeIncomingLogMessage(msg, this.#privateResponses)) });
+      appendNative(link.threadId, {
+        dir: 'in',
+        source: this.options.source,
+        msg: this.options.logMessage(acpNativeIncomingLogMessage(msg, this.#privateResponses)),
+      });
       // Inbound traffic proves the session is alive and making progress, so its idle deadlines restart; only its
       // own silence trips one.
       link.heard();

@@ -3,20 +3,24 @@
 // server. vite.config.ts is inherited on purpose (react, tailwind, the @ alias)
 // so the page renders exactly what the app renders; only the host, the port
 // and the /api target are pinned here.
-import { realpathSync } from "node:fs";
-import type { IncomingMessage, ServerResponse } from "node:http";
-import { join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { createServer } from "vite";
+import { realpathSync } from 'node:fs';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'vite';
 
-export const REPO_ROOT = fileURLToPath(new URL("../..", import.meta.url));
+export const REPO_ROOT = fileURLToPath(new URL('../..', import.meta.url));
 
 export interface PreviewRoute {
   /** Pathname to answer (the query string is ignored); a RegExp hands its match to the handler. */
   path: string | RegExp;
   /** Restrict to one HTTP method; any method when omitted. */
   method?: string;
-  handler: (req: IncomingMessage, res: ServerResponse, match: RegExpExecArray | null) => void | Promise<void>;
+  handler: (
+    req: IncomingMessage,
+    res: ServerResponse,
+    match: RegExpExecArray | null,
+  ) => void | Promise<void>;
 }
 
 export interface PreviewOptions {
@@ -31,7 +35,7 @@ export interface PreviewOptions {
   viewport?: string;
   /** Vite's log level. Its default prints port and dependency notes on stdout,
    * ahead of anything the fixture prints there. */
-  logLevel?: "info" | "warn" | "error" | "silent";
+  logLevel?: 'info' | 'warn' | 'error' | 'silent';
   /** Set on every request the page sends the fixture, e.g. a Cloud home's edge headers and a paired device's token. */
   proxyHeaders?: Record<string, string>;
 }
@@ -42,11 +46,14 @@ export interface MountedPreview {
 }
 
 const escapeHtml = (text: string) =>
-  text.replace(/[&<>"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[char] ?? char);
+  text.replace(
+    /[&<>"]/g,
+    (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char] ?? char,
+  );
 
 const matchRoute = (route: PreviewRoute, pathname: string, method: string | undefined) => {
   if (route.method !== undefined && route.method !== method) return undefined;
-  if (typeof route.path === "string") return route.path === pathname ? { match: null } : undefined;
+  if (typeof route.path === 'string') return route.path === pathname ? { match: null } : undefined;
   const match = route.path.exec(pathname);
   return match ? { match } : undefined;
 };
@@ -56,43 +63,67 @@ export async function mountPreview(
   fixture: { info: { url: string } },
   options: PreviewOptions,
 ): Promise<MountedPreview> {
-  const { entry, route, title, extraRoutes = [], viewport = "width=device-width, initial-scale=1", logLevel, proxyHeaders } = options;
+  const {
+    entry,
+    route,
+    title,
+    extraRoutes = [],
+    viewport = 'width=device-width, initial-scale=1',
+    logLevel,
+    proxyHeaders,
+  } = options;
   const page = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="${escapeHtml(viewport)}"><title>${escapeHtml(title)}</title></head><body><div id="root"></div><script type="module" src="${escapeHtml(entry)}"></script></body></html>`;
   const ui = await createServer({
     root: REPO_ROOT,
     ...(logLevel ? { logLevel } : {}),
     // A worktree's node_modules may be a link to another checkout's: its files (the fonts) are served from there.
-    server: { host: "127.0.0.1", port: 0, fs: { allow: [REPO_ROOT, realpathSync(join(REPO_ROOT, "node_modules"))] }, proxy: {
-      "/api": { target: fixture.info.url, ...(proxyHeaders ? { headers: proxyHeaders } : {}) },
-      "/.well-known/openmausbot/environment": { target: fixture.info.url, ...(proxyHeaders ? { headers: proxyHeaders } : {}) },
-    } },
-    plugins: [{
-      name: "isolated-preview",
-      configureServer(server) {
-        server.middlewares.use((req, res, next) => {
-          const pathname = (req.url ?? "").split("?")[0]!;
-          if (pathname === route) {
-            void server.transformIndexHtml(route, page)
-              .then((html) => { res.setHeader("content-type", "text/html"); res.end(html); })
-              .catch(next);
-            return;
-          }
-          for (const extra of extraRoutes) {
-            const hit = matchRoute(extra, pathname, req.method);
-            if (!hit) continue;
-            void Promise.resolve().then(() => extra.handler(req, res, hit.match)).catch(next);
-            return;
-          }
-          next();
-        });
+    server: {
+      host: '127.0.0.1',
+      port: 0,
+      fs: { allow: [REPO_ROOT, realpathSync(join(REPO_ROOT, 'node_modules'))] },
+      proxy: {
+        '/api': { target: fixture.info.url, ...(proxyHeaders ? { headers: proxyHeaders } : {}) },
+        '/.well-known/openmausbot/environment': {
+          target: fixture.info.url,
+          ...(proxyHeaders ? { headers: proxyHeaders } : {}),
+        },
       },
-    }],
+    },
+    plugins: [
+      {
+        name: 'isolated-preview',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            const pathname = (req.url ?? '').split('?')[0]!;
+            if (pathname === route) {
+              void server
+                .transformIndexHtml(route, page)
+                .then((html) => {
+                  res.setHeader('content-type', 'text/html');
+                  res.end(html);
+                })
+                .catch(next);
+              return;
+            }
+            for (const extra of extraRoutes) {
+              const hit = matchRoute(extra, pathname, req.method);
+              if (!hit) continue;
+              void Promise.resolve()
+                .then(() => extra.handler(req, res, hit.match))
+                .catch(next);
+              return;
+            }
+            next();
+          });
+        },
+      },
+    ],
   });
   await ui.listen();
   const base = ui.resolvedUrls?.local[0];
   if (!base) {
     await ui.close();
-    throw new Error("the preview server did not report a local URL");
+    throw new Error('the preview server did not report a local URL');
   }
   return {
     previewUrl: new URL(route, base).href,
@@ -104,12 +135,12 @@ export async function mountPreview(
 export function parkUntilSignal(): Promise<void> {
   return new Promise<void>((resolve) => {
     const settle = () => {
-      process.off("SIGINT", settle);
-      process.off("SIGTERM", settle);
+      process.off('SIGINT', settle);
+      process.off('SIGTERM', settle);
       resolve();
     };
-    process.once("SIGINT", settle);
-    process.once("SIGTERM", settle);
+    process.once('SIGINT', settle);
+    process.once('SIGTERM', settle);
   });
 }
 
@@ -124,7 +155,8 @@ export interface FixtureApiOptions {
 export function fixtureApi(baseUrl: string, options: FixtureApiOptions = {}) {
   return async (method: string, path: string, body?: unknown): Promise<any> => {
     const response = await fetch(`${baseUrl}${path}`, {
-      method, headers: { "content-type": "application/json", ...options.headers },
+      method,
+      headers: { 'content-type': 'application/json', ...options.headers },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const result = await response.json();

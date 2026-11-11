@@ -1,12 +1,12 @@
 // server/index.ts runs this right after the auth gate, so every handler here is already authenticated.
-import type { IncomingMessage, ServerResponse } from "node:http";
-import type { json, readBody } from "../harness/http.ts";
-import type { RequestAuth } from "../request-auth.ts";
-import { cloudSyncRoutes } from "./cloud-sync.ts";
-import { ownMcpHttpRoutes } from "./own-mcp-http.ts";
-import { webPanelRoutes } from "./web-panels.ts";
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { json, readBody } from '../harness/http.ts';
+import type { RequestAuth } from '../request-auth.ts';
+import { cloudSyncRoutes } from './cloud-sync.ts';
+import { ownMcpHttpRoutes } from './own-mcp-http.ts';
+import { webPanelRoutes } from './web-panels.ts';
 
-export const PASS: unique symbol = Symbol("route.pass");
+export const PASS: unique symbol = Symbol('route.pass');
 
 export interface RouteContext {
   req: IncomingMessage;
@@ -26,7 +26,10 @@ export type RouteHandler = (ctx: RouteContext) => Promise<typeof PASS | void>;
 export const ROUTES: RouteHandler[] = [cloudSyncRoutes, ownMcpHttpRoutes, webPanelRoutes];
 
 /** True means stop routing. A handler that wrote a response but returned PASS still counts as answered. */
-export async function dispatchRoutes(routes: readonly RouteHandler[], ctx: RouteContext): Promise<boolean> {
+export async function dispatchRoutes(
+  routes: readonly RouteHandler[],
+  ctx: RouteContext,
+): Promise<boolean> {
   for (const route of routes) {
     const out = await route(ctx);
     if (out !== PASS || ctx.res.headersSent || ctx.res.writableEnded) return true;

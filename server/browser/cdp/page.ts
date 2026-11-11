@@ -1,24 +1,35 @@
-import * as actions from "./actions.ts";
-import type { ActionContext, Target } from "./actions.ts";
-import { sessionKindOf, type CdpSession, type Params } from "./connection.ts";
-import { AuthChallenges, type AuthChallenge } from "./auth.ts";
-import { Dialogs, type PendingDialog } from "./dialogs.ts";
-import { DriverError, parseNetError } from "./errors.ts";
-import { evaluate, valueInWorld, type EvaluateOptions } from "./evaluate.ts";
-import { FileChoosers, setInputFiles } from "./files.ts";
-import { FrameTree, type FrameTreeNode } from "./frames.ts";
-import { PageHealth, type HealthReport } from "./health.ts";
-import { Mouse, type Point } from "./input.ts";
-import { Navigations } from "./navigations.ts";
-import { Keyboard } from "./keyboard.ts";
-import { RefTable, type RefCounter } from "./refs.ts";
-import { captureScreenshot, type Screenshot, type ScreenshotOptions } from "./screencast.ts";
-import { SecretGuard } from "./secrets.ts";
-import { resolveElement } from "./selectors.ts";
-import { takeSnapshot, visibleText, type Snapshot } from "./snapshot.ts";
-import { releaseSession, setUpDocumentSession, setUpWorkerSession, type TargetSetup } from "./targets.ts";
-import { Lifecycle, waitFor, type LoadState, type WaitConditions, type WaitContext } from "./wait.ts";
-import { extensionPage } from "../extensions.ts";
+import * as actions from './actions.ts';
+import type { ActionContext, Target } from './actions.ts';
+import { sessionKindOf, type CdpSession, type Params } from './connection.ts';
+import { AuthChallenges, type AuthChallenge } from './auth.ts';
+import { Dialogs, type PendingDialog } from './dialogs.ts';
+import { DriverError, parseNetError } from './errors.ts';
+import { evaluate, valueInWorld, type EvaluateOptions } from './evaluate.ts';
+import { FileChoosers, setInputFiles } from './files.ts';
+import { FrameTree, type FrameTreeNode } from './frames.ts';
+import { PageHealth, type HealthReport } from './health.ts';
+import { Mouse, type Point } from './input.ts';
+import { Navigations } from './navigations.ts';
+import { Keyboard } from './keyboard.ts';
+import { RefTable, type RefCounter } from './refs.ts';
+import { captureScreenshot, type Screenshot, type ScreenshotOptions } from './screencast.ts';
+import { SecretGuard } from './secrets.ts';
+import { resolveElement } from './selectors.ts';
+import { takeSnapshot, visibleText, type Snapshot } from './snapshot.ts';
+import {
+  releaseSession,
+  setUpDocumentSession,
+  setUpWorkerSession,
+  type TargetSetup,
+} from './targets.ts';
+import {
+  Lifecycle,
+  waitFor,
+  type LoadState,
+  type WaitConditions,
+  type WaitContext,
+} from './wait.ts';
+import { extensionPage } from '../extensions.ts';
 
 export const DEFAULT_NAVIGATION_TIMEOUT_MS = 15_000;
 
@@ -40,7 +51,7 @@ export interface PageHost {
 }
 
 export interface NavigateOptions {
-  readiness?: LoadState | "none";
+  readiness?: LoadState | 'none';
   timeoutMs?: number;
   /** The person picked an installed extension's page from the panel's Extensions menu; never set for a bot. */
   personExtension?: boolean;
@@ -62,7 +73,7 @@ export interface PageSnapshot extends Snapshot {
 
 /** Agent navigation goes to web pages, blank pages and inline documents only. */
 export function navigable(url: string): boolean {
-  return /^https?:\/\//i.test(url) || url === "about:blank" || /^data:/i.test(url);
+  return /^https?:\/\//i.test(url) || url === 'about:blank' || /^data:/i.test(url);
 }
 
 /** One tab, driven without the Runtime domain. */
@@ -110,7 +121,7 @@ export class CdpPage implements ActionContext, WaitContext {
     this.fileChoosers.watch(session);
     this.health.watch(session);
     this.frames.onChange((change) => {
-      if (change.kind === "navigated" && change.frameId === this.frames.mainFrameId) {
+      if (change.kind === 'navigated' && change.frameId === this.frames.mainFrameId) {
         this.refs.invalidateAll();
         this.fileChoosers.forget();
       } else {
@@ -118,26 +129,39 @@ export class CdpPage implements ActionContext, WaitContext {
       }
     });
     this.dialogs.onClose(() => this.refs.invalidateAll());
-    session.on("Target.attachedToTarget", (params) => this.#child(params));
-    session.on("Network.responseReceived", (params) => {
+    session.on('Target.attachedToTarget', (params) => this.#child(params));
+    session.on('Network.responseReceived', (params) => {
       const response = params.response as { status?: number } | undefined;
-      if (params.type === "Document" && params.frameId === this.targetId && typeof params.loaderId === "string" && typeof response?.status === "number") {
+      if (
+        params.type === 'Document' &&
+        params.frameId === this.targetId &&
+        typeof params.loaderId === 'string' &&
+        typeof response?.status === 'number'
+      ) {
         this.#documentStatus = { loaderId: params.loaderId, status: response.status };
       }
     });
-    this.ready = setUpDocumentSession(session, host.setup, { isPage: true }).then(() => this.#adoptDocument());
+    this.ready = setUpDocumentSession(session, host.setup, { isPage: true }).then(() =>
+      this.#adoptDocument(),
+    );
   }
 
   async #adoptDocument(): Promise<void> {
     if (this.frames.main?.loaderId !== null) return;
     try {
-      const { frameTree } = await this.session.send<{ frameTree: FrameTreeNode }>("Page.getFrameTree");
+      const { frameTree } = await this.session.send<{ frameTree: FrameTreeNode }>(
+        'Page.getFrameTree',
+      );
       if (this.frames.main?.loaderId !== null) return;
       this.frames.adopt(frameTree);
       const loaderId = frameTree.frame.loaderId;
       if (!loaderId || this.lifecycle.loaderId !== null) return;
-      const state = await valueInWorld<string>(this.frames, this.frames.mainFrameId, "document.readyState").catch(() => "loading");
-      this.lifecycle.adopt(loaderId, state === "complete");
+      const state = await valueInWorld<string>(
+        this.frames,
+        this.frames.mainFrameId,
+        'document.readyState',
+      ).catch(() => 'loading');
+      this.lifecycle.adopt(loaderId, state === 'complete');
     } catch {}
   }
 
@@ -157,7 +181,7 @@ export class CdpPage implements ActionContext, WaitContext {
     return this.#title;
   }
 
-  updateInfo(info: Pick<TargetInfo, "url" | "title">): void {
+  updateInfo(info: Pick<TargetInfo, 'url' | 'title'>): void {
     this.#url = info.url;
     this.#title = info.title;
   }
@@ -168,20 +192,23 @@ export class CdpPage implements ActionContext, WaitContext {
 
   #child(params: Params): void {
     const info = params.targetInfo as TargetInfo | undefined;
-    const child = typeof params.sessionId === "string" ? this.session.connection.session(params.sessionId) : undefined;
+    const child =
+      typeof params.sessionId === 'string'
+        ? this.session.connection.session(params.sessionId)
+        : undefined;
     if (!info || !child) return;
-    if (info.type === "iframe") {
+    if (info.type === 'iframe') {
       this.frames.watch(child, info.targetId);
       this.health.watch(child);
       this.fileChoosers.watch(child);
       this.dialogs.watch(child);
-      child.on("Target.attachedToTarget", (nested) => this.#child(nested));
+      child.on('Target.attachedToTarget', (nested) => this.#child(nested));
       child.onDetach(() => {
         this.refs.invalidateSession(child);
         this.fileChoosers.forget(child);
       });
       void setUpDocumentSession(child, this.#host.setup, { isPage: false }).catch(() => {});
-    } else if (sessionKindOf(info.type) === "worker") {
+    } else if (sessionKindOf(info.type) === 'worker') {
       setUpWorkerSession(child, this.#host.setup.identity);
     } else {
       releaseSession(child);
@@ -189,14 +216,19 @@ export class CdpPage implements ActionContext, WaitContext {
   }
 
   #usable(): void {
-    if (this.closed) throw new DriverError("closed", "This tab is closed.");
-    if (this.#crashed) throw new DriverError("closed", "This tab's page crashed. Reload it or open it again.");
+    if (this.closed) throw new DriverError('closed', 'This tab is closed.');
+    if (this.#crashed)
+      throw new DriverError('closed', "This tab's page crashed. Reload it or open it again.");
   }
 
   #noDialog(): void {
     const dialog = this.dialogs.pending;
     if (dialog) {
-      throw new DriverError("dialog-pending", `A ${dialog.type} dialog is open on this tab: "${dialog.message.slice(0, 200)}". Answer it first.`, { dialog });
+      throw new DriverError(
+        'dialog-pending',
+        `A ${dialog.type} dialog is open on this tab: "${dialog.message.slice(0, 200)}". Answer it first.`,
+        { dialog },
+      );
     }
   }
 
@@ -209,58 +241,116 @@ export class CdpPage implements ActionContext, WaitContext {
     return this.#host.bringToFront(this);
   }
 
-  async navigate(url: string, { readiness = "load", timeoutMs = DEFAULT_NAVIGATION_TIMEOUT_MS, personExtension = false }: NavigateOptions = {}): Promise<NavigationResult> {
-    if (!navigable(url) && !(personExtension && extensionPage(url))) throw new DriverError("refused", `Only http(s), about:blank and data: addresses open here, not ${url.slice(0, 80)}.`);
+  async navigate(
+    url: string,
+    {
+      readiness = 'load',
+      timeoutMs = DEFAULT_NAVIGATION_TIMEOUT_MS,
+      personExtension = false,
+    }: NavigateOptions = {},
+  ): Promise<NavigationResult> {
+    if (!navigable(url) && !(personExtension && extensionPage(url)))
+      throw new DriverError(
+        'refused',
+        `Only http(s), about:blank and data: addresses open here, not ${url.slice(0, 80)}.`,
+      );
     this.#usable();
     await this.bringToFront();
     return this.dialogs.acceptingBeforeUnload(async () => {
-      const sameDocument = this.session.waitFor("Page.navigatedWithinDocument", { match: (params) => params.frameId === this.targetId, timeoutMs });
+      const sameDocument = this.session.waitFor('Page.navigatedWithinDocument', {
+        match: (params) => params.frameId === this.targetId,
+        timeoutMs,
+      });
       sameDocument.catch(() => {});
-      const navigating = this.session.send<{ loaderId?: string; errorText?: string; isDownload?: boolean }>("Page.navigate", { url }, { timeoutMs });
+      const navigating = this.session.send<{
+        loaderId?: string;
+        errorText?: string;
+        isDownload?: boolean;
+      }>('Page.navigate', { url }, { timeoutMs });
       navigating.catch(() => {});
       let stopAsking = () => {};
       const asked = new Promise<AuthChallenge>((resolve) => {
-        stopAsking = this.auth.onChange((challenge) => { if (challenge) resolve(challenge); });
+        stopAsking = this.auth.onChange((challenge) => {
+          if (challenge) resolve(challenge);
+        });
       });
       const first = await Promise.race([navigating, asked]).finally(() => stopAsking());
-      if ("origin" in first) return { url, status: 401, signInPrompt: { origin: first.origin, realm: first.realm } };
+      if ('origin' in first)
+        return { url, status: 401, signInPrompt: { origin: first.origin, realm: first.realm } };
       const result = first;
       if (result.isDownload) {
-        throw new DriverError("navigation", `${url} is a file this browser cannot show, so it was downloaded instead. The tab's downloads list it.`, { download: true });
+        throw new DriverError(
+          'navigation',
+          `${url} is a file this browser cannot show, so it was downloaded instead. The tab's downloads list it.`,
+          { download: true },
+        );
       }
       if (result.errorText) {
         const { description } = parseNetError(result.errorText);
-        throw new DriverError("navigation", `Navigation to ${url} failed: ${description}`, { netError: description });
+        throw new DriverError('navigation', `Navigation to ${url} failed: ${description}`, {
+          netError: description,
+        });
       }
       if (!result.loaderId) await sameDocument;
-      else if (readiness !== "none") await this.lifecycle.waitFor(readiness, { loaderId: result.loaderId, timeoutMs });
-      const status = result.loaderId && this.#documentStatus?.loaderId === result.loaderId ? this.#documentStatus.status : null;
+      else if (readiness !== 'none')
+        await this.lifecycle.waitFor(readiness, { loaderId: result.loaderId, timeoutMs });
+      const status =
+        result.loaderId && this.#documentStatus?.loaderId === result.loaderId
+          ? this.#documentStatus.status
+          : null;
       return { url: this.url(), status };
     });
   }
 
   /** Runs `start` and waits for the main frame to commit a new document (and reach `readiness`) or move within this one. */
-  async #settle(start: () => Promise<unknown>, readiness: LoadState | "none", timeoutMs: number): Promise<NavigationResult> {
+  async #settle(
+    start: () => Promise<unknown>,
+    readiness: LoadState | 'none',
+    timeoutMs: number,
+  ): Promise<NavigationResult> {
     const deadline = Date.now() + timeoutMs;
     const nextDocument = this.lifecycle.nextDocument(timeoutMs);
-    const sameDocument = this.session.waitFor("Page.navigatedWithinDocument", { match: (params) => params.frameId === this.targetId, timeoutMs });
+    const sameDocument = this.session.waitFor('Page.navigatedWithinDocument', {
+      match: (params) => params.frameId === this.targetId,
+      timeoutMs,
+    });
     nextDocument.catch(() => {});
     sameDocument.catch(() => {});
     await this.dialogs.acceptingBeforeUnload(async () => {
       await start();
       const loaderId = await Promise.race([nextDocument, sameDocument.then(() => null)]);
-      if (loaderId && readiness !== "none") await this.lifecycle.waitFor(readiness, { loaderId, timeoutMs: Math.max(1, deadline - Date.now()) });
+      if (loaderId && readiness !== 'none')
+        await this.lifecycle.waitFor(readiness, {
+          loaderId,
+          timeoutMs: Math.max(1, deadline - Date.now()),
+        });
     });
     return { url: this.url(), status: null };
   }
 
-  async #history(delta: -1 | 1, { readiness = "load", timeoutMs = DEFAULT_NAVIGATION_TIMEOUT_MS }: NavigateOptions): Promise<NavigationResult> {
+  async #history(
+    delta: -1 | 1,
+    { readiness = 'load', timeoutMs = DEFAULT_NAVIGATION_TIMEOUT_MS }: NavigateOptions,
+  ): Promise<NavigationResult> {
     this.#ready();
     await this.bringToFront();
-    const { currentIndex, entries } = await this.session.send<{ currentIndex: number; entries: Array<{ id: number }> }>("Page.getNavigationHistory");
+    const { currentIndex, entries } = await this.session.send<{
+      currentIndex: number;
+      entries: Array<{ id: number }>;
+    }>('Page.getNavigationHistory');
     const entry = entries[currentIndex + delta];
-    if (!entry) throw new DriverError("refused", delta < 0 ? "There is no earlier page in this tab's history." : "There is no later page in this tab's history.");
-    return this.#settle(() => this.session.send("Page.navigateToHistoryEntry", { entryId: entry.id }), readiness, timeoutMs);
+    if (!entry)
+      throw new DriverError(
+        'refused',
+        delta < 0
+          ? "There is no earlier page in this tab's history."
+          : "There is no later page in this tab's history.",
+      );
+    return this.#settle(
+      () => this.session.send('Page.navigateToHistoryEntry', { entryId: entry.id }),
+      readiness,
+      timeoutMs,
+    );
   }
 
   back(options: NavigateOptions = {}): Promise<NavigationResult> {
@@ -271,11 +361,18 @@ export class CdpPage implements ActionContext, WaitContext {
     return this.#history(1, options);
   }
 
-  async reload({ readiness = "load", timeoutMs = DEFAULT_NAVIGATION_TIMEOUT_MS }: NavigateOptions = {}): Promise<NavigationResult> {
-    if (this.closed) throw new DriverError("closed", "This tab is closed.");
+  async reload({
+    readiness = 'load',
+    timeoutMs = DEFAULT_NAVIGATION_TIMEOUT_MS,
+  }: NavigateOptions = {}): Promise<NavigationResult> {
+    if (this.closed) throw new DriverError('closed', 'This tab is closed.');
     this.#noDialog();
     await this.bringToFront();
-    const result = await this.#settle(() => this.session.send("Page.reload", {}), readiness, timeoutMs);
+    const result = await this.#settle(
+      () => this.session.send('Page.reload', {}),
+      readiness,
+      timeoutMs,
+    );
     this.#crashed = false;
     return result;
   }
@@ -289,23 +386,38 @@ export class CdpPage implements ActionContext, WaitContext {
   async emulateSize(size: { width: number; height: number } | null, zoom = 1): Promise<void> {
     if (!size) {
       this.#emulated = null;
-      await this.session.send("Emulation.clearDeviceMetricsOverride");
+      await this.session.send('Emulation.clearDeviceMetricsOverride');
       return;
     }
     const ratio = await this.devicePixelRatio().catch(() => 1);
-    await this.session.send("Emulation.setDeviceMetricsOverride", { width: size.width, height: size.height, deviceScaleFactor: ratio * zoom, mobile: false });
+    await this.session.send('Emulation.setDeviceMetricsOverride', {
+      width: size.width,
+      height: size.height,
+      deviceScaleFactor: ratio * zoom,
+      mobile: false,
+    });
     this.#emulated = { width: size.width, height: size.height, zoom };
   }
 
   async devicePixelRatio(): Promise<number> {
     if (this.#devicePixelRatio === null) {
-      const ratio = await valueInWorld<number>(this.frames, this.frames.mainFrameId, "devicePixelRatio");
-      this.#devicePixelRatio = typeof ratio === "number" && ratio > 0 ? ratio : 1;
+      const ratio = await valueInWorld<number>(
+        this.frames,
+        this.frames.mainFrameId,
+        'devicePixelRatio',
+      );
+      this.#devicePixelRatio = typeof ratio === 'number' && ratio > 0 ? ratio : 1;
     }
     return this.#devicePixelRatio;
   }
 
-  async snapshot({ includeImage = false, maskValue }: { includeImage?: boolean; maskValue?: (value: string) => boolean } = {}): Promise<PageSnapshot> {
+  async snapshot({
+    includeImage = false,
+    maskValue,
+  }: {
+    includeImage?: boolean;
+    maskValue?: (value: string) => boolean;
+  } = {}): Promise<PageSnapshot> {
     this.#ready();
     if (includeImage) await this.secrets.refuseWhilePresent(this.frames);
     const mask = (value: string) => this.secrets.holds(value) || maskValue?.(value) === true;
@@ -319,18 +431,27 @@ export class CdpPage implements ActionContext, WaitContext {
     return visibleText(this.frames, maxChars);
   }
 
-  async screenshot(options: ScreenshotOptions & { target?: Exclude<Target, Point> } = {}): Promise<Screenshot> {
+  async screenshot(
+    options: ScreenshotOptions & { target?: Exclude<Target, Point> } = {},
+  ): Promise<Screenshot> {
     this.#ready();
     await this.secrets.refuseWhilePresent(this.frames);
     let clip = options.clip;
     if (options.target) {
       const handle = await resolveElement(this.frames, this.refs, options.target);
-      await handle.session.send("DOM.scrollIntoViewIfNeeded", { backendNodeId: handle.backendNodeId }).catch(() => {});
-      const { model } = await handle.session.send<{ model: { border: number[] } }>("DOM.getBoxModel", { backendNodeId: handle.backendNodeId });
+      await handle.session
+        .send('DOM.scrollIntoViewIfNeeded', { backendNodeId: handle.backendNodeId })
+        .catch(() => {});
+      const { model } = await handle.session.send<{ model: { border: number[] } }>(
+        'DOM.getBoxModel',
+        { backendNodeId: handle.backendNodeId },
+      );
       const offset = await this.frames.localRootOffset(handle.session);
       const xs = [model.border[0]!, model.border[2]!, model.border[4]!, model.border[6]!];
       const ys = [model.border[1]!, model.border[3]!, model.border[5]!, model.border[7]!];
-      const metrics = await this.session.send<{ cssVisualViewport: { pageX: number; pageY: number } }>("Page.getLayoutMetrics");
+      const metrics = await this.session.send<{
+        cssVisualViewport: { pageX: number; pageY: number };
+      }>('Page.getLayoutMetrics');
       clip = {
         x: Math.min(...xs) + offset.x + metrics.cssVisualViewport.pageX,
         y: Math.min(...ys) + offset.y + metrics.cssVisualViewport.pageY,
@@ -338,7 +459,11 @@ export class CdpPage implements ActionContext, WaitContext {
         height: Math.max(1, Math.max(...ys) - Math.min(...ys)),
       };
     }
-    return captureScreenshot(this.session, (await this.devicePixelRatio()) * (this.#emulated?.zoom ?? 1), { ...options, ...(clip ? { clip } : {}) });
+    return captureScreenshot(
+      this.session,
+      (await this.devicePixelRatio()) * (this.#emulated?.zoom ?? 1),
+      { ...options, ...(clip ? { clip } : {}) },
+    );
   }
 
   async evaluate(expression: string, options: EvaluateOptions = {}): Promise<unknown> {
@@ -357,7 +482,10 @@ export class CdpPage implements ActionContext, WaitContext {
     return actions.click(this, target, options);
   }
 
-  async hover(target: Target, options: { timeoutMs?: number; pointer?: actions.PointerReporter } = {}): Promise<Point> {
+  async hover(
+    target: Target,
+    options: { timeoutMs?: number; pointer?: actions.PointerReporter } = {},
+  ): Promise<Point> {
     this.#ready();
     return actions.hover(this, target, options);
   }
@@ -384,22 +512,38 @@ export class CdpPage implements ActionContext, WaitContext {
     return actions.press(this, chord);
   }
 
-  async select(target: Exclude<Target, Point>, values: readonly string[]): Promise<{ selected: string[] }> {
+  async select(
+    target: Exclude<Target, Point>,
+    values: readonly string[],
+  ): Promise<{ selected: string[] }> {
     this.#ready();
     return actions.select(this, target, values);
   }
 
-  async check(target: Exclude<Target, Point>, checked = true, options: { timeoutMs?: number } = {}): Promise<{ checked: boolean; changed: boolean }> {
+  async check(
+    target: Exclude<Target, Point>,
+    checked = true,
+    options: { timeoutMs?: number } = {},
+  ): Promise<{ checked: boolean; changed: boolean }> {
     this.#ready();
     return actions.check(this, target, checked, options);
   }
 
-  async drag(from: Target, to: Target, options: { timeoutMs?: number; pointer?: actions.PointerReporter } = {}): Promise<{ from: Point; to: Point; dropped: "html5" | "mouse" }> {
+  async drag(
+    from: Target,
+    to: Target,
+    options: { timeoutMs?: number; pointer?: actions.PointerReporter } = {},
+  ): Promise<{ from: Point; to: Point; dropped: 'html5' | 'mouse' }> {
     this.#ready();
     return actions.drag(this, from, to, options);
   }
 
-  async scroll(target: Target | null, deltaX: number, deltaY: number, options: { timeoutMs?: number } = {}): Promise<Point> {
+  async scroll(
+    target: Target | null,
+    deltaX: number,
+    deltaY: number,
+    options: { timeoutMs?: number } = {},
+  ): Promise<Point> {
     this.#ready();
     return actions.scroll(this, target, deltaX, deltaY, options);
   }
@@ -407,7 +551,8 @@ export class CdpPage implements ActionContext, WaitContext {
   /** Files for a named file input, or else for the picker the page opened. */
   async upload(paths: readonly string[], target?: Exclude<Target, Point>): Promise<void> {
     this.#ready();
-    if (target) await setInputFiles(this.frames, await resolveElement(this.frames, this.refs, target), paths);
+    if (target)
+      await setInputFiles(this.frames, await resolveElement(this.frames, this.refs, target), paths);
     else await this.fileChoosers.answer(paths);
   }
 
@@ -422,9 +567,18 @@ export class CdpPage implements ActionContext, WaitContext {
 
   /** What a copy or cut key press just put on the page's clipboard, from any frame. */
   async takeCopiedText(): Promise<string> {
-    const copies = await Promise.all(this.frames.all().map((frame) =>
-      valueInWorld<string>(this.frames, frame.id, "typeof __ombTakeCopy === 'function' ? __ombTakeCopy() : ''").catch(() => "")));
-    return copies.find((text) => typeof text === "string" && text.length > 0) ?? "";
+    const copies = await Promise.all(
+      this.frames
+        .all()
+        .map((frame) =>
+          valueInWorld<string>(
+            this.frames,
+            frame.id,
+            "typeof __ombTakeCopy === 'function' ? __ombTakeCopy() : ''",
+          ).catch(() => ''),
+        ),
+    );
+    return copies.find((text) => typeof text === 'string' && text.length > 0) ?? '';
   }
 
   /** A takeover revokes every ref, even when the document stays the same. */

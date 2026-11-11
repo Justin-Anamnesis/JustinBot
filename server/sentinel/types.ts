@@ -1,26 +1,50 @@
 // Privacy invariant: records carry tool output only in memory, for signatures; an issue stores evidence ids, never text.
 
 /** external: another MCP server, the engine's own tools or the provider account. */
-export type Origin = "harness" | "external" | "shell";
-export type Severity = "high" | "medium" | "low";
+export type Origin = 'harness' | 'external' | 'shell';
+export type Severity = 'high' | 'medium' | 'low';
 
 export interface EvidenceRef {
-  source: "messages" | "events" | "runtime";
+  source: 'messages' | 'events' | 'runtime';
   id: string;
 }
 
 export type SentinelRecord =
   | {
-    type: "tool"; id: string; threadId: string; turnId?: string; botId?: string; at: number;
-    /** "harness_notice": a sentence the harness wrote into the transcript. */
-    tool: string;
-    ok: boolean;
-    /** Signatures only; never stored. */
-    text: string;
-  }
-  | { type: "turn"; id: string; threadId: string; turnId?: string; botId?: string; at: number; ok: boolean; stopReason: string | null; cost: number | null }
+      type: 'tool';
+      id: string;
+      threadId: string;
+      turnId?: string;
+      botId?: string;
+      at: number;
+      /** "harness_notice": a sentence the harness wrote into the transcript. */
+      tool: string;
+      ok: boolean;
+      /** Signatures only; never stored. */
+      text: string;
+    }
+  | {
+      type: 'turn';
+      id: string;
+      threadId: string;
+      turnId?: string;
+      botId?: string;
+      at: number;
+      ok: boolean;
+      stopReason: string | null;
+      cost: number | null;
+    }
   /** `started: false`: still waiting at scan time. */
-  | { type: "queue"; id: string; assignmentId: string; threadId: string; botId?: string; at: number; waitMs: number; started: boolean };
+  | {
+      type: 'queue';
+      id: string;
+      assignmentId: string;
+      threadId: string;
+      botId?: string;
+      at: number;
+      waitMs: number;
+      started: boolean;
+    };
 
 export interface Observation {
   kind: string;

@@ -17,7 +17,9 @@ export class TurnResources {
   /** Told each time a claim makes a turn a resource's new holder; returns the way to stop listening. */
   onClaim(listener: (resource: string, owner: TurnOwner) => void): () => void {
     this.claimListeners.add(listener);
-    return () => { this.claimListeners.delete(listener); };
+    return () => {
+      this.claimListeners.delete(listener);
+    };
   }
 
   startWaiting(resource: string, owner: TurnOwner): number {
@@ -26,7 +28,7 @@ export class TurnResources {
       this.waiters.set(resource, [owner]);
       return 1;
     }
-    const index = queue.findIndex(waiting => sameOwner(waiting, owner));
+    const index = queue.findIndex((waiting) => sameOwner(waiting, owner));
     if (index >= 0) return index + 1;
     queue.push(owner);
     return queue.length;
@@ -35,7 +37,7 @@ export class TurnResources {
   stopWaiting(resource: string, owner: TurnOwner): void {
     const queue = this.waiters.get(resource);
     if (!queue) return;
-    const next = queue.filter(waiting => !sameOwner(waiting, owner));
+    const next = queue.filter((waiting) => !sameOwner(waiting, owner));
     if (next.length) this.waiters.set(resource, next);
     else this.waiters.delete(resource);
   }
@@ -43,7 +45,7 @@ export class TurnResources {
   waitPosition(resource: string, owner: TurnOwner): number | undefined {
     const queue = this.waiters.get(resource);
     if (!queue) return undefined;
-    const index = queue.findIndex(waiting => sameOwner(waiting, owner));
+    const index = queue.findIndex((waiting) => sameOwner(waiting, owner));
     return index < 0 ? undefined : index + 1;
   }
 
@@ -51,9 +53,12 @@ export class TurnResources {
     if (!Number.isFinite(waitedMs) || waitedMs < 0) return;
     const sample = Math.min(waitedMs, 24 * 60 * 60_000);
     const stats = this.waitStats.get(resource);
-    this.waitStats.set(resource, stats
-      ? { ewmaMs: stats.ewmaMs + 0.25 * (sample - stats.ewmaMs), samples: stats.samples + 1 }
-      : { ewmaMs: sample, samples: 1 });
+    this.waitStats.set(
+      resource,
+      stats
+        ? { ewmaMs: stats.ewmaMs + 0.25 * (sample - stats.ewmaMs), samples: stats.samples + 1 }
+        : { ewmaMs: sample, samples: 1 },
+    );
   }
 
   waitEstimateMs(resource: string): number | undefined {
@@ -92,7 +97,7 @@ export class TurnResources {
 
   release(owner: TurnOwner): void {
     for (const [key, queue] of this.waiters) {
-      const next = queue.filter(waiting => !sameOwner(waiting, owner));
+      const next = queue.filter((waiting) => !sameOwner(waiting, owner));
       if (next.length) this.waiters.set(key, next);
       else this.waiters.delete(key);
     }

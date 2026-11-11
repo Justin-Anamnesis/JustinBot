@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useDesktopCapabilities } from "@/components/DesktopCapabilities";
-import { withOpenSettings } from "@/components/OpenSystemSettings";
-import { useStore } from "@/state/store";
-import { t } from "./i18n";
-import { fishSpeech } from "./fish-speech";
-import { listensHere, speechBridge } from "./speech";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useDesktopCapabilities } from '@/components/DesktopCapabilities';
+import { withOpenSettings } from '@/components/OpenSystemSettings';
+import { useStore } from '@/state/store';
+import { t } from './i18n';
+import { fishSpeech } from './fish-speech';
+import { listensHere, speechBridge } from './speech';
 
-export function useComposerDictation({ draftId, text, onText }: {
+export function useComposerDictation({
+  draftId,
+  text,
+  onText,
+}: {
   draftId: string;
   text: string;
   onText: (text: string) => void;
@@ -17,7 +21,7 @@ export function useComposerDictation({ draftId, text, onText }: {
   const [speechError, setSpeechError] = useState<ReactNode>(null);
   const draft = useRef({ id: draftId, text });
   draft.current = { id: draftId, text };
-  const session = useRef({ draftId: "", base: "" });
+  const session = useRef({ draftId: '', base: '' });
   const cancel = useRef<(() => void) | null>(null);
   // Fish Audio hears the clip only at its end, so stopping the mic must finish it.
   const finish = useRef<(() => void) | null>(null);
@@ -51,8 +55,8 @@ export function useComposerDictation({ draftId, text, onText }: {
         cancelSession();
         return;
       }
-      if (typeof line.text !== "string" || !line.text.trim()) return;
-      lastText = base ? `${base}${/\s$/.test(base) ? "" : " "}${line.text}` : line.text;
+      if (typeof line.text !== 'string' || !line.text.trim()) return;
+      lastText = base ? `${base}${/\s$/.test(base) ? '' : ' '}${line.text}` : line.text;
       draft.current.text = lastText;
       onText(lastText);
     });
@@ -61,17 +65,25 @@ export function useComposerDictation({ draftId, text, onText }: {
       active = false;
       setRecording(false);
       if (code === 2) {
-        setSpeechError(t("composer.dictation.macOnly"));
+        setSpeechError(t('composer.dictation.macOnly'));
       } else if (code === 1) {
         // A refused permission comes with a way to the pane that grants it.
-        setSpeechError(message ?? (reason === "speech-not-authorized" ? withOpenSettings(t("composer.dictation.permission"), "speech")
-          : t(reason === "dictation-disabled" ? "composer.dictation.disabled" : "composer.dictation.failed")));
+        setSpeechError(
+          message ??
+            (reason === 'speech-not-authorized'
+              ? withOpenSettings(t('composer.dictation.permission'), 'speech')
+              : t(
+                  reason === 'dictation-disabled'
+                    ? 'composer.dictation.disabled'
+                    : 'composer.dictation.failed',
+                )),
+        );
       }
     });
     void bridge.speechStart().catch(() => {
       if (!active) return;
       cancelSession();
-      setSpeechError(t("composer.dictation.failed"));
+      setSpeechError(t('composer.dictation.failed'));
     });
     return () => {
       if (cancel.current === cancelSession) cancel.current = null;
@@ -87,7 +99,7 @@ export function useComposerDictation({ draftId, text, onText }: {
 
   const toggle = () => {
     if (!ready || !speechBridge()) {
-      setSpeechError(t("composer.dictation.unavailable"));
+      setSpeechError(t('composer.dictation.unavailable'));
     } else if (recording) {
       if (finish.current) finish.current();
       else stop();

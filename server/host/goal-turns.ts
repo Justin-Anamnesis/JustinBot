@@ -1,5 +1,5 @@
 // A goal lead's own turns: their text is held back until the private envelope is stripped, in a room or a one-on-one chat.
-import type { RuntimeEvent } from "../../shared/runtime-events.ts";
+import type { RuntimeEvent } from '../../shared/runtime-events.ts';
 
 export type GoalLeadTurn = {
   token: symbol;
@@ -29,8 +29,7 @@ export function createGoalTurns(deps: { retireProviderTurn(turnId: string): void
   }
 
   function hasUnboundDiscarded(threadId: string): boolean {
-    return [...(turnsByThread.get(threadId) ?? [])]
-      .some((turn) => turn.discard && !turn.turnId);
+    return [...(turnsByThread.get(threadId) ?? [])].some((turn) => turn.discard && !turn.turnId);
   }
 
   /** Per provider turn, never per room thread; most adapters emit turn.started before sendTurn resolves. */
@@ -65,14 +64,18 @@ export function createGoalTurns(deps: { retireProviderTurn(turnId: string): void
   }
 
   function begin(threadId: string): GoalLeadTurn {
-    const turn: GoalLeadTurn = { token: Symbol("goal-coordinator-turn"), assistantItems: [], discard: false };
+    const turn: GoalLeadTurn = {
+      token: Symbol('goal-coordinator-turn'),
+      assistantItems: [],
+      discard: false,
+    };
     add(threadId, turn);
     return turn;
   }
 
   function end(threadId: string, turn: GoalLeadTurn, outcome: string | undefined): void {
     if (!turnsByThread.get(threadId)?.has(turn)) return;
-    if (outcome === "timed_out" || outcome === "stalled") {
+    if (outcome === 'timed_out' || outcome === 'stalled') {
       // interruptTurn is async: keep a discard-only guard so a late private envelope never reaches the room; the token check keeps an old timer off a newer turn.
       turn.discard = true;
       turn.assistantItems = [];

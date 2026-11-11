@@ -1,6 +1,6 @@
-import { api } from "@/state/store";
-import type { WidgetOther, WidgetValues } from "../../../shared/widget";
-import { randomUuid } from "@/lib/random-uuid";
+import { api } from '@/state/store';
+import type { WidgetOther, WidgetValues } from '../../../shared/widget';
+import { randomUuid } from '@/lib/random-uuid';
 
 export interface WidgetPress {
   botId: string;
@@ -23,16 +23,26 @@ export const newWidgetSendId = (): string => randomUuid();
 export async function sendWidgetAction(press: WidgetPress): Promise<WidgetSendResult> {
   try {
     await api(`/api/bots/${press.botId}/messages`, {
-      method: "POST",
+      method: 'POST',
       body: JSON.stringify({
         threadId: press.threadId,
         sendId: press.sendId,
-        widgetAction: { messageId: press.messageId, ref: press.ref, rev: press.rev, ...(press.values ? { values: press.values } : {}), ...(press.other ? { other: press.other } : {}) },
+        widgetAction: {
+          messageId: press.messageId,
+          ref: press.ref,
+          rev: press.rev,
+          ...(press.values ? { values: press.values } : {}),
+          ...(press.other ? { other: press.other } : {}),
+        },
       }),
     });
     return { ok: true };
   } catch (error) {
-    const refused = typeof (error as { status?: unknown } | null)?.status === "number";
-    return { ok: false, refused, ...(refused && error instanceof Error && error.message ? { error: error.message } : {}) };
+    const refused = typeof (error as { status?: unknown } | null)?.status === 'number';
+    return {
+      ok: false,
+      refused,
+      ...(refused && error instanceof Error && error.message ? { error: error.message } : {}),
+    };
   }
 }

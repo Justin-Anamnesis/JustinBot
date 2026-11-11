@@ -1,7 +1,7 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { loadLocale } from "@/lib/i18n";
+import { useEffect, useState, useSyncExternalStore } from 'react';
+import { loadLocale } from '@/lib/i18n';
 
-export const LANGUAGE_KEY = "omb-language";
+export const LANGUAGE_KEY = 'omb-language';
 
 let sessionChoice: string | null | undefined;
 let storedChoiceOffered = false;
@@ -43,15 +43,23 @@ export function languageChoice(): string | null {
   return bridge ? desktopChoice(bridge) : storedChoice();
 }
 
-export function effectiveLanguage(choice: string | null, serverDefault: string | undefined): string {
-  return choice ?? serverDefault ?? "";
+export function effectiveLanguage(
+  choice: string | null,
+  serverDefault: string | undefined,
+): string {
+  return choice ?? serverDefault ?? '';
 }
 
-export function localeTag(language: string, system: string | undefined = globalThis.navigator?.language): string | undefined {
+export function localeTag(
+  language: string,
+  system: string | undefined = globalThis.navigator?.language,
+): string | undefined {
   return language || system;
 }
 
-export function startupLocaleTag(system: string | undefined = globalThis.navigator?.language): string | undefined {
+export function startupLocaleTag(
+  system: string | undefined = globalThis.navigator?.language,
+): string | undefined {
   return localeTag(effectiveLanguage(languageChoice(), undefined), system);
 }
 
@@ -75,14 +83,14 @@ let stopDesktopChanges: (() => void) | undefined;
 
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
-  if (listeners.size === 1 && typeof window !== "undefined") {
-    window.addEventListener("storage", onStorage);
+  if (listeners.size === 1 && typeof window !== 'undefined') {
+    window.addEventListener('storage', onStorage);
     stopDesktopChanges = desktop()?.onChange(onDesktopChange);
   }
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0 && typeof window !== "undefined") {
-      window.removeEventListener("storage", onStorage);
+    if (listeners.size === 0 && typeof window !== 'undefined') {
+      window.removeEventListener('storage', onStorage);
       stopDesktopChanges?.();
       stopDesktopChanges = undefined;
     }
@@ -100,8 +108,7 @@ export function setLanguageChoice(language: string): void {
     const local = storage();
     local?.setItem(LANGUAGE_KEY, language);
     if (!bridge && local?.getItem(LANGUAGE_KEY) === language) sessionChoice = undefined;
-  } catch {
-  }
+  } catch {}
   notify();
 }
 
@@ -111,7 +118,9 @@ export function useLanguageChoice(): string | null {
 
 /** The person's own language, loaded before a page first draws, so they never see another one first. */
 export function loadPageLanguage(): Promise<string> {
-  return loadLocale(effectiveLanguage(languageChoice(), undefined) || globalThis.navigator?.language);
+  return loadLocale(
+    effectiveLanguage(languageChoice(), undefined) || globalThis.navigator?.language,
+  );
 }
 
 /** Shows `language` (the system's when empty) once its pack has loaded, and draws the caller again then. `windowPage`:

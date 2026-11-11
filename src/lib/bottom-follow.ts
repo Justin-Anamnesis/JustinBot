@@ -1,4 +1,4 @@
-import { useLayoutEffect, type RefObject } from "react";
+import { useLayoutEffect, type RefObject } from 'react';
 
 export const BOTTOM_FOLLOW_THRESHOLD = 4;
 
@@ -13,7 +13,9 @@ export function shouldResumeBottomFollow({
   scrollTop: number;
   distanceFromBottom: number;
 }): boolean {
-  return !following && scrollTop > previousScrollTop && distanceFromBottom < BOTTOM_FOLLOW_THRESHOLD;
+  return (
+    !following && scrollTop > previousScrollTop && distanceFromBottom < BOTTOM_FOLLOW_THRESHOLD
+  );
 }
 
 interface BottomFollowScroller {

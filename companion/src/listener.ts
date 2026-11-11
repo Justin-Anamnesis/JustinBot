@@ -1,6 +1,6 @@
 // Where this computer can be reached and what it is called there. Binds nothing and runs nothing.
-import { homedir, networkInterfaces } from "node:os";
-import { delimiter, join } from "node:path";
+import { homedir, networkInterfaces } from 'node:os';
+import { delimiter, join } from 'node:path';
 
 /** Interfaces that tunnel, bridge, virtualize or mesh. Their addresses stay
  * listed (the tailnet one is what an off-network phone dials, and a Hyper-V
@@ -40,12 +40,14 @@ export function lanAddresses(interfaces = networkInterfaces()): string[] {
 
 /** The name is what Windows calls the adapter ("Wi-Fi"), used to ask whether
  * Windows has that network down as Public. */
-export function lanInterfaces(interfaces = networkInterfaces()): Array<{ name: string; address: string }> {
+export function lanInterfaces(
+  interfaces = networkInterfaces(),
+): Array<{ name: string; address: string }> {
   const found: Array<{ rank: number; name: string; address: string }> = [];
   for (const [name, entries] of Object.entries(interfaces)) {
     for (const entry of entries ?? []) {
-      if (entry.family !== "IPv4" || entry.internal) continue;
-      if (entry.address.startsWith("169.254.")) continue;
+      if (entry.family !== 'IPv4' || entry.internal) continue;
+      if (entry.address.startsWith('169.254.')) continue;
       found.push({ rank: interfaceRank(name), name, address: entry.address });
     }
   }
@@ -56,7 +58,7 @@ export function lanInterfaces(interfaces = networkInterfaces()): Array<{ name: s
  * aside; unlike a LAN address it keeps working away from home. */
 export function tailscaleAddress(addresses: string[] = lanAddresses()): string | null {
   for (const address of addresses) {
-    const [first, second] = address.split(".").map(Number);
+    const [first, second] = address.split('.').map(Number);
     if (first === 100 && second >= 64 && second <= 127) return address;
   }
   return null;
@@ -83,20 +85,20 @@ export function tailscaleCandidates(home = homedir()): string[] {
   // The macOS app's own executable comes last: run without CLI mode it opens
   // the Tailscale app, which then connects.
   return [
-    "/opt/homebrew/bin/tailscale",
-    "/usr/local/bin/tailscale",
-    "/usr/bin/tailscale",
-    "/run/current-system/sw/bin/tailscale",
-    "C:\\Program Files\\Tailscale\\tailscale.exe",
-    "C:\\Program Files (x86)\\Tailscale\\tailscale.exe",
-    "tailscale",
-    "/Applications/Tailscale.app/Contents/MacOS/Tailscale",
-    join(home, "Applications", "Tailscale.app", "Contents", "MacOS", "Tailscale"),
+    '/opt/homebrew/bin/tailscale',
+    '/usr/local/bin/tailscale',
+    '/usr/bin/tailscale',
+    '/run/current-system/sw/bin/tailscale',
+    'C:\\Program Files\\Tailscale\\tailscale.exe',
+    'C:\\Program Files (x86)\\Tailscale\\tailscale.exe',
+    'tailscale',
+    '/Applications/Tailscale.app/Contents/MacOS/Tailscale',
+    join(home, 'Applications', 'Tailscale.app', 'Contents', 'MacOS', 'Tailscale'),
   ];
 }
 
 export const searchPath = (): string =>
-  [process.env.PATH ?? "", "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin"]
+  [process.env.PATH ?? '', '/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', '/bin']
     .filter(Boolean)
     .join(delimiter);
 
@@ -106,5 +108,5 @@ export const searchPath = (): string =>
 export const tailscaleEnvironment = (): NodeJS.ProcessEnv => ({
   ...process.env,
   PATH: searchPath(),
-  TAILSCALE_BE_CLI: "1",
+  TAILSCALE_BE_CLI: '1',
 });

@@ -13,7 +13,10 @@ export function parseHex(value: string): Rgb {
 }
 
 export function toHex({ r, g, b }: Rgb): string {
-  const channel = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, "0");
+  const channel = (n: number) =>
+    Math.max(0, Math.min(255, Math.round(n)))
+      .toString(16)
+      .padStart(2, '0');
   return `#${channel(r)}${channel(g)}${channel(b)}`;
 }
 
@@ -66,7 +69,8 @@ function oklchToLinear(l: number, c: number, h: number): [number, number, number
 }
 
 export function fromOklch({ l, c, h }: Oklch): string {
-  const fits = (chroma: number) => oklchToLinear(l, chroma, h).every((v) => v >= -1e-4 && v <= 1 + 1e-4);
+  const fits = (chroma: number) =>
+    oklchToLinear(l, chroma, h).every((v) => v >= -1e-4 && v <= 1 + 1e-4);
   let chroma = c;
   if (!fits(c)) {
     let lo = 0;
@@ -106,9 +110,15 @@ function rgbToHsl({ r, g, b }: Rgb): [number, number, number] {
   const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
   let h = 0;
   switch (max) {
-    case rn: h = (gn - bn) / d + (gn < bn ? 6 : 0); break;
-    case gn: h = (bn - rn) / d + 2; break;
-    default: h = (rn - gn) / d + 4; break;
+    case rn:
+      h = (gn - bn) / d + (gn < bn ? 6 : 0);
+      break;
+    case gn:
+      h = (bn - rn) / d + 2;
+      break;
+    default:
+      h = (rn - gn) / d + 4;
+      break;
   }
   return [h / 6, s, l];
 }
@@ -151,7 +161,7 @@ export function toneForSurface(hex: string, surface: string, min = 4.5): string 
   }
   if (contrastRatio(best, surface) >= min) return best;
   let nudged = best;
-  const toward = towardLight ? "#ffffff" : "#000000";
+  const toward = towardLight ? '#ffffff' : '#000000';
   for (let step = 0; step < 24 && contrastRatio(nudged, surface) < min; step += 1) {
     nudged = mixSrgb(toward, nudged, 0.08);
   }

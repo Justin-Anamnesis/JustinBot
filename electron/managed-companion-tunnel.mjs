@@ -1,45 +1,46 @@
 // The connector token reaches cloudflared only through a private short-lived file: never argv, the environment, status or logs.
-import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import {
   MANAGED_COMPANION_ORIGIN_PORT,
   validCompanionOriginTarget,
-} from "./companion-origin-gateway.mjs";
-import { minimalGuardianEnvironment } from "./managed-companion-guardian.mjs";
+} from './companion-origin-gateway.mjs';
+import { minimalGuardianEnvironment } from './managed-companion-guardian.mjs';
 
-export const MANAGED_COMPANION_ENDPOINT_FIELD = "managedCompanionEndpointUrl";
-export const MANAGED_COMPANION_TOKEN_FIELD = "managedCompanionConnectorToken";
-export const MANAGED_COMPANION_ORIGIN_VERSION_FIELD = "managedCompanionOriginVersion";
+export const MANAGED_COMPANION_ENDPOINT_FIELD = 'managedCompanionEndpointUrl';
+export const MANAGED_COMPANION_TOKEN_FIELD = 'managedCompanionConnectorToken';
+export const MANAGED_COMPANION_ORIGIN_VERSION_FIELD = 'managedCompanionOriginVersion';
 export const MANAGED_COMPANION_ORIGIN_VERSION = 2;
-export const MANAGED_COMPANION_RELEASE_AT_FIELD = "managedCompanionReleaseAt";
+export const MANAGED_COMPANION_RELEASE_AT_FIELD = 'managedCompanionReleaseAt';
 
-const TOKEN_FILE_PATTERN = /^connector-([1-9][0-9]*)-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.token$/;
+const TOKEN_FILE_PATTERN =
+  /^connector-([1-9][0-9]*)-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.token$/;
 const TOKEN_MIN_BYTES = 40;
 const TOKEN_MAX_BYTES = 16 * 1024;
-const isString = (value) => Object.prototype.toString.call(value) === "[object String]";
+const isString = (value) => Object.prototype.toString.call(value) === '[object String]';
 
 /** Only a complete HTTPS origin can ever become a phone route. */
 export function normalizeManagedCompanionEndpoint(value) {
-  if (!isString(value) || !value.trim()) return "";
+  if (!isString(value) || !value.trim()) return '';
   let parsed;
   try {
     parsed = new URL(value.trim());
   } catch {
-    return "";
+    return '';
   }
   if (
-    parsed.protocol !== "https:" ||
+    parsed.protocol !== 'https:' ||
     parsed.username ||
     parsed.password ||
-    (parsed.pathname !== "" && parsed.pathname !== "/") ||
+    (parsed.pathname !== '' && parsed.pathname !== '/') ||
     parsed.search ||
     parsed.hash
   ) {
-    return "";
+    return '';
   }
   return parsed.origin;
 }
@@ -76,7 +77,7 @@ export function withManagedCompanionTunnelAccess(credentials, provision) {
   const endpoint = normalizeManagedCompanionEndpoint(provision?.endpoint?.url);
   const token = provision?.connectorToken;
   if (!endpoint || !validConnectorToken(token)) {
-    throw new Error("The companion service returned an invalid managed endpoint");
+    throw new Error('The companion service returned an invalid managed endpoint');
   }
   const next = {
     ...credentials,
@@ -97,9 +98,19 @@ export function withoutManagedCompanionTunnelAccess(credentials) {
   return next;
 }
 
-export function stagedCloudflaredPath({ appPath, platform = process.platform, arch = process.arch } = {}) {
-  const executable = platform === "win32" ? "cloudflared.exe" : "cloudflared";
-  return path.join(String(appPath ?? ""), "dist-native", "cloudflared", `${platform}-${arch}`, executable);
+export function stagedCloudflaredPath({
+  appPath,
+  platform = process.platform,
+  arch = process.arch,
+} = {}) {
+  const executable = platform === 'win32' ? 'cloudflared.exe' : 'cloudflared';
+  return path.join(
+    String(appPath ?? ''),
+    'dist-native',
+    'cloudflared',
+    `${platform}-${arch}`,
+    executable,
+  );
 }
 
 /** Packaged apps trust only the connector shipped in Resources. */
@@ -112,8 +123,8 @@ export function resolveCloudflaredBinary({
   environment = process.env,
   exists = fs.existsSync,
 } = {}) {
-  const executable = platform === "win32" ? "cloudflared.exe" : "cloudflared";
-  const bundled = path.join(String(resourcesPath ?? ""), "cloudflared", executable);
+  const executable = platform === 'win32' ? 'cloudflared.exe' : 'cloudflared';
+  const bundled = path.join(String(resourcesPath ?? ''), 'cloudflared', executable);
   if (isPackaged) return exists(bundled) ? bundled : null;
 
   const override = environment.OMB_CLOUDFLARED_PATH?.trim();
@@ -121,10 +132,10 @@ export function resolveCloudflaredBinary({
 
   const staged = stagedCloudflaredPath({ appPath, platform, arch });
   if (exists(staged)) return staged;
-  const pathEntry = Object.entries(environment).find(([name]) => name.toLowerCase() === "path");
+  const pathEntry = Object.entries(environment).find(([name]) => name.toLowerCase() === 'path');
   const pathValue = pathEntry?.[1];
   if (!pathValue) return null;
-  const delimiter = platform === "win32" ? ";" : ":";
+  const delimiter = platform === 'win32' ? ';' : ':';
   for (const directory of pathValue.split(delimiter)) {
     if (!directory || !path.isAbsolute(directory)) continue;
     const candidate = path.join(directory, executable);
@@ -134,7 +145,7 @@ export function resolveCloudflaredBinary({
 }
 
 export function resolveManagedCompanionGuardian({ appPath, exists = fs.existsSync } = {}) {
-  const entry = path.join(String(appPath ?? ""), "electron", "managed-companion-guardian-main.mjs");
+  const entry = path.join(String(appPath ?? ''), 'electron', 'managed-companion-guardian-main.mjs');
   return exists(entry) ? entry : null;
 }
 
@@ -142,10 +153,10 @@ function ensurePrivateDirectory(directory, fileSystem, currentUid) {
   fileSystem.mkdirSync(directory, { recursive: true, mode: 0o700 });
   const stat = fileSystem.lstatSync(directory);
   if (!stat.isDirectory() || stat.isSymbolicLink()) {
-    throw new Error("The managed companion runtime path is unsafe");
+    throw new Error('The managed companion runtime path is unsafe');
   }
   if (currentUid !== undefined && stat.uid !== currentUid) {
-    throw new Error("The managed companion runtime path has an unexpected owner");
+    throw new Error('The managed companion runtime path has an unexpected owner');
   }
   fileSystem.chmodSync(directory, 0o700);
 }
@@ -155,22 +166,18 @@ function processIsAlive(pid) {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return error?.code !== "ESRCH";
+    return error?.code !== 'ESRCH';
   }
 }
 
 // Node reports synthetic uids on Windows; ACLs on the per-user data directory are the ownership boundary there.
 const currentUserId = () =>
-  process.platform === "win32" ? undefined : (process.getuid?.() ?? os.userInfo().uid);
+  process.platform === 'win32' ? undefined : (process.getuid?.() ?? os.userInfo().uid);
 
 /** Suspicious paths are preserved instead of broadening cleanup around a secret. */
 export function cleanupStaleManagedCompanionTokens(
   runtimeRoot,
-  {
-    fileSystem = fs,
-    currentUid = currentUserId(),
-    isProcessAlive = processIsAlive,
-  } = {},
+  { fileSystem = fs, currentUid = currentUserId(), isProcessAlive = processIsAlive } = {},
 ) {
   let entries;
   try {
@@ -192,14 +199,13 @@ export function cleanupStaleManagedCompanionTokens(
         !stat.isFile() ||
         stat.isSymbolicLink() ||
         (currentUid !== undefined && stat.uid !== currentUid) ||
-        (process.platform !== "win32" && (stat.mode & 0o077) !== 0)
+        (process.platform !== 'win32' && (stat.mode & 0o077) !== 0)
       ) {
         continue;
       }
       fileSystem.unlinkSync(file);
       removed += 1;
-    } catch {
-    }
+    } catch {}
   }
   return removed;
 }
@@ -209,8 +215,8 @@ function writePrivateToken(runtimeRoot, token, { fileSystem, processId, identifi
   const file = path.join(runtimeRoot, `connector-${processId}-${identifier()}.token`);
   let descriptor;
   try {
-    descriptor = fileSystem.openSync(file, "wx", 0o600);
-    fileSystem.writeFileSync(descriptor, token, "utf8");
+    descriptor = fileSystem.openSync(file, 'wx', 0o600);
+    fileSystem.writeFileSync(descriptor, token, 'utf8');
     fileSystem.fsyncSync(descriptor);
     fileSystem.closeSync(descriptor);
     descriptor = undefined;
@@ -239,7 +245,7 @@ async function waitForExit(child, milliseconds) {
       clearTimeout(timer);
       resolve();
     };
-    child.once("exit", finish);
+    child.once('exit', finish);
     const timer = setTimeout(finish, milliseconds);
     timer.unref?.();
   });
@@ -254,7 +260,7 @@ async function terminateChild(child, graceMs) {
   await waitForExit(child, graceMs);
   if (child.exitCode !== null || child.signalCode !== null) return;
   try {
-    child.kill("SIGTERM");
+    child.kill('SIGTERM');
   } catch {}
   // Never SIGKILL the guardian: a wedged cloudflared would outlive it while 8812 is released. A stuck guardian keeps 8812 closed.
   await waitForExit(child, Math.min(graceMs, 500));
@@ -266,8 +272,8 @@ async function verifyHostedEndpoint(
 ) {
   const requestSignal = timeoutSignal(timeoutMs);
   const response = await fetchImpl(`${endpoint}/api/health`, {
-    headers: { accept: "application/json" },
-    redirect: "error",
+    headers: { accept: 'application/json' },
+    redirect: 'error',
     signal: cancellationSignal
       ? AbortSignal.any([requestSignal, cancellationSignal])
       : requestSignal,
@@ -276,7 +282,7 @@ async function verifyHostedEndpoint(
   const text = await response.text();
   if (Buffer.byteLength(text) > 4096) return false;
   try {
-    return JSON.parse(text)?.app === "openmausbot";
+    return JSON.parse(text)?.app === 'openmausbot';
   } catch {
     return false;
   }
@@ -316,7 +322,7 @@ export function createManagedCompanionTunnel({
   let access = null;
   let retryAttempt = 0;
   let retryTimer = null;
-  let state = Object.freeze({ status: "stopped", ready: false, configured: false });
+  let state = Object.freeze({ status: 'stopped', ready: false, configured: false });
   let transition = Promise.resolve();
 
   cleanupStaleManagedCompanionTokens(runtimeRoot, {
@@ -328,7 +334,7 @@ export function createManagedCompanionTunnel({
   const publish = (next) => {
     const published = {
       configured: Boolean(access),
-      ready: next.status === "ready",
+      ready: next.status === 'ready',
       ...next,
     };
     if (access) published.endpoint = access.endpoint;
@@ -343,7 +349,7 @@ export function createManagedCompanionTunnel({
     try {
       fileSystem.unlinkSync(file);
     } catch (error) {
-      if (error?.code !== "ENOENT") log("managed companion connector token cleanup failed");
+      if (error?.code !== 'ENOENT') log('managed companion connector token cleanup failed');
     }
   };
 
@@ -360,7 +366,7 @@ export function createManagedCompanionTunnel({
     if (!desired || ownedGeneration !== generation || retryTimer) return;
     const delay = Math.min(1_000 * 2 ** retryAttempt, maxRetryMs);
     retryAttempt += 1;
-    publish({ status: "retrying", ready: false, error: reason, retryInMs: delay });
+    publish({ status: 'retrying', ready: false, error: reason, retryInMs: delay });
     retryTimer = setTimeout(() => {
       retryTimer = null;
       if (!desired || ownedGeneration !== generation) return;
@@ -380,14 +386,14 @@ export function createManagedCompanionTunnel({
       !validCompanionOriginTarget(originTarget)
     ) {
       publish({
-        status: "unavailable",
+        status: 'unavailable',
         ready: false,
-        error: "The managed companion connector is missing from this build.",
+        error: 'The managed companion connector is missing from this build.',
       });
       return state;
     }
 
-    publish({ status: "starting", ready: false });
+    publish({ status: 'starting', ready: false });
     let attemptHandle = null;
     let attemptTokenFile = null;
     try {
@@ -413,7 +419,7 @@ export function createManagedCompanionTunnel({
           shell: false,
           windowsHide: true,
           // This open pipe is the parent-death signal: the guardian tears down gateway and connector on EOF.
-          stdio: ["pipe", "ignore", "ignore"],
+          stdio: ['pipe', 'ignore', 'ignore'],
         },
       );
       child = spawned;
@@ -446,12 +452,12 @@ export function createManagedCompanionTunnel({
         if (child === spawned) child = null;
         removeTokenFile(attemptTokenFile);
         if (!expectedStop && desired && ownedGeneration === generation) {
-          scheduleRetry("The secure connection stopped unexpectedly.", ownedGeneration);
+          scheduleRetry('The secure connection stopped unexpectedly.', ownedGeneration);
         }
       };
-      spawned.once("exit", onTerminated);
+      spawned.once('exit', onTerminated);
       // A child that fails before spawn emits `error` and `close`, not necessarily `exit`.
-      spawned.once("error", onTerminated);
+      spawned.once('error', onTerminated);
 
       const deadline = Date.now() + verifyTimeoutMs;
       while (desired && ownedGeneration === generation && child === spawned && !terminated) {
@@ -468,7 +474,7 @@ export function createManagedCompanionTunnel({
         if (verified && child === spawned && desired && ownedGeneration === generation) {
           removeTokenFile(attemptTokenFile);
           retryAttempt = 0;
-          publish({ status: "ready", ready: true });
+          publish({ status: 'ready', ready: true });
           return state;
         }
         if (Date.now() >= deadline) break;
@@ -490,7 +496,7 @@ export function createManagedCompanionTunnel({
       }
       removeTokenFile(attemptTokenFile);
       if (desired && ownedGeneration === generation) {
-        scheduleRetry("The secure connection could not be verified.", ownedGeneration);
+        scheduleRetry('The secure connection could not be verified.', ownedGeneration);
       }
       return state;
     } catch {
@@ -499,7 +505,7 @@ export function createManagedCompanionTunnel({
       removeTokenFile(attemptTokenFile);
       if (spawned) await terminateChild(spawned, stopGraceMs);
       if (desired && ownedGeneration === generation) {
-        scheduleRetry("The secure connection could not start.", ownedGeneration);
+        scheduleRetry('The secure connection could not start.', ownedGeneration);
       }
       return state;
     } finally {
@@ -551,9 +557,9 @@ export function createManagedCompanionTunnel({
         removeTokenFile();
         if (!access) {
           return publish({
-            status: "unconfigured",
+            status: 'unconfigured',
             ready: false,
-            error: "Sign in to enable a secure connection from any network.",
+            error: 'Sign in to enable a secure connection from any network.',
           });
         }
         return attempt(generation);
@@ -572,14 +578,12 @@ export function createManagedCompanionTunnel({
       child = null;
       const existingTokenFile = tokenFile;
       removeTokenFile(existingTokenFile);
-      const terminated = existing
-        ? terminateChild(existing, stopGraceMs)
-        : Promise.resolve();
+      const terminated = existing ? terminateChild(existing, stopGraceMs) : Promise.resolve();
 
       return serialize(async () => {
         await terminated;
         if (requestedRevision !== intentRevision) return state;
-        return publish({ status: "stopped", ready: false });
+        return publish({ status: 'stopped', ready: false });
       });
     },
 

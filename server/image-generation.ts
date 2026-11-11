@@ -1,8 +1,15 @@
-import type { ReadableStreamReadResult } from "node:stream/web";
-import { z } from "zod";
+import type { ReadableStreamReadResult } from 'node:stream/web';
+import { z } from 'zod';
 
-import { IMAGE_DEFAULT_MODELS, IMAGE_PROVIDERS, looksLikeApiKey, normalizeImageGenerationUrl, type ImageGenerationConfig, type ImageProvider } from "../shared/image-generation.ts";
-import { decodeGeneratedImage } from "./generated-image.ts";
+import {
+  IMAGE_DEFAULT_MODELS,
+  IMAGE_PROVIDERS,
+  looksLikeApiKey,
+  normalizeImageGenerationUrl,
+  type ImageGenerationConfig,
+  type ImageProvider,
+} from '../shared/image-generation.ts';
+import { decodeGeneratedImage } from './generated-image.ts';
 
 export const IMAGE_GENERATION_TIMEOUT_MS = 120_000;
 const MAX_UPSTREAM_RESPONSE_BYTES = 15 * 1024 * 1024;
@@ -23,7 +30,7 @@ export interface ImageSlot {
   model: string;
 }
 
-export type ImageAspect = "1:1" | "16:9" | "9:16";
+export type ImageAspect = '1:1' | '16:9' | '9:16';
 
 export interface ImageRequest {
   prompt: string;
@@ -33,7 +40,7 @@ export interface ImageRequest {
 
 export interface GeneratedImage {
   bytes: Buffer;
-  mime: "image/png" | "image/jpeg" | "image/webp";
+  mime: 'image/png' | 'image/jpeg' | 'image/webp';
 }
 
 export interface GeneratedSlotImage extends GeneratedImage, ImageSlot {
@@ -42,50 +49,69 @@ export interface GeneratedSlotImage extends GeneratedImage, ImageSlot {
   baseError?: string;
 }
 
-const OPENAI_SIZES: Record<ImageAspect, string> = { "1:1": "1024x1024", "16:9": "1536x1024", "9:16": "1024x1536" };
+const OPENAI_SIZES: Record<ImageAspect, string> = {
+  '1:1': '1024x1024',
+  '16:9': '1536x1024',
+  '9:16': '1024x1536',
+};
 
-const PROVIDERS: Record<ImageProvider, {
-  name: string;
-  missing: string;
-  key: (cfg: ImageCredentials) => string | undefined;
-  url: (cfg: ImageCredentials) => string;
-  body: (request: ImageRequest) => Record<string, unknown>;
-}> = {
+const PROVIDERS: Record<
+  ImageProvider,
+  {
+    name: string;
+    missing: string;
+    key: (cfg: ImageCredentials) => string | undefined;
+    url: (cfg: ImageCredentials) => string;
+    body: (request: ImageRequest) => Record<string, unknown>;
+  }
+> = {
   openai: {
-    name: "OpenAI",
-    missing: "Add an OpenAI image API key first",
+    name: 'OpenAI',
+    missing: 'Add an OpenAI image API key first',
     key: (cfg) => cfg.imageGen?.key,
-    url: () => "https://api.openai.com/v1/images/generations",
-    body: (request) => ({ size: OPENAI_SIZES[request.aspect ?? "1:1"], quality: request.draft ? "low" : "auto", output_format: "webp" }),
+    url: () => 'https://api.openai.com/v1/images/generations',
+    body: (request) => ({
+      size: OPENAI_SIZES[request.aspect ?? '1:1'],
+      quality: request.draft ? 'low' : 'auto',
+      output_format: 'webp',
+    }),
   },
   xai: {
-    name: "xAI",
-    missing: "Add an xAI API key first",
+    name: 'xAI',
+    missing: 'Add an xAI API key first',
     key: (cfg) => cfg.xai?.key,
-    url: () => "https://api.x.ai/v1/images/generations",
-    body: (request) => ({ response_format: "b64_json", aspect_ratio: request.aspect ?? "1:1" }),
+    url: () => 'https://api.x.ai/v1/images/generations',
+    body: (request) => ({ response_format: 'b64_json', aspect_ratio: request.aspect ?? '1:1' }),
   },
   gemini: {
-    name: "Gemini",
-    missing: "Add a Gemini API key first",
+    name: 'Gemini',
+    missing: 'Add a Gemini API key first',
     key: (cfg) => cfg.imageGen?.geminiKey,
     // Google's OpenAI-compatible route; the native API has no stable Images shape.
-    url: () => "https://generativelanguage.googleapis.com/v1beta/openai/images/generations",
-    body: (request) => ({ response_format: "b64_json", size: OPENAI_SIZES[request.aspect ?? "1:1"], n: 1 }),
+    url: () => 'https://generativelanguage.googleapis.com/v1beta/openai/images/generations',
+    body: (request) => ({
+      response_format: 'b64_json',
+      size: OPENAI_SIZES[request.aspect ?? '1:1'],
+      n: 1,
+    }),
   },
   openrouter: {
-    name: "OpenRouter",
-    missing: "Add an OpenRouter API key first",
+    name: 'OpenRouter',
+    missing: 'Add an OpenRouter API key first',
     key: (cfg) => cfg.openrouter?.key,
-    url: () => "https://openrouter.ai/api/v1/images",
-    body: (request) => ({ aspect_ratio: request.aspect ?? "1:1" }),
+    url: () => 'https://openrouter.ai/api/v1/images',
+    body: (request) => ({ aspect_ratio: request.aspect ?? '1:1' }),
   },
   custom: {
-    name: "Custom",
-    missing: "Set a valid custom image API URL and model first",
+    name: 'Custom',
+    missing: 'Set a valid custom image API URL and model first',
     key: (cfg) => cfg.imageGen?.customApiKey,
     url: (cfg) => `${customImageUrl(cfg)}/images/generations`,
-    body: (request) => ({ response_format: "b64_json", size: OPENAI_SIZES[request.aspect ?? "1:1"], n: 1 }),
+    body: (request) => ({
+      response_format: 'b64_json',
+      size: OPENAI_SIZES[request.aspect ?? '1:1'],
+      n: 1,
+    }),
   },
 };
 
@@ -94,10 +120,16 @@ export function imageProviderName(provider: ImageProvider): string {
 }
 
 export function imageProviderKey(cfg: ImageCredentials, provider: ImageProvider): string {
-  return PROVIDERS[provider].key(cfg)?.trim() ?? "";
+  return PROVIDERS[provider].key(cfg)?.trim() ?? '';
 }
 
-const UNREACHED_CODES = new Set(["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH"]);
+const UNREACHED_CODES = new Set([
+  'ECONNREFUSED',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+]);
 /** Answers that refuse before any work: no access, no credit, or rate limited. */
 const NOT_STARTED_STATUSES = new Set([401, 402, 403, 429]);
 
@@ -106,7 +138,11 @@ function fail(message: string, status: number, neverStarted = false): never {
 }
 
 export function shouldUseFallback(error: unknown): boolean {
-  return Boolean(error && typeof error === "object" && (error as { neverStarted?: unknown }).neverStarted === true);
+  return Boolean(
+    error &&
+    typeof error === 'object' &&
+    (error as { neverStarted?: unknown }).neverStarted === true,
+  );
 }
 
 export function customImageUrl(cfg: ImageCredentials): string {
@@ -115,26 +151,37 @@ export function customImageUrl(cfg: ImageCredentials): string {
   } catch {
     // A manually edited invalid URL must not become an outbound request.
   }
-  return "";
+  return '';
 }
 
-export function imageSlots(cfg: ImageCredentials): { primary: ImageSlot; fallback: ImageSlot | null } {
+export function imageSlots(cfg: ImageCredentials): {
+  primary: ImageSlot;
+  fallback: ImageSlot | null;
+} {
   // A key saved as a model before saves were checked is never sent or shown: the slot acts as if no model was typed.
-  const keys = new Set(IMAGE_PROVIDERS.map((provider) => imageProviderKey(cfg, provider)).filter(Boolean));
+  const keys = new Set(
+    IMAGE_PROVIDERS.map((provider) => imageProviderKey(cfg, provider)).filter(Boolean),
+  );
   const usable = (model?: string) => {
-    const id = model?.trim() ?? "";
-    return id && !keys.has(id) && !looksLikeApiKey(id) ? id : "";
+    const id = model?.trim() ?? '';
+    return id && !keys.has(id) && !looksLikeApiKey(id) ? id : '';
   };
   // Custom has no default model, so a Custom slot saved without one uses the last model typed for Custom.
   const resolveSlot = (provider: ImageProvider, model?: string): ImageSlot => ({
     provider,
-    model: usable(model) || (provider === "custom" ? usable(cfg.imageGen?.customModel) : "") || IMAGE_DEFAULT_MODELS[provider],
+    model:
+      usable(model) ||
+      (provider === 'custom' ? usable(cfg.imageGen?.customModel) : '') ||
+      IMAGE_DEFAULT_MODELS[provider],
   });
   const saved = cfg.imageGen?.primary;
-  const primary = saved ? resolveSlot(saved.provider, saved.model) : resolveSlot(cfg.imageGen?.provider ?? "openai");
+  const primary = saved
+    ? resolveSlot(saved.provider, saved.model)
+    : resolveSlot(cfg.imageGen?.provider ?? 'openai');
   const backup = cfg.imageGen?.fallback;
   const fallback = backup ? resolveSlot(backup.provider, backup.model) : null;
-  const same = fallback && fallback.provider === primary.provider && fallback.model === primary.model;
+  const same =
+    fallback && fallback.provider === primary.provider && fallback.model === primary.model;
   return { primary, fallback: same ? null : fallback };
 }
 
@@ -143,24 +190,26 @@ export function primaryImageSlot(cfg: ImageCredentials): ImageSlot {
 }
 
 export function imageSlotConfigured(cfg: ImageCredentials, slot: ImageSlot): boolean {
-  if (slot.provider === "custom") return Boolean(customImageUrl(cfg) && slot.model);
+  if (slot.provider === 'custom') return Boolean(customImageUrl(cfg) && slot.model);
   return Boolean(PROVIDERS[slot.provider].key(cfg)?.trim() && slot.model);
 }
 
 export function imageGenerationReady(cfg: ImageCredentials): boolean {
   const { primary, fallback } = imageSlots(cfg);
-  return imageSlotConfigured(cfg, primary) || Boolean(fallback && imageSlotConfigured(cfg, fallback));
+  return (
+    imageSlotConfigured(cfg, primary) || Boolean(fallback && imageSlotConfigured(cfg, fallback))
+  );
 }
 
 /** The image API returns base64 JSON, so a byte cap on the untrusted body is the real memory boundary. */
 async function boundedResponseText(response: Response): Promise<string> {
-  const advertised = Number(response.headers.get("content-length"));
+  const advertised = Number(response.headers.get('content-length'));
   if (Number.isFinite(advertised) && advertised > MAX_UPSTREAM_RESPONSE_BYTES) {
     await response.body?.cancel().catch(() => {});
-    fail("Generated image exceeded the response limit", 502);
+    fail('Generated image exceeded the response limit', 502);
   }
   const reader = response.body?.getReader();
-  if (!reader) return "";
+  if (!reader) return '';
 
   const decoder = new TextDecoder();
   const chunks: string[] = [];
@@ -171,19 +220,19 @@ async function boundedResponseText(response: Response): Promise<string> {
       try {
         chunk = await reader.read();
       } catch {
-        fail("Could not read the generated image response", 502);
+        fail('Could not read the generated image response', 502);
       }
       const { done, value } = chunk;
       if (done) break;
       received += value.byteLength;
       if (received > MAX_UPSTREAM_RESPONSE_BYTES) {
         await reader.cancel().catch(() => {});
-        fail("Generated image exceeded the response limit", 502);
+        fail('Generated image exceeded the response limit', 502);
       }
       chunks.push(decoder.decode(value, { stream: true }));
     }
     chunks.push(decoder.decode());
-    return chunks.join("");
+    return chunks.join('');
   } finally {
     reader.releaseLock();
   }
@@ -191,7 +240,7 @@ async function boundedResponseText(response: Response): Promise<string> {
 
 function unreached(error: unknown): boolean {
   const code = (error as { cause?: { code?: unknown } } | null)?.cause?.code;
-  return typeof code === "string" && UNREACHED_CODES.has(code);
+  return typeof code === 'string' && UNREACHED_CODES.has(code);
 }
 
 export async function generateImageWith(
@@ -206,7 +255,7 @@ export async function generateImageWith(
   if (!imageSlotConfigured(cfg, slot)) fail(provider.missing, 409, true);
 
   const apiKey = provider.key(cfg)?.trim();
-  const headers: Record<string, string> = { "content-type": "application/json" };
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
   const body = { model: slot.model, prompt: request.prompt, ...provider.body(request) };
 
@@ -215,34 +264,38 @@ export async function generateImageWith(
   let response: Response;
   try {
     response = await fetchImpl(provider.url(cfg), {
-      method: "POST",
+      method: 'POST',
       headers,
       body: JSON.stringify(body),
-      redirect: "error",
+      redirect: 'error',
       signal: cancel ? AbortSignal.any([timeoutSignal, cancel]) : timeoutSignal,
     });
   } catch (error) {
-    if (cancelled()) fail("Image generation was cancelled", 409);
-    const timedOut = timeoutSignal.aborted || (error instanceof Error && error.name === "TimeoutError");
-    if (timedOut) fail("Image generation timed out", 502);
+    if (cancelled()) fail('Image generation was cancelled', 409);
+    const timedOut =
+      timeoutSignal.aborted || (error instanceof Error && error.name === 'TimeoutError');
+    if (timedOut) fail('Image generation timed out', 502);
     fail(`Could not reach ${provider.name} image generation`, 502, unreached(error));
   }
 
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
     // Upstream errors can repeat authorization headers or signed URLs: return only the provider and status, never the body.
-    fail(`${provider.name} image generation failed (HTTP ${response.status}, model ${slot.model})`, response.status === 401 ? 401 : 502,
-      NOT_STARTED_STATUSES.has(response.status));
+    fail(
+      `${provider.name} image generation failed (HTTP ${response.status}, model ${slot.model})`,
+      response.status === 401 ? 401 : 502,
+      NOT_STARTED_STATUSES.has(response.status),
+    );
   }
 
   let text: string;
   try {
     text = await boundedResponseText(response);
   } catch (error) {
-    if (cancelled()) fail("Image generation was cancelled", 409);
+    if (cancelled()) fail('Image generation was cancelled', 409);
     // When the timeout aborts the body after headers, undici may surface TimeoutError or AbortError; the signal decides.
-    if (timeoutSignal.aborted || (error instanceof Error && error.name === "TimeoutError")) {
-      fail("Image generation timed out", 502);
+    if (timeoutSignal.aborted || (error instanceof Error && error.name === 'TimeoutError')) {
+      fail('Image generation timed out', 502);
     }
     throw error;
   }
@@ -265,40 +318,58 @@ export async function generateImageWith(
   }
   try {
     const image = decodeGeneratedImage(encoded);
-    if (image.mime === "image/gif") throw new Error("unsupported image format");
+    if (image.mime === 'image/gif') throw new Error('unsupported image format');
     return { bytes: image.bytes, mime: image.mime };
   } catch {
-    fail(`${provider.name} returned invalid or oversized image data; expected PNG, JPEG, or WebP`, 502);
+    fail(
+      `${provider.name} returned invalid or oversized image data; expected PNG, JPEG, or WebP`,
+      502,
+    );
   }
 }
 
 export async function generateImage(
   cfg: ImageCredentials,
   request: ImageRequest,
-  options: { slot?: "primary" | "fallback"; fetchImpl?: typeof fetch; timeoutMs?: number; signal?: AbortSignal } = {},
+  options: {
+    slot?: 'primary' | 'fallback';
+    fetchImpl?: typeof fetch;
+    timeoutMs?: number;
+    signal?: AbortSignal;
+  } = {},
 ): Promise<GeneratedSlotImage> {
   const { primary, fallback } = imageSlots(cfg);
   const attempt = async (slot: ImageSlot, usedFallback: boolean): Promise<GeneratedSlotImage> => ({
-    ...await generateImageWith(cfg, slot, request, options.fetchImpl, options.timeoutMs, options.signal),
+    ...(await generateImageWith(
+      cfg,
+      slot,
+      request,
+      options.fetchImpl,
+      options.timeoutMs,
+      options.signal,
+    )),
     ...slot,
     usedFallback,
   });
-  if (options.slot === "fallback") {
-    if (!fallback) fail("No backup image provider is set", 409);
+  if (options.slot === 'fallback') {
+    if (!fallback) fail('No backup image provider is set', 409);
     return attempt(fallback, true);
   }
   try {
     return await attempt(primary, false);
   } catch (error) {
-    if (!fallback || options.slot === "primary" || !shouldUseFallback(error)) throw error;
+    if (!fallback || options.slot === 'primary' || !shouldUseFallback(error)) throw error;
     const baseError = error instanceof Error ? error.message : String(error);
     try {
-      return { ...await attempt(fallback, true), baseError };
+      return { ...(await attempt(fallback, true)), baseError };
     } catch (backupError) {
       if (!(backupError instanceof Error)) throw backupError;
-      throw Object.assign(new Error(`${backupError.message}; the base first failed: ${baseError}`), {
-        status: (backupError as { status?: unknown }).status,
-      });
+      throw Object.assign(
+        new Error(`${backupError.message}; the base first failed: ${baseError}`),
+        {
+          status: (backupError as { status?: unknown }).status,
+        },
+      );
     }
   }
 }

@@ -1,20 +1,20 @@
-import type { ServerTextParams } from "./server-text.ts";
+import type { ServerTextParams } from './server-text.ts';
 // The shape of one line in a bot's activity log, shared by the harness reader
 // and the panel that renders it.
 
 export type ActivityOutcome =
   /** the tool finished and reported success */
-  | "ran"
+  | 'ran'
   /** the tool finished and reported failure */
-  | "failed"
+  | 'failed'
   /** started, no completion seen yet */
-  | "running"
+  | 'running'
   /** approved, but no matching tool run was found in the thread's events */
-  | "allowed"
+  | 'allowed'
   /** a person or reviewer said no; nothing ran */
-  | "denied"
+  | 'denied'
   /** a card is open and nobody has answered it */
-  | "waiting";
+  | 'waiting';
 
 export interface ActivityRow {
   /** when it started (a tool) or was asked (a request) */

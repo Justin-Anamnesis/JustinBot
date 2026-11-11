@@ -14,33 +14,33 @@
 // (0.34-1.26 GB) into a new %TEMP%\_MEI... folder, and taskkill /T /F skips PyInstaller's cleanup.
 // The name is `_MEI` + the unpacking PID + a _wtempnam counter; the PID is `%08x` since 6.22.1 and
 // `%d` before (bootloader/src/pyi_utils_win32.c, pyi_create_temporary_application_directory).
-import { createHash, randomUUID } from "node:crypto";
-import type { Dirent } from "node:fs";
-import { lstat, readdir, realpath, rename, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { createHash, randomUUID } from 'node:crypto';
+import type { Dirent } from 'node:fs';
+import { lstat, readdir, realpath, rename, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { basename, dirname, join, resolve } from 'node:path';
 
-import { DATA_DIR } from "../config.ts";
+import { DATA_DIR } from '../config.ts';
 
-const UNPACK_PREFIX = "_MEI";
-const CLAIM_PREFIX = ".omb-removing-";
+const UNPACK_PREFIX = '_MEI';
+const CLAIM_PREFIX = '.omb-removing-';
 /** Other programs use PyInstaller too; without both files a folder is not Antigravity's. */
-const ANTIGRAVITY_MARKERS = ["agy_acp_licenses.txt", "python310.dll"] as const;
+const ANTIGRAVITY_MARKERS = ['agy_acp_licenses.txt', 'python310.dll'] as const;
 /** A folder this recent may still be unpacking, even if its ID looks free. */
 export const SYSTEM_LEFTOVER_MIN_AGE_MS = 10 * 60_000;
 const INSTANCE_FOLDER = /^[0-9a-f]{12}$/u;
 
 export function antigravityTempRoot(dataDir: string = DATA_DIR): string {
-  return join(dataDir, "tmp", "agy");
+  return join(dataDir, 'tmp', 'agy');
 }
 
 /** Stands in for an instance ID for runtime verifications; the space keeps it apart from every instance ID. */
-export const VERIFICATION_TEMP_KEY = "runtime verification";
+export const VERIFICATION_TEMP_KEY = 'runtime verification';
 
 /** Short, because the runtime unpacks files up to 120 characters deep and Windows paths stop at 260;
  * hashed, so IDs differing only in case stay apart on case-insensitive disks. */
 export function antigravityTempDir(dataDir: string, instanceId: string): string {
-  const key = createHash("sha256").update(instanceId).digest("hex").slice(0, 12);
+  const key = createHash('sha256').update(instanceId).digest('hex').slice(0, 12);
   return join(antigravityTempRoot(dataDir), key);
 }
 
@@ -50,10 +50,10 @@ export function setAntigravityTempEnvironment(
   directory: string,
   platform: NodeJS.Platform = process.platform,
 ): void {
-  if (platform !== "win32") return;
+  if (platform !== 'win32') return;
   for (const key of Object.keys(environment)) {
     const upper = key.toUpperCase();
-    if (upper === "TEMP" || upper === "TMP") delete environment[key];
+    if (upper === 'TEMP' || upper === 'TMP') delete environment[key];
   }
   environment.TEMP = directory;
   environment.TMP = directory;
@@ -84,7 +84,7 @@ export function processIsAlive(
     kill(pid, 0);
     return true;
   } catch (error) {
-    return (error as NodeJS.ErrnoException)?.code !== "ESRCH";
+    return (error as NodeJS.ErrnoException)?.code !== 'ESRCH';
   }
 }
 
@@ -95,7 +95,7 @@ export interface AntigravityTempOptions {
 
 export interface LeftoverFolder {
   path: string;
-  where: "app" | "system";
+  where: 'app' | 'system';
   bytes: number;
 }
 
@@ -117,17 +117,17 @@ function ownedByDeadProcess(name: string, isAlive: (pid: number) => boolean): bo
   return pids !== null && !pids.some((pid) => isAlive(pid));
 }
 
-async function entryKind(path: string): Promise<"directory" | "gone" | "other"> {
+async function entryKind(path: string): Promise<'directory' | 'gone' | 'other'> {
   try {
     const info = await lstat(path);
-    return info.isDirectory() && !info.isSymbolicLink() ? "directory" : "other";
+    return info.isDirectory() && !info.isSymbolicLink() ? 'directory' : 'other';
   } catch (error) {
-    return (error as NodeJS.ErrnoException)?.code === "ENOENT" ? "gone" : "other";
+    return (error as NodeJS.ErrnoException)?.code === 'ENOENT' ? 'gone' : 'other';
   }
 }
 
 async function realDirectory(path: string): Promise<boolean> {
-  return (await entryKind(path)) === "directory";
+  return (await entryKind(path)) === 'directory';
 }
 
 async function listDirectory(path: string): Promise<Dirent[]> {
@@ -145,19 +145,22 @@ async function ownedTempDirectories(dataDir: string, only?: string): Promise<str
   try {
     const realData = await realpath(resolve(dataDir));
     realRoot = await realpath(root);
-    if (realRoot !== join(realData, "tmp", "agy")) return [];
+    if (realRoot !== join(realData, 'tmp', 'agy')) return [];
   } catch {
     return [];
   }
-  const names = only === undefined
-    ? (await listDirectory(root)).filter((entry) => entry.isDirectory()).map((entry) => entry.name)
-    : [only];
+  const names =
+    only === undefined
+      ? (await listDirectory(root))
+          .filter((entry) => entry.isDirectory())
+          .map((entry) => entry.name)
+      : [only];
   const owned: string[] = [];
   for (const name of names) {
     if (!INSTANCE_FOLDER.test(name)) continue;
     const directory = join(root, name);
     try {
-      if (await realpath(directory) !== join(realRoot, name)) continue;
+      if ((await realpath(directory)) !== join(realRoot, name)) continue;
     } catch {
       continue;
     }
@@ -166,7 +169,10 @@ async function ownedTempDirectories(dataDir: string, only?: string): Promise<str
   return owned;
 }
 
-async function abandonedIn(directory: string, isAlive: (pid: number) => boolean): Promise<string[]> {
+async function abandonedIn(
+  directory: string,
+  isAlive: (pid: number) => boolean,
+): Promise<string[]> {
   const found: string[] = [];
   for (const entry of await listDirectory(directory)) {
     // Dirent follows lstat: a link or junction is never a directory here.
@@ -212,7 +218,10 @@ async function systemLeftovers(
   return found;
 }
 
-export async function folderBytes(directory: string, deadline = Infinity): Promise<{ bytes: number; complete: boolean }> {
+export async function folderBytes(
+  directory: string,
+  deadline = Infinity,
+): Promise<{ bytes: number; complete: boolean }> {
   let bytes = 0;
   const pending = [directory];
   while (pending.length) {
@@ -222,7 +231,9 @@ export async function folderBytes(directory: string, deadline = Infinity): Promi
       const path = join(current, entry.name);
       if (entry.isDirectory()) pending.push(path);
       else if (entry.isFile()) {
-        try { bytes += (await lstat(path)).size; } catch {}
+        try {
+          bytes += (await lstat(path)).size;
+        } catch {}
       }
     }
   }
@@ -230,17 +241,24 @@ export async function folderBytes(directory: string, deadline = Infinity): Promi
 }
 
 /** On Windows the rename fails while any process has a file inside open, a second check after the PID. */
-async function claimAndRemove(directory: string, countBytes: boolean): Promise<number | "gone" | null> {
+async function claimAndRemove(
+  directory: string,
+  countBytes: boolean,
+): Promise<number | 'gone' | null> {
   const name = basename(directory);
   const kind = await entryKind(directory);
-  if (kind !== "directory") return kind === "gone" ? "gone" : null;
+  if (kind !== 'directory') return kind === 'gone' ? 'gone' : null;
   let claimed = directory;
   if (!name.startsWith(CLAIM_PREFIX)) {
     claimed = join(dirname(directory), `${CLAIM_PREFIX}${name}-${randomUUID().slice(0, 8)}`);
     try {
       await rename(directory, claimed);
     } catch (error) {
-      if ((error as NodeJS.ErrnoException)?.code === "ENOENT" && (await entryKind(directory)) === "gone") return "gone";
+      if (
+        (error as NodeJS.ErrnoException)?.code === 'ENOENT' &&
+        (await entryKind(directory)) === 'gone'
+      )
+        return 'gone';
       return null;
     }
   }
@@ -256,7 +274,10 @@ async function claimAndRemove(directory: string, countBytes: boolean): Promise<n
 const sweeps = new Map<string, Promise<number>>();
 
 /** Touches nothing outside dataDir/tmp/agy/<instance>. */
-export function sweepAntigravityTemp(instanceId: string, options: AntigravityTempOptions = {}): Promise<number> {
+export function sweepAntigravityTemp(
+  instanceId: string,
+  options: AntigravityTempOptions = {},
+): Promise<number> {
   const dataDir = options.dataDir ?? DATA_DIR;
   const key = antigravityTempDir(dataDir, instanceId);
   const running = sweeps.get(key);
@@ -266,7 +287,7 @@ export function sweepAntigravityTemp(instanceId: string, options: AntigravityTem
     let removed = 0;
     for (const directory of await ownedTempDirectories(dataDir, basename(key))) {
       for (const folder of await abandonedIn(directory, isAlive)) {
-        if (typeof await claimAndRemove(folder, false) === "number") removed++;
+        if (typeof (await claimAndRemove(folder, false)) === 'number') removed++;
       }
     }
     return removed;
@@ -275,9 +296,14 @@ export function sweepAntigravityTemp(instanceId: string, options: AntigravityTem
   return sweep;
 }
 
-export function scheduleAntigravityTempSweep(instanceId: string, options: AntigravityTempOptions = {}): void {
+export function scheduleAntigravityTempSweep(
+  instanceId: string,
+  options: AntigravityTempOptions = {},
+): void {
   void sweepAntigravityTemp(instanceId, options).catch((error) => {
-    console.warn(`antigravity: could not clear leftover runtime files: ${error instanceof Error ? error.message : String(error)}`);
+    console.warn(
+      `antigravity: could not clear leftover runtime files: ${error instanceof Error ? error.message : String(error)}`,
+    );
   });
 }
 
@@ -288,25 +314,30 @@ export interface LeftoverOptions extends AntigravityTempOptions {
   budgetMs?: number;
 }
 
-async function leftoverCandidates(options: LeftoverOptions): Promise<Array<{ path: string; where: "app" | "system" }>> {
+async function leftoverCandidates(
+  options: LeftoverOptions,
+): Promise<Array<{ path: string; where: 'app' | 'system' }>> {
   const isAlive = options.isAlive ?? processIsAlive;
-  const candidates: Array<{ path: string; where: "app" | "system" }> = [];
+  const candidates: Array<{ path: string; where: 'app' | 'system' }> = [];
   for (const directory of await ownedTempDirectories(options.dataDir ?? DATA_DIR)) {
-    for (const path of await abandonedIn(directory, isAlive)) candidates.push({ path, where: "app" });
+    for (const path of await abandonedIn(directory, isAlive))
+      candidates.push({ path, where: 'app' });
   }
-  if ((options.platform ?? process.platform) === "win32") {
+  if ((options.platform ?? process.platform) === 'win32') {
     // TEMP itself may legitimately be a junction; what is inside it may not.
     const systemTemp = await realpath(resolve(options.systemTemp ?? tmpdir())).catch(() => null);
-    if (systemTemp && await realDirectory(systemTemp)) {
+    if (systemTemp && (await realDirectory(systemTemp))) {
       for (const path of await systemLeftovers(systemTemp, isAlive, options.now ?? Date.now())) {
-        candidates.push({ path, where: "system" });
+        candidates.push({ path, where: 'system' });
       }
     }
   }
   return candidates;
 }
 
-export async function findAntigravityLeftovers(options: LeftoverOptions = {}): Promise<LeftoverScan> {
+export async function findAntigravityLeftovers(
+  options: LeftoverOptions = {},
+): Promise<LeftoverScan> {
   const deadline = Date.now() + (options.budgetMs ?? 15_000);
   const folders: LeftoverFolder[] = [];
   let complete = true;
@@ -318,7 +349,9 @@ export async function findAntigravityLeftovers(options: LeftoverOptions = {}): P
   return { folders, bytes: folders.reduce((total, folder) => total + folder.bytes, 0), complete };
 }
 
-export async function removeAntigravityLeftovers(options: LeftoverOptions = {}): Promise<LeftoverRemoval> {
+export async function removeAntigravityLeftovers(
+  options: LeftoverOptions = {},
+): Promise<LeftoverRemoval> {
   const deadline = Date.now() + (options.budgetMs ?? 120_000);
   const candidates = await leftoverCandidates(options);
   let removed = 0;
@@ -327,8 +360,8 @@ export async function removeAntigravityLeftovers(options: LeftoverOptions = {}):
   for (const candidate of candidates) {
     if (Date.now() > deadline) break;
     const bytes = await claimAndRemove(candidate.path, true);
-    if (bytes === "gone") alreadyGone++;
-    if (typeof bytes !== "number") continue;
+    if (bytes === 'gone') alreadyGone++;
+    if (typeof bytes !== 'number') continue;
     removed++;
     freedBytes += bytes;
   }

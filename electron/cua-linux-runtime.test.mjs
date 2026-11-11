@@ -1,13 +1,13 @@
-import { EventEmitter } from "node:events";
-import { createRequire } from "node:module";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { EventEmitter } from 'node:events';
+import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const require = createRequire(import.meta.url);
-const { createCuaConnectionStore } = require("./cua-connection.cjs");
-const { validateDriverCandidate } = require("./cua-linux.cjs");
+const { createCuaConnectionStore } = require('./cua-connection.cjs');
+const { validateDriverCandidate } = require('./cua-linux.cjs');
 const {
   cleanupStaleRuntimeDirectories,
   createLinuxCuaPreferenceStore,
@@ -18,21 +18,21 @@ const {
   validateToolSurface,
   validateWaylandHealthReport,
   writePrivateJson,
-} = require("./cua-linux-runtime.cjs");
+} = require('./cua-linux-runtime.cjs');
 
 const temporaryDirectories = [];
 
 function temporaryDirectory() {
-  const base = process.platform === "win32" ? os.tmpdir() : fs.realpathSync("/tmp");
-  const directory = fs.mkdtempSync(path.join(base, "omb-cua-runtime-"));
+  const base = process.platform === 'win32' ? os.tmpdir() : fs.realpathSync('/tmp');
+  const directory = fs.mkdtempSync(path.join(base, 'omb-cua-runtime-'));
   temporaryDirectories.push(directory);
   return directory;
 }
 
 function executable(directory) {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const binary = path.join(directory, "cua-driver");
-  fs.writeFileSync(binary, "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+  const binary = path.join(directory, 'cua-driver');
+  fs.writeFileSync(binary, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
   return binary;
 }
 
@@ -46,18 +46,18 @@ function fakeChild(pid = 4321) {
     end: vi.fn(() => {
       if (child.exitCode !== null) return;
       child.exitCode = 0;
-      queueMicrotask(() => child.emit("exit", 0, null));
+      queueMicrotask(() => child.emit('exit', 0, null));
     }),
   };
   child.kill = vi.fn((signal) => {
     if (child.exitCode !== null) return true;
-    child.exitCode = signal === "SIGKILL" ? 137 : 0;
-    queueMicrotask(() => child.emit("exit", child.exitCode, signal));
+    child.exitCode = signal === 'SIGKILL' ? 137 : 0;
+    queueMicrotask(() => child.emit('exit', child.exitCode, signal));
     return true;
   });
   child.crash = () => {
     child.exitCode = 1;
-    child.emit("exit", 1, null);
+    child.emit('exit', 1, null);
   };
   return child;
 }
@@ -65,16 +65,16 @@ function fakeChild(pid = 4321) {
 function handshake(pid = 4321) {
   return {
     metadata: {
-      driver_version: "0.41.3",
-      contract_version: "0.8.0",
-      tools_list_schema_version: "1",
-      capability_version: "1",
-      mcp_protocol_version: "2025-06-18",
+      driver_version: '0.41.3',
+      contract_version: '0.8.0',
+      tools_list_schema_version: '1',
+      capability_version: '1',
+      mcp_protocol_version: '2025-06-18',
       pid,
       embedded: true,
-      host_bundle_id: "com.openmausbot.app",
+      host_bundle_id: 'com.openmausbot.app',
     },
-    tools: ["click", "get_window_state", "list_apps", "type_text"],
+    tools: ['click', 'get_window_state', 'list_apps', 'type_text'],
   };
 }
 
@@ -83,24 +83,24 @@ function healthyWaylandHealth() {
     ok: true,
     result: {
       structuredContent: {
-        schema_version: "1",
-        platform: "linux",
-        driver_version: "0.41.3",
-        overall: "ok",
+        schema_version: '1',
+        platform: 'linux',
+        driver_version: '0.41.3',
+        overall: 'ok',
         checks: [
-          { name: "binary_version", status: "pass", message: "cua-driver 0.41.3" },
-          { name: "platform_supported", status: "pass", message: "Ubuntu 24.04" },
-          { name: "session_active", status: "pass", message: "MCP session is active." },
-          { name: "ax_capability", status: "pass", message: "AT-SPI is reachable." },
+          { name: 'binary_version', status: 'pass', message: 'cua-driver 0.41.3' },
+          { name: 'platform_supported', status: 'pass', message: 'Ubuntu 24.04' },
+          { name: 'session_active', status: 'pass', message: 'MCP session is active.' },
+          { name: 'ax_capability', status: 'pass', message: 'AT-SPI is reachable.' },
           {
-            name: "screen_capture_capability",
-            status: "pass",
-            message: "Screenshot portal is reachable.",
+            name: 'screen_capture_capability',
+            status: 'pass',
+            message: 'Screenshot portal is reachable.',
           },
           {
-            name: "wayland_backend",
-            status: "pass",
-            message: "Portal/libei and verified target activation are reachable.",
+            name: 'wayland_backend',
+            status: 'pass',
+            message: 'Portal/libei and verified target activation are reachable.',
           },
         ],
       },
@@ -111,15 +111,15 @@ function healthyWaylandHealth() {
 function harness({
   preferenceEnabled = false,
   afterIdentityCaptured,
-  session = "x11",
-  compositor = session === "wayland" ? "gnome-mutter" : undefined,
+  session = 'x11',
+  compositor = session === 'wayland' ? 'gnome-mutter' : undefined,
   inspected = {},
   runtimeOptions = {},
 } = {}) {
   const userData = temporaryDirectory();
-  const runtimeRoot = path.join(userData, "session");
+  const runtimeRoot = path.join(userData, 'session');
   fs.mkdirSync(runtimeRoot, { mode: 0o700 });
-  const binary = executable(path.join(userData, "driver"));
+  const binary = executable(path.join(userData, 'driver'));
   const connectionStore = createCuaConnectionStore({ getUserData: () => userData });
   const preferenceStore = createLinuxCuaPreferenceStore({ getUserData: () => userData });
   if (preferenceEnabled) preferenceStore.write(true);
@@ -128,13 +128,13 @@ function harness({
   const inspect = vi.fn(async () => {
     afterIdentityCaptured?.(binary);
     return {
-      status: "ready",
+      status: 'ready',
       path: binary,
       fileIdentity,
-      source: "environment",
-      driverVersion: "0.41.3",
-      manifestSchema: "1",
-      mcp: { command: binary, args: ["mcp"] },
+      source: 'environment',
+      driverVersion: '0.41.3',
+      manifestSchema: '1',
+      mcp: { command: binary, args: ['mcp'] },
       doctor: { ok: true, probes: [], warnings: [] },
       session,
       ...(compositor ? { compositor } : {}),
@@ -148,28 +148,30 @@ function harness({
     getUserData: () => userData,
     connectionStore,
     preferenceStore,
-    platform: "linux",
+    platform: 'linux',
     env: {
       HOME: userData,
-      PATH: "/usr/bin",
-      DISPLAY: ":0",
+      PATH: '/usr/bin',
+      DISPLAY: ':0',
       XDG_SESSION_TYPE: session,
-      ...(session === "wayland"
+      ...(session === 'wayland'
         ? {
-            WAYLAND_DISPLAY: "wayland-0",
-            XDG_CURRENT_DESKTOP: compositor === "hyprland" ? "Hyprland" : "ubuntu:GNOME",
-            ...(compositor === "hyprland" ? { HYPRLAND_INSTANCE_SIGNATURE: "6f2a0c1e_1762560000_123456789" } : {}),
-            DBUS_SESSION_BUS_ADDRESS: "unix:path=/run/user/1000/bus",
+            WAYLAND_DISPLAY: 'wayland-0',
+            XDG_CURRENT_DESKTOP: compositor === 'hyprland' ? 'Hyprland' : 'ubuntu:GNOME',
+            ...(compositor === 'hyprland'
+              ? { HYPRLAND_INSTANCE_SIGNATURE: '6f2a0c1e_1762560000_123456789' }
+              : {}),
+            DBUS_SESSION_BUS_ADDRESS: 'unix:path=/run/user/1000/bus',
           }
         : {}),
       XDG_RUNTIME_DIR: runtimeRoot,
-      OPENAI_API_KEY: "must-not-leak",
+      OPENAI_API_KEY: 'must-not-leak',
     },
     inspect,
     spawnProcess,
     probe,
     healthCheckIntervalMs: 0,
-    identifier: () => "01234567-89ab-cdef-0123-456789abcdef",
+    identifier: () => '01234567-89ab-cdef-0123-456789abcdef',
     processId: 1234,
     onChange: (connection) => changes.push(connection),
     ...runtimeOptions,
@@ -194,8 +196,8 @@ afterEach(() => {
   }
 });
 
-describe("unavailable Linux CUA runtime", () => {
-  it("fails closed without rejecting any IPC-facing operation", async () => {
+describe('unavailable Linux CUA runtime', () => {
+  it('fails closed without rejecting any IPC-facing operation', async () => {
     const persisted = [];
     const changed = [];
     const runtime = createUnavailableLinuxRuntime({
@@ -204,18 +206,18 @@ describe("unavailable Linux CUA runtime", () => {
       processId: 1234,
     });
 
-    for (const operation of ["initialize", "enable", "retry", "disable", "shutdown"]) {
+    for (const operation of ['initialize', 'enable', 'retry', 'disable', 'shutdown']) {
       await expect(runtime[operation]()).resolves.toMatchObject({
-        mode: "unavailable",
-        status: "unavailable",
-        reasonCode: "bundled-driver-invalid",
+        mode: 'unavailable',
+        status: 'unavailable',
+        reasonCode: 'bundled-driver-invalid',
       });
     }
     expect(runtime.getStatus()).toEqual({
       enabled: false,
-      status: "unavailable",
-      reasonCode: "bundled-driver-invalid",
-      message: "The bundled Cua Driver failed integrity validation.",
+      status: 'unavailable',
+      reasonCode: 'bundled-driver-invalid',
+      message: 'The bundled Cua Driver failed integrity validation.',
       driverPath: undefined,
       driverVersion: undefined,
       driverSource: undefined,
@@ -227,39 +229,39 @@ describe("unavailable Linux CUA runtime", () => {
     expect(changed).toHaveLength(1);
   });
 
-  it("still returns a typed status if persisting the failure is unavailable", () => {
+  it('still returns a typed status if persisting the failure is unavailable', () => {
     const runtime = createUnavailableLinuxRuntime({
       connectionStore: {
         persist() {
-          throw new Error("read-only user data");
+          throw new Error('read-only user data');
         },
       },
     });
     expect(runtime.getStatus()).toMatchObject({
       enabled: false,
-      status: "unavailable",
-      reasonCode: "bundled-driver-invalid",
+      status: 'unavailable',
+      reasonCode: 'bundled-driver-invalid',
     });
   });
 
-  it("clears a durable opt-in when the Wayland safety gate blocks startup", async () => {
+  it('clears a durable opt-in when the Wayland safety gate blocks startup', async () => {
     const preferenceStore = { write: vi.fn() };
     const runtime = createUnavailableLinuxRuntime({
       connectionStore: { persist: (connection) => connection },
       preferenceStore,
       clearPreference: true,
-      reasonCode: "linux-wayland-seat-safety-blocked",
-      message: "Local control is not available on Wayland yet.",
+      reasonCode: 'linux-wayland-seat-safety-blocked',
+      message: 'Local control is not available on Wayland yet.',
     });
 
     await expect(runtime.initialize()).resolves.toMatchObject({
       enabled: false,
-      status: "unavailable",
-      reasonCode: "linux-wayland-seat-safety-blocked",
+      status: 'unavailable',
+      reasonCode: 'linux-wayland-seat-safety-blocked',
     });
     await expect(runtime.enable()).resolves.toMatchObject({
       enabled: false,
-      reasonCode: "linux-wayland-seat-safety-blocked",
+      reasonCode: 'linux-wayland-seat-safety-blocked',
     });
     expect(preferenceStore.write).toHaveBeenCalledOnce();
     expect(preferenceStore.write).toHaveBeenCalledWith(false);
@@ -267,80 +269,78 @@ describe("unavailable Linux CUA runtime", () => {
 });
 
 // Windows lacks the POSIX executable and Unix-socket semantics this exercises; short canonical temp paths keep it portable.
-describe.skipIf(process.platform === "win32")("Linux CUA opt-in and lifecycle", () => {
-  it("cleans only known private runtime files from a dead owner", () => {
+describe.skipIf(process.platform === 'win32')('Linux CUA opt-in and lifecycle', () => {
+  it('cleans only known private runtime files from a dead owner', () => {
     const root = temporaryDirectory();
-    const stale = path.join(root, "99999999-01234567-89a");
-    const suspicious = path.join(root, "99999998-01234567-89a");
+    const stale = path.join(root, '99999999-01234567-89a');
+    const suspicious = path.join(root, '99999998-01234567-89a');
     fs.mkdirSync(stale, { mode: 0o700 });
-    fs.writeFileSync(path.join(stale, "driver.pid"), "99999999\n", { mode: 0o600 });
+    fs.writeFileSync(path.join(stale, 'driver.pid'), '99999999\n', { mode: 0o600 });
     fs.mkdirSync(suspicious, { mode: 0o700 });
-    fs.writeFileSync(path.join(suspicious, "unexpected"), "preserve", { mode: 0o600 });
+    fs.writeFileSync(path.join(suspicious, 'unexpected'), 'preserve', { mode: 0o600 });
 
-    expect(
-      cleanupStaleRuntimeDirectories(root, { isProcessAlive: () => false }),
-    ).toBe(1);
+    expect(cleanupStaleRuntimeDirectories(root, { isProcessAlive: () => false })).toBe(1);
     expect(fs.existsSync(stale)).toBe(false);
-    expect(fs.readFileSync(path.join(suspicious, "unexpected"), "utf8")).toBe("preserve");
+    expect(fs.readFileSync(path.join(suspicious, 'unexpected'), 'utf8')).toBe('preserve');
   });
 
-  it("preserves a certified runtime directory while its owner is alive", () => {
+  it('preserves a certified runtime directory while its owner is alive', () => {
     const root = temporaryDirectory();
-    const live = path.join(root, "1234-01234567-89a");
+    const live = path.join(root, '1234-01234567-89a');
     fs.mkdirSync(live, { mode: 0o700 });
-    fs.writeFileSync(path.join(live, "driver.pid"), "1234\n", { mode: 0o600 });
+    fs.writeFileSync(path.join(live, 'driver.pid'), '1234\n', { mode: 0o600 });
 
     expect(cleanupStaleRuntimeDirectories(root, { isProcessAlive: () => true })).toBe(0);
-    expect(fs.existsSync(path.join(live, "driver.pid"))).toBe(true);
+    expect(fs.existsSync(path.join(live, 'driver.pid'))).toBe(true);
   });
 
-  it("does not inspect or execute a driver before explicit opt-in", async () => {
+  it('does not inspect or execute a driver before explicit opt-in', async () => {
     const context = harness();
     await context.runtime.initialize();
     expect(context.inspect).not.toHaveBeenCalled();
     expect(context.spawnProcess).not.toHaveBeenCalled();
     expect(context.runtime.getStatus()).toMatchObject({
       enabled: false,
-      status: "disabled",
-      reasonCode: "opt-in-required",
+      status: 'disabled',
+      reasonCode: 'opt-in-required',
     });
   });
 
-  it("passes the exact packaged candidate and architecture into inspection", async () => {
-    const bundledDriverPath = "/opt/OpenMausBot/resources/cua-linux-x64/cua-driver";
+  it('passes the exact packaged candidate and architecture into inspection', async () => {
+    const bundledDriverPath = '/opt/OpenMausBot/resources/cua-linux-x64/cua-driver';
     const context = harness({
-      runtimeOptions: { bundledDriverPath, arch: "x64" },
+      runtimeOptions: { bundledDriverPath, arch: 'x64' },
     });
     await context.runtime.enable();
     expect(context.inspect).toHaveBeenCalledWith(
       expect.objectContaining({
-        platform: "linux",
-        arch: "x64",
+        platform: 'linux',
+        arch: 'x64',
         bundledDriverPath,
       }),
     );
   });
 
-  it("publishes a retryable error when driver inspection throws", async () => {
-    const inspectError = Object.assign(new Error("probe failed"), {
-      code: "driver-inspection-failed",
+  it('publishes a retryable error when driver inspection throws', async () => {
+    const inspectError = Object.assign(new Error('probe failed'), {
+      code: 'driver-inspection-failed',
     });
     const context = harness({
       runtimeOptions: { inspect: vi.fn(async () => Promise.reject(inspectError)) },
     });
 
     await expect(context.runtime.enable()).resolves.toMatchObject({
-      status: "error",
-      reasonCode: "driver-inspection-failed",
+      status: 'error',
+      reasonCode: 'driver-inspection-failed',
     });
     expect(context.runtime.getStatus()).toMatchObject({
-      status: "error",
-      reasonCode: "driver-inspection-failed",
+      status: 'error',
+      reasonCode: 'driver-inspection-failed',
     });
     expect(context.spawnProcess).not.toHaveBeenCalled();
   });
 
-  it("coalesces starts, verifies a private daemon, and publishes a strict ready descriptor", async () => {
+  it('coalesces starts, verifies a private daemon, and publishes a strict ready descriptor', async () => {
     const context = harness();
     const [first, second] = await Promise.all([context.runtime.enable(), context.runtime.enable()]);
     expect(first).toEqual(second);
@@ -349,105 +349,105 @@ describe.skipIf(process.platform === "win32")("Linux CUA opt-in and lifecycle", 
     expect(context.spawnProcess).toHaveBeenCalledWith(
       context.binary,
       expect.arrayContaining([
-        "serve",
-        "--embedded",
-        "--no-overlay",
-        "--socket",
-        "--permission-mode",
-        "standard",
+        'serve',
+        '--embedded',
+        '--no-overlay',
+        '--socket',
+        '--permission-mode',
+        'standard',
       ]),
-      expect.objectContaining({ shell: false, stdio: ["pipe", "ignore", "pipe"] }),
+      expect.objectContaining({ shell: false, stdio: ['pipe', 'ignore', 'pipe'] }),
     );
     const daemonArgs = context.spawnProcess.mock.calls[0][1];
-    expect(daemonArgs.filter((argument) => argument === "--no-overlay")).toHaveLength(1);
+    expect(daemonArgs.filter((argument) => argument === '--no-overlay')).toHaveLength(1);
     const spawnOptions = context.spawnProcess.mock.calls[0][2];
     expect(spawnOptions.env).toMatchObject({
-      CUA_DRIVER_EMBEDDED: "1",
-      CUA_DRIVER_PARENT_LIVENESS_STDIN: "1",
-      CUA_DRIVER_HOST_BUNDLE_ID: "com.openmausbot.app",
-      CUA_DRIVER_RS_UPDATE_CHECK: "false",
-      CUA_DRIVER_RS_TELEMETRY_ENABLED: "false",
+      CUA_DRIVER_EMBEDDED: '1',
+      CUA_DRIVER_PARENT_LIVENESS_STDIN: '1',
+      CUA_DRIVER_HOST_BUNDLE_ID: 'com.openmausbot.app',
+      CUA_DRIVER_RS_UPDATE_CHECK: 'false',
+      CUA_DRIVER_RS_TELEMETRY_ENABLED: 'false',
     });
     expect(spawnOptions.env.OPENAI_API_KEY).toBeUndefined();
     expect(context.probe).toHaveBeenCalledWith(expect.stringMatching(/driver\.sock$/), {
       childPid: context.child.pid,
-      session: "x11",
-      driverVersion: "0.41.3",
+      session: 'x11',
+      driverVersion: '0.41.3',
       compositor: undefined,
     });
     expect(context.runtime.getConnection()).toMatchObject({
       schemaVersion: 1,
-      mode: "linux-x11-supervised",
-      platform: "linux",
-      session: "x11",
+      mode: 'linux-x11-supervised',
+      platform: 'linux',
+      session: 'x11',
       enabled: true,
-      status: "ready",
+      status: 'ready',
       ownerPid: 1234,
-      generation: "01234567-89ab-cdef-0123-456789abcdef",
+      generation: '01234567-89ab-cdef-0123-456789abcdef',
       driver: {
         path: context.binary,
-        version: "0.41.3",
-        source: "environment",
-        manifestSchema: "1",
+        version: '0.41.3',
+        source: 'environment',
+        manifestSchema: '1',
         fileIdentity: validateDriverCandidate(context.binary).fileIdentity,
       },
-      daemon: { pid: 4321, contractVersion: "0.8.0" },
+      daemon: { pid: 4321, contractVersion: '0.8.0' },
       mcp: {
         command: context.binary,
-        args: ["mcp", "--embedded", "--socket", expect.stringMatching(/driver\.sock$/)],
+        args: ['mcp', '--embedded', '--socket', expect.stringMatching(/driver\.sock$/)],
         env: {
-          CUA_DRIVER_EMBEDDED: "1",
-          CUA_DRIVER_HOST_BUNDLE_ID: "com.openmausbot.app",
-          CUA_DRIVER_RS_UPDATE_CHECK: "false",
-          CUA_DRIVER_RS_TELEMETRY_ENABLED: "false",
+          CUA_DRIVER_EMBEDDED: '1',
+          CUA_DRIVER_HOST_BUNDLE_ID: 'com.openmausbot.app',
+          CUA_DRIVER_RS_UPDATE_CHECK: 'false',
+          CUA_DRIVER_RS_TELEMETRY_ENABLED: 'false',
         },
       },
     });
-    const descriptor = path.join(context.userData, "cua-connection.json");
+    const descriptor = path.join(context.userData, 'cua-connection.json');
     expect(fs.statSync(descriptor).mode & 0o777).toBe(0o600);
     expect(fs.statSync(context.userData).mode & 0o777).toBe(0o700);
-    expect(JSON.parse(fs.readFileSync(descriptor, "utf8"))).toMatchObject({
+    expect(JSON.parse(fs.readFileSync(descriptor, 'utf8'))).toMatchObject({
       driver: { fileIdentity: validateDriverCandidate(context.binary).fileIdentity },
     });
-    expect(context.runtime.getStatus()).not.toHaveProperty("fileIdentity");
-    expect(context.runtime.getStatus()).not.toHaveProperty("driver.fileIdentity");
+    expect(context.runtime.getStatus()).not.toHaveProperty('fileIdentity');
+    expect(context.runtime.getStatus()).not.toHaveProperty('driver.fileIdentity');
   });
 
-  it("refuses to spawn when the inspected executable identity changes", async () => {
+  it('refuses to spawn when the inspected executable identity changes', async () => {
     const context = harness({
       afterIdentityCaptured(binary) {
-        fs.appendFileSync(binary, "# changed after inspection\n");
+        fs.appendFileSync(binary, '# changed after inspection\n');
       },
     });
     await context.runtime.enable();
     expect(context.spawnProcess).not.toHaveBeenCalled();
     expect(context.probe).not.toHaveBeenCalled();
     expect(context.runtime.getConnection()).toMatchObject({
-      mode: "unavailable",
-      status: "error",
-      reasonCode: "driver-changed",
+      mode: 'unavailable',
+      status: 'error',
+      reasonCode: 'driver-changed',
     });
-    expect(fs.readFileSync(path.join(context.userData, "cua-connection.json"), "utf8")).not.toContain(
-      "fileIdentity",
-    );
+    expect(
+      fs.readFileSync(path.join(context.userData, 'cua-connection.json'), 'utf8'),
+    ).not.toContain('fileIdentity');
   });
 
-  it("invalidates readiness immediately when the owned daemon exits", async () => {
+  it('invalidates readiness immediately when the owned daemon exits', async () => {
     const context = harness();
     await context.runtime.enable();
     context.child.crash();
     expect(context.runtime.getConnection()).toMatchObject({
-      mode: "unavailable",
-      status: "error",
-      reasonCode: "daemon-exited",
-      generation: "01234567-89ab-cdef-0123-456789abcdef",
+      mode: 'unavailable',
+      status: 'error',
+      reasonCode: 'daemon-exited',
+      generation: '01234567-89ab-cdef-0123-456789abcdef',
     });
     expect(
-      JSON.parse(fs.readFileSync(path.join(context.userData, "cua-connection.json"), "utf8")),
-    ).toMatchObject({ mode: "unavailable", reasonCode: "daemon-exited" });
+      JSON.parse(fs.readFileSync(path.join(context.userData, 'cua-connection.json'), 'utf8')),
+    ).toMatchObject({ mode: 'unavailable', reasonCode: 'daemon-exited' });
   });
 
-  it("closes the parent-liveness pipe on shutdown without clearing durable opt-in", async () => {
+  it('closes the parent-liveness pipe on shutdown without clearing durable opt-in', async () => {
     const context = harness();
     await context.runtime.enable();
     await context.runtime.shutdown();
@@ -455,24 +455,24 @@ describe.skipIf(process.platform === "win32")("Linux CUA opt-in and lifecycle", 
     expect(context.child.kill).not.toHaveBeenCalled();
     expect(context.preferenceStore.read()).toBe(true);
     expect(context.runtime.getConnection()).toMatchObject({
-      mode: "unavailable",
-      status: "stopped",
-      reasonCode: "app-stopped",
+      mode: 'unavailable',
+      status: 'stopped',
+      reasonCode: 'app-stopped',
     });
   });
 
-  it("does not wait again for a child that was already reaped by a signal", async () => {
+  it('does not wait again for a child that was already reaped by a signal', async () => {
     const context = harness();
     await context.runtime.enable();
-    context.child.signalCode = "SIGTERM";
+    context.child.signalCode = 'SIGTERM';
     context.child.stdin.end = vi.fn();
     vi.useFakeTimers();
     try {
       const shutdown = context.runtime.shutdown();
       await vi.advanceTimersByTimeAsync(0);
       await expect(shutdown).resolves.toMatchObject({
-        status: "stopped",
-        reasonCode: "app-stopped",
+        status: 'stopped',
+        reasonCode: 'app-stopped',
       });
       expect(context.child.kill).not.toHaveBeenCalled();
     } finally {
@@ -480,7 +480,7 @@ describe.skipIf(process.platform === "win32")("Linux CUA opt-in and lifecycle", 
     }
   });
 
-  it("serializes an in-flight start before retrying with a fresh runtime", async () => {
+  it('serializes an in-flight start before retrying with a fresh runtime', async () => {
     let releaseFirstProbe;
     const firstProbeGate = new Promise((resolve) => {
       releaseFirstProbe = resolve;
@@ -502,40 +502,40 @@ describe.skipIf(process.platform === "win32")("Linux CUA opt-in and lifecycle", 
     const retry = context.runtime.retry();
     releaseFirstProbe();
 
-    await expect(firstStart).resolves.toMatchObject({ status: "ready" });
-    await expect(retry).resolves.toMatchObject({ status: "ready", daemon: { pid: 4322 } });
+    await expect(firstStart).resolves.toMatchObject({ status: 'ready' });
+    await expect(retry).resolves.toMatchObject({ status: 'ready', daemon: { pid: 4322 } });
     expect(spawnProcess).toHaveBeenCalledTimes(2);
     expect(firstChild.exitCode !== null || firstChild.signalCode !== null).toBe(true);
   });
 
-  it("starts on launch only after a durable prior opt-in and supports explicit disable", async () => {
+  it('starts on launch only after a durable prior opt-in and supports explicit disable', async () => {
     const context = harness({ preferenceEnabled: true });
     await context.runtime.initialize();
-    expect(context.runtime.getConnection().mode).toBe("linux-x11-supervised");
+    expect(context.runtime.getConnection().mode).toBe('linux-x11-supervised');
     await context.runtime.disable();
     expect(context.preferenceStore.read()).toBe(false);
-    expect(context.runtime.getStatus()).toMatchObject({ enabled: false, status: "disabled" });
+    expect(context.runtime.getStatus()).toMatchObject({ enabled: false, status: 'disabled' });
   });
 
-  it("publishes the distinct GNOME Wayland contract and propagates the opt-in environment", async () => {
-    const context = harness({ session: "wayland" });
+  it('publishes the distinct GNOME Wayland contract and propagates the opt-in environment', async () => {
+    const context = harness({ session: 'wayland' });
     await context.runtime.enable();
     expect(context.probe).toHaveBeenCalledWith(expect.stringMatching(/driver\.sock$/), {
       childPid: context.child.pid,
-      session: "wayland",
-      driverVersion: "0.41.3",
-      compositor: "gnome-mutter",
+      session: 'wayland',
+      driverVersion: '0.41.3',
+      compositor: 'gnome-mutter',
     });
-    expect(context.spawnProcess.mock.calls[0][2].env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe("1");
+    expect(context.spawnProcess.mock.calls[0][2].env.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe('1');
     expect(context.runtime.getConnection()).toMatchObject({
-      mode: "linux-wayland-gnome-supervised",
-      session: "wayland",
-      compositor: "gnome-mutter",
+      mode: 'linux-wayland-gnome-supervised',
+      session: 'wayland',
+      compositor: 'gnome-mutter',
       mcp: {
         env: {
-          CUA_DRIVER_RS_ENABLE_WAYLAND: "1",
-          CUA_DRIVER_RS_TELEMETRY_ENABLED: "false",
-          CUA_DRIVER_RS_UPDATE_CHECK: "false",
+          CUA_DRIVER_RS_ENABLE_WAYLAND: '1',
+          CUA_DRIVER_RS_TELEMETRY_ENABLED: 'false',
+          CUA_DRIVER_RS_UPDATE_CHECK: 'false',
         },
       },
     });
@@ -543,62 +543,66 @@ describe.skipIf(process.platform === "win32")("Linux CUA opt-in and lifecycle", 
 
   it("publishes the Omarchy contract for Omarchy's package-owned driver and checks the daemon against that version", async () => {
     const context = harness({
-      session: "wayland",
-      compositor: "hyprland",
-      inspected: { source: "system-package", driverVersion: "0.41.5", packageVersion: "0.41.5-1" },
+      session: 'wayland',
+      compositor: 'hyprland',
+      inspected: { source: 'system-package', driverVersion: '0.41.5', packageVersion: '0.41.5-1' },
     });
     context.probe.mockImplementation(async () => {
       const ready = handshake(context.child.pid);
-      return { ...ready, metadata: { ...ready.metadata, driver_version: "0.41.5" } };
+      return { ...ready, metadata: { ...ready.metadata, driver_version: '0.41.5' } };
     });
     await context.runtime.enable();
     expect(context.probe).toHaveBeenCalledWith(expect.stringMatching(/driver\.sock$/), {
       childPid: context.child.pid,
-      session: "wayland",
-      driverVersion: "0.41.5",
-      compositor: "hyprland",
+      session: 'wayland',
+      driverVersion: '0.41.5',
+      compositor: 'hyprland',
     });
     const spawnEnv = context.spawnProcess.mock.calls[0][2].env;
-    expect(spawnEnv.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe("1");
-    expect(spawnEnv.HYPRLAND_INSTANCE_SIGNATURE).toBe("6f2a0c1e_1762560000_123456789");
+    expect(spawnEnv.CUA_DRIVER_RS_ENABLE_WAYLAND).toBe('1');
+    expect(spawnEnv.HYPRLAND_INSTANCE_SIGNATURE).toBe('6f2a0c1e_1762560000_123456789');
     expect(context.runtime.getConnection()).toMatchObject({
-      mode: "linux-wayland-hyprland-supervised",
-      session: "wayland",
-      compositor: "hyprland",
-      driver: { source: "system-package", version: "0.41.5" },
-      mcp: { env: { CUA_DRIVER_RS_ENABLE_WAYLAND: "1" } },
+      mode: 'linux-wayland-hyprland-supervised',
+      session: 'wayland',
+      compositor: 'hyprland',
+      driver: { source: 'system-package', version: '0.41.5' },
+      mcp: { env: { CUA_DRIVER_RS_ENABLE_WAYLAND: '1' } },
     });
-    expect(context.runtime.getStatus()).toMatchObject({ status: "ready", compositor: "hyprland", driverSource: "system-package" });
+    expect(context.runtime.getStatus()).toMatchObject({
+      status: 'ready',
+      compositor: 'hyprland',
+      driverSource: 'system-package',
+    });
   });
 
-  it("keeps the Omarchy plugin guidance when the plugin is off at start", async () => {
-    const context = harness({ session: "wayland", compositor: "hyprland" });
+  it('keeps the Omarchy plugin guidance when the plugin is off at start', async () => {
+    const context = harness({ session: 'wayland', compositor: 'hyprland' });
     context.inspect.mockImplementation(async () => ({
-      status: "unavailable",
-      reasonCode: "linux-hyprland-plugin-required",
-      message: "Turn the plugin on.",
-      compositor: "hyprland",
+      status: 'unavailable',
+      reasonCode: 'linux-hyprland-plugin-required',
+      message: 'Turn the plugin on.',
+      compositor: 'hyprland',
     }));
     await context.runtime.enable();
     expect(context.spawnProcess).not.toHaveBeenCalled();
     expect(context.runtime.getStatus()).toMatchObject({
-      status: "error",
-      reasonCode: "linux-hyprland-plugin-required",
-      compositor: "hyprland",
+      status: 'error',
+      reasonCode: 'linux-hyprland-plugin-required',
+      compositor: 'hyprland',
     });
   });
 
-  it("revokes Wayland readiness when a prompt-free health recheck fails", async () => {
+  it('revokes Wayland readiness when a prompt-free health recheck fails', async () => {
     let healthTick = null;
     const timer = { unref: vi.fn() };
     const clearRecurring = vi.fn();
     const context = harness({
-      session: "wayland",
+      session: 'wayland',
       runtimeOptions: {
         healthCheckIntervalMs: 30_000,
         healthProbe: vi.fn(async () => {
-          throw Object.assign(new Error("The Cua WinRects helper is no longer active."), {
-            code: "wayland-helper-required",
+          throw Object.assign(new Error('The Cua WinRects helper is no longer active.'), {
+            code: 'wayland-helper-required',
           });
         }),
         setRecurring: vi.fn((callback) => {
@@ -609,13 +613,13 @@ describe.skipIf(process.platform === "win32")("Linux CUA opt-in and lifecycle", 
       },
     });
     await context.runtime.enable();
-    expect(context.runtime.getConnection().status).toBe("ready");
+    expect(context.runtime.getConnection().status).toBe('ready');
     healthTick();
     await vi.waitFor(() => {
       expect(context.runtime.getConnection()).toMatchObject({
-        mode: "unavailable",
-        status: "error",
-        reasonCode: "wayland-helper-required",
+        mode: 'unavailable',
+        status: 'error',
+        reasonCode: 'wayland-helper-required',
       });
     });
     expect(clearRecurring).toHaveBeenCalledWith(timer);
@@ -624,15 +628,15 @@ describe.skipIf(process.platform === "win32")("Linux CUA opt-in and lifecycle", 
 });
 
 // POSIX modes and symlink guarantees are available on Linux and macOS.
-describe.skipIf(process.platform === "win32")("Linux CUA private data", () => {
-  it("uses strict preference schema and private atomic files", () => {
+describe.skipIf(process.platform === 'win32')('Linux CUA private data', () => {
+  it('uses strict preference schema and private atomic files', () => {
     const userData = temporaryDirectory();
     const store = createLinuxCuaPreferenceStore({ getUserData: () => userData });
     store.write(true);
-    const file = path.join(userData, "cua-local-control.json");
+    const file = path.join(userData, 'cua-local-control.json');
     expect(store.read()).toBe(true);
     expect(fs.statSync(file).mode & 0o777).toBe(0o600);
-    expect(JSON.parse(fs.readFileSync(file, "utf8"))).toEqual({
+    expect(JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({
       schemaVersion: 2,
       linuxLocalControlEnabled: true,
     });
@@ -640,87 +644,106 @@ describe.skipIf(process.platform === "win32")("Linux CUA private data", () => {
       mode: 0o600,
     });
     expect(store.read()).toBe(false);
-    fs.writeFileSync(file, JSON.stringify({ schemaVersion: 2, linuxLocalControlEnabled: true, extra: true }), {
-      mode: 0o600,
-    });
+    fs.writeFileSync(
+      file,
+      JSON.stringify({ schemaVersion: 2, linuxLocalControlEnabled: true, extra: true }),
+      {
+        mode: 0o600,
+      },
+    );
     expect(store.read()).toBe(false);
   });
 
-  it("does not follow a symlink when creating private state", () => {
+  it('does not follow a symlink when creating private state', () => {
     const root = temporaryDirectory();
-    const target = path.join(root, "target.json");
-    const link = path.join(root, "state.json");
-    fs.writeFileSync(target, "untouched", { mode: 0o600 });
+    const target = path.join(root, 'target.json');
+    const link = path.join(root, 'state.json');
+    fs.writeFileSync(target, 'untouched', { mode: 0o600 });
     fs.symlinkSync(target, link);
     writePrivateJson(link, { ok: true });
-    expect(fs.readFileSync(target, "utf8")).toBe("untouched");
-    expect(JSON.parse(fs.readFileSync(link, "utf8"))).toEqual({ ok: true });
+    expect(fs.readFileSync(target, 'utf8')).toBe('untouched');
+    expect(JSON.parse(fs.readFileSync(link, 'utf8'))).toEqual({ ok: true });
   });
 });
 
-describe("Linux CUA handshake validation", () => {
-  it("pins metadata to the certified child and contract", () => {
+describe('Linux CUA handshake validation', () => {
+  it('pins metadata to the certified child and contract', () => {
     const valid = { ok: true, result: handshake(99).metadata };
     expect(validateDaemonMetadata(valid, { childPid: 99 })).toEqual(valid.result);
     expect(() => validateDaemonMetadata(valid, { childPid: 100 })).toThrow(/PID/);
     expect(() =>
-      validateDaemonMetadata({ ok: true, result: { ...valid.result, contract_version: "9" } }),
+      validateDaemonMetadata({ ok: true, result: { ...valid.result, contract_version: '9' } }),
     ).toThrow(/contract_version/);
   });
 
   it("checks a package-owned driver's daemon against the version that was inspected, not the bundled one", () => {
-    const newer = { ok: true, result: { ...handshake(99).metadata, driver_version: "0.41.5" } };
-    expect(validateDaemonMetadata(newer, { childPid: 99, driverVersion: "0.41.5" })).toEqual(newer.result);
+    const newer = { ok: true, result: { ...handshake(99).metadata, driver_version: '0.41.5' } };
+    expect(validateDaemonMetadata(newer, { childPid: 99, driverVersion: '0.41.5' })).toEqual(
+      newer.result,
+    );
     expect(() => validateDaemonMetadata(newer, { childPid: 99 })).toThrow(/driver_version/);
     const health = healthyWaylandHealth();
-    health.result.structuredContent.driver_version = "0.41.5";
-    expect(validateWaylandHealthReport(health, { driverVersion: "0.41.5", compositor: "hyprland" }).overall).toBe("ok");
+    health.result.structuredContent.driver_version = '0.41.5';
+    expect(
+      validateWaylandHealthReport(health, { driverVersion: '0.41.5', compositor: 'hyprland' })
+        .overall,
+    ).toBe('ok');
     expect(() => validateWaylandHealthReport(health)).toThrow(/invalid Wayland health report/);
   });
 
-  it("names Hyprland, not GNOME, when the Omarchy backend fails its health check", () => {
+  it('names Hyprland, not GNOME, when the Omarchy backend fails its health check', () => {
     const unhealthy = healthyWaylandHealth();
-    unhealthy.result.structuredContent.overall = "failed";
-    const backend = unhealthy.result.structuredContent.checks.find((entry) => entry.name === "wayland_backend");
-    Object.assign(backend, { status: "fail", message: "No virtual pointer.", hint: "Use a wlroots compositor." });
-    expect(() => validateWaylandHealthReport(unhealthy, { compositor: "hyprland" })).toThrow(/Hyprland control backend.*cua-hyprland-plugin/);
+    unhealthy.result.structuredContent.overall = 'failed';
+    const backend = unhealthy.result.structuredContent.checks.find(
+      (entry) => entry.name === 'wayland_backend',
+    );
+    Object.assign(backend, {
+      status: 'fail',
+      message: 'No virtual pointer.',
+      hint: 'Use a wlroots compositor.',
+    });
+    expect(() => validateWaylandHealthReport(unhealthy, { compositor: 'hyprland' })).toThrow(
+      /Hyprland control backend.*cua-hyprland-plugin/,
+    );
     expect(() => validateWaylandHealthReport(unhealthy)).toThrow(/GNOME/);
   });
 
-  it("requires the inspect and mutation tool surface", () => {
+  it('requires the inspect and mutation tool surface', () => {
     const tools = handshake().tools.map((name) => ({ name }));
-    const manifest = { schema_version: "1", capability_version: "1", tools };
-    expect(validateToolSurface({ ok: true, result: manifest })).toEqual([...handshake().tools].sort());
+    const manifest = { schema_version: '1', capability_version: '1', tools };
+    expect(validateToolSurface({ ok: true, result: manifest })).toEqual(
+      [...handshake().tools].sort(),
+    );
     expect(() =>
       validateToolSurface({
         ok: true,
         result: {
           ...manifest,
-          tools: tools.filter((tool) => tool.name !== "type_text"),
+          tools: tools.filter((tool) => tool.name !== 'type_text'),
         },
       }),
     ).toThrow(/type_text/);
     expect(() =>
-      validateToolSurface({ ok: true, result: { ...manifest, capability_version: "2" } }),
+      validateToolSurface({ ok: true, result: { ...manifest, capability_version: '2' } }),
     ).toThrow(/could not be verified/);
   });
 
-  it("accepts only a healthy certified Wayland report", () => {
+  it('accepts only a healthy certified Wayland report', () => {
     expect(validateWaylandHealthReport(healthyWaylandHealth())).toEqual({
-      schemaVersion: "1",
-      overall: "ok",
-      requiredChecks: ["ax_capability", "screen_capture_capability", "wayland_backend"],
+      schemaVersion: '1',
+      overall: 'ok',
+      requiredChecks: ['ax_capability', 'screen_capture_capability', 'wayland_backend'],
     });
     const unhealthy = healthyWaylandHealth();
     const check = unhealthy.result.structuredContent.checks.find(
-      (entry) => entry.name === "wayland_backend",
+      (entry) => entry.name === 'wayland_backend',
     );
-    check.status = "fail";
-    check.message = "The compositor has no verified target-activation adapter.";
-    check.hint = "Install and enable the bundled WinRects Shell helper.";
-    unhealthy.result.structuredContent.overall = "degraded";
+    check.status = 'fail';
+    check.message = 'The compositor has no verified target-activation adapter.';
+    check.hint = 'Install and enable the bundled WinRects Shell helper.';
+    unhealthy.result.structuredContent.overall = 'degraded';
     expect(() => validateWaylandHealthReport(unhealthy)).toThrowError(
-      expect.objectContaining({ code: "wayland-helper-required" }),
+      expect.objectContaining({ code: 'wayland-helper-required' }),
     );
     expect(() =>
       validateWaylandHealthReport({
@@ -728,24 +751,24 @@ describe("Linux CUA handshake validation", () => {
         result: {
           structuredContent: {
             ...healthyWaylandHealth().result.structuredContent,
-            schema_version: "2",
+            schema_version: '2',
           },
         },
       }),
-    ).toThrowError(expect.objectContaining({ code: "invalid-health-report" }));
+    ).toThrowError(expect.objectContaining({ code: 'invalid-health-report' }));
   });
 
-  it("calls health_report during the private daemon handshake only on Wayland", async () => {
+  it('calls health_report during the private daemon handshake only on Wayland', async () => {
     const calls = [];
     const request = vi.fn(async (_socket, payload) => {
       calls.push(payload);
-      if (payload.method === "metadata") return { ok: true, result: handshake(99).metadata };
-      if (payload.method === "list") {
+      if (payload.method === 'metadata') return { ok: true, result: handshake(99).metadata };
+      if (payload.method === 'list') {
         return {
           ok: true,
           result: {
-            schema_version: "1",
-            capability_version: "1",
+            schema_version: '1',
+            capability_version: '1',
             tools: handshake().tools.map((name) => ({ name })),
           },
         };
@@ -754,13 +777,13 @@ describe("Linux CUA handshake validation", () => {
     });
 
     await expect(
-      probePrivateDaemon("/tmp/cua.sock", {
+      probePrivateDaemon('/tmp/cua.sock', {
         childPid: 99,
-        session: "wayland",
+        session: 'wayland',
         request,
         timeoutMs: 100,
       }),
-    ).resolves.toMatchObject({ health: { overall: "ok" } });
-    expect(calls.at(-1)).toEqual({ method: "call", name: "health_report", args: {} });
+    ).resolves.toMatchObject({ health: { overall: 'ok' } });
+    expect(calls.at(-1)).toEqual({ method: 'call', name: 'health_report', args: {} });
   });
 });

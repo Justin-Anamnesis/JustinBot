@@ -4,7 +4,8 @@ interface ThreadOwner {
   tasks?: Array<{ threadId: string }>;
 }
 
-const ownsThread = (owner: ThreadOwner, threadId: string) => owner.threadId === threadId || (owner.tasks ?? []).some((task) => task.threadId === threadId);
+const ownsThread = (owner: ThreadOwner, threadId: string) =>
+  owner.threadId === threadId || (owner.tasks ?? []).some((task) => task.threadId === threadId);
 
 /** The ids on a card are written by a bot: act only on a bot or room the viewer has, and never on a thread that is another's. */
 export function resolvedThreadTarget(
@@ -15,9 +16,9 @@ export function resolvedThreadTarget(
   const owns = (owner: ThreadOwner) => ownsThread(owner, target.threadId);
   const bots = state.bots.filter(owns);
   const groups = state.groups.filter(owns);
-  if ("groupId" in target) {
+  if ('groupId' in target) {
     const only = groups.length === 1 && groups[0]!.id === target.groupId && bots.length === 0;
-    return only ? { botId: "", threadId: target.threadId } : undefined;
+    return only ? { botId: '', threadId: target.threadId } : undefined;
   }
   if (!state.bots.some((bot) => bot.id === target.botId)) return undefined;
   const unowned = bots.length === 0 && groups.length === 0;
@@ -30,5 +31,7 @@ export function existingThreadTarget(
   state: { bots: ThreadOwner[]; groups: ThreadOwner[] },
 ): { botId: string; threadId: string } | undefined {
   const resolved = resolvedThreadTarget(target ?? undefined, state);
-  return resolved && state.bots.some((bot) => ownsThread(bot, resolved.threadId)) ? resolved : undefined;
+  return resolved && state.bots.some((bot) => ownsThread(bot, resolved.threadId))
+    ? resolved
+    : undefined;
 }

@@ -5,8 +5,9 @@
  * payload is bot-authored: validated rather than cast, and capped.
  */
 
-export const ASK_USER_QUESTION_TOOL = "AskUserQuestion";
-export const QUESTION_DISMISS_MESSAGE = "The user closed this question without answering. Use your best judgment and continue.";
+export const ASK_USER_QUESTION_TOOL = 'AskUserQuestion';
+export const QUESTION_DISMISS_MESSAGE =
+  'The user closed this question without answering. Use your best judgment and continue.';
 
 /** Claude Code's own limits are 1-4 questions and 2-4 options; these leave
  * room for a provider that widens them. */
@@ -38,45 +39,57 @@ export interface QuestionRequestCardData {
   questions: AskQuestion[];
   /** "tool" (or absent): a real tool call; "output": a block parsed from
    * model-authored output. Only drives the agent-composed badge. */
-  origin?: "tool" | "output";
+  origin?: 'tool' | 'output';
 }
 
 /** Excludes the other durable proposal card kinds that share requestId. */
-export function isPersistentQuestionCard(card?: {
-  requestType?: "permission" | "question";
-  questionRequest?: unknown;
-  tool?: string;
-  routineRequest?: unknown;
-  skillRequest?: unknown;
-  profileRequest?: unknown;
-  modelRequest?: unknown;
-  teamSetupRequest?: unknown;
-} | null): boolean {
-  return Boolean(card && (
-    card.requestType === "question" || card.questionRequest ||
-    (!card.requestType && !card.tool && !card.routineRequest && !card.skillRequest && !card.profileRequest &&
-      !card.modelRequest && !card.teamSetupRequest)
-  ));
+export function isPersistentQuestionCard(
+  card?: {
+    requestType?: 'permission' | 'question';
+    questionRequest?: unknown;
+    tool?: string;
+    routineRequest?: unknown;
+    skillRequest?: unknown;
+    profileRequest?: unknown;
+    modelRequest?: unknown;
+    teamSetupRequest?: unknown;
+  } | null,
+): boolean {
+  return Boolean(
+    card &&
+    (card.requestType === 'question' ||
+      card.questionRequest ||
+      (!card.requestType &&
+        !card.tool &&
+        !card.routineRequest &&
+        !card.skillRequest &&
+        !card.profileRequest &&
+        !card.modelRequest &&
+        !card.teamSetupRequest)),
+  );
 }
 
 /** System/provider completion ends the live run, not the human's question. */
-export function shouldSettleRequestCard(card: Parameters<typeof isPersistentQuestionCard>[0], source: "user" | "auto" | "timeout" | "system" | "unavailable" | "peer"): boolean {
-  return !isPersistentQuestionCard(card) || source === "user";
+export function shouldSettleRequestCard(
+  card: Parameters<typeof isPersistentQuestionCard>[0],
+  source: 'user' | 'auto' | 'timeout' | 'system' | 'unavailable' | 'peer',
+): boolean {
+  return !isPersistentQuestionCard(card) || source === 'user';
 }
 
 function text(value: unknown, limit: number): string | undefined {
-  if (typeof value !== "string") return undefined;
+  if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, limit).trim() : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function parseOption(value: unknown): AskQuestionOption | null {
   // Not the documented shape, but accepted.
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     const label = text(value, MAX_LABEL);
     return label ? { label } : null;
   }
@@ -131,16 +144,18 @@ export function parseAskQuestions(input: unknown): AskQuestion[] | null {
 export function parseAsyncQuestions(entries: unknown): AskQuestion[] | null {
   if (!Array.isArray(entries)) return null;
   const questions = parseAskQuestions({
-    questions: entries.map((entry) => (isRecord(entry) ? { question: entry.title, options: entry.options } : null)),
+    questions: entries.map((entry) =>
+      isRecord(entry) ? { question: entry.title, options: entry.options } : null,
+    ),
   });
   return questions?.some((question) => question.options.length > 0) ? questions : null;
 }
 
 /** The one line the card subtitle and a spoken prompt show. */
 export function askQuestionSummary(questions: readonly AskQuestion[]): string {
-  const first = questions[0]?.question ?? "";
+  const first = questions[0]?.question ?? '';
   const rest = questions.length - 1;
-  return rest > 0 ? `${first} (+${rest} more question${rest > 1 ? "s" : ""})` : first;
+  return rest > 0 ? `${first} (+${rest} more question${rest > 1 ? 's' : ''})` : first;
 }
 
 /** The tool advertises "2-5 suggested answers". */
@@ -156,7 +171,12 @@ export function parseChoices(input: unknown, limit = MAX_CHOICES): string[] | un
   const choices: string[] = [];
   const seen = new Set<string>();
   for (const raw of input) {
-    const label = typeof raw === "string" ? text(raw, MAX_LABEL) : isRecord(raw) ? text(raw.label, MAX_LABEL) : undefined;
+    const label =
+      typeof raw === 'string'
+        ? text(raw, MAX_LABEL)
+        : isRecord(raw)
+          ? text(raw.label, MAX_LABEL)
+          : undefined;
     if (!label || seen.has(label)) continue;
     seen.add(label);
     choices.push(label);
@@ -176,50 +196,53 @@ export function questionChoices(questions: readonly AskQuestion[]): string[] | u
 
 /** The chat runtime's ask tool. Named ask_user so the ASKS_A_PERSON backstop
  * covers it: no auto mode may answer a question. */
-export const ASK_USER_TOOL = "ask_user";
+export const ASK_USER_TOOL = 'ask_user';
 
 /** Shaped for an OpenAI function-calling tool list. The parser enforces the caps
  * again: a model-authored argument is not a guarantee it followed the schema. */
 export const ASK_USER_TOOL_DEFINITION = {
-  type: "function",
+  type: 'function',
   function: {
     name: ASK_USER_TOOL,
     description:
-      "Ask the person questions when the decision is theirs. Offer concrete options where they exist; they can always answer in their own words. Ask up to six questions in one call rather than one at a time.",
+      'Ask the person questions when the decision is theirs. Offer concrete options where they exist; they can always answer in their own words. Ask up to six questions in one call rather than one at a time.',
     parameters: {
-      type: "object",
+      type: 'object',
       properties: {
         questions: {
-          type: "array",
+          type: 'array',
           minItems: 1,
           maxItems: MAX_QUESTIONS,
           items: {
-            type: "object",
+            type: 'object',
             properties: {
-              question: { type: "string", description: "The question to show the person." },
-              header: { type: "string", description: "A short label for the question's tab." },
-              multiSelect: { type: "boolean", description: "Whether several options may be picked." },
+              question: { type: 'string', description: 'The question to show the person.' },
+              header: { type: 'string', description: "A short label for the question's tab." },
+              multiSelect: {
+                type: 'boolean',
+                description: 'Whether several options may be picked.',
+              },
               options: {
-                type: "array",
+                type: 'array',
                 maxItems: MAX_OPTIONS,
-                description: "Suggested answers; the person may always write their own.",
+                description: 'Suggested answers; the person may always write their own.',
                 items: {
-                  type: "object",
+                  type: 'object',
                   properties: {
-                    label: { type: "string" },
-                    description: { type: "string" },
+                    label: { type: 'string' },
+                    description: { type: 'string' },
                   },
-                  required: ["label"],
+                  required: ['label'],
                   additionalProperties: false,
                 },
               },
             },
-            required: ["question"],
+            required: ['question'],
             additionalProperties: false,
           },
         },
       },
-      required: ["questions"],
+      required: ['questions'],
       additionalProperties: false,
     },
   },
@@ -227,7 +250,7 @@ export const ASK_USER_TOOL_DEFINITION = {
 
 /** The answer is delivered on the deny channel, so it says what it is; the card
  * strips it back off for display. */
-export const ANSWER_PREAMBLE = "The user answered your questions.";
+export const ANSWER_PREAMBLE = 'The user answered your questions.';
 const JSON_ANSWERS_PREFIX = `${ANSWER_PREAMBLE}\n\nAnswers (JSON):\n`;
 
 /** Arrives as the tool's result, so it names each question and what was picked. */
@@ -239,31 +262,38 @@ export function formatQuestionAnswers(
   questions.forEach((question, index) => {
     const picked = (answers[index] ?? []).map((value) => value.trim()).filter(Boolean);
     if (!picked.length) return;
-    pairs.push([question.question, picked.join(", ")]);
+    pairs.push([question.question, picked.join(', ')]);
   });
-  if (!pairs.length) return "";
+  if (!pairs.length) return '';
   // Newlines can contain Q:/A: headers; JSON preserves them as answer text.
-  if (pairs.some(pair => pair.some(value => /[\r\n]/.test(value)))) {
+  if (pairs.some((pair) => pair.some((value) => /[\r\n]/.test(value)))) {
     return JSON_ANSWERS_PREFIX + JSON.stringify(pairs);
   }
-  return `${ANSWER_PREAMBLE}\n\n${pairs.map(([question, answer]) => `Q: ${question}\nA: ${answer}`).join("\n\n")}`;
+  return `${ANSWER_PREAMBLE}\n\n${pairs.map(([question, answer]) => `Q: ${question}\nA: ${answer}`).join('\n\n')}`;
 }
 
 export function answerWithoutPreamble(answer: string): string {
-  return answer.startsWith(`${ANSWER_PREAMBLE}\n\n`) ? answer.slice(ANSWER_PREAMBLE.length + 2) : answer;
+  return answer.startsWith(`${ANSWER_PREAMBLE}\n\n`)
+    ? answer.slice(ANSWER_PREAMBLE.length + 2)
+    : answer;
 }
 
 /** Sized so a reply typed in a card is never cut; only a longer chat message echoed back as free text is. */
-export const MAX_ANSWER_ECHO = ANSWER_PREAMBLE.length + MAX_QUESTIONS
-  * ("\n\nQ: \nA: ".length + MAX_QUESTION_TEXT + MAX_OPTIONS * (MAX_LABEL + ", ".length) + MAX_CUSTOM_ANSWER);
+export const MAX_ANSWER_ECHO =
+  ANSWER_PREAMBLE.length +
+  MAX_QUESTIONS *
+    ('\n\nQ: \nA: '.length +
+      MAX_QUESTION_TEXT +
+      MAX_OPTIONS * (MAX_LABEL + ', '.length) +
+      MAX_CUSTOM_ANSWER);
 
 /** Cut back to the last whole block, so no partial answer reads as one. */
 export function capAnswerEcho(answer: string, limit = MAX_ANSWER_ECHO): string {
   if (answer.length <= limit) return answer;
   const cut = answer.slice(0, limit);
-  const boundary = cut.lastIndexOf("\n\nQ: ");
+  const boundary = cut.lastIndexOf('\n\nQ: ');
   const kept = boundary > 0 ? cut.slice(0, boundary) : cut;
-  return kept + "\n\n[answer truncated]";
+  return kept + '\n\n[answer truncated]';
 }
 
 /**
@@ -276,7 +306,10 @@ export function questionAnswersByQuestion(
   message: string,
   questions: readonly AskQuestion[],
 ): Record<string, string> {
-  return questionAnswersById(message, questions.map(question => ({ id: question.question, question })));
+  return questionAnswersById(
+    message,
+    questions.map((question) => ({ id: question.question, question })),
+  );
 }
 
 /**
@@ -284,7 +317,10 @@ export function questionAnswersByQuestion(
  * The card joins multi-select labels with ", " and a label may contain ", ": every reading is tried, a reading that
  * is labels end to end wins, and when the best readings disagree the whole answer is own words, never a guessed option.
  */
-export function pickedOptionLabels(answer: string, question: AskQuestion): { labels: string[]; other?: string } {
+export function pickedOptionLabels(
+  answer: string,
+  question: AskQuestion,
+): { labels: string[]; other?: string } {
   const text = answer.trim();
   const labels = question.options.map((option) => option.label);
   if (!question.multiSelect) {
@@ -294,7 +330,9 @@ export function pickedOptionLabels(answer: string, question: AskQuestion): { lab
   const whole: string[][] = [];
   const partial: Array<{ labels: string[]; other: string }> = [];
   const read = (rest: string, picked: string[]): void => {
-    const next = labels.filter((label) => !picked.includes(label) && (rest === label || rest.startsWith(`${label}, `)));
+    const next = labels.filter(
+      (label) => !picked.includes(label) && (rest === label || rest.startsWith(`${label}, `)),
+    );
     if (!next.length) {
       if (rest) partial.push({ labels: picked, other: rest });
       else whole.push(picked);
@@ -303,7 +341,8 @@ export function pickedOptionLabels(answer: string, question: AskQuestion): { lab
     for (const label of next) read(rest.slice(label.length + 2), [...picked, label]);
   };
   read(text, []);
-  const key = (reading: { labels: string[]; other?: string }) => JSON.stringify([[...reading.labels].sort(), reading.other ?? null]);
+  const key = (reading: { labels: string[]; other?: string }) =>
+    JSON.stringify([[...reading.labels].sort(), reading.other ?? null]);
   const readings = whole.length ? whole.map((picked) => ({ labels: picked })) : partial;
   const first = readings[0]!;
   const agree = readings.every((reading) => key(reading) === key(first));
@@ -333,7 +372,7 @@ export function parseProtocolAskQuestions(entries: unknown): ProtocolAskQuestion
     // whole. A duplicate id fails the request: two questions cannot share one
     // answer slot.
     const id = raw.id;
-    if (!question || typeof id !== "string" || !id.trim() || id.length > MAX_QUESTION_ID) continue;
+    if (!question || typeof id !== 'string' || !id.trim() || id.length > MAX_QUESTION_ID) continue;
     if (seenIds.has(id)) return null;
     seenIds.add(id);
     parsed.push({ id, question });
@@ -368,9 +407,21 @@ export function questionAnswersById(
   }
   if (message.startsWith(JSON_ANSWERS_PREFIX)) {
     let pairs: unknown;
-    try { pairs = JSON.parse(message.slice(JSON_ANSWERS_PREFIX.length)); }
-    catch { return {}; }
-    if (!Array.isArray(pairs) || !pairs.every(pair => Array.isArray(pair) && pair.length === 2 && pair.every(value => typeof value === "string"))) return {};
+    try {
+      pairs = JSON.parse(message.slice(JSON_ANSWERS_PREFIX.length));
+    } catch {
+      return {};
+    }
+    if (
+      !Array.isArray(pairs) ||
+      !pairs.every(
+        (pair) =>
+          Array.isArray(pair) &&
+          pair.length === 2 &&
+          pair.every((value) => typeof value === 'string'),
+      )
+    )
+      return {};
     for (const [asked, answer] of pairs as [string, string][]) {
       const id = idByText.get(asked);
       if (id && !ambiguous.has(asked) && answer.trim()) answers[id] = answer;

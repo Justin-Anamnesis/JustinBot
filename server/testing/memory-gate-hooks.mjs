@@ -19,12 +19,24 @@ registerHooks({
     if (url === plan) {
       const anchor = 'starter: () => tier === "starter",';
       if (!String(result.source).includes(anchor)) throw new Error('Plan seam changed');
-      return { ...result, source: String(result.source).replace(anchor, 'starter: () => globalThis.__ombTestStarter(),') };
+      return {
+        ...result,
+        source: String(result.source).replace(
+          anchor,
+          'starter: () => globalThis.__ombTestStarter(),',
+        ),
+      };
     }
     if (url !== gate) return result;
     const source = String(result.source);
     const anchor = /export const engineMemory = new EngineMemory\(\{ enabled: [^\n]*\}\);/;
     if (!anchor.test(source)) throw new Error('Memory gate seam changed');
-    return { ...result, source: source.replace(anchor, 'export const engineMemory = new EngineMemory({ enabled: true, read: () => globalThis.__ombTestHostMemory(), groups: () => new Map(), tickMs: 100 });') };
+    return {
+      ...result,
+      source: source.replace(
+        anchor,
+        'export const engineMemory = new EngineMemory({ enabled: true, read: () => globalThis.__ombTestHostMemory(), groups: () => new Map(), tickMs: 100 });',
+      ),
+    };
   },
 });

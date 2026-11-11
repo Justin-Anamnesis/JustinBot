@@ -21,23 +21,23 @@ export const MAX_WEB_PANEL_NAME = 40;
 
 export type WebPanelInput = { name: string; url: string };
 export type WebPanelCheck =
-  | { ok: true; name: string; url: string }
-  | { ok: false; error: "name" | "url" | "self" };
+  { ok: true; name: string; url: string } | { ok: false; error: 'name' | 'url' | 'self' };
 
 /** A trimmed name of 1–40 characters and an absolute http(s) URL with no
  * user name or password in it, never on `appOrigin`. */
 export function validateWebPanel(input: WebPanelInput, appOrigin?: string): WebPanelCheck {
   const name = input.name.trim();
-  if (!name || name.length > MAX_WEB_PANEL_NAME) return { ok: false, error: "name" };
+  if (!name || name.length > MAX_WEB_PANEL_NAME) return { ok: false, error: 'name' };
   let parsed: URL;
   try {
     parsed = new URL(input.url.trim());
   } catch {
-    return { ok: false, error: "url" };
+    return { ok: false, error: 'url' };
   }
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return { ok: false, error: "url" };
-  if (parsed.username || parsed.password || !parsed.hostname) return { ok: false, error: "url" };
-  if (appOrigin && isAppOrigin(parsed.href, appOrigin)) return { ok: false, error: "self" };
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+    return { ok: false, error: 'url' };
+  if (parsed.username || parsed.password || !parsed.hostname) return { ok: false, error: 'url' };
+  if (appOrigin && isAppOrigin(parsed.href, appOrigin)) return { ok: false, error: 'self' };
   return { ok: true, name, url: parsed.href };
 }
 
@@ -66,9 +66,9 @@ export function parseWebPanels(raw: string | null | undefined): WebPanel[] {
   const seen = new Set<string>();
   for (const entry of value) {
     if (panels.length >= MAX_WEB_PANELS) break;
-    if (!entry || typeof entry !== "object") continue;
+    if (!entry || typeof entry !== 'object') continue;
     const { id, name, url, page } = entry as Record<string, unknown>;
-    if (typeof id !== "string" || !id || seen.has(id) || typeof name !== "string") continue;
+    if (typeof id !== 'string' || !id || seen.has(id) || typeof name !== 'string') continue;
     if (page !== undefined) {
       const ref = chatPageRef(page);
       const title = pinnedPageName(name);
@@ -77,7 +77,7 @@ export function parseWebPanels(raw: string | null | undefined): WebPanel[] {
       panels.push({ id, name: title, page: ref });
       continue;
     }
-    if (typeof url !== "string") continue;
+    if (typeof url !== 'string') continue;
     const check = validateWebPanel({ name, url });
     if (!check.ok) continue;
     seen.add(id);
@@ -89,29 +89,39 @@ export function parseWebPanels(raw: string | null | undefined): WebPanel[] {
 const MAX_REF_ID = 200;
 
 function chatPageRef(value: unknown): PinnedChatPage | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
   const { botId, threadId, messageId } = value as Record<string, unknown>;
-  const ok = (part: unknown): part is string => typeof part === "string" && part.length > 0 && part.length <= MAX_REF_ID;
+  const ok = (part: unknown): part is string =>
+    typeof part === 'string' && part.length > 0 && part.length <= MAX_REF_ID;
   return ok(botId) && ok(threadId) && ok(messageId) ? { botId, threadId, messageId } : undefined;
 }
 
 /** A page's title as a panel name: one line, at most 40 characters. */
 export function pinnedPageName(title: string): string {
-  return title.replace(/\s+/g, " ").trim().slice(0, MAX_WEB_PANEL_NAME).trim();
+  return title.replace(/\s+/g, ' ').trim().slice(0, MAX_WEB_PANEL_NAME).trim();
 }
 
 /** The panel that pins this chat page, if any. */
-export function findPinnedPage(panels: readonly WebPanel[], page: PinnedChatPage): WebPanel | undefined {
-  return panels.find((panel) => panel.page?.threadId === page.threadId && panel.page.messageId === page.messageId);
+export function findPinnedPage(
+  panels: readonly WebPanel[],
+  page: PinnedChatPage,
+): WebPanel | undefined {
+  return panels.find(
+    (panel) => panel.page?.threadId === page.threadId && panel.page.messageId === page.messageId,
+  );
 }
 
 /** The list with this chat page pinned (named after its title) or, when it already is, unpinned. Pinning onto a full
  * list changes nothing. */
-export function togglePinnedPage(panels: readonly WebPanel[], page: PinnedChatPage, title: string): readonly WebPanel[] {
+export function togglePinnedPage(
+  panels: readonly WebPanel[],
+  page: PinnedChatPage,
+  title: string,
+): readonly WebPanel[] {
   const pinned = findPinnedPage(panels, page);
   if (pinned) return panels.filter((panel) => panel !== pinned);
   if (panels.length >= MAX_WEB_PANELS) return panels;
-  return [...panels, { id: newWebPanelId(panels), name: pinnedPageName(title) || "Page", page }];
+  return [...panels, { id: newWebPanelId(panels), name: pinnedPageName(title) || 'Page', page }];
 }
 
 export function newWebPanelId(existing: readonly WebPanel[]): string {

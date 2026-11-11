@@ -3,7 +3,7 @@
  * "before" is the exact selection the user was shown; a confirmation fails
  * closed if the target's default moved since.
  */
-import type { ModelSelection } from "./wire.ts";
+import type { ModelSelection } from './wire.ts';
 
 export interface ModelRequestCardData {
   version: 1;

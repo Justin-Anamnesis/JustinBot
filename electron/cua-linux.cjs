@@ -1,62 +1,62 @@
-const { spawn, spawnSync } = require("node:child_process");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
+const { spawn, spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const {
   PLUGIN_REQUIRED_MESSAGE,
   SYSTEM_DRIVER,
   isHyprlandSession,
   probeCuaHyprlandPlugin,
   systemDriverPackageVersion,
-} = require("./cua-hyprland.cjs");
+} = require('./cua-hyprland.cjs');
 
-const CERTIFIED_DRIVER_VERSION = "0.41.3";
-const CERTIFIED_MANIFEST_SCHEMA = "1";
+const CERTIFIED_DRIVER_VERSION = '0.41.3';
+const CERTIFIED_MANIFEST_SCHEMA = '1';
 const DEFAULT_TIMEOUT_MS = 8_000;
 const DEFAULT_MAX_OUTPUT_BYTES = 512 * 1024;
-const GETENT_BINARY = "/usr/bin/getent";
+const GETENT_BINARY = '/usr/bin/getent';
 const GETENT_TIMEOUT_MS = 1_500;
 const GETENT_MAX_OUTPUT_BYTES = 256 * 1024;
 // Keep in sync with DRIVER_FILE_IDENTITY_KEYS in server/local-computer.ts, which revalidates what Electron publishes.
 const DRIVER_FILE_IDENTITY_KEYS = Object.freeze([
-  "dev",
-  "ino",
-  "uid",
-  "gid",
-  "mode",
-  "size",
-  "mtimeNs",
-  "ctimeNs",
+  'dev',
+  'ino',
+  'uid',
+  'gid',
+  'mode',
+  'size',
+  'mtimeNs',
+  'ctimeNs',
 ]);
 
 const SESSION_ENV_KEYS = new Set([
-  "AT_SPI_BUS",
-  "DBUS_SESSION_BUS_ADDRESS",
-  "DISPLAY",
-  "HOME",
+  'AT_SPI_BUS',
+  'DBUS_SESSION_BUS_ADDRESS',
+  'DISPLAY',
+  'HOME',
   // Hyprland's IPC and Cua's plugin sockets are found through it.
-  "HYPRLAND_INSTANCE_SIGNATURE",
-  "LANG",
-  "LANGUAGE",
-  "LC_ALL",
-  "PATH",
-  "USER",
-  "WAYLAND_DISPLAY",
-  "XAUTHORITY",
-  "XDG_CURRENT_DESKTOP",
-  "XDG_RUNTIME_DIR",
-  "XDG_SESSION_DESKTOP",
-  "XDG_SESSION_TYPE",
+  'HYPRLAND_INSTANCE_SIGNATURE',
+  'LANG',
+  'LANGUAGE',
+  'LC_ALL',
+  'PATH',
+  'USER',
+  'WAYLAND_DISPLAY',
+  'XAUTHORITY',
+  'XDG_CURRENT_DESKTOP',
+  'XDG_RUNTIME_DIR',
+  'XDG_SESSION_DESKTOP',
+  'XDG_SESSION_TYPE',
 ]);
 
 function unavailable(reasonCode, message, details = {}) {
-  return { status: "unavailable", reasonCode, message, ...details };
+  return { status: 'unavailable', reasonCode, message, ...details };
 }
 
 function sanitizePath(value) {
   const seen = new Set();
   const entries = [];
-  for (const entry of String(value ?? "").split(path.delimiter)) {
+  for (const entry of String(value ?? '').split(path.delimiter)) {
     if (!entry || !path.isAbsolute(entry)) continue;
     const normalized = path.normalize(entry);
     if (seen.has(normalized)) continue;
@@ -70,12 +70,12 @@ function desktopCommandEnvironment(source = process.env, additions = {}) {
   const env = {};
   for (const [key, value] of Object.entries(source)) {
     if (value == null) continue;
-    if (SESSION_ENV_KEYS.has(key) || key.startsWith("LC_")) env[key] = String(value);
+    if (SESSION_ENV_KEYS.has(key) || key.startsWith('LC_')) env[key] = String(value);
   }
   env.PATH = sanitizePath(source.PATH);
   // Bundled native code must not update itself or opt users into upstream telemetry.
-  env.CUA_DRIVER_RS_UPDATE_CHECK = "false";
-  env.CUA_DRIVER_RS_TELEMETRY_ENABLED = "false";
+  env.CUA_DRIVER_RS_UPDATE_CHECK = 'false';
+  env.CUA_DRIVER_RS_TELEMETRY_ENABLED = 'false';
   for (const [key, value] of Object.entries(additions)) {
     if (value != null) env[key] = String(value);
   }
@@ -89,11 +89,15 @@ function commandFailure(code, message, details = {}) {
   return error;
 }
 
-function runCuaCommand(binary, args, {
-  env = desktopCommandEnvironment(),
-  timeoutMs = DEFAULT_TIMEOUT_MS,
-  maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
-} = {}) {
+function runCuaCommand(
+  binary,
+  args,
+  {
+    env = desktopCommandEnvironment(),
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    maxOutputBytes = DEFAULT_MAX_OUTPUT_BYTES,
+  } = {},
+) {
   return new Promise((resolve, reject) => {
     let settled = false;
     let timedOut = false;
@@ -103,7 +107,7 @@ function runCuaCommand(binary, args, {
     const child = spawn(binary, args, {
       env,
       shell: false,
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     });
 
@@ -115,7 +119,7 @@ function runCuaCommand(binary, args, {
     };
     const stop = () => {
       try {
-        child.kill("SIGKILL");
+        child.kill('SIGKILL');
       } catch {}
     };
     const collect = (current, chunk) => {
@@ -127,35 +131,38 @@ function runCuaCommand(binary, args, {
       return next.subarray(0, maxOutputBytes);
     };
 
-    child.stdout?.on("data", (chunk) => {
+    child.stdout?.on('data', (chunk) => {
       stdout = collect(stdout, chunk);
     });
-    child.stderr?.on("data", (chunk) => {
+    child.stderr?.on('data', (chunk) => {
       stderr = collect(stderr, chunk);
     });
-    child.once("error", (error) =>
-      finish(reject, commandFailure("spawn-failed", `Could not start Cua Driver: ${error.message}`)),
+    child.once('error', (error) =>
+      finish(
+        reject,
+        commandFailure('spawn-failed', `Could not start Cua Driver: ${error.message}`),
+      ),
     );
-    child.once("close", (exitCode, signal) => {
+    child.once('close', (exitCode, signal) => {
       if (timedOut) {
         finish(
           reject,
-          commandFailure("command-timeout", "Cua Driver did not respond in time.", { timeoutMs }),
+          commandFailure('command-timeout', 'Cua Driver did not respond in time.', { timeoutMs }),
         );
         return;
       }
       if (overflowed) {
         finish(
           reject,
-          commandFailure("output-too-large", "Cua Driver returned too much diagnostic output."),
+          commandFailure('output-too-large', 'Cua Driver returned too much diagnostic output.'),
         );
         return;
       }
       finish(resolve, {
         exitCode,
         signal,
-        stdout: stdout.toString("utf8"),
-        stderr: stderr.toString("utf8"),
+        stdout: stdout.toString('utf8'),
+        stderr: stderr.toString('utf8'),
       });
     });
 
@@ -203,7 +210,7 @@ function captureDriverFileIdentity(target, fileSystem = fs) {
 }
 
 function sameDriverFileIdentity(expected, actual) {
-  if (!expected || !actual || typeof expected !== "object" || typeof actual !== "object") {
+  if (!expected || !actual || typeof expected !== 'object' || typeof actual !== 'object') {
     return false;
   }
   const expectedKeys = Object.keys(expected).sort();
@@ -217,32 +224,35 @@ function sameDriverFileIdentity(expected, actual) {
     return false;
   }
   return DRIVER_FILE_IDENTITY_KEYS.every(
-    (key) => typeof expected[key] === "string" && expected[key] === actual[key],
+    (key) => typeof expected[key] === 'string' && expected[key] === actual[key],
   );
 }
 
-function runGetent(args, {
-  spawnCommand = spawnSync,
-  timeoutMs = GETENT_TIMEOUT_MS,
-  maxOutputBytes = GETENT_MAX_OUTPUT_BYTES,
-} = {}) {
+function runGetent(
+  args,
+  {
+    spawnCommand = spawnSync,
+    timeoutMs = GETENT_TIMEOUT_MS,
+    maxOutputBytes = GETENT_MAX_OUTPUT_BYTES,
+  } = {},
+) {
   const result = spawnCommand(GETENT_BINARY, args, {
-    encoding: "utf8",
-    env: { LANG: "C", LC_ALL: "C" },
+    encoding: 'utf8',
+    env: { LANG: 'C', LC_ALL: 'C' },
     maxBuffer: maxOutputBytes,
     shell: false,
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ['ignore', 'pipe', 'pipe'],
     timeout: timeoutMs,
     windowsHide: true,
   });
-  if (result?.error || result?.status !== 0 || typeof result?.stdout !== "string") {
+  if (result?.error || result?.status !== 0 || typeof result?.stdout !== 'string') {
     return {
       ok: false,
-      reason: result?.error?.code === "ETIMEDOUT" ? "lookup-timeout" : "lookup-failed",
+      reason: result?.error?.code === 'ETIMEDOUT' ? 'lookup-timeout' : 'lookup-failed',
     };
   }
   if (Buffer.byteLength(result.stdout) > maxOutputBytes) {
-    return { ok: false, reason: "lookup-output-too-large" };
+    return { ok: false, reason: 'lookup-output-too-large' };
   }
   return { ok: true, stdout: result.stdout };
 }
@@ -251,19 +261,19 @@ function privatePrimaryGroup(identity, { getent = runGetent } = {}) {
   if (
     !Number.isSafeInteger(identity?.uid) ||
     !Number.isSafeInteger(identity?.gid) ||
-    typeof identity?.username !== "string" ||
+    typeof identity?.username !== 'string' ||
     !identity.username
   ) {
-    return { exclusive: false, reason: "identity-unavailable" };
+    return { exclusive: false, reason: 'identity-unavailable' };
   }
 
-  const groupResult = getent(["group", String(identity.gid)]);
+  const groupResult = getent(['group', String(identity.gid)]);
   if (!groupResult?.ok) {
-    return { exclusive: false, reason: groupResult?.reason ?? "lookup-failed" };
+    return { exclusive: false, reason: groupResult?.reason ?? 'lookup-failed' };
   }
 
   const groupLines = groupResult.stdout.split(/\r?\n/).filter(Boolean);
-  const groupRecords = groupLines.map((line) => line.split(":"));
+  const groupRecords = groupLines.map((line) => line.split(':'));
   if (
     groupRecords.length !== 1 ||
     groupRecords[0].length !== 4 ||
@@ -271,27 +281,26 @@ function privatePrimaryGroup(identity, { getent = runGetent } = {}) {
     Number(groupRecords[0][2]) !== identity.gid ||
     groupRecords[0][0] !== identity.username
   ) {
-    return { exclusive: false, reason: "primary-group-not-private" };
+    return { exclusive: false, reason: 'primary-group-not-private' };
   }
-  const explicitMembers = groupRecords[0][3].split(",").filter(Boolean);
+  const explicitMembers = groupRecords[0][3].split(',').filter(Boolean);
   if (explicitMembers.some((member) => member !== identity.username)) {
-    return { exclusive: false, reason: "primary-group-shared" };
+    return { exclusive: false, reason: 'primary-group-shared' };
   }
 
-  const passwdResult = getent(["passwd"]);
+  const passwdResult = getent(['passwd']);
   if (!passwdResult?.ok) {
-    return { exclusive: false, reason: passwdResult?.reason ?? "lookup-failed" };
+    return { exclusive: false, reason: passwdResult?.reason ?? 'lookup-failed' };
   }
   const passwdLines = passwdResult.stdout.split(/\r?\n/).filter(Boolean);
-  const passwdRecords = passwdLines.map((line) => line.split(":"));
+  const passwdRecords = passwdLines.map((line) => line.split(':'));
   if (
     passwdRecords.length === 0 ||
     passwdRecords.some(
-      (fields) =>
-        fields.length !== 7 || !/^\d+$/.test(fields[2]) || !/^\d+$/.test(fields[3]),
+      (fields) => fields.length !== 7 || !/^\d+$/.test(fields[2]) || !/^\d+$/.test(fields[3]),
     )
   ) {
-    return { exclusive: false, reason: "lookup-malformed" };
+    return { exclusive: false, reason: 'lookup-malformed' };
   }
   const primaryMembers = passwdRecords
     .filter((fields) => Number(fields[3]) === identity.gid)
@@ -301,7 +310,7 @@ function privatePrimaryGroup(identity, { getent = runGetent } = {}) {
     primaryMembers[0].username !== identity.username ||
     primaryMembers[0].uid !== identity.uid
   ) {
-    return { exclusive: false, reason: "primary-group-shared" };
+    return { exclusive: false, reason: 'primary-group-shared' };
   }
   return { exclusive: true, gid: identity.gid, name: identity.username };
 }
@@ -310,8 +319,7 @@ function driverIdentity({ currentUid, currentGid, currentUsername } = {}) {
   let info = {};
   try {
     info = os.userInfo();
-  } catch {
-  }
+  } catch {}
   return {
     uid: currentUid ?? process.getuid?.() ?? info.uid,
     gid: currentGid ?? process.getgid?.() ?? info.gid,
@@ -327,7 +335,7 @@ function createPermissionCheck(identity, lookupPrivateGroup) {
       try {
         groupProof = lookupPrivateGroup(identity);
       } catch {
-        groupProof = { exclusive: false, reason: "lookup-failed" };
+        groupProof = { exclusive: false, reason: 'lookup-failed' };
       }
     }
     return (
@@ -339,7 +347,7 @@ function createPermissionCheck(identity, lookupPrivateGroup) {
   const failure = (component, stat) => {
     const worldWritable = (Number(stat.mode) & 0o002) !== 0;
     return unavailable(
-      "unsafe-driver-permissions",
+      'unsafe-driver-permissions',
       worldWritable
         ? `Cua Driver path is world-writable: ${component}`
         : `Cua Driver path is group-writable and its group could not be proven private: ${component}`,
@@ -352,7 +360,12 @@ function createPermissionCheck(identity, lookupPrivateGroup) {
   return { failure, groupWriteAllowed };
 }
 
-function writablePermissionError(component, stat, permissionCheck, { allowRootSticky = false } = {}) {
+function writablePermissionError(
+  component,
+  stat,
+  permissionCheck,
+  { allowRootSticky = false } = {},
+) {
   const mode = Number(stat.mode);
   const rootOwnedStickyDirectory =
     allowRootSticky && stat.isDirectory() && Number(stat.uid) === 0 && (mode & 0o1000) !== 0;
@@ -369,7 +382,7 @@ function validatePathComponents(target, currentUid, permissionCheck) {
     const stat = fs.lstatSync(component);
     if (!safeOwner(stat, currentUid)) {
       return unavailable(
-        "unsafe-driver-owner",
+        'unsafe-driver-owner',
         `Cua Driver path component is owned by an unexpected user: ${component}`,
         { affectedPaths: [component] },
       );
@@ -382,16 +395,14 @@ function validatePathComponents(target, currentUid, permissionCheck) {
   return null;
 }
 
-function validateDriverCandidate(candidate, {
-  currentUid,
-  currentGid,
-  currentUsername,
-  lookupPrivateGroup = privatePrimaryGroup,
-} = {}) {
+function validateDriverCandidate(
+  candidate,
+  { currentUid, currentGid, currentUsername, lookupPrivateGroup = privatePrimaryGroup } = {},
+) {
   const identity = driverIdentity({ currentUid, currentGid, currentUsername });
   const permissionCheck = createPermissionCheck(identity, lookupPrivateGroup);
   if (!path.isAbsolute(candidate)) {
-    return unavailable("driver-path-not-absolute", "Cua Driver path must be absolute.", {
+    return unavailable('driver-path-not-absolute', 'Cua Driver path must be absolute.', {
       candidate,
     });
   }
@@ -407,7 +418,7 @@ function validateDriverCandidate(candidate, {
     targetStat = fs.statSync(canonicalPath, { bigint: true });
     fileIdentity = driverFileIdentityFromStat(targetStat);
   } catch (error) {
-    return unavailable("driver-not-found", `Cua Driver was not found at ${candidate}.`, {
+    return unavailable('driver-not-found', `Cua Driver was not found at ${candidate}.`, {
       candidate,
       cause: error?.code,
     });
@@ -415,19 +426,19 @@ function validateDriverCandidate(candidate, {
 
   if (!safeOwner(linkStat, identity.uid) || !safeOwner(targetStat, identity.uid)) {
     return unavailable(
-      "unsafe-driver-owner",
-      "Cua Driver must be owned by the current user or root.",
+      'unsafe-driver-owner',
+      'Cua Driver must be owned by the current user or root.',
       { candidate, canonicalPath, affectedPaths: [canonicalPath] },
     );
   }
   if (!targetStat.isFile()) {
-    return unavailable("driver-not-file", "Cua Driver must resolve to a regular file.", {
+    return unavailable('driver-not-file', 'Cua Driver must resolve to a regular file.', {
       candidate,
       canonicalPath,
     });
   }
   if ((Number(targetStat.mode) & 0o111) === 0) {
-    return unavailable("driver-not-executable", "Cua Driver is not executable.", {
+    return unavailable('driver-not-executable', 'Cua Driver is not executable.', {
       candidate,
       canonicalPath,
     });
@@ -442,7 +453,7 @@ function validateDriverCandidate(candidate, {
     if (canonicalError) return { ...canonicalError, candidate, canonicalPath };
     fs.accessSync(canonicalPath, fs.constants.X_OK);
   } catch (error) {
-    return unavailable("driver-not-executable", "Cua Driver cannot be executed.", {
+    return unavailable('driver-not-executable', 'Cua Driver cannot be executed.', {
       candidate,
       canonicalPath,
       cause: error?.code,
@@ -452,20 +463,20 @@ function validateDriverCandidate(candidate, {
   try {
     const finalIdentity = captureDriverFileIdentity(canonicalPath);
     if (!sameDriverFileIdentity(fileIdentity, finalIdentity)) {
-      return unavailable("driver-changed", "Cua Driver changed while it was being validated.", {
+      return unavailable('driver-changed', 'Cua Driver changed while it was being validated.', {
         candidate,
         canonicalPath,
       });
     }
   } catch (error) {
-    return unavailable("driver-not-found", "Cua Driver changed while it was being validated.", {
+    return unavailable('driver-not-found', 'Cua Driver changed while it was being validated.', {
       candidate,
       canonicalPath,
       cause: error?.code,
     });
   }
 
-  return { status: "found", path: canonicalPath, fileIdentity };
+  return { status: 'found', path: canonicalPath, fileIdentity };
 }
 
 function discoverLinuxCuaDriver({
@@ -481,36 +492,33 @@ function discoverLinuxCuaDriver({
   const explicit = env.CUA_DRIVER_PATH;
   if (explicit) {
     const result = validateDriverCandidate(explicit, validationOptions);
-    return result.status === "found" ? { ...result, source: "environment" } : result;
+    return result.status === 'found' ? { ...result, source: 'environment' } : result;
   }
 
   // A packaged build never falls through to ambient user/PATH code: a damaged bundle fails closed (CUA_DRIVER_PATH is the one override).
   if (bundledDriverPath) {
     const result = validateDriverCandidate(bundledDriverPath, validationOptions);
-    return result.status === "found" ? { ...result, source: "bundled" } : result;
+    return result.status === 'found' ? { ...result, source: 'bundled' } : result;
   }
 
-  const localCandidate = path.join(homeDir, ".local", "bin", "cua-driver");
+  const localCandidate = path.join(homeDir, '.local', 'bin', 'cua-driver');
   if (fs.existsSync(localCandidate)) {
     const result = validateDriverCandidate(localCandidate, validationOptions);
-    if (result.status === "found") return { ...result, source: "user-local" };
+    if (result.status === 'found') return { ...result, source: 'user-local' };
     return result;
   }
 
   let firstUnsafe = null;
   for (const directory of sanitizePath(env.PATH).split(path.delimiter).filter(Boolean)) {
-    const candidate = path.join(directory, "cua-driver");
+    const candidate = path.join(directory, 'cua-driver');
     if (!fs.existsSync(candidate)) continue;
     const result = validateDriverCandidate(candidate, validationOptions);
-    if (result.status === "found") return { ...result, source: "path" };
+    if (result.status === 'found') return { ...result, source: 'path' };
     firstUnsafe ??= result;
   }
   return (
     firstUnsafe ??
-    unavailable(
-      "driver-not-found",
-      "Cua Driver was not found. Install it, then try again.",
-    )
+    unavailable('driver-not-found', 'Cua Driver was not found. Install it, then try again.')
   );
 }
 
@@ -519,112 +527,134 @@ function parseJsonObject(value, label) {
   try {
     parsed = JSON.parse(value);
   } catch {
-    throw commandFailure("invalid-json", `${label} returned invalid JSON.`);
+    throw commandFailure('invalid-json', `${label} returned invalid JSON.`);
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw commandFailure("invalid-json", `${label} returned an invalid JSON object.`);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw commandFailure('invalid-json', `${label} returned an invalid JSON object.`);
   }
   return parsed;
 }
 
 function parseVersion(stdout) {
-  const match = String(stdout).trim().match(/(?:cua-driver\s+)?(\d+\.\d+\.\d+)/i);
+  const match = String(stdout)
+    .trim()
+    .match(/(?:cua-driver\s+)?(\d+\.\d+\.\d+)/i);
   return match?.[1] ?? null;
 }
 
 function validateManifest(manifest, binaryPath, expectedVersion = CERTIFIED_DRIVER_VERSION) {
   if (manifest.schema_version !== CERTIFIED_MANIFEST_SCHEMA) {
     throw commandFailure(
-      "unsupported-manifest",
+      'unsupported-manifest',
       `Cua Driver manifest schema ${String(manifest.schema_version)} is not supported.`,
     );
   }
   if (manifest.binary_version !== expectedVersion) {
     throw commandFailure(
-      "unsupported-driver-version",
+      'unsupported-driver-version',
       `Cua Driver ${String(manifest.binary_version)} is not supported; install ${CERTIFIED_DRIVER_VERSION}.`,
     );
   }
   const invocation = manifest.mcp_invocation;
   if (
     !invocation ||
-    typeof invocation.command !== "string" ||
+    typeof invocation.command !== 'string' ||
     !Array.isArray(invocation.args) ||
     invocation.args.length !== 1 ||
-    invocation.args[0] !== "mcp"
+    invocation.args[0] !== 'mcp'
   ) {
-    throw commandFailure("unsupported-manifest", "Cua Driver returned an unsupported MCP contract.");
+    throw commandFailure(
+      'unsupported-manifest',
+      'Cua Driver returned an unsupported MCP contract.',
+    );
   }
   let invocationPath;
   try {
     invocationPath = fs.realpathSync(invocation.command);
   } catch {
-    throw commandFailure("unsupported-manifest", "Cua Driver MCP command could not be verified.");
+    throw commandFailure('unsupported-manifest', 'Cua Driver MCP command could not be verified.');
   }
   if (invocationPath !== binaryPath) {
-    throw commandFailure("unsupported-manifest", "Cua Driver MCP command does not match the verified binary.");
+    throw commandFailure(
+      'unsupported-manifest',
+      'Cua Driver MCP command does not match the verified binary.',
+    );
   }
-  return { command: binaryPath, args: ["mcp"] };
+  return { command: binaryPath, args: ['mcp'] };
 }
 
-function validateDoctor(report, { session = "x11" } = {}) {
-  if (typeof report.ok !== "boolean" || !Array.isArray(report.probes)) {
-    throw commandFailure("invalid-doctor-report", "Cua Driver returned an invalid doctor report.");
+function validateDoctor(report, { session = 'x11' } = {}) {
+  if (typeof report.ok !== 'boolean' || !Array.isArray(report.probes)) {
+    throw commandFailure('invalid-doctor-report', 'Cua Driver returned an invalid doctor report.');
   }
   const probes = report.probes.map((probe) => {
     if (
       !probe ||
-      typeof probe.label !== "string" ||
-      !["ok", "warn", "err"].includes(probe.status) ||
-      typeof probe.message !== "string"
+      typeof probe.label !== 'string' ||
+      !['ok', 'warn', 'err'].includes(probe.status) ||
+      typeof probe.message !== 'string'
     ) {
-      throw commandFailure("invalid-doctor-report", "Cua Driver returned an invalid doctor probe.");
+      throw commandFailure('invalid-doctor-report', 'Cua Driver returned an invalid doctor probe.');
     }
     return {
       label: probe.label,
       status: probe.status,
       message: probe.message,
-      ...(typeof probe.detail === "string" ? { detail: probe.detail } : {}),
+      ...(typeof probe.detail === 'string' ? { detail: probe.detail } : {}),
     };
   });
   const byLabel = new Map(probes.map((probe) => [probe.label, probe]));
-  const display = byLabel.get("display server");
-  const x11 = byLabel.get("X11 connection");
-  const atSpi = byLabel.get("AT-SPI");
-  if (!report.ok || probes.some((probe) => probe.status === "err")) {
-    throw commandFailure("doctor-failed", "Cua Driver diagnostics reported an error.", { probes });
+  const display = byLabel.get('display server');
+  const x11 = byLabel.get('X11 connection');
+  const atSpi = byLabel.get('AT-SPI');
+  if (!report.ok || probes.some((probe) => probe.status === 'err')) {
+    throw commandFailure('doctor-failed', 'Cua Driver diagnostics reported an error.', { probes });
   }
-  if (session === "wayland") {
-    if (display?.status !== "ok" || !display.message.startsWith("Wayland")) {
+  if (session === 'wayland') {
+    if (display?.status !== 'ok' || !display.message.startsWith('Wayland')) {
       throw commandFailure(
-        "wayland-session-unavailable",
-        "Cua Driver did not confirm an active Wayland display.",
+        'wayland-session-unavailable',
+        'Cua Driver did not confirm an active Wayland display.',
         { probes },
       );
     }
   } else {
-    if (display?.status !== "ok" || !display.message.startsWith("X11 ")) {
-      throw commandFailure("x11-unavailable", "Cua Driver did not confirm an Xorg display.", { probes });
+    if (display?.status !== 'ok' || !display.message.startsWith('X11 ')) {
+      throw commandFailure('x11-unavailable', 'Cua Driver did not confirm an Xorg display.', {
+        probes,
+      });
     }
-    if (!x11 || x11.status === "err") {
-      throw commandFailure("x11-unavailable", "Cua Driver could not verify the Xorg session.", { probes });
+    if (!x11 || x11.status === 'err') {
+      throw commandFailure('x11-unavailable', 'Cua Driver could not verify the Xorg session.', {
+        probes,
+      });
     }
   }
-  if (atSpi?.status !== "ok") {
-    throw commandFailure("at-spi-unavailable", "Cua Driver could not reach the AT-SPI accessibility bus.", {
-      probes,
-    });
+  if (atSpi?.status !== 'ok') {
+    throw commandFailure(
+      'at-spi-unavailable',
+      'Cua Driver could not reach the AT-SPI accessibility bus.',
+      {
+        probes,
+      },
+    );
   }
-  return { ok: true, probes, warnings: probes.filter((probe) => probe.status === "warn") };
+  return { ok: true, probes, warnings: probes.filter((probe) => probe.status === 'warn') };
 }
 
 /** A system driver may run ahead of the bundled one within the certified minor line; patch releases keep the daemon
  * contract this app checks at every start. */
 function compatibleSystemDriverVersion(version) {
-  const parse = (value) => /^(\d+)\.(\d+)\.(\d+)$/.exec(String(value ?? ""))?.slice(1).map(Number);
+  const parse = (value) =>
+    /^(\d+)\.(\d+)\.(\d+)$/
+      .exec(String(value ?? ''))
+      ?.slice(1)
+      .map(Number);
   const found = parse(version);
   const certified = parse(CERTIFIED_DRIVER_VERSION);
-  return Boolean(found && found[0] === certified[0] && found[1] === certified[1] && found[2] >= certified[2]);
+  return Boolean(
+    found && found[0] === certified[0] && found[1] === certified[1] && found[2] >= certified[2],
+  );
 }
 
 /**
@@ -645,56 +675,59 @@ async function discoverSystemPackageDriver({
   try {
     owner = statFile(SYSTEM_DRIVER).uid;
   } catch {
-    return unavailable("system-driver-missing", "Omarchy's cua-driver package is not installed.");
+    return unavailable('system-driver-missing', "Omarchy's cua-driver package is not installed.");
   }
   if (owner !== 0) {
-    return unavailable("system-driver-untrusted", "The system cua-driver is not owned by root.");
+    return unavailable('system-driver-untrusted', 'The system cua-driver is not owned by root.');
   }
   const validated = validate(SYSTEM_DRIVER);
-  if (validated.status !== "found") {
-    return unavailable("system-driver-untrusted", "The system cua-driver failed path validation.");
+  if (validated.status !== 'found') {
+    return unavailable('system-driver-untrusted', 'The system cua-driver failed path validation.');
   }
   const version = await packageVersion(SYSTEM_DRIVER);
   // A packaged symlink is followed only into a file the same package owns.
   const target = validated.path === SYSTEM_DRIVER ? version : await packageVersion(validated.path);
   if (!version || target !== version) {
-    return unavailable("system-driver-unowned", "pacman does not list cua-driver-bin as the owner of the system cua-driver.");
+    return unavailable(
+      'system-driver-unowned',
+      'pacman does not list cua-driver-bin as the owner of the system cua-driver.',
+    );
   }
-  return { ...validated, source: "system-package", packageVersion: version };
+  return { ...validated, source: 'system-package', packageVersion: version };
 }
 
 async function checkDriver(discovered, { session, commandEnv, run, acceptVersion }) {
-  const versionResult = await run(discovered.path, ["--version"], { env: commandEnv });
+  const versionResult = await run(discovered.path, ['--version'], { env: commandEnv });
   const driverVersion = parseVersion(versionResult.stdout || versionResult.stderr);
   if (versionResult.exitCode !== 0 || !acceptVersion(driverVersion)) {
     return unavailable(
-      "unsupported-driver-version",
-      `Cua Driver ${driverVersion ?? "unknown"} is not supported; install ${CERTIFIED_DRIVER_VERSION}.`,
+      'unsupported-driver-version',
+      `Cua Driver ${driverVersion ?? 'unknown'} is not supported; install ${CERTIFIED_DRIVER_VERSION}.`,
       { path: discovered.path, source: discovered.source, driverVersion },
     );
   }
 
-  const manifestResult = await run(discovered.path, ["manifest"], { env: commandEnv });
+  const manifestResult = await run(discovered.path, ['manifest'], { env: commandEnv });
   if (manifestResult.exitCode !== 0) {
-    return unavailable("manifest-failed", "Cua Driver manifest validation failed.", {
+    return unavailable('manifest-failed', 'Cua Driver manifest validation failed.', {
       path: discovered.path,
       source: discovered.source,
     });
   }
-  const manifest = parseJsonObject(manifestResult.stdout, "Cua Driver manifest");
+  const manifest = parseJsonObject(manifestResult.stdout, 'Cua Driver manifest');
   const mcp = validateManifest(manifest, discovered.path, driverVersion);
 
-  const doctorResult = await run(discovered.path, ["doctor", "--json"], { env: commandEnv });
-  const doctorReport = parseJsonObject(doctorResult.stdout, "Cua Driver doctor");
+  const doctorResult = await run(discovered.path, ['doctor', '--json'], { env: commandEnv });
+  const doctorReport = parseJsonObject(doctorResult.stdout, 'Cua Driver doctor');
   if (doctorResult.exitCode !== 0 && doctorReport.ok !== false) {
-    return unavailable("doctor-failed", "Cua Driver diagnostics failed.", {
+    return unavailable('doctor-failed', 'Cua Driver diagnostics failed.', {
       path: discovered.path,
       source: discovered.source,
     });
   }
   const doctor = validateDoctor(doctorReport, { session });
   return {
-    status: "ready",
+    status: 'ready',
     path: discovered.path,
     source: discovered.source,
     fileIdentity: discovered.fileIdentity,
@@ -719,78 +752,92 @@ async function inspectLinuxCuaDriver({
   probePlugin = probeCuaHyprlandPlugin,
   discoverSystemDriver = discoverSystemPackageDriver,
 } = {}) {
-  const declaredSession = String(env.XDG_SESSION_TYPE ?? "").toLowerCase();
+  const declaredSession = String(env.XDG_SESSION_TYPE ?? '').toLowerCase();
   const session =
-    declaredSession === "wayland" || env.WAYLAND_DISPLAY
-      ? "wayland"
-      : declaredSession === "x11" || declaredSession === "xorg"
-        ? "x11"
-        : "unknown";
-  if (platform !== "linux") {
-    return unavailable("unsupported-platform", "Linux local control is only available on Ubuntu.");
+    declaredSession === 'wayland' || env.WAYLAND_DISPLAY
+      ? 'wayland'
+      : declaredSession === 'x11' || declaredSession === 'xorg'
+        ? 'x11'
+        : 'unknown';
+  if (platform !== 'linux') {
+    return unavailable('unsupported-platform', 'Linux local control is only available on Ubuntu.');
   }
-  if (arch !== "x64") {
+  if (arch !== 'x64') {
     return unavailable(
-      "unsupported-architecture",
-      "Bundled Linux local control is currently available only on x64 Ubuntu.",
+      'unsupported-architecture',
+      'Bundled Linux local control is currently available only on x64 Ubuntu.',
     );
   }
   let compositor;
-  if (session === "wayland") {
+  if (session === 'wayland') {
     const desktops = [env.XDG_CURRENT_DESKTOP, env.XDG_SESSION_DESKTOP]
-      .flatMap((value) => String(value ?? "").toLowerCase().split(":"))
+      .flatMap((value) =>
+        String(value ?? '')
+          .toLowerCase()
+          .split(':'),
+      )
       .filter(Boolean);
     if (isHyprlandSession(env)) {
-      compositor = "hyprland";
-    } else if (desktops.includes("gnome")) {
-      compositor = "gnome-mutter";
+      compositor = 'hyprland';
+    } else if (desktops.includes('gnome')) {
+      compositor = 'gnome-mutter';
     } else {
       return unavailable(
-        "wayland-compositor-unsupported",
-        "Wayland local control is currently limited to GNOME and Omarchy (Hyprland).",
+        'wayland-compositor-unsupported',
+        'Wayland local control is currently limited to GNOME and Omarchy (Hyprland).',
       );
     }
     if (!env.WAYLAND_DISPLAY || !env.DBUS_SESSION_BUS_ADDRESS) {
       return unavailable(
-        "wayland-session-unavailable",
-        compositor === "hyprland"
-          ? "Local control requires an active Hyprland desktop session."
-          : "Local control requires an active GNOME Wayland desktop session.",
+        'wayland-session-unavailable',
+        compositor === 'hyprland'
+          ? 'Local control requires an active Hyprland desktop session.'
+          : 'Local control requires an active GNOME Wayland desktop session.',
       );
     }
     // Checked again at every start: the plugin may have been disabled, or left stale by a Hyprland update.
-    if (compositor === "hyprland" && (await probePlugin({ env })) !== "active") {
-      return unavailable("linux-hyprland-plugin-required", PLUGIN_REQUIRED_MESSAGE, { compositor });
+    if (compositor === 'hyprland' && (await probePlugin({ env })) !== 'active') {
+      return unavailable('linux-hyprland-plugin-required', PLUGIN_REQUIRED_MESSAGE, { compositor });
     }
-  } else if (session !== "x11") {
+  } else if (session !== 'x11') {
     return unavailable(
-      "desktop-session-required",
-      "Local control requires an interactive GNOME desktop session.",
+      'desktop-session-required',
+      'Local control requires an interactive GNOME desktop session.',
     );
   }
-  if (session === "x11" && !env.DISPLAY) {
-    return unavailable("display-unavailable", "Local control requires an active Xorg display.");
+  if (session === 'x11' && !env.DISPLAY) {
+    return unavailable('display-unavailable', 'Local control requires an active Xorg display.');
   }
 
   const commandEnv = desktopCommandEnvironment(
     env,
-    session === "wayland" ? { CUA_DRIVER_RS_ENABLE_WAYLAND: "1" } : {},
+    session === 'wayland' ? { CUA_DRIVER_RS_ENABLE_WAYLAND: '1' } : {},
   );
-  const located = (result) => ({ ...result, commandEnv, session, ...(compositor ? { compositor } : {}) });
+  const located = (result) => ({
+    ...result,
+    commandEnv,
+    session,
+    ...(compositor ? { compositor } : {}),
+  });
   const failed = (error, discovered) =>
-    unavailable(error?.code ?? "diagnostics-failed", error?.message ?? String(error), {
+    unavailable(error?.code ?? 'diagnostics-failed', error?.message ?? String(error), {
       path: discovered.path,
       source: discovered.source,
       ...(error?.probes ? { probes: error.probes } : {}),
     });
 
   // An explicit CUA_DRIVER_PATH keeps its existing meaning; otherwise Omarchy's package-owned driver goes first.
-  if (compositor === "hyprland" && !env.CUA_DRIVER_PATH) {
+  if (compositor === 'hyprland' && !env.CUA_DRIVER_PATH) {
     const system = await discoverSystemDriver({
       validate: (candidate) =>
-        validateDriverCandidate(candidate, { currentUid, currentGid, currentUsername, lookupPrivateGroup }),
+        validateDriverCandidate(candidate, {
+          currentUid,
+          currentGid,
+          currentUsername,
+          lookupPrivateGroup,
+        }),
     });
-    if (system.status === "found") {
+    if (system.status === 'found') {
       try {
         const checked = await checkDriver(system, {
           session,
@@ -799,8 +846,8 @@ async function inspectLinuxCuaDriver({
           acceptVersion: compatibleSystemDriverVersion,
         });
         // The package's own version must name the binary that answered, or the file is not what pacman installed.
-        const packaged = String(system.packageVersion).replace(/^\d+:/, "").split("-")[0];
-        if (checked.status === "ready" && packaged === checked.driverVersion) {
+        const packaged = String(system.packageVersion).replace(/^\d+:/, '').split('-')[0];
+        if (checked.status === 'ready' && packaged === checked.driverVersion) {
           return located({ ...checked, packageVersion: system.packageVersion });
         }
       } catch {
@@ -818,7 +865,7 @@ async function inspectLinuxCuaDriver({
     currentUsername,
     lookupPrivateGroup,
   });
-  if (discovered.status !== "found") return discovered;
+  if (discovered.status !== 'found') return discovered;
   try {
     const checked = await checkDriver(discovered, {
       session,
@@ -826,7 +873,7 @@ async function inspectLinuxCuaDriver({
       run,
       acceptVersion: (version) => version === CERTIFIED_DRIVER_VERSION,
     });
-    return checked.status === "ready" ? located(checked) : checked;
+    return checked.status === 'ready' ? located(checked) : checked;
   } catch (error) {
     return failed(error, discovered);
   }

@@ -1,18 +1,17 @@
-import { randomUUID } from "node:crypto";
-import { mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { z } from "zod";
+import { randomUUID } from 'node:crypto';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { z } from 'zod';
 
-import { writeFileAtomic } from "./atomic.ts";
-import { DATA_DIR } from "./config.ts";
-import { startDueTimer, type DueTimer } from "./due-timer.ts";
-import { nextOccurrence } from "./routines.ts";
+import { writeFileAtomic } from './atomic.ts';
+import { DATA_DIR } from './config.ts';
+import { startDueTimer, type DueTimer } from './due-timer.ts';
+import { nextOccurrence } from './routines.ts';
 
 export type CalendarCallSchedule =
-  | { type: "once"; at: number }
-  | { type: "daily"; time: string; weekdays: number[] };
+  { type: 'once'; at: number } | { type: 'daily'; time: string; weekdays: number[] };
 
-export type CalendarCallAttachmentKind = "file" | "image";
+export type CalendarCallAttachmentKind = 'file' | 'image';
 
 export interface CalendarCallAttachment {
   id: string;
@@ -63,10 +62,10 @@ interface CalendarCallFile {
 const MAX_BOTS = 100;
 const MAX_ATTACHMENTS = 50;
 
-const scheduleSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("once"), at: z.number().finite() }),
+const scheduleSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('once'), at: z.number().finite() }),
   z.object({
-    type: z.literal("daily"),
+    type: z.literal('daily'),
     time: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
     weekdays: z.array(z.number().int().min(0).max(6)).min(1).max(7),
   }),
@@ -76,7 +75,7 @@ const attachmentSchema = z.object({
   name: z.string().trim().min(1).max(255),
   path: z.string().trim().min(1).max(4_096),
   size: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-  kind: z.enum(["file", "image"]),
+  kind: z.enum(['file', 'image']),
 });
 const callSchema = z.object({
   id: z.string().min(1),
@@ -97,9 +96,9 @@ const fileSchema = z.object({
 });
 
 function cloneSchedule(schedule: CalendarCallSchedule): CalendarCallSchedule {
-  return schedule.type === "once"
-    ? { type: "once", at: schedule.at }
-    : { type: "daily", time: schedule.time, weekdays: [...schedule.weekdays] };
+  return schedule.type === 'once'
+    ? { type: 'once', at: schedule.at }
+    : { type: 'daily', time: schedule.time, weekdays: [...schedule.weekdays] };
 }
 
 function sameRoster(left: readonly string[], right: readonly string[]): boolean {
@@ -119,11 +118,11 @@ function cloneCall(call: CalendarCall): CalendarCall {
 
 function cleanSchedule(value: CalendarCallSchedule): CalendarCallSchedule {
   const parsed = scheduleSchema.safeParse(value);
-  if (!parsed.success) throw new Error("Choose a valid call schedule");
-  if (parsed.data.type === "once") return { type: "once", at: parsed.data.at };
+  if (!parsed.success) throw new Error('Choose a valid call schedule');
+  if (parsed.data.type === 'once') return { type: 'once', at: parsed.data.at };
   const weekdays = [...new Set(parsed.data.weekdays)].sort((a, b) => a - b);
-  if (!weekdays.length) throw new Error("Choose at least one day");
-  return { type: "daily", time: parsed.data.time, weekdays };
+  if (!weekdays.length) throw new Error('Choose at least one day');
+  return { type: 'daily', time: parsed.data.time, weekdays };
 }
 
 function cleanAttachments(value: CalendarCallAttachment[] | undefined): CalendarCallAttachment[] {
@@ -134,10 +133,10 @@ function cleanAttachments(value: CalendarCallAttachment[] | undefined): Calendar
   const ids = new Set<string>();
   return value.map((candidate) => {
     const parsed = attachmentSchema.safeParse(candidate);
-    if (!parsed.success || parsed.data.name.includes("\0") || parsed.data.path.includes("\0")) {
-      throw new Error("Choose a valid attachment");
+    if (!parsed.success || parsed.data.name.includes('\0') || parsed.data.path.includes('\0')) {
+      throw new Error('Choose a valid attachment');
     }
-    if (ids.has(parsed.data.id)) throw new Error("Each attachment must be unique");
+    if (ids.has(parsed.data.id)) throw new Error('Each attachment must be unique');
     ids.add(parsed.data.id);
     return { ...parsed.data };
   });
@@ -145,21 +144,26 @@ function cleanAttachments(value: CalendarCallAttachment[] | undefined): Calendar
 
 function cleanInput(
   input: CalendarCallInput,
-  botExists: CalendarCallManagerOptions["botExists"],
-): Omit<CalendarCall, "id" | "roomId" | "nextRunAt" | "createdAt" | "updatedAt"> {
-  const name = String(input.name ?? "").trim().slice(0, 120);
-  const description = String(input.description ?? "").trim().slice(0, 20_000);
-  if (!name) throw new Error("Give the call a title");
+  botExists: CalendarCallManagerOptions['botExists'],
+): Omit<CalendarCall, 'id' | 'roomId' | 'nextRunAt' | 'createdAt' | 'updatedAt'> {
+  const name = String(input.name ?? '')
+    .trim()
+    .slice(0, 120);
+  const description = String(input.description ?? '')
+    .trim()
+    .slice(0, 20_000);
+  if (!name) throw new Error('Give the call a title');
 
-  if (!Array.isArray(input.botIds)) throw new Error("Add at least one bot");
-  const botIds = [...new Set(input.botIds.map((id) => String(id ?? "").trim()).filter(Boolean))];
-  if (!botIds.length) throw new Error("Add at least one bot");
+  if (!Array.isArray(input.botIds)) throw new Error('Add at least one bot');
+  const botIds = [...new Set(input.botIds.map((id) => String(id ?? '').trim()).filter(Boolean))];
+  if (!botIds.length) throw new Error('Add at least one bot');
   if (botIds.length > MAX_BOTS) throw new Error(`Add no more than ${MAX_BOTS} bots`);
-  if (botIds.some((botId) => !botExists(botId))) throw new Error("One or more bots no longer exist");
+  if (botIds.some((botId) => !botExists(botId)))
+    throw new Error('One or more bots no longer exist');
 
   const duration = input.durationMinutes ?? 30;
   if (!Number.isInteger(duration) || duration < 5 || duration > 240) {
-    throw new Error("Call duration must be between 5 and 240 minutes");
+    throw new Error('Call duration must be between 5 and 240 minutes');
   }
 
   return {
@@ -175,28 +179,29 @@ function cleanInput(
 export class CalendarCallManager {
   private readonly file: string;
   private readonly now: () => number;
-  private readonly botExists: CalendarCallManagerOptions["botExists"];
-  private readonly onDue: CalendarCallManagerOptions["onDue"];
+  private readonly botExists: CalendarCallManagerOptions['botExists'];
+  private readonly onDue: CalendarCallManagerOptions['onDue'];
   private calls: CalendarCall[] = [];
   private timer: DueTimer | null = null;
   private ticking = false;
 
   constructor(options: CalendarCallManagerOptions) {
-    this.file = options.file ?? join(DATA_DIR, "calendar-calls.json");
+    this.file = options.file ?? join(DATA_DIR, 'calendar-calls.json');
     this.now = options.now ?? Date.now;
     this.botExists = options.botExists;
     this.onDue = options.onDue;
     let migrated = false;
     try {
-      const parsed = fileSchema.safeParse(JSON.parse(readFileSync(this.file, "utf8")));
+      const parsed = fileSchema.safeParse(JSON.parse(readFileSync(this.file, 'utf8')));
       this.calls = parsed.success
         ? parsed.data.calls.flatMap((candidate) => {
             const call = callSchema.safeParse(candidate);
             if (!call.success) return [];
             if (call.data.nextRunAt === undefined) migrated = true;
-            const nextRunAt = call.data.nextRunAt === undefined
-              ? this.loadedOccurrence(call.data.schedule)
-              : call.data.nextRunAt;
+            const nextRunAt =
+              call.data.nextRunAt === undefined
+                ? this.loadedOccurrence(call.data.schedule)
+                : call.data.nextRunAt;
             return [cloneCall({ ...call.data, nextRunAt })];
           })
         : [];
@@ -207,7 +212,7 @@ export class CalendarCallManager {
       try {
         this.save();
       } catch (error) {
-        console.error("calendar calls: could not persist schedule migration", error);
+        console.error('calendar calls: could not persist schedule migration', error);
       }
     }
   }
@@ -242,28 +247,41 @@ export class CalendarCallManager {
     const clean = cleanInput(record, this.botExists);
     const index = this.calls.findIndex((call) => call.id === record.id);
     const held = index < 0 ? null : this.calls[index]!;
-    const call: CalendarCall = { id: record.id, ...clean, ...(record.roomId ? { roomId: record.roomId } : {}), nextRunAt: held?.nextRunAt ?? null,
-      createdAt: record.createdAt, updatedAt: this.now() };
-    this.commit(() => { if (held) this.calls[index] = call; else this.calls.push(call); });
+    const call: CalendarCall = {
+      id: record.id,
+      ...clean,
+      ...(record.roomId ? { roomId: record.roomId } : {}),
+      nextRunAt: held?.nextRunAt ?? null,
+      createdAt: record.createdAt,
+      updatedAt: this.now(),
+    };
+    this.commit(() => {
+      if (held) this.calls[index] = call;
+      else this.calls.push(call);
+    });
     return cloneCall(call);
   }
 
   update(id: string, patch: CalendarCallPatch): CalendarCall {
     const index = this.calls.findIndex((call) => call.id === id);
-    if (index < 0) throw new Error("Call not found");
+    if (index < 0) throw new Error('Call not found');
     const previous = this.calls[index]!;
-    const clean = cleanInput({
-      name: patch.name ?? previous.name,
-      description: patch.description ?? previous.description,
-      botIds: patch.botIds ?? previous.botIds,
-      schedule: patch.schedule ?? previous.schedule,
-      durationMinutes: patch.durationMinutes ?? previous.durationMinutes,
-      attachments: patch.attachments ?? previous.attachments,
-    }, this.botExists);
+    const clean = cleanInput(
+      {
+        name: patch.name ?? previous.name,
+        description: patch.description ?? previous.description,
+        botIds: patch.botIds ?? previous.botIds,
+        schedule: patch.schedule ?? previous.schedule,
+        durationMinutes: patch.durationMinutes ?? previous.durationMinutes,
+        attachments: patch.attachments ?? previous.attachments,
+      },
+      this.botExists,
+    );
     const updated: CalendarCall = {
       id: previous.id,
       ...clean,
-      roomId: patch.botIds && !sameRoster(clean.botIds, previous.botIds) ? undefined : previous.roomId,
+      roomId:
+        patch.botIds && !sameRoster(clean.botIds, previous.botIds) ? undefined : previous.roomId,
       nextRunAt: this.initialOccurrence(clean.schedule, this.now()),
       createdAt: previous.createdAt,
       updatedAt: this.now(),
@@ -288,7 +306,7 @@ export class CalendarCallManager {
 
   linkRoom(id: string, roomId: string): CalendarCall {
     const call = this.calls.find((candidate) => candidate.id === id);
-    if (!call) throw new Error("Call not found");
+    if (!call) throw new Error('Call not found');
     if (call.roomId === roomId) return cloneCall(call);
     this.commit(() => {
       call.roomId = roomId;
@@ -318,15 +336,21 @@ export class CalendarCallManager {
     return affected;
   }
 
-  get isTicking(): boolean { return this.ticking; }
+  get isTicking(): boolean {
+    return this.ticking;
+  }
 
   start(): void {
     if (this.timer) return;
     this.timer = startDueTimer({
       run: () => this.tick(),
-      next: () => this.calls.reduce<number | null>((at, call) => call.nextRunAt == null ? at : Math.min(at ?? Infinity, call.nextRunAt), null),
+      next: () =>
+        this.calls.reduce<number | null>(
+          (at, call) => (call.nextRunAt == null ? at : Math.min(at ?? Infinity, call.nextRunAt)),
+          null,
+        ),
       now: this.now,
-      onError: (error) => console.error("calendar calls: a scheduler pass failed", error),
+      onError: (error) => console.error('calendar calls: a scheduler pass failed', error),
     });
   }
 
@@ -351,9 +375,10 @@ export class CalendarCallManager {
             continue;
           }
         }
-        call.nextRunAt = call.schedule.type === "once"
-          ? null
-          : nextOccurrence(call.schedule, Math.max(now, scheduledFor));
+        call.nextRunAt =
+          call.schedule.type === 'once'
+            ? null
+            : nextOccurrence(call.schedule, Math.max(now, scheduledFor));
         this.save();
       }
     } finally {
@@ -362,13 +387,13 @@ export class CalendarCallManager {
   }
 
   private initialOccurrence(schedule: CalendarCallSchedule, now: number): number | null {
-    return schedule.type === "once" ? schedule.at : nextOccurrence(schedule, now);
+    return schedule.type === 'once' ? schedule.at : nextOccurrence(schedule, now);
   }
 
   /** Recurring reminders start from the next future slot; a past one-time reminder is never replayed. */
   private loadedOccurrence(schedule: CalendarCallSchedule): number | null {
     const now = this.now();
-    if (schedule.type === "once") return schedule.at > now ? schedule.at : null;
+    if (schedule.type === 'once') return schedule.at > now ? schedule.at : null;
     return nextOccurrence(schedule, now);
   }
 
@@ -386,8 +411,12 @@ export class CalendarCallManager {
 
   private save(): void {
     mkdirSync(dirname(this.file), { recursive: true });
-    writeFileAtomic(this.file, JSON.stringify({ version: 1, calls: this.calls } satisfies CalendarCallFile, null, 2), {
-      mode: 0o600,
-    });
+    writeFileAtomic(
+      this.file,
+      JSON.stringify({ version: 1, calls: this.calls } satisfies CalendarCallFile, null, 2),
+      {
+        mode: 0o600,
+      },
+    );
   }
 }

@@ -1,9 +1,14 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import {
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type WheelEvent as ReactWheelEvent,
+} from 'react';
 
-import { useStore, type Bot } from "@/state/store";
-import { imageAttachmentFromFile } from "@/lib/composer-attachments";
-import { useOrganizationBranding } from "@/lib/use-organization-branding";
-import { t } from "@/lib/i18n";
+import { useStore, type Bot } from '@/state/store';
+import { imageAttachmentFromFile } from '@/lib/composer-attachments';
+import { useOrganizationBranding } from '@/lib/use-organization-branding';
+import { t } from '@/lib/i18n';
 import {
   AVATAR_FOCUS_CENTER,
   AVATAR_ZOOM_MAX,
@@ -12,21 +17,38 @@ import {
   clampAvatarFocus,
   clampAvatarZoom,
   type BotAvatarCrop,
-} from "../../shared/bot-avatar";
-import { BotAvatar } from "./Avatar";
-import { useBotEditor } from "./bot-settings/BotEditorContext";
+} from '../../shared/bot-avatar';
+import { BotAvatar } from './Avatar';
+import { useBotEditor } from './bot-settings/BotEditorContext';
 
 export type AvatarPatch = Partial<
-  Pick<Bot, "avatarCrop" | "avatarUrl" | "avatarZoom" | "avatarFocusX" | "avatarFocusY" | "color" | "mascotExpression" | "mascotBody" | "mascotFaceColor">
+  Pick<
+    Bot,
+    | 'avatarCrop'
+    | 'avatarUrl'
+    | 'avatarZoom'
+    | 'avatarFocusX'
+    | 'avatarFocusY'
+    | 'color'
+    | 'mascotExpression'
+    | 'mascotBody'
+    | 'mascotFaceColor'
+  >
 >;
 
-export const RESET_MASCOT_PATCH: AvatarPatch = { avatarCrop: "mascot", color: "green", mascotExpression: null, mascotBody: "cursor", mascotFaceColor: null };
+export const RESET_MASCOT_PATCH: AvatarPatch = {
+  avatarCrop: 'mascot',
+  color: 'green',
+  mascotExpression: null,
+  mascotBody: 'cursor',
+  mascotFaceColor: null,
+};
 
 export const CROP_LABEL = {
-  mascot: "Mascot",
-  circle: "Circle",
-  rounded: "Rounded",
-  square: "Square",
+  mascot: 'Mascot',
+  circle: 'Circle',
+  rounded: 'Rounded',
+  square: 'Square',
 } satisfies Record<BotAvatarCrop, string>;
 
 const FRAME_SIZE = 168;
@@ -43,8 +65,15 @@ export function AvatarFraming({
   const zoom = clampAvatarZoom(bot.avatarZoom ?? AVATAR_ZOOM_MIN);
   const focusX = clampAvatarFocus(bot.avatarFocusX ?? AVATAR_FOCUS_CENTER);
   const focusY = clampAvatarFocus(bot.avatarFocusY ?? AVATAR_FOCUS_CENTER);
-  const framed = zoom !== AVATAR_ZOOM_MIN || focusX !== AVATAR_FOCUS_CENTER || focusY !== AVATAR_FOCUS_CENTER;
-  const drag = useRef<{ x: number; y: number; focusX: number; focusY: number; pointer: number } | null>(null);
+  const framed =
+    zoom !== AVATAR_ZOOM_MIN || focusX !== AVATAR_FOCUS_CENTER || focusY !== AVATAR_FOCUS_CENTER;
+  const drag = useRef<{
+    x: number;
+    y: number;
+    focusX: number;
+    focusY: number;
+    pointer: number;
+  } | null>(null);
 
   const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (disabled || event.button !== 0) return;
@@ -69,46 +98,59 @@ export function AvatarFraming({
   };
 
   return (
-    <div className="py-3">
+    <div className='py-3'>
       <div
-        className="mx-auto w-fit cursor-grab touch-none active:cursor-grabbing"
+        className='mx-auto w-fit cursor-grab touch-none active:cursor-grabbing'
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
-        onWheel={onWheel}
-      >
-        <BotAvatar bot={bot} size={FRAME_SIZE} animated={false} label={t("botIdentity.framing.preview", { name: bot.name })} />
+        onWheel={onWheel}>
+        <BotAvatar
+          bot={bot}
+          size={FRAME_SIZE}
+          animated={false}
+          label={t('botIdentity.framing.preview', { name: bot.name })}
+        />
       </div>
-      <div className="mb-1.5 mt-4 flex items-baseline justify-between">
-        <span className="text-[12px] font-medium uppercase tracking-[0.08em] text-ink-secondary">{t("settings.profile.avatar.zoom")}</span>
-        <span className="tabular-nums text-[12px] text-ink-secondary">{Math.round(zoom * 100)}%</span>
+      <div className='mb-1.5 mt-4 flex items-baseline justify-between'>
+        <span className='text-[12px] font-medium uppercase tracking-[0.08em] text-ink-secondary'>
+          {t('settings.profile.avatar.zoom')}
+        </span>
+        <span className='tabular-nums text-[12px] text-ink-secondary'>
+          {Math.round(zoom * 100)}%
+        </span>
       </div>
       <input
-        type="range"
+        type='range'
         min={AVATAR_ZOOM_MIN}
         max={AVATAR_ZOOM_MAX}
         step={0.01}
         value={zoom}
         disabled={disabled}
-        aria-label={t("botIdentity.framing.zoom")}
+        aria-label={t('botIdentity.framing.zoom')}
         aria-valuemin={AVATAR_ZOOM_MIN}
         aria-valuemax={AVATAR_ZOOM_MAX}
         aria-valuenow={zoom}
         aria-valuetext={`${Math.round(zoom * 100)}%`}
         onChange={(event) => onPatch({ avatarZoom: clampAvatarZoom(Number(event.target.value)) })}
-        className="w-full accent-accent"
+        className='w-full accent-accent'
       />
-      <div className="mt-1.5 flex items-center justify-between gap-3 text-[12px] text-ink-secondary">
-        <span>{t("botIdentity.framing.hint")}</span>
+      <div className='mt-1.5 flex items-center justify-between gap-3 text-[12px] text-ink-secondary'>
+        <span>{t('botIdentity.framing.hint')}</span>
         {framed && (
           <button
-            type="button"
+            type='button'
             disabled={disabled}
-            onClick={() => onPatch({ avatarZoom: AVATAR_ZOOM_MIN, avatarFocusX: AVATAR_FOCUS_CENTER, avatarFocusY: AVATAR_FOCUS_CENTER })}
-            className="shrink-0 rounded-md px-2 py-1 text-ink hover:bg-control disabled:opacity-50"
-          >
-            {t("botIdentity.framing.reset")}
+            onClick={() =>
+              onPatch({
+                avatarZoom: AVATAR_ZOOM_MIN,
+                avatarFocusX: AVATAR_FOCUS_CENTER,
+                avatarFocusY: AVATAR_FOCUS_CENTER,
+              })
+            }
+            className='shrink-0 rounded-md px-2 py-1 text-ink hover:bg-control disabled:opacity-50'>
+            {t('botIdentity.framing.reset')}
           </button>
         )}
       </div>
@@ -116,16 +158,39 @@ export function AvatarFraming({
   );
 }
 
-export function OrganizationAvatarIcons({ busy, onUpload }: { busy: boolean; onUpload: (file: File) => void }) {
+export function OrganizationAvatarIcons({
+  busy,
+  onUpload,
+}: {
+  busy: boolean;
+  onUpload: (file: File) => void;
+}) {
   const organization = useOrganizationBranding();
   if (!organization?.icons.length) return null;
   return (
-    <div className="mb-3 border-b border-hairline/40 pb-3">
-      <div className="mb-2 text-[13px] font-medium text-ink-secondary">{t("botIdentity.orgIcons", { name: organization.name })}</div>
-      <div className="flex flex-wrap gap-2">{organization.icons.map(icon => <button key={icon.id} type="button" disabled={busy} title={icon.name} aria-label={t("botIdentity.useOrgIcon", { name: icon.name })} className="flex size-12 items-center justify-center rounded-lg border border-hairline/40 hover:bg-control disabled:opacity-50" onClick={() => {
-        const bytes = Uint8Array.from(atob(icon.image.slice(22)), byte => byte.charCodeAt(0));
-        onUpload(new File([bytes], `${icon.id}.png`, { type: "image/png" }));
-      }}><img src={icon.image} alt="" className="size-10 rounded-md object-contain" /></button>)}</div>
+    <div className='mb-3 border-b border-hairline/40 pb-3'>
+      <div className='mb-2 text-[13px] font-medium text-ink-secondary'>
+        {t('botIdentity.orgIcons', { name: organization.name })}
+      </div>
+      <div className='flex flex-wrap gap-2'>
+        {organization.icons.map((icon) => (
+          <button
+            key={icon.id}
+            type='button'
+            disabled={busy}
+            title={icon.name}
+            aria-label={t('botIdentity.useOrgIcon', { name: icon.name })}
+            className='flex size-12 items-center justify-center rounded-lg border border-hairline/40 hover:bg-control disabled:opacity-50'
+            onClick={() => {
+              const bytes = Uint8Array.from(atob(icon.image.slice(22)), (byte) =>
+                byte.charCodeAt(0),
+              );
+              onUpload(new File([bytes], `${icon.id}.png`, { type: 'image/png' }));
+            }}>
+            <img src={icon.image} alt='' className='size-10 rounded-md object-contain' />
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -137,7 +202,7 @@ export function useAvatarImage(bot: Bot, onPatch: (patch: AvatarPatch) => void) 
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const crop = bot.avatarCrop ?? "mascot";
+  const crop = bot.avatarCrop ?? 'mascot';
   const cropRef = useRef(crop);
   cropRef.current = crop;
   const busy = uploading || generating;
@@ -148,12 +213,16 @@ export function useAvatarImage(bot: Bot, onPatch: (patch: AvatarPatch) => void) 
     setError(null);
     try {
       const saved = uploadAvatar ? null : await imageAttachmentFromFile(file);
-      const avatarUrl = uploadAvatar ? await uploadAvatar(file) : saved ? botAvatarUrlFromStoredPath(saved.path) : null;
-      if (!avatarUrl) throw new Error(t("botIdentity.uploadUnusable"));
+      const avatarUrl = uploadAvatar
+        ? await uploadAvatar(file)
+        : saved
+          ? botAvatarUrlFromStoredPath(saved.path)
+          : null;
+      if (!avatarUrl) throw new Error(t('botIdentity.uploadUnusable'));
       const latestCrop = cropRef.current;
       onPatch({
         avatarUrl,
-        avatarCrop: latestCrop === "mascot" ? "circle" : latestCrop,
+        avatarCrop: latestCrop === 'mascot' ? 'circle' : latestCrop,
         avatarZoom: AVATAR_ZOOM_MIN,
         avatarFocusX: AVATAR_FOCUS_CENTER,
         avatarFocusY: AVATAR_FOCUS_CENTER,
@@ -162,7 +231,7 @@ export function useAvatarImage(bot: Bot, onPatch: (patch: AvatarPatch) => void) 
       setError(uploadError instanceof Error ? uploadError.message : String(uploadError));
     } finally {
       setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+      if (fileRef.current) fileRef.current.value = '';
     }
   };
 
@@ -170,7 +239,7 @@ export function useAvatarImage(bot: Bot, onPatch: (patch: AvatarPatch) => void) 
     setError(null);
     onPatch({
       avatarUrl: null,
-      avatarCrop: "mascot",
+      avatarCrop: 'mascot',
       avatarZoom: AVATAR_ZOOM_MIN,
       avatarFocusX: AVATAR_FOCUS_CENTER,
       avatarFocusY: AVATAR_FOCUS_CENTER,
@@ -186,17 +255,17 @@ export function useAvatarImage(bot: Bot, onPatch: (patch: AvatarPatch) => void) 
       // lane as upload and remove.
       const cropAtStart = cropRef.current;
       await flushBotPatches(bot.id);
-      const result: { avatarUrl: string; bot: Bot } = await api(`/api/bots/${bot.id}/avatar/generate`, {
-        method: "POST",
-        body: JSON.stringify({ prompt: direction.trim() }),
-      });
+      const result: { avatarUrl: string; bot: Bot } = await api(
+        `/api/bots/${bot.id}/avatar/generate`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ prompt: direction.trim() }),
+        },
+      );
       const latestCrop = cropRef.current;
       onPatch({
         avatarUrl: result.avatarUrl,
-        avatarCrop:
-          latestCrop === cropAtStart
-            ? (result.bot.avatarCrop ?? "circle")
-            : latestCrop,
+        avatarCrop: latestCrop === cropAtStart ? (result.bot.avatarCrop ?? 'circle') : latestCrop,
       });
     } catch (generateError) {
       setError(generateError instanceof Error ? generateError.message : String(generateError));

@@ -1,5 +1,5 @@
-import type { CdpSession } from "./connection.ts";
-import { staleRefError } from "./errors.ts";
+import type { CdpSession } from './connection.ts';
+import { staleRefError } from './errors.ts';
 
 /** A DOM node the agent can name: the frame it lives in, the session that owns that frame, and Chrome's node id. */
 export interface NodeHandle {
@@ -24,7 +24,8 @@ export function parseRef(text: string): string | null {
   return REF.exec(text.trim())?.[1] ?? null;
 }
 
-const nodeKey = (handle: Pick<NodeHandle, "session" | "backendNodeId">) => `${handle.session.id ?? ""}|${handle.backendNodeId}`;
+const nodeKey = (handle: Pick<NodeHandle, 'session' | 'backendNodeId'>) =>
+  `${handle.session.id ?? ''}|${handle.backendNodeId}`;
 
 /** One tab's refs. An element keeps its ref across snapshots while its node lives; a number is never given out twice. */
 export class RefTable {

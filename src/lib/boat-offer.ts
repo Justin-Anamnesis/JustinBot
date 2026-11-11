@@ -12,9 +12,9 @@ export interface BoatOffer {
 }
 
 export const BOAT_OFFER: BoatOffer = {
-  url: "https://boat.dev",
-  claimTo: "support@ascii.dev",
-  subject: "MausBot introduced me: $50 Boat credit",
+  url: 'https://boat.dev',
+  claimTo: 'support@ascii.dev',
+  subject: 'MausBot introduced me: $50 Boat credit',
   body: "Hi Boat team,\n\nMausBot introduced me to Boat. I'm on the $___ plan.\nMy Boat account email: ___\n\nThanks!",
   until: null,
 };
@@ -25,6 +25,6 @@ export function boatOfferRuns(now: number, offer: BoatOffer = BOAT_OFFER): boole
 
 /** RFC 6068: everything after the address is percent-encoded (never "+" for a space) and a line break is %0D%0A. */
 export function boatClaimMailto(offer: BoatOffer = BOAT_OFFER): string {
-  const encode = (text: string) => encodeURIComponent(text.replace(/\r?\n/g, "\r\n"));
+  const encode = (text: string) => encodeURIComponent(text.replace(/\r?\n/g, '\r\n'));
   return `mailto:${offer.claimTo}?subject=${encode(offer.subject)}&body=${encode(offer.body)}`;
 }

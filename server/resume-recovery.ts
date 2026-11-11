@@ -1,10 +1,10 @@
 // Replay safety is classified from the driver's protocol state, never from provider error text (reworded, localized).
 
 export type ResumeFailureClass =
-  | "before-accept"
-  | "after-accept"
+  | 'before-accept'
+  | 'after-accept'
   /** Treated exactly like after-accept: an unproven guess is not a licence to repeat side effects. */
-  | "unknown";
+  | 'unknown';
 
 export interface ResumeAttemptState {
   attempted: boolean;
@@ -14,13 +14,13 @@ export interface ResumeAttemptState {
 }
 
 export function classifyResumeFailure(state: ResumeAttemptState): ResumeFailureClass {
-  if (state.producedOutput || state.promptSubmitted) return "after-accept";
-  if (state.attempted && state.rejected) return "before-accept";
-  return "unknown";
+  if (state.producedOutput || state.promptSubmitted) return 'after-accept';
+  if (state.attempted && state.rejected) return 'before-accept';
+  return 'unknown';
 }
 
 export function mayReplay(failure: ResumeFailureClass): boolean {
-  return failure === "before-accept";
+  return failure === 'before-accept';
 }
 
 export interface RecoveryPromptInput {
@@ -37,7 +37,8 @@ export interface RecoveryPrompt {
 export function recoveryPromptFor(input: RecoveryPromptInput): RecoveryPrompt {
   if (!mayReplay(input.failure)) return { text: input.currentText, replayed: false };
   const replay = input.recoveryText?.trim();
-  if (!replay || replay === input.currentText.trim()) return { text: input.currentText, replayed: false };
+  if (!replay || replay === input.currentText.trim())
+    return { text: input.currentText, replayed: false };
   return { text: replay, replayed: true };
 }
 

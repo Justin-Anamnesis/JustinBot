@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from 'vitest';
 
-import { BOTTOM_FOLLOW_THRESHOLD, followBottomGrowth, shouldResumeBottomFollow } from "./bottom-follow";
+import {
+  BOTTOM_FOLLOW_THRESHOLD,
+  followBottomGrowth,
+  shouldResumeBottomFollow,
+} from './bottom-follow';
 
-describe("followBottomGrowth", () => {
-  it("scrolls resized content to its new bottom while following", () => {
+describe('followBottomGrowth', () => {
+  it('scrolls resized content to its new bottom while following', () => {
     const calls: ScrollToOptions[] = [];
     const scroller = {
       scrollHeight: 1_240,
@@ -14,7 +18,7 @@ describe("followBottomGrowth", () => {
     expect(calls).toEqual([{ top: 1_240 }]);
   });
 
-  it("preserves scrollback when bottom-follow is detached", () => {
+  it('preserves scrollback when bottom-follow is detached', () => {
     const calls: ScrollToOptions[] = [];
     const scroller = {
       scrollHeight: 1_240,
@@ -26,8 +30,8 @@ describe("followBottomGrowth", () => {
   });
 });
 
-describe("shouldResumeBottomFollow", () => {
-  it("does not re-pin a small upward scroll inside the near-bottom zone", () => {
+describe('shouldResumeBottomFollow', () => {
+  it('does not re-pin a small upward scroll inside the near-bottom zone', () => {
     expect(
       shouldResumeBottomFollow({
         following: false,
@@ -38,7 +42,7 @@ describe("shouldResumeBottomFollow", () => {
     ).toBe(false);
   });
 
-  it("re-pins after scrolling downward to the end", () => {
+  it('re-pins after scrolling downward to the end', () => {
     expect(
       shouldResumeBottomFollow({
         following: false,
@@ -49,7 +53,7 @@ describe("shouldResumeBottomFollow", () => {
     ).toBe(true);
   });
 
-  it("stays detached while downward movement remains away from the end", () => {
+  it('stays detached while downward movement remains away from the end', () => {
     expect(
       shouldResumeBottomFollow({
         following: false,
@@ -60,7 +64,7 @@ describe("shouldResumeBottomFollow", () => {
     ).toBe(false);
   });
 
-  it("does not re-pin in the old 48px magnet zone", () => {
+  it('does not re-pin in the old 48px magnet zone', () => {
     expect(
       shouldResumeBottomFollow({
         following: false,
@@ -71,7 +75,7 @@ describe("shouldResumeBottomFollow", () => {
     ).toBe(false);
   });
 
-  it("does nothing when bottom-follow is already active", () => {
+  it('does nothing when bottom-follow is already active', () => {
     expect(
       shouldResumeBottomFollow({
         following: true,

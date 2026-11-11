@@ -12,7 +12,8 @@ export const metadata: Metadata = {
     default: appName,
     template: `%s · ${appName}`,
   },
-  description: 'MausBot docs: install, configure and extend your local-first team of AI agents. MausBot is free and open source (Apache 2.0).',
+  description:
+    'MausBot docs: install, configure and extend your local-first team of AI agents. MausBot is free and open source (Apache 2.0).',
   openGraph: {
     title: appName,
     siteName: appName,
@@ -27,8 +28,8 @@ export const metadata: Metadata = {
 
 export default function Layout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={inter.className} suppressHydrationWarning>
-      <body className="flex min-h-screen flex-col">
+    <html lang='en' className={inter.className} suppressHydrationWarning>
+      <body className='flex min-h-screen flex-col'>
         <Provider>{children}</Provider>
       </body>
     </html>

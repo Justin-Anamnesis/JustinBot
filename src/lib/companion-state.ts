@@ -3,7 +3,7 @@ export interface CompanionStateMutationEpoch {
 }
 
 /** Advanced before and after the IPC call, so snapshots taken before or during a mutation read as stale. */
-export const mutateCompanionBridgeState = async <State,>(
+export const mutateCompanionBridgeState = async <State>(
   epoch: CompanionStateMutationEpoch,
   mutate: () => Promise<State>,
 ): Promise<State> => {
@@ -23,7 +23,7 @@ export const companionStateRefreshIsCurrent = (
 export const phonePairingManualCodeMode = (
   pairingOpen: boolean,
   pairingLink: string | null,
-): "details" | "direct" | "hidden" => {
-  if (!pairingOpen) return "hidden";
-  return pairingLink ? "details" : "direct";
+): 'details' | 'direct' | 'hidden' => {
+  if (!pairingOpen) return 'hidden';
+  return pairingLink ? 'details' : 'direct';
 };

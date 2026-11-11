@@ -1,7 +1,7 @@
 // Recognised by shape only, never fetched: nothing leaves the app to render a reference.
 
 /** owner/repo#N: GitHub numbers issues and pull requests together, so the text cannot say which. */
-export type GithubRefKind = "pull" | "issue" | "commit" | "ref";
+export type GithubRefKind = 'pull' | 'issue' | 'commit' | 'ref';
 
 export type GithubRef = {
   kind: GithubRefKind;
@@ -12,11 +12,11 @@ export type GithubRef = {
   url: string;
 };
 
-const OWNER = "[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})";
-const REPO = "[A-Za-z0-9._-]{1,100}";
+const OWNER = '[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})';
+const REPO = '[A-Za-z0-9._-]{1,100}';
 const URL_SHAPE = new RegExp(
   `^https?://(?:www\\.)?github\\.com/(${OWNER})/(${REPO})/(pull|issues|commit)/([0-9]{1,7}|[0-9a-f]{7,40})(?:[/?#].*)?$`,
-  "i",
+  'i',
 );
 
 export function parseGithubUrl(href: string | undefined): GithubRef | null {
@@ -24,9 +24,14 @@ export function parseGithubUrl(href: string | undefined): GithubRef | null {
   const match = URL_SHAPE.exec(href.trim());
   if (!match) return null;
   const [, owner, repo, section, id] = match as unknown as [string, string, string, string, string];
-  if (repo === "." || repo === "..") return null;
-  const kind: GithubRefKind = section.toLowerCase() === "pull" ? "pull" : section.toLowerCase() === "issues" ? "issue" : "commit";
-  if (kind === "commit") {
+  if (repo === '.' || repo === '..') return null;
+  const kind: GithubRefKind =
+    section.toLowerCase() === 'pull'
+      ? 'pull'
+      : section.toLowerCase() === 'issues'
+        ? 'issue'
+        : 'commit';
+  if (kind === 'commit') {
     if (!/^[0-9a-f]{7,40}$/i.test(id)) return null;
     return { kind, owner, repo, sha: id.toLowerCase(), url: href.trim() };
   }
@@ -34,7 +39,7 @@ export function parseGithubUrl(href: string | undefined): GithubRef | null {
   return { kind, owner, repo, number: Number(id), url: href.trim() };
 }
 
-const SHORT_REF = new RegExp(`(?<![\\w/.@-])(${OWNER})/(${REPO})#([0-9]{1,7})(?![\\w-])`, "g");
+const SHORT_REF = new RegExp(`(?<![\\w/.@-])(${OWNER})/(${REPO})#([0-9]{1,7})(?![\\w-])`, 'g');
 
 export type TextSpan = { text: string; ref?: GithubRef };
 
@@ -45,11 +50,17 @@ export function splitShortRefs(text: string): TextSpan[] {
   for (const match of text.matchAll(SHORT_REF)) {
     const [whole, owner, repo, number] = match as unknown as [string, string, string, string];
     const start = match.index ?? 0;
-    if (repo.endsWith(".") || Number(number) < 1) continue;
+    if (repo.endsWith('.') || Number(number) < 1) continue;
     if (start > last) spans.push({ text: text.slice(last, start) });
     spans.push({
       text: whole,
-      ref: { kind: "ref", owner, repo, number: Number(number), url: `https://github.com/${owner}/${repo}/issues/${number}` },
+      ref: {
+        kind: 'ref',
+        owner,
+        repo,
+        number: Number(number),
+        url: `https://github.com/${owner}/${repo}/issues/${number}`,
+      },
     });
     last = start + whole.length;
   }
@@ -58,30 +69,46 @@ export function splitShortRefs(text: string): TextSpan[] {
 }
 
 export function githubRefLabel(ref: GithubRef, qualify: boolean): string {
-  const id = ref.kind === "commit" ? ref.sha!.slice(0, 7) : `#${ref.number}`;
+  const id = ref.kind === 'commit' ? ref.sha!.slice(0, 7) : `#${ref.number}`;
   if (!qualify) return id;
-  return ref.kind === "commit" ? `${ref.repo}@${id}` : `${ref.repo}${id}`;
+  return ref.kind === 'commit' ? `${ref.repo}@${id}` : `${ref.repo}${id}`;
 }
 
 export const repoKey = (ref: GithubRef) => `${ref.owner}/${ref.repo}`.toLowerCase();
 
-type MdNode = { type: string; value?: string; url?: string; children?: MdNode[]; data?: Record<string, unknown> };
+type MdNode = {
+  type: string;
+  value?: string;
+  url?: string;
+  children?: MdNode[];
+  data?: Record<string, unknown>;
+};
 
-const SKIP = new Set(["link", "linkReference", "image", "imageReference", "definition", "html", "inlineCode", "code", "mention"]);
+const SKIP = new Set([
+  'link',
+  'linkReference',
+  'image',
+  'imageReference',
+  'definition',
+  'html',
+  'inlineCode',
+  'code',
+  'mention',
+]);
 
 function textOf(node: MdNode): string {
-  if (typeof node.value === "string") return node.value;
-  return (node.children ?? []).map(textOf).join("");
+  if (typeof node.value === 'string') return node.value;
+  return (node.children ?? []).map(textOf).join('');
 }
 
 function refProperties(ref: GithubRef, label: string): Record<string, string> {
   return {
-    "data-github-ref": ref.kind,
-    "data-github-owner": ref.owner,
-    "data-github-repo": ref.repo,
-    ...(ref.number ? { "data-github-number": String(ref.number) } : {}),
-    ...(ref.sha ? { "data-github-sha": ref.sha } : {}),
-    "data-github-label": label,
+    'data-github-ref': ref.kind,
+    'data-github-owner': ref.owner,
+    'data-github-repo': ref.repo,
+    ...(ref.number ? { 'data-github-number': String(ref.number) } : {}),
+    ...(ref.sha ? { 'data-github-sha': ref.sha } : {}),
+    'data-github-label': label,
   };
 }
 
@@ -91,22 +118,27 @@ export function remarkGithubRefs() {
     const visit = (node: MdNode) => {
       if (!node.children) return;
       node.children = node.children.flatMap((child): MdNode[] => {
-        if (child.type === "link") {
+        if (child.type === 'link') {
           const ref = parseGithubUrl(child.url);
           const text = textOf(child).trim();
-          if (ref && (text === child.url || text === child.url?.replace(/^https?:\/\//i, ""))) found.push({ node: child, ref });
+          if (ref && (text === child.url || text === child.url?.replace(/^https?:\/\//i, '')))
+            found.push({ node: child, ref });
           return [child];
         }
         if (SKIP.has(child.type)) return [child];
-        if (child.type !== "text" || typeof child.value !== "string") {
+        if (child.type !== 'text' || typeof child.value !== 'string') {
           visit(child);
           return [child];
         }
         const spans = splitShortRefs(child.value);
         if (!spans.some((span) => span.ref)) return [child];
         return spans.map((span) => {
-          if (!span.ref) return { type: "text", value: span.text };
-          const link: MdNode = { type: "link", url: span.ref.url, children: [{ type: "text", value: span.text }] };
+          if (!span.ref) return { type: 'text', value: span.text };
+          const link: MdNode = {
+            type: 'link',
+            url: span.ref.url,
+            children: [{ type: 'text', value: span.text }],
+          };
           found.push({ node: link, ref: span.ref });
           return link;
         });
@@ -117,18 +149,31 @@ export function remarkGithubRefs() {
     const qualify = new Set(found.map(({ ref }) => repoKey(ref))).size > 1;
     for (const { node, ref } of found) {
       const label = githubRefLabel(ref, qualify);
-      node.children = [{ type: "text", value: label }];
-      node.data = { ...node.data, hProperties: { ...(node.data?.hProperties as object | undefined), ...refProperties(ref, label) } };
+      node.children = [{ type: 'text', value: label }];
+      node.data = {
+        ...node.data,
+        hProperties: {
+          ...(node.data?.hProperties as object | undefined),
+          ...refProperties(ref, label),
+        },
+      };
     }
   };
 }
 
-export function githubRefFromProps(props: Record<string, unknown>, href: string | undefined): GithubRef | null {
-  const kind = props["data-github-ref"];
-  if (kind !== "pull" && kind !== "issue" && kind !== "commit" && kind !== "ref") return null;
-  const owner = props["data-github-owner"], repo = props["data-github-repo"];
-  if (typeof owner !== "string" || typeof repo !== "string" || !href) return null;
-  const number = typeof props["data-github-number"] === "string" ? Number(props["data-github-number"]) : undefined;
-  const sha = typeof props["data-github-sha"] === "string" ? props["data-github-sha"] : undefined;
+export function githubRefFromProps(
+  props: Record<string, unknown>,
+  href: string | undefined,
+): GithubRef | null {
+  const kind = props['data-github-ref'];
+  if (kind !== 'pull' && kind !== 'issue' && kind !== 'commit' && kind !== 'ref') return null;
+  const owner = props['data-github-owner'],
+    repo = props['data-github-repo'];
+  if (typeof owner !== 'string' || typeof repo !== 'string' || !href) return null;
+  const number =
+    typeof props['data-github-number'] === 'string'
+      ? Number(props['data-github-number'])
+      : undefined;
+  const sha = typeof props['data-github-sha'] === 'string' ? props['data-github-sha'] : undefined;
   return { kind, owner, repo, ...(number ? { number } : {}), ...(sha ? { sha } : {}), url: href };
 }

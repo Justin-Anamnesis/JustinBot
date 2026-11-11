@@ -10,7 +10,7 @@ export declare class ControlPlaneError extends Error {
 }
 
 /** Sent only when given: a self-hosted server says `server`, and the control plane never gives its tunnel to the relay. */
-export type InstallationKind = "desktop" | "server";
+export type InstallationKind = 'desktop' | 'server';
 
 export declare function normalizeControlPlaneURL(value: unknown): string;
 export declare function normalizeAccountEmail(value: unknown): string;
@@ -57,7 +57,11 @@ export interface ControlPlaneClient {
     platform: string;
     appVersion?: string;
     kind?: InstallationKind;
-  }): Promise<{ installation: ControlPlaneInstallation; credential: string; credentialExpiresAt: number | null }>;
+  }): Promise<{
+    installation: ControlPlaneInstallation;
+    credential: string;
+    credentialExpiresAt: number | null;
+  }>;
   /** `appVersion`, when printable and at most 64 characters, is sent as the
    * release this installation runs. */
   ensureEndpoint(
@@ -68,7 +72,11 @@ export interface ControlPlaneClient {
    * ControlPlaneError with code `relay_unavailable` (503) outside the rollout. */
   relayToken(
     installationCredential: string,
-    options: { appVersion: string; devices: { e2e: number; legacy: number }; kind?: InstallationKind },
+    options: {
+      appVersion: string;
+      devices: { e2e: number; legacy: number };
+      kind?: InstallationKind;
+    },
   ): Promise<unknown>;
   getEndpoint(installationCredential: string): Promise<{ url: string; status: string } | null>;
   deleteEndpoint(installationCredential: string): Promise<void>;

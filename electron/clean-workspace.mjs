@@ -17,22 +17,22 @@
 // any other folder runs `realCopy` answers only what the copy's own files can say, and refuses the rest. `holding` brings
 // the copy back first from the clean workspace or a profile for the two things that must reach it (lifting the freeze,
 // forgetting the copy); a named local environment the person chose stays, and those wait until they open the copy again.
-import nodeFs from "node:fs";
-import path from "node:path";
+import nodeFs from 'node:fs';
+import path from 'node:path';
 
-import { WELCOME_VERSION } from "./onboarding-record.mjs";
-import nativeText from "./native-text.cjs";
+import { WELCOME_VERSION } from './onboarding-record.mjs';
+import nativeText from './native-text.cjs';
 
 /** This first conversation stays quiet: no corner notices until a reply, no spotlights (src/lib/onboarding.ts MET_CHIEF_HINT). */
-const QUIET_HINT = "met-chief-v1";
+const QUIET_HINT = 'met-chief-v1';
 /** The popup that offers to bring bots here (src/lib/notices.ts GROK_MOVE_NOTICE) would read badly beside a line saying they're safe in the Cloud. */
-const NO_MOVE_POPUP = "grok-move-2026-11";
-const CLEAN = "clean-workspace";
+const NO_MOVE_POPUP = 'grok-move-2026-11';
+const CLEAN = 'clean-workspace';
 
 export const cleanWorkspaceDir = (dataDir) => `${dataDir}-clean`;
 export const profilesDir = (dataDir) => `${dataDir}-profiles`;
 /** The profile the rail calls This Mac (or This PC). */
-export const DEFAULT_PROFILE = "default";
+export const DEFAULT_PROFILE = 'default';
 /** A profile id: its folder's name, and nothing that could reach outside the profiles' folder. */
 export const PROFILE_ID = /^[a-z0-9][a-z0-9-]{0,63}$/;
 export const profileDir = (dataDir, id) => path.join(profilesDir(dataDir), id);
@@ -40,7 +40,14 @@ export const profileDir = (dataDir, id) => path.join(profilesDir(dataDir), id);
 /** A clean workspace's first config: never the new-user setup, which would read as the person's bots being gone. Connecting
  * an AI isn't part of this: the page's line offers it while none works (HomeLine). */
 export function cleanWorkspaceConfig(language = null, now = new Date()) {
-  return { ...(typeof language === "string" && language ? { language } : {}), onboarding: { completedAt: now.toISOString(), version: WELCOME_VERSION, hintsSeen: [QUIET_HINT, NO_MOVE_POPUP] } };
+  return {
+    ...(typeof language === 'string' && language ? { language } : {}),
+    onboarding: {
+      completedAt: now.toISOString(),
+      version: WELCOME_VERSION,
+      hintsSeen: [QUIET_HINT, NO_MOVE_POPUP],
+    },
+  };
 }
 
 /**
@@ -56,17 +63,32 @@ export function cleanWorkspaceConfig(language = null, now = new Date()) {
  * `swap`: starts the server on that folder instead, and moves the window to its page. `changed`: the clean workspace started or
  * ended, so whatever depends on it (lending) looks again.
  */
-export function createCleanWorkspace({ dataDir, running, swap, allowed = () => true, changed = () => {}, log = () => {}, fs = nodeFs, t = nativeText.englishText.t }) {
+export function createCleanWorkspace({
+  dataDir,
+  running,
+  swap,
+  allowed = () => true,
+  changed = () => {},
+  log = () => {},
+  fs = nodeFs,
+  t = nativeText.englishText.t,
+}) {
   const folder = () => cleanWorkspaceDir(dataDir());
   const stranded = () => running() === folder();
   const profile = () => {
     const dir = running();
-    return typeof dir === "string" && path.dirname(dir) === profilesDir(dataDir()) && PROFILE_ID.test(path.basename(dir)) ? path.basename(dir) : null;
+    return typeof dir === 'string' &&
+      path.dirname(dir) === profilesDir(dataDir()) &&
+      PROFILE_ID.test(path.basename(dir))
+      ? path.basename(dir)
+      : null;
   };
   const active = () => stranded() || profile() !== null;
-  let held = 0, swapping = false;
+  let held = 0,
+    swapping = false;
   /** `dir` is this computer's own data folder, however it is spelled; no folder at all (no server) is not. */
-  const own = (dir) => typeof dir === "string" && dir !== "" && path.resolve(dir) === path.resolve(dataDir());
+  const own = (dir) =>
+    typeof dir === 'string' && dir !== '' && path.resolve(dir) === path.resolve(dataDir());
   /** This computer's own copy is the server that answers now: its server runs on the data folder, and isn't on its way to
    * or from another. */
   const ownCopy = () => !swapping && own(running());
@@ -77,19 +99,43 @@ export function createCleanWorkspace({ dataDir, running, swap, allowed = () => t
     queue = turn.catch(() => {});
     return turn;
   };
-  const readOwn = (name) => { try { return fs.readFileSync(path.join(dataDir(), name), "utf8"); } catch { return null; } };
+  const readOwn = (name) => {
+    try {
+      return fs.readFileSync(path.join(dataDir(), name), 'utf8');
+    } catch {
+      return null;
+    }
+  };
 
   function seed(dir) {
     fs.mkdirSync(dir, { recursive: true });
     let language = null;
-    try { language = JSON.parse(readOwn("config.json") ?? "{}")?.language ?? null; } catch {}
-    try { fs.writeFileSync(path.join(dir, "config.json"), JSON.stringify(cleanWorkspaceConfig(language)), { mode: 0o600, flag: "wx" }); }
-    catch (error) { if (error?.code !== "EEXIST") throw error; }
+    try {
+      language = JSON.parse(readOwn('config.json') ?? '{}')?.language ?? null;
+    } catch {}
+    try {
+      fs.writeFileSync(
+        path.join(dir, 'config.json'),
+        JSON.stringify(cleanWorkspaceConfig(language)),
+        { mode: 0o600, flag: 'wx' },
+      );
+    } catch (error) {
+      if (error?.code !== 'EEXIST') throw error;
+    }
   }
   async function swapTo(dir) {
     swapping = true;
-    const done = await swap(dir).catch((error) => ({ ok: false, error })).finally(() => { swapping = false; });
-    if (done?.ok !== true) { log(`clean workspace: could not start on ${dir} (${done?.error?.message ?? done?.error ?? "no answer"})`); return false; }
+    const done = await swap(dir)
+      .catch((error) => ({ ok: false, error }))
+      .finally(() => {
+        swapping = false;
+      });
+    if (done?.ok !== true) {
+      log(
+        `clean workspace: could not start on ${dir} (${done?.error?.message ?? done?.error ?? 'no answer'})`,
+      );
+      return false;
+    }
     changed();
     return true;
   }
@@ -97,11 +143,17 @@ export function createCleanWorkspace({ dataDir, running, swap, allowed = () => t
   const leave = () => inTurn(() => (active() ? swapTo(dataDir()) : true));
   /** This computer's freeze marker, as the frozen copy's own server would say it. */
   function marker() {
-    const text = readOwn("moved.json");
+    const text = readOwn('moved.json');
     if (text === null) return { frozen: false };
     let saved = null;
-    try { saved = JSON.parse(text); } catch {}
-    return { frozen: true, ...(typeof saved?.cloud === "string" ? { cloud: saved.cloud } : {}), ...(typeof saved?.place === "string" ? { place: saved.place } : {}) };
+    try {
+      saved = JSON.parse(text);
+    } catch {}
+    return {
+      frozen: true,
+      ...(typeof saved?.cloud === 'string' ? { cloud: saved.cloud } : {}),
+      ...(typeof saved?.place === 'string' ? { place: saved.place } : {}),
+    };
   }
 
   return {
@@ -115,22 +167,34 @@ export function createCleanWorkspace({ dataDir, running, swap, allowed = () => t
     marker,
     /** Opens the clean workspace; true once it runs. False when it can't, and the window says why as before. A named local
      * environment the person chose is no frozen copy, so it stays, and so does a profile. */
-    enter: () => inTurn(async () => {
-      if (active()) return true;
-      if (!allowed() || held > 0) return false;
-      if (!own(running())) return true;
-      try { seed(folder()); } catch (error) { log(`clean workspace: could not set it up (${error?.message ?? error})`); return false; }
-      return swapTo(folder());
-    }),
+    enter: () =>
+      inTurn(async () => {
+        if (active()) return true;
+        if (!allowed() || held > 0) return false;
+        if (!own(running())) return true;
+        try {
+          seed(folder());
+        } catch (error) {
+          log(`clean workspace: could not set it up (${error?.message ?? error})`);
+          return false;
+        }
+        return swapTo(folder());
+      }),
     /** Opens profile `id`, set up fresh the first time; true once it runs. */
-    open: (id = DEFAULT_PROFILE) => inTurn(async () => {
-      if (!PROFILE_ID.test(id)) return false;
-      if (profile() === id) return true;
-      if (!allowed() || held > 0) return false;
-      const dir = profileDir(dataDir(), id);
-      try { seed(dir); } catch (error) { log(`profile ${id}: could not set it up (${error?.message ?? error})`); return false; }
-      return swapTo(dir);
-    }),
+    open: (id = DEFAULT_PROFILE) =>
+      inTurn(async () => {
+        if (!PROFILE_ID.test(id)) return false;
+        if (profile() === id) return true;
+        if (!allowed() || held > 0) return false;
+        const dir = profileDir(dataDir(), id);
+        try {
+          seed(dir);
+        } catch (error) {
+          log(`profile ${id}: could not set it up (${error?.message ?? error})`);
+          return false;
+        }
+        return swapTo(dir);
+      }),
     leave,
     /** Settles once the swaps asked for so far are done. */
     settled: () => queue,
@@ -138,23 +202,25 @@ export function createCleanWorkspace({ dataDir, running, swap, allowed = () => t
     async holding(work) {
       held++;
       try {
-        if (!(await leave())) throw new Error(t("native.home.ownCopyNotReady"));
+        if (!(await leave())) throw new Error(t('native.home.ownCopyNotReady'));
         return await work();
-      } finally { held--; }
+      } finally {
+        held--;
+      }
     },
     /** `request` (this computer's server) as the move may use it: while any other folder runs, what the frozen copy's own
      * files say, and everything else refused. */
     realCopy(request) {
       return async (route, init) => {
         if (ownCopy()) return request(route, init);
-        if ((init?.method ?? "GET").toUpperCase() === "GET") {
-          if (route === "/api/move/freeze") return Response.json(marker());
-          if (route === "/.well-known/openmausbot/environment") {
-            const id = readOwn("environment-id")?.trim();
+        if ((init?.method ?? 'GET').toUpperCase() === 'GET') {
+          if (route === '/api/move/freeze') return Response.json(marker());
+          if (route === '/.well-known/openmausbot/environment') {
+            const id = readOwn('environment-id')?.trim();
             return Response.json(id ? { environmentId: id } : {});
           }
         }
-        throw Object.assign(new Error(t("native.home.ownCopyNotRunning")), { code: CLEAN });
+        throw Object.assign(new Error(t('native.home.ownCopyNotRunning')), { code: CLEAN });
       };
     },
   };

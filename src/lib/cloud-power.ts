@@ -5,9 +5,9 @@
 
 /** Background requests (polls nobody asked for just now) carry this header, so the home doesn't count them as someone
  * using it (server/cloud-power.ts `countsAsActivity`). */
-export const BACKGROUND_HEADER = "x-omb-background";
-export const CLOUD_POWER_HEADER = "x-omb-cloud-power";
-const WAKE_PATH = "/api/auth/session";
+export const BACKGROUND_HEADER = 'x-omb-background';
+export const CLOUD_POWER_HEADER = 'x-omb-cloud-power';
+const WAKE_PATH = '/api/auth/session';
 
 type Listener = (asleep: boolean) => void;
 const listeners = new Set<Listener>();
@@ -20,7 +20,9 @@ export function cloudAsleep(): boolean {
 
 export function onCloudPower(listener: Listener): () => void {
   listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  return () => {
+    listeners.delete(listener);
+  };
 }
 
 function set(next: boolean) {
@@ -41,42 +43,60 @@ export function markCloudAwake(): void {
 }
 
 /** The home agreed to sleep: stay quiet until the person does something. */
-export function markCloudAsleep(target: Pick<Window, "addEventListener" | "removeEventListener"> | undefined = globalThis.window): void {
+export function markCloudAsleep(
+  target: Pick<Window, 'addEventListener' | 'removeEventListener'> | undefined = globalThis.window,
+): void {
   if (asleep) return;
   set(true);
   if (!target) return;
   const wake = () => markCloudAwake();
-  const events = ["pointerdown", "keydown", "focus", "touchstart"] as const;
+  const events = ['pointerdown', 'keydown', 'focus', 'touchstart'] as const;
   for (const name of events) target.addEventListener(name, wake, { capture: true });
-  detach = () => { for (const name of events) target.removeEventListener(name, wake, { capture: true }); };
+  detach = () => {
+    for (const name of events) target.removeEventListener(name, wake, { capture: true });
+  };
 }
 
 /** The page is out of sight: a background tab, a minimized or hidden window. */
 export function pageHidden(): boolean {
-  return typeof document !== "undefined" && document.visibilityState === "hidden";
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
 }
 
 /** Resolves once the page shows again (at once when it isn't hidden); rejects if `signal` aborts first. */
 export function pageShown(signal?: AbortSignal): Promise<void> {
   if (!pageHidden()) return Promise.resolve();
   return new Promise((resolve, reject) => {
-    const done = () => { document.removeEventListener("visibilitychange", check); signal?.removeEventListener("abort", abort); };
-    const check = () => { if (!pageHidden()) { done(); resolve(); } };
-    const abort = () => { done(); reject(signal?.reason ?? new DOMException("The request was aborted.", "AbortError")); };
-    if (signal?.aborted) { abort(); return; }
-    document.addEventListener("visibilitychange", check);
-    signal?.addEventListener("abort", abort, { once: true });
+    const done = () => {
+      document.removeEventListener('visibilitychange', check);
+      signal?.removeEventListener('abort', abort);
+    };
+    const check = () => {
+      if (!pageHidden()) {
+        done();
+        resolve();
+      }
+    };
+    const abort = () => {
+      done();
+      reject(signal?.reason ?? new DOMException('The request was aborted.', 'AbortError'));
+    };
+    if (signal?.aborted) {
+      abort();
+      return;
+    }
+    document.addEventListener('visibilitychange', check);
+    signal?.addEventListener('abort', abort, { once: true });
   });
 }
 
 /** An "asleep" answer from the home (held polls and refused background requests carry it). */
-export function asleepAnswer(response: Pick<Response, "status" | "headers">): boolean {
-  return response.status === 503 && response.headers.get(CLOUD_POWER_HEADER) === "asleep";
+export function asleepAnswer(response: Pick<Response, 'status' | 'headers'>): boolean {
+  return response.status === 503 && response.headers.get(CLOUD_POWER_HEADER) === 'asleep';
 }
 
 /** The event stream's frame for it. */
 export function sleepingFrame(frame: { kind: string; state?: unknown }): boolean {
-  return frame.kind === "power" && frame.state === "sleeping";
+  return frame.kind === 'power' && frame.state === 'sleeping';
 }
 
 /** Tests only. */

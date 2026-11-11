@@ -1,15 +1,39 @@
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 
-import { browserMatesOf, loginPageCheck, loginPlace, loginSite, type LoginBots, type LoginPlace } from "../shared/logins.ts";
-import type { LinkedSecret } from "../shared/vault.ts";
-import type { FillCandidate } from "./login-fill.ts";
-import { receiveLoginHandoff, type ConnectionHandoffAnswer, type ConnectionHandoffWhat, type LoginHandoffResult } from "./login-handoff.ts";
-import type { VaultStore } from "./vault-store.ts";
-import type { OnePasswordLogins } from "./onepassword.ts";
-import type { LoginRouteDeps } from "./routes/logins.ts";
-import { findLinkedSecret, linkedCandidates, linkedSecretNames, linkedSecrets, linkedSites, readLinkedSecret, type VaultProvider } from "./vault/providers.ts";
+import {
+  browserMatesOf,
+  loginPageCheck,
+  loginPlace,
+  loginSite,
+  type LoginBots,
+  type LoginPlace,
+} from '../shared/logins.ts';
+import type { LinkedSecret } from '../shared/vault.ts';
+import type { FillCandidate } from './login-fill.ts';
+import {
+  receiveLoginHandoff,
+  type ConnectionHandoffAnswer,
+  type ConnectionHandoffWhat,
+  type LoginHandoffResult,
+} from './login-handoff.ts';
+import type { VaultStore } from './vault-store.ts';
+import type { OnePasswordLogins } from './onepassword.ts';
+import type { LoginRouteDeps } from './routes/logins.ts';
+import {
+  findLinkedSecret,
+  linkedCandidates,
+  linkedSecretNames,
+  linkedSecrets,
+  linkedSites,
+  readLinkedSecret,
+  type VaultProvider,
+} from './vault/providers.ts';
 
-const linkedItemId = (secretId: string, field: string | undefined) => `linked-${createHash("sha256").update(`${secretId}\0${field ?? ""}`).digest("hex").slice(0, 32)}`;
+const linkedItemId = (secretId: string, field: string | undefined) =>
+  `linked-${createHash('sha256')
+    .update(`${secretId}\0${field ?? ''}`)
+    .digest('hex')
+    .slice(0, 32)}`;
 
 /** What the bot's browser shows while the person answers a sign-in card. */
 export interface ObservedPage {
@@ -21,30 +45,53 @@ export interface ObservedPage {
 const OBSERVE_PAGE = `JSON.stringify({ href: location.href, signIn: Boolean(document.querySelector('input[type="password"], input[type="email"], input[autocomplete~="username"], input[autocomplete~="email"]')) })`;
 
 /** Null when nothing a login could be filled on is open. */
-export async function observeSignInPage(engine: (args: string[]) => Promise<Record<string, unknown> | null>): Promise<ObservedPage | null> {
+export async function observeSignInPage(
+  engine: (args: string[]) => Promise<Record<string, unknown> | null>,
+): Promise<ObservedPage | null> {
   let value: unknown;
-  try { value = (await engine(["eval", OBSERVE_PAGE]))?.result; } catch { return null; }
-  for (let depth = 0; depth < 2 && typeof value === "string"; depth++) {
-    try { value = JSON.parse(value); } catch { return null; }
+  try {
+    value = (await engine(['eval', OBSERVE_PAGE]))?.result;
+  } catch {
+    return null;
+  }
+  for (let depth = 0; depth < 2 && typeof value === 'string'; depth++) {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
   }
   const page = value as { href?: unknown; signIn?: unknown } | null;
-  if (typeof page?.href !== "string") return null;
+  if (typeof page?.href !== 'string') return null;
   const check = loginPageCheck(page.href);
   return check.ok ? { host: check.pageHost, signIn: page.signIn === true } : null;
 }
 
 /** A sign-in page on another site than the card's, which a login saved from the card fills only once the person, shown
  * that host on the card, confirms it: a page the bot chose must not receive a password saved for the site the card names. */
-export function cardSignInElsewhere(cardHost: string, observed: ObservedPage | null): string | null {
-  return observed?.signIn && loginSite(observed.host) !== loginSite(cardHost) ? observed.host : null;
+export function cardSignInElsewhere(
+  cardHost: string,
+  observed: ObservedPage | null,
+): string | null {
+  return observed?.signIn && loginSite(observed.host) !== loginSite(cardHost)
+    ? observed.host
+    : null;
 }
 
 /** Where a login saved from a sign-in card fills: the card's site, the sign-in page open on that site (else the card's
  * own host), and a sign-in page on another site when the person confirmed it. */
-export function cardLoginPlace(cardHost: string, observed: ObservedPage | null, confirmedHost: unknown): LoginPlace {
-  const onSite = observed?.signIn && loginSite(observed.host) === loginSite(cardHost) ? observed.host : cardHost;
+export function cardLoginPlace(
+  cardHost: string,
+  observed: ObservedPage | null,
+  confirmedHost: unknown,
+): LoginPlace {
+  const onSite =
+    observed?.signIn && loginSite(observed.host) === loginSite(cardHost) ? observed.host : cardHost;
   const elsewhere = cardSignInElsewhere(cardHost, observed);
-  return loginPlace(cardHost, [onSite, ...(elsewhere && confirmedHost === elsewhere ? [elsewhere] : [])]);
+  return loginPlace(cardHost, [
+    onSite,
+    ...(elsewhere && confirmedHost === elsewhere ? [elsewhere] : []),
+  ]);
 }
 
 /** Saved logins and secrets, and a linked password manager's, as each bot may use them. A login kept to some bots is
@@ -58,8 +105,12 @@ export class BotLogins {
   private readonly hold: (value: string) => void;
 
   /** `hold` masks a value read from a linked manager wherever text crosses to a bot or a transcript. */
-  constructor(store: VaultStore, onePassword: OnePasswordLogins, bots: () => ReadonlyArray<{ id: string; browserProfile?: string | null }> = () => [],
-    hold: (value: string) => void = () => {}) {
+  constructor(
+    store: VaultStore,
+    onePassword: OnePasswordLogins,
+    bots: () => ReadonlyArray<{ id: string; browserProfile?: string | null }> = () => [],
+    hold: (value: string) => void = () => {},
+  ) {
     this.store = store;
     this.onePassword = onePassword;
     this.providers = [onePassword];
@@ -74,14 +125,27 @@ export class BotLogins {
   }
 
   /** The desktop main process's private ask for one login, for Send to My Cloud, or for a connection a move carries. */
-  receiveHandoff(message: unknown, post: (reply: LoginHandoffResult) => boolean, connections?: (what: ConnectionHandoffWhat) => Promise<ConnectionHandoffAnswer>): boolean {
-    return receiveLoginHandoff(message, this.store, post, () => this.onePassword.status().error, connections);
+  receiveHandoff(
+    message: unknown,
+    post: (reply: LoginHandoffResult) => boolean,
+    connections?: (what: ConnectionHandoffWhat) => Promise<ConnectionHandoffAnswer>,
+  ): boolean {
+    return receiveLoginHandoff(
+      message,
+      this.store,
+      post,
+      () => this.onePassword.status().error,
+      connections,
+    );
   }
 
   /** Where each login the bot may use fills, with its username. */
   sitesFor(botId: string): Array<LoginPlace & { username: string }> {
     const bots = this.cardBots(botId);
-    return [...this.store.sitesFor(bots), ...this.providers.flatMap((provider) => linkedSites(provider, bots))];
+    return [
+      ...this.store.sitesFor(bots),
+      ...this.providers.flatMap((provider) => linkedSites(provider, bots)),
+    ];
   }
 
   /** Reads each linked manager's list again if it is older than the manager allows. */
@@ -95,7 +159,12 @@ export class BotLogins {
     const bots = this.cardBots(botId);
     return [
       ...this.store.usableFor(pageHost, bots).map((login): FillCandidate => ({
-        id: login.id, site: login.site, hosts: login.hosts, exactHost: login.exactHost, username: login.username, source: login.source,
+        id: login.id,
+        site: login.site,
+        hosts: login.hosts,
+        exactHost: login.exactHost,
+        username: login.username,
+        source: login.source,
         secrets: async () => ({ password: login.password, totp: login.totp ?? null }),
       })),
       ...this.providers.flatMap((provider) => linkedCandidates(provider, pageHost, bots)),
@@ -113,31 +182,51 @@ export class BotLogins {
 
   /** The names of the secrets the bot may use, for its prompt: never a value. */
   secretNamesFor(botId: string): Array<{ name: string; refOnly?: true }> {
-    const linked = this.providers.flatMap((provider) => linkedSecrets(provider, botId).flatMap((secret) => linkedSecretNames(secret).map(({ name }) => ({ name }))));
+    const linked = this.providers.flatMap((provider) =>
+      linkedSecrets(provider, botId).flatMap((secret) =>
+        linkedSecretNames(secret).map(({ name }) => ({ name })),
+      ),
+    );
     return [...this.store.secretNamesFor(botId), ...linked];
   }
 
   /** A secret a linked manager holds for the bot by this name, read from it now; its id is safe as a file name. */
-  async linkedSecret(name: string, botId: string): Promise<{ id: string; name: string; value: string } | null> {
+  async linkedSecret(
+    name: string,
+    botId: string,
+  ): Promise<{ id: string; name: string; value: string } | null> {
     await this.fresh();
     const use = findLinkedSecret(this.providers, name, botId);
     if (!use) return null;
     const value = await readLinkedSecret(use);
     this.hold(value);
-    return { id: linkedItemId(use.secret.id, use.field), name: use.field ? `${use.secret.name} ${use.field}` : use.secret.name, value };
+    return {
+      id: linkedItemId(use.secret.id, use.field),
+      name: use.field ? `${use.secret.name} ${use.field}` : use.secret.name,
+      value,
+    };
   }
 
   /** The linked secret `linkedSecret` gave this id: who may use it, and its value read from the manager when asked. */
   linkedById(id: string): { bots: LoginBots; read(): Promise<string> } | null {
     for (const provider of this.providers) {
       for (const secret of linkedSecrets(provider)) {
-        const name = linkedSecretNames(secret).find(({ field }) => linkedItemId(secret.id, field) === id);
+        const name = linkedSecretNames(secret).find(
+          ({ field }) => linkedItemId(secret.id, field) === id,
+        );
         if (!name) continue;
-        return { bots: secret.bots, read: async () => {
-          const value = await readLinkedSecret({ provider, secret, ...(name.field ? { field: name.field } : {}) });
-          this.hold(value);
-          return value;
-        } };
+        return {
+          bots: secret.bots,
+          read: async () => {
+            const value = await readLinkedSecret({
+              provider,
+              secret,
+              ...(name.field ? { field: name.field } : {}),
+            });
+            this.hold(value);
+            return value;
+          },
+        };
       }
     }
     return null;
@@ -157,7 +246,10 @@ export class BotLogins {
       botExists,
       onePassword: {
         status: () => this.onePassword.status(),
-        list: () => { void this.onePassword.fresh(); return this.onePassword.list(); },
+        list: () => {
+          void this.onePassword.fresh();
+          return this.onePassword.list();
+        },
         connect: async (token) => {
           const status = await this.onePassword.refresh(token);
           this.store.setOnePasswordToken(token);

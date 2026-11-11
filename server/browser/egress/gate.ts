@@ -7,17 +7,25 @@
 // T3 Tools Inc. (full text in third_party/t3-code/LICENSE); modified: plain Node in place of Effect, the policy is
 // the caller's and every refusal is reported, localhost names resolve here as Chrome resolves them, a failed
 // upstream connection gets a SOCKS reply, and a connection may go out through an upstream.
-import { lookup } from "node:dns/promises";
-import { connect, createServer, isIP, type BlockList, type Socket } from "node:net";
+import { lookup } from 'node:dns/promises';
+import { connect, createServer, isIP, type BlockList, type Socket } from 'node:net';
 
-import type { LinkOpened } from "../../../electron/device-link-protocol.mjs";
-import { addressClass, namesThisMachine, ownAddresses } from "./policy.ts";
+import type { LinkOpened } from '../../../electron/device-link-protocol.mjs';
+import { addressClass, namesThisMachine, ownAddresses } from './policy.ts';
 
-export interface ResolvedAddress { address: string; family: number }
-export interface GateTarget { host: string; port: number }
+export interface ResolvedAddress {
+  address: string;
+  family: number;
+}
+export interface GateTarget {
+  host: string;
+  port: number;
+}
 
 /** Another way out for one connection: the person's own computer, which looks the name up and checks it itself. */
-export interface GateUpstream { open(target: GateTarget): Promise<LinkOpened> }
+export interface GateUpstream {
+  open(target: GateTarget): Promise<LinkOpened>;
+}
 
 export interface GateOptions {
   /** Why a destination is refused by its name alone, or null; a name refused here is never looked up. */
@@ -41,31 +49,48 @@ export interface EgressGate {
 /** A Chrome OpenMausBot starts never touches the person's credential store: on macOS Chrome otherwise opens the login
  * keychain (a dialog when it cannot find one), and on Linux it asks the desktop keyring. */
 export function credentialStoreFlags(platform: NodeJS.Platform = process.platform): string[] {
-  return platform === "darwin" ? ["--use-mock-keychain"] : platform === "linux" ? ["--password-store=basic"] : [];
+  return platform === 'darwin'
+    ? ['--use-mock-keychain']
+    : platform === 'linux'
+      ? ['--password-store=basic']
+      : [];
 }
 
 /** How a whole Chrome goes through the gate on `port`. */
-export function gateChromeSettings(port: number, platform: NodeJS.Platform = process.platform): { proxy: string; bypass: string; args: string[] } {
+export function gateChromeSettings(
+  port: number,
+  platform: NodeJS.Platform = process.platform,
+): { proxy: string; bypass: string; args: string[] } {
   return {
     proxy: `socks5://127.0.0.1:${port}`,
     // Chrome otherwise connects to loopback directly.
-    bypass: "<-loopback>",
+    bypass: '<-loopback>',
     args: [
       // WebRTC would otherwise send UDP around the proxy. Chrome 155 reads the first switch and
       // chrome-headless-shell 153 the second; each ignores the other.
-      "--webrtc-ip-handling-policy=disable_non_proxied_udp",
-      "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+      '--webrtc-ip-handling-policy=disable_non_proxied_udp',
+      '--force-webrtc-ip-handling-policy=disable_non_proxied_udp',
       ...credentialStoreFlags(platform),
     ],
   };
 }
 
-export function gateChromeFlags(port: number, platform: NodeJS.Platform = process.platform): string[] {
+export function gateChromeFlags(
+  port: number,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
   const settings = gateChromeSettings(port, platform);
-  return [`--proxy-server=${settings.proxy}`, `--proxy-bypass-list=${settings.bypass}`, ...settings.args];
+  return [
+    `--proxy-server=${settings.proxy}`,
+    `--proxy-bypass-list=${settings.bypass}`,
+    ...settings.args,
+  ];
 }
 
-const LOOPBACK_NAMES: ResolvedAddress[] = [{ address: "127.0.0.1", family: 4 }, { address: "::1", family: 6 }];
+const LOOPBACK_NAMES: ResolvedAddress[] = [
+  { address: '127.0.0.1', family: 4 },
+  { address: '::1', family: 6 },
+];
 
 /** Chrome sends names, address literals included, for the proxy to resolve. */
 export async function resolveTarget(host: string): Promise<ResolvedAddress[]> {
@@ -90,7 +115,7 @@ const MAX_EARLY_BYTES = 64 * 1024;
  * policy, so a bot's dev server here stays reachable and nothing private is asked of the person's computer. */
 export function staysHere(host: string, own: BlockList = ownAddresses()): boolean {
   if (/^(?:[^.]+\.)*localhost\.?$/i.test(host)) return true;
-  return isIP(host) !== 0 && addressClass(host, own) !== "public";
+  return isIP(host) !== 0 && addressClass(host, own) !== 'public';
 }
 
 /** Answers and closes; whatever the client sent after its request is dropped, not left buffered. */
@@ -100,17 +125,20 @@ function refuse(client: Socket, code: number): void {
 
 /** The CONNECT target in a complete SOCKS5 request, or "short" while more bytes are needed. */
 function readRequest(data: Buffer) {
-  if (data.length < 5) return "short" as const;
+  if (data.length < 5) return 'short' as const;
   if (data[0] !== 5 || data[2] !== 0) return undefined;
   const type = data[3];
   const end = type === 1 ? 10 : type === 3 ? 7 + data[4]! : type === 4 ? 22 : -1;
   if (end === -1) return undefined;
-  if (data.length < end) return "short" as const;
-  const host = type === 1
-    ? [...data.subarray(4, 8)].join(".")
-    : type === 3
-      ? data.subarray(5, 5 + data[4]!).toString("latin1")
-      : Array.from({ length: 8 }, (_, index) => data.readUInt16BE(4 + index * 2).toString(16)).join(":");
+  if (data.length < end) return 'short' as const;
+  const host =
+    type === 1
+      ? [...data.subarray(4, 8)].join('.')
+      : type === 3
+        ? data.subarray(5, 5 + data[4]!).toString('latin1')
+        : Array.from({ length: 8 }, (_, index) =>
+            data.readUInt16BE(4 + index * 2).toString(16),
+          ).join(':');
   return { command: data[1], host, port: data.readUInt16BE(end - 2), rest: data.subarray(end) };
 }
 
@@ -122,7 +150,13 @@ function readRequest(data: Buffer) {
  * By hand, because autoSelectFamily with a custom lookup never falls back: on Node 24, a list that mixes families
  * where the first cannot route (a host with no IPv6 route is the usual case) leaves the socket stalled until it
  * times out, with the IPv4 answer never tried. */
-function connectChecked(port: number, addresses: readonly ResolvedAddress[], track: (socket: Socket) => Socket, client: Socket, staggerMs = 250): Promise<Socket> {
+function connectChecked(
+  port: number,
+  addresses: readonly ResolvedAddress[],
+  track: (socket: Socket) => Socket,
+  client: Socket,
+  staggerMs = 250,
+): Promise<Socket> {
   return new Promise((resolve, reject) => {
     const inFlight = new Set<Socket>();
     let next = 0;
@@ -132,22 +166,25 @@ function connectChecked(port: number, addresses: readonly ResolvedAddress[], tra
       if (settled) return;
       settled = true;
       for (const attempt of inFlight) attempt.destroy();
-      reject(new Error("client left"));
+      reject(new Error('client left'));
     };
-    client.once("close", giveUp);
-    const settle = () => { settled = true; client.off("close", giveUp); };
+    client.once('close', giveUp);
+    const settle = () => {
+      settled = true;
+      client.off('close', giveUp);
+    };
     const startNext = (): void => {
       if (settled || next >= addresses.length) return;
       const { address, family } = addresses[next++]!;
       const attempt = track(connect({ host: address, port, family }));
       inFlight.add(attempt);
-      attempt.once("connect", () => {
+      attempt.once('connect', () => {
         if (settled) return void attempt.destroy();
         settle();
         for (const other of inFlight) if (other !== attempt) other.destroy();
         resolve(attempt);
       });
-      attempt.once("error", (error: NodeJS.ErrnoException) => {
+      attempt.once('error', (error: NodeJS.ErrnoException) => {
         inFlight.delete(attempt);
         if (settled) return;
         // A quick failure moves straight on to the next address instead of waiting out the stagger.
@@ -169,8 +206,8 @@ export function openGate(options: GateOptions): Promise<EgressGate> {
   const sockets = new Set<Socket>();
   const track = (socket: Socket) => {
     sockets.add(socket);
-    socket.on("close", () => sockets.delete(socket));
-    socket.on("error", () => socket.destroy());
+    socket.on('close', () => sockets.delete(socket));
+    socket.on('error', () => socket.destroy());
     return socket;
   };
   const server = createServer((client) => {
@@ -182,15 +219,17 @@ export function openGate(options: GateOptions): Promise<EgressGate> {
       if (!greeted) {
         if (data.length < 2 || data.length < 2 + data[1]!) return;
         // Version 5, offering "no authentication".
-        if (data[0] !== 5 || !data.subarray(2, 2 + data[1]!).includes(0)) return void client.end(Buffer.from([5, 0xff]));
+        if (data[0] !== 5 || !data.subarray(2, 2 + data[1]!).includes(0))
+          return void client.end(Buffer.from([5, 0xff]));
         data = data.subarray(2 + data[1]!);
         greeted = true;
         client.write(Buffer.from([5, 0]));
       }
       const request = readRequest(data);
-      if (request === "short") return;
-      client.off("data", onData);
-      if (request === undefined || request.command !== 1 || request.port === 0) return refuse(client, UNSUPPORTED);
+      if (request === 'short') return;
+      client.off('data', onData);
+      if (request === undefined || request.command !== 1 || request.port === 0)
+        return refuse(client, UNSUPPORTED);
       const target = { host: request.host, port: request.port };
       // Keeps reading while the target resolves, so a client that leaves is noticed, and holds what it sends early.
       const early: Buffer[] = [request.rest];
@@ -200,20 +239,27 @@ export function openGate(options: GateOptions): Promise<EgressGate> {
         if (earlyBytes > MAX_EARLY_BYTES) return void client.destroy();
         early.push(chunk);
       };
-      client.on("data", holdEarly);
+      client.on('data', holdEarly);
       void (async () => {
         const named = options.refuseName?.(target) ?? null;
-        const through = named === null && !staysHere(target.host, options.own?.()) ? options.upstream?.(target) ?? null : null;
+        const through =
+          named === null && !staysHere(target.host, options.own?.())
+            ? (options.upstream?.(target) ?? null)
+            : null;
         if (through) {
           const opened = await through.open(target).catch((): LinkOpened => ({ gone: true }));
-          if (!("gone" in opened)) {
-            if (client.destroyed) return void ("cancel" in opened && opened.cancel());
-            client.off("data", holdEarly);
-            if ("refused" in opened) {
+          if (!('gone' in opened)) {
+            if (client.destroyed) return void ('cancel' in opened && opened.cancel());
+            client.off('data', holdEarly);
+            if ('refused' in opened) {
               options.onRefusal?.(target, opened.refused);
               return refuse(client, NOT_ALLOWED);
             }
-            if ("failed" in opened) return refuse(client, opened.failed === "refused" ? CONNECTION_REFUSED : HOST_UNREACHABLE);
+            if ('failed' in opened)
+              return refuse(
+                client,
+                opened.failed === 'refused' ? CONNECTION_REFUSED : HOST_UNREACHABLE,
+              );
             client.write(reply(SUCCEEDED));
             opened.join(client, early);
             return;
@@ -221,9 +267,11 @@ export function openGate(options: GateOptions): Promise<EgressGate> {
           if (client.destroyed) return;
         }
         const addresses = named === null ? await resolve(target.host) : [];
-        const refusal = named ?? (addresses.length ? await options.decide(target, addresses).catch(() => "error") : null);
+        const refusal =
+          named ??
+          (addresses.length ? await options.decide(target, addresses).catch(() => 'error') : null);
         if (client.destroyed) return;
-        client.off("data", holdEarly);
+        client.off('data', holdEarly);
         if (refusal !== null) {
           options.onRefusal?.(target, refusal);
           return refuse(client, NOT_ALLOWED);
@@ -244,25 +292,26 @@ export function openGate(options: GateOptions): Promise<EgressGate> {
         for (const chunk of early) upstream.write(chunk);
         upstream.pipe(client);
         client.pipe(upstream);
-        upstream.on("close", () => client.destroy());
-        client.on("close", () => upstream.destroy());
+        upstream.on('close', () => client.destroy());
+        client.on('close', () => upstream.destroy());
       })().catch(() => client.destroy());
     };
-    client.on("data", onData);
+    client.on('data', onData);
   });
   return new Promise((done, fail) => {
     // A failure to listen fails this browser; once listening, a server error must not reach Node unhandled.
-    server.once("error", fail);
-    server.listen(0, "127.0.0.1", () => {
-      server.off("error", fail);
-      server.on("error", () => {});
+    server.once('error', fail);
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', fail);
+      server.on('error', () => {});
       const address = server.address();
       done({
-        port: typeof address === "object" && address !== null ? address.port : 0,
-        close: () => new Promise<void>((closed) => {
-          for (const socket of sockets) socket.destroy();
-          server.close(() => closed());
-        }),
+        port: typeof address === 'object' && address !== null ? address.port : 0,
+        close: () =>
+          new Promise<void>((closed) => {
+            for (const socket of sockets) socket.destroy();
+            server.close(() => closed());
+          }),
       });
     });
   });

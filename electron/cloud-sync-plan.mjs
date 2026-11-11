@@ -11,25 +11,47 @@ export const ASK_DELETES_SHARE = 0.2;
  * (`unsettled`, or `kept`: links and hard-linked files, present but not carried). Files only My Cloud has (a bot's) stay.
  */
 export function planShare({ base, pc, cloud, keptDirs = [] }) {
-  const uploads = [], records = [], deletes = [], forgets = [];
+  const uploads = [],
+    records = [],
+    deletes = [],
+    forgets = [];
   const underKept = (path) => keptDirs.some((dir) => path.startsWith(`${dir}/`));
   for (const [path, file] of pc) {
     if (file.unsettled || file.kept) continue;
     const there = cloud.get(path);
     if (there?.sha256 === file.sha256) {
       const known = base.get(path);
-      if (!known || known.sha256 !== file.sha256 || known.size !== file.size || known.mtimeMs !== file.mtimeMs) records.push({ path, sha256: file.sha256, size: file.size, mtimeMs: file.mtimeMs });
+      if (
+        !known ||
+        known.sha256 !== file.sha256 ||
+        known.size !== file.size ||
+        known.mtimeMs !== file.mtimeMs
+      )
+        records.push({ path, sha256: file.sha256, size: file.size, mtimeMs: file.mtimeMs });
       continue;
     }
-    uploads.push({ path, sha256: file.sha256, size: file.size, mtimeMs: file.mtimeMs, file: file.file, baseSha256: there?.sha256 ?? null });
+    uploads.push({
+      path,
+      sha256: file.sha256,
+      size: file.size,
+      mtimeMs: file.mtimeMs,
+      file: file.file,
+      baseSha256: there?.sha256 ?? null,
+    });
   }
   for (const [path, known] of base) {
     if (pc.has(path) || underKept(path)) continue;
     const there = cloud.get(path);
-    if (!there) { forgets.push({ path }); continue; }
+    if (!there) {
+      forgets.push({ path });
+      continue;
+    }
     deletes.push({ path, baseSha256: there.sha256, size: known.size });
   }
-  const ask = deletes.length > 0 && ((pc.size === 0 && base.size > 0) || (deletes.length >= ASK_DELETES_AT && deletes.length >= ASK_DELETES_SHARE * base.size));
+  const ask =
+    deletes.length > 0 &&
+    ((pc.size === 0 && base.size > 0) ||
+      (deletes.length >= ASK_DELETES_AT && deletes.length >= ASK_DELETES_SHARE * base.size));
   return { uploads, records, deletes, forgets, ask };
 }
 
@@ -39,18 +61,35 @@ export function planShare({ base, pc, cloud, keptDirs = [] }) {
  * the person removed here comes back only when My Cloud has a newer version.
  */
 export function planOutputs({ base, pc, cloud }) {
-  const downloads = [], records = [];
+  const downloads = [],
+    records = [];
   for (const [path, there] of cloud) {
-    const here = pc.get(path), known = base.get(path);
+    const here = pc.get(path),
+      known = base.get(path);
     if (here?.unsettled || here?.kept) continue;
     if (here && here.sha256 === there.sha256) {
-      if (!known || known.sha256 !== there.sha256 || known.size !== here.size || known.mtimeMs !== here.mtimeMs) records.push({ path, sha256: there.sha256, size: here.size, mtimeMs: here.mtimeMs });
+      if (
+        !known ||
+        known.sha256 !== there.sha256 ||
+        known.size !== here.size ||
+        known.mtimeMs !== here.mtimeMs
+      )
+        records.push({ path, sha256: there.sha256, size: here.size, mtimeMs: here.mtimeMs });
       continue;
     }
     if (known && known.sha256 === there.sha256) continue;
-    if (!here) { downloads.push({ path, sha256: there.sha256, size: there.size, replace: null }); continue; }
+    if (!here) {
+      downloads.push({ path, sha256: there.sha256, size: there.size, replace: null });
+      continue;
+    }
     const untouched = Boolean(known && here.size === known.size && here.mtimeMs === known.mtimeMs);
-    downloads.push({ path, sha256: there.sha256, size: there.size, replace: untouched ? here : null, beside: !untouched });
+    downloads.push({
+      path,
+      sha256: there.sha256,
+      size: there.size,
+      replace: untouched ? here : null,
+      beside: !untouched,
+    });
   }
   return { downloads, records };
 }

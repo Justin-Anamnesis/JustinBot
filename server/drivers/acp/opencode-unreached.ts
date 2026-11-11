@@ -5,11 +5,16 @@
  * Error" stay ordinary errors. It answers the same after a tool already ran, so only the absence of prompt activity
  * proves nothing started. */
 export function openCodePromptUnreachedModel(error: unknown): boolean {
-  const value = error && typeof error === "object" ? error as Record<string, unknown> : {};
+  const value = error && typeof error === 'object' ? (error as Record<string, unknown>) : {};
   if (value.code !== -32603) return false;
-  const data = value.data && typeof value.data === "object" && !Array.isArray(value.data)
-    ? value.data as Record<string, unknown>
-    : {};
-  const text = [value.message, data.message, data.details].filter((part) => typeof part === "string").join(" ");
-  return /\bECONNREFUSED\b|\bConnectionRefused\b|\bCannot connect to API: Unable to connect\b/u.test(text);
+  const data =
+    value.data && typeof value.data === 'object' && !Array.isArray(value.data)
+      ? (value.data as Record<string, unknown>)
+      : {};
+  const text = [value.message, data.message, data.details]
+    .filter((part) => typeof part === 'string')
+    .join(' ');
+  return /\bECONNREFUSED\b|\bConnectionRefused\b|\bCannot connect to API: Unable to connect\b/u.test(
+    text,
+  );
 }

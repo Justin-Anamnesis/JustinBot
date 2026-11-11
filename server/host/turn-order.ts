@@ -1,5 +1,5 @@
-import type { TurnKind } from "../agents-turn.ts";
-import type { HandoffView } from "../coordinator.ts";
+import type { TurnKind } from '../agents-turn.ts';
+import type { HandoffView } from '../coordinator.ts';
 
 export interface TurnOrderDeps {
   /** What started the direct turn this thread runs or is about to run, and whether it goes on from a person's own line. */
@@ -16,8 +16,11 @@ export interface TurnOrderDeps {
 export function createTurnOrder(deps: TurnOrderDeps) {
   return (threadId: string): boolean => {
     const turn = deps.turn(threadId);
-    if (turn?.kind === "person") return true;
-    if (turn?.kind === "continuation" && turn.personLine && !deps.unattended(threadId)) return true;
-    return deps.roomLine(threadId) || deps.running(threadId).some((node) => node.answer !== undefined && !node.answeredBy);
+    if (turn?.kind === 'person') return true;
+    if (turn?.kind === 'continuation' && turn.personLine && !deps.unattended(threadId)) return true;
+    return (
+      deps.roomLine(threadId) ||
+      deps.running(threadId).some((node) => node.answer !== undefined && !node.answeredBy)
+    );
   };
 }

@@ -1,16 +1,25 @@
 // An in-memory Docker Engine for the connector's tests: images, containers, volumes holding files, and the fixed
 // helper commands the connector runs (cp, find, du, tar, the box probe) carried out on those files.
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
-import type { ContainerInfo, ContainerSpec, ContainerSummary, Docker, DockerInfo, DockerVersion, ImageInfo, VolumeInfo } from "../src/docker.ts";
-import { DockerError } from "../src/docker.ts";
+import type {
+  ContainerInfo,
+  ContainerSpec,
+  ContainerSummary,
+  Docker,
+  DockerInfo,
+  DockerVersion,
+  ImageInfo,
+  VolumeInfo,
+} from '../src/docker.ts';
+import { DockerError } from '../src/docker.ts';
 
 export interface FakeContainer {
   id: string;
   name: string;
   spec: ContainerSpec;
-  status: "created" | "running" | "exited" | "paused";
+  status: 'created' | 'running' | 'exited' | 'paused';
   exitCode: number;
   startedAt: number;
   logs: string;
@@ -21,7 +30,7 @@ export interface FakeVolume {
   files: Map<string, string>;
 }
 
-const VERSION_LABEL = "org.opencontainers.image.version";
+const VERSION_LABEL = 'org.opencontainers.image.version';
 
 export class FakeDocker implements Docker {
   /** What `pull` can fetch: reference → image labels. */
@@ -34,15 +43,23 @@ export class FakeDocker implements Docker {
   readonly helperRuns: string[][] = [];
   readonly startFailures = new Map<string, string>();
   info_: DockerInfo = {
-    ServerVersion: "28.0.4", OperatingSystem: "Ubuntu 24.04.3 LTS", KernelVersion: "6.8.0-1021-azure", Architecture: "x86_64", NCPU: 4,
-    MemTotal: 16 * 1073741824, SecurityOptions: ["name=apparmor", "name=seccomp,profile=builtin", "name=cgroupns"], DockerRootDir: "/var/lib/docker",
+    ServerVersion: '28.0.4',
+    OperatingSystem: 'Ubuntu 24.04.3 LTS',
+    KernelVersion: '6.8.0-1021-azure',
+    Architecture: 'x86_64',
+    NCPU: 4,
+    MemTotal: 16 * 1073741824,
+    SecurityOptions: ['name=apparmor', 'name=seccomp,profile=builtin', 'name=cgroupns'],
+    DockerRootDir: '/var/lib/docker',
   };
   /** A copy of /data fails, as on a full disk. */
   failCopy = false;
   /** What the box probe prints and its exit code. */
-  probe = { code: 0, output: "" };
+  probe = { code: 0, output: '' };
   /** What a command run inside a container prints: lets a test act as the home's own loopback. */
-  onExec: ((container: FakeContainer, command: string[]) => { code: number; output: string }) | null = null;
+  onExec:
+    ((container: FakeContainer, command: string[]) => { code: number; output: string }) | null =
+    null;
   /** Folders on the host that containers bind-mount, by path. */
   readonly folders = new Map<string, FakeVolume>();
   /** Run when a home container starts: lets a test act as the home (write files, crash). */
@@ -72,11 +89,15 @@ export class FakeDocker implements Docker {
   }
 
   container(name: string): FakeContainer | null {
-    return this.containers.get(name) ?? [...this.containers.values()].find((container) => container.id === name) ?? null;
+    return (
+      this.containers.get(name) ??
+      [...this.containers.values()].find((container) => container.id === name) ??
+      null
+    );
   }
 
   async version(): Promise<DockerVersion> {
-    return { Version: this.info_.ServerVersion, ApiVersion: "1.48", MinAPIVersion: "1.24" };
+    return { Version: this.info_.ServerVersion, ApiVersion: '1.48', MinAPIVersion: '1.24' };
   }
 
   async info(): Promise<DockerInfo> {
@@ -92,7 +113,9 @@ export class FakeDocker implements Docker {
 
   async imageInspect(image: string): Promise<ImageInfo | null> {
     const labels = this.images.get(image);
-    return labels ? { Id: `sha256:${image.length}`, RepoDigests: [image], Config: { Labels: labels } } : null;
+    return labels
+      ? { Id: `sha256:${image.length}`, RepoDigests: [image], Config: { Labels: labels } }
+      : null;
   }
 
   async removeImage(image: string): Promise<void> {
@@ -108,39 +131,85 @@ export class FakeDocker implements Docker {
       Id: container.id,
       Name: `/${container.name}`,
       Created: new Date(0).toISOString(),
-      Config: { Image: container.spec.Image, Env: container.spec.Env ?? [], Labels: container.spec.Labels ?? {}, Cmd: container.spec.Cmd ?? null, Entrypoint: container.spec.Entrypoint ?? null },
+      Config: {
+        Image: container.spec.Image,
+        Env: container.spec.Env ?? [],
+        Labels: container.spec.Labels ?? {},
+        Cmd: container.spec.Cmd ?? null,
+        Entrypoint: container.spec.Entrypoint ?? null,
+      },
       HostConfig: { ...container.spec.HostConfig } as Record<string, unknown>,
       State: {
-        Status: container.status, Running: container.status === "running" || container.status === "paused", Paused: container.status === "paused",
-        Restarting: false, ExitCode: container.exitCode, StartedAt: new Date(container.startedAt).toISOString(), FinishedAt: new Date(0).toISOString(),
+        Status: container.status,
+        Running: container.status === 'running' || container.status === 'paused',
+        Paused: container.status === 'paused',
+        Restarting: false,
+        ExitCode: container.exitCode,
+        StartedAt: new Date(container.startedAt).toISOString(),
+        FinishedAt: new Date(0).toISOString(),
       },
-      Mounts: (container.spec.HostConfig.Mounts ?? []).map((mount) => ({ Type: mount.Type, Name: mount.Source, Source: mount.Source, Destination: mount.Target })),
+      Mounts: (container.spec.HostConfig.Mounts ?? []).map((mount) => ({
+        Type: mount.Type,
+        Name: mount.Source,
+        Source: mount.Source,
+        Destination: mount.Target,
+      })),
     };
   }
 
   async listContainers(labels: Record<string, string>): Promise<ContainerSummary[]> {
     return [...this.containers.values()]
-      .filter((container) => Object.entries(labels).every(([key, value]) => container.spec.Labels?.[key] === value))
-      .map((container) => ({ Id: container.id, Names: [`/${container.name}`], Image: container.spec.Image, State: container.status, Labels: container.spec.Labels ?? {} }));
+      .filter((container) =>
+        Object.entries(labels).every(([key, value]) => container.spec.Labels?.[key] === value),
+      )
+      .map((container) => ({
+        Id: container.id,
+        Names: [`/${container.name}`],
+        Image: container.spec.Image,
+        State: container.status,
+        Labels: container.spec.Labels ?? {},
+      }));
   }
 
   async containersUsing(volume: string): Promise<ContainerSummary[]> {
     return [...this.containers.values()]
-      .filter((container) => (container.spec.HostConfig.Mounts ?? []).some((mount) => mount.Source === volume))
-      .map((container) => ({ Id: container.id, Names: [`/${container.name}`], Image: container.spec.Image, State: container.status, Labels: container.spec.Labels ?? {} }));
+      .filter((container) =>
+        (container.spec.HostConfig.Mounts ?? []).some((mount) => mount.Source === volume),
+      )
+      .map((container) => ({
+        Id: container.id,
+        Names: [`/${container.name}`],
+        Image: container.spec.Image,
+        State: container.status,
+        Labels: container.spec.Labels ?? {},
+      }));
   }
 
   async createContainer(name: string, spec: ContainerSpec): Promise<string> {
     this.calls.push(`create ${name} ${spec.Image}`);
-    if (this.containers.has(name)) throw new DockerError(409, `Conflict. The container name "/${name}" is already in use`);
+    if (this.containers.has(name))
+      throw new DockerError(409, `Conflict. The container name "/${name}" is already in use`);
     if (!this.images.has(spec.Image)) throw new DockerError(404, `No such image: ${spec.Image}`);
     for (const mount of spec.HostConfig.Mounts ?? []) {
-      if (mount.Type === "bind") {
-        if (!existsSync(mount.Source)) throw new DockerError(400, `invalid mount config for type "bind": bind source path does not exist: ${mount.Source}`);
-      } else if (!this.volumes.has(mount.Source)) this.volumes.set(mount.Source, { labels: {}, files: new Map() });
+      if (mount.Type === 'bind') {
+        if (!existsSync(mount.Source))
+          throw new DockerError(
+            400,
+            `invalid mount config for type "bind": bind source path does not exist: ${mount.Source}`,
+          );
+      } else if (!this.volumes.has(mount.Source))
+        this.volumes.set(mount.Source, { labels: {}, files: new Map() });
     }
-    const id = `c${String(this.nextId++).padStart(11, "0")}`;
-    this.containers.set(name, { id, name, spec, status: "created", exitCode: 0, startedAt: 0, logs: "" });
+    const id = `c${String(this.nextId++).padStart(11, '0')}`;
+    this.containers.set(name, {
+      id,
+      name,
+      spec,
+      status: 'created',
+      exitCode: 0,
+      startedAt: 0,
+      logs: '',
+    });
     return id;
   }
 
@@ -150,31 +219,37 @@ export class FakeDocker implements Docker {
     this.calls.push(`start ${container.name}`);
     const failure = this.startFailures.get(container.name);
     if (failure) throw new DockerError(500, failure);
-    if (container.status === "running") return;
-    container.status = "running";
+    if (container.status === 'running') return;
+    container.status = 'running';
     container.startedAt = this.now();
-    const role = container.spec.Labels?.["com.mausbot.role"];
-    if (role === "helper") this.runHelper(container);
-    else if (role === "home") this.onHomeStart?.(container);
-    else if (role === "connector") await this.onConnectorStart?.(container);
+    const role = container.spec.Labels?.['com.mausbot.role'];
+    if (role === 'helper') this.runHelper(container);
+    else if (role === 'home') this.onHomeStart?.(container);
+    else if (role === 'connector') await this.onConnectorStart?.(container);
   }
 
   async stopContainer(name: string): Promise<void> {
     const container = this.container(name);
     if (!container) return;
-    if (container.status === "running" || container.status === "paused") this.calls.push(`stop ${container.name}`);
-    if (container.status === "running" || container.status === "paused") container.status = "exited";
+    if (container.status === 'running' || container.status === 'paused')
+      this.calls.push(`stop ${container.name}`);
+    if (container.status === 'running' || container.status === 'paused')
+      container.status = 'exited';
   }
 
   async unpauseContainer(name: string): Promise<void> {
     const container = this.container(name);
-    if (container?.status === "paused") container.status = "running";
+    if (container?.status === 'paused') container.status = 'running';
   }
 
   async removeContainer(name: string): Promise<void> {
     const container = this.container(name);
     if (!container) return;
-    if (container.status === "paused") throw new DockerError(409, "You cannot remove a paused container. Unpause and then stop the container before attempting removal or force remove");
+    if (container.status === 'paused')
+      throw new DockerError(
+        409,
+        'You cannot remove a paused container. Unpause and then stop the container before attempting removal or force remove',
+      );
     this.calls.push(`rm ${container.name}`);
     this.containers.delete(container.name);
   }
@@ -182,7 +257,8 @@ export class FakeDocker implements Docker {
   async renameContainer(name: string, to: string): Promise<void> {
     const container = this.container(name);
     if (!container) throw new DockerError(404, `No such container: ${name}`);
-    if (this.containers.has(to)) throw new DockerError(409, `Conflict. The container name "/${to}" is already in use`);
+    if (this.containers.has(to))
+      throw new DockerError(409, `Conflict. The container name "/${to}" is already in use`);
     this.calls.push(`rename ${container.name} ${to}`);
     this.containers.delete(container.name);
     container.name = to;
@@ -196,26 +272,29 @@ export class FakeDocker implements Docker {
   }
 
   async logs(name: string): Promise<string> {
-    return this.container(name)?.logs ?? "";
+    return this.container(name)?.logs ?? '';
   }
 
   async exec(name: string, command: string[]): Promise<{ code: number; output: string }> {
     const container = this.container(name);
-    if (!container || container.status !== "running") throw new DockerError(409, `Container ${name} is not running`);
+    if (!container || container.status !== 'running')
+      throw new DockerError(409, `Container ${name} is not running`);
     this.calls.push(`exec ${container.name}`);
-    return this.onExec?.(container, command) ?? { code: 127, output: "" };
+    return this.onExec?.(container, command) ?? { code: 127, output: '' };
   }
 
   folder(path: string): FakeVolume {
     let folder = this.folders.get(path);
-    if (!folder) this.folders.set(path, folder = { labels: {}, files: new Map() });
+    if (!folder) this.folders.set(path, (folder = { labels: {}, files: new Map() }));
     return folder;
   }
 
   async volumeInspect(name: string): Promise<VolumeInfo | null> {
-    if (name === "mausbot-connector") return { Name: name, Labels: {}, Mountpoint: this.stateDir };
+    if (name === 'mausbot-connector') return { Name: name, Labels: {}, Mountpoint: this.stateDir };
     const volume = this.volumes.get(name);
-    return volume ? { Name: name, Labels: volume.labels, Mountpoint: `/var/lib/docker/volumes/${name}/_data` } : null;
+    return volume
+      ? { Name: name, Labels: volume.labels, Mountpoint: `/var/lib/docker/volumes/${name}/_data` }
+      : null;
   }
 
   async createVolume(name: string, labels: Record<string, string>): Promise<void> {
@@ -225,7 +304,11 @@ export class FakeDocker implements Docker {
 
   async removeVolume(name: string): Promise<void> {
     if (!this.volumes.has(name)) return;
-    if ([...this.containers.values()].some((container) => (container.spec.HostConfig.Mounts ?? []).some((mount) => mount.Source === name))) {
+    if (
+      [...this.containers.values()].some((container) =>
+        (container.spec.HostConfig.Mounts ?? []).some((mount) => mount.Source === name),
+      )
+    ) {
       throw new DockerError(409, `remove ${name}: volume is in use`);
     }
     this.calls.push(`volume rm ${name}`);
@@ -234,7 +317,9 @@ export class FakeDocker implements Docker {
 
   async listVolumes(labels: Record<string, string>): Promise<VolumeInfo[]> {
     return [...this.volumes]
-      .filter(([, volume]) => Object.entries(labels).every(([key, value]) => volume.labels[key] === value))
+      .filter(([, volume]) =>
+        Object.entries(labels).every(([key, value]) => volume.labels[key] === value),
+      )
       .map(([name, volume]) => ({ Name: name, Labels: volume.labels }));
   }
 
@@ -243,65 +328,85 @@ export class FakeDocker implements Docker {
     const command = [...(container.spec.Entrypoint ?? []), ...(container.spec.Cmd ?? [])];
     this.helperRuns.push(command);
     const mounted = (target: string) => {
-      const mount = (container.spec.HostConfig.Mounts ?? []).find((entry) => entry.Target === target);
+      const mount = (container.spec.HostConfig.Mounts ?? []).find(
+        (entry) => entry.Target === target,
+      );
       if (!mount) throw new Error(`helper has nothing mounted at ${target}`);
-      return { volume: mount.Type === "bind" ? this.folder(mount.Source) : this.volume(mount.Source), readOnly: Boolean(mount.ReadOnly) };
+      return {
+        volume: mount.Type === 'bind' ? this.folder(mount.Source) : this.volume(mount.Source),
+        readOnly: Boolean(mount.ReadOnly),
+      };
     };
     const writable = (target: string) => {
       const found = mounted(target);
       if (found.readOnly) throw new Error(`helper writes to read-only ${target}`);
       return found.volume;
     };
-    const finish = (code: number, logs = "") => {
-      container.status = "exited";
+    const finish = (code: number, logs = '') => {
+      container.status = 'exited';
       container.exitCode = code;
       container.logs = logs;
     };
-    const line = command.join(" ");
-    if (line === "cp -a /from/. /to/") {
-      if (this.failCopy) return finish(1, "cp: error writing '/to/big.bin': No space left on device");
-      const from = mounted("/from").volume;
-      const to = writable("/to");
+    const line = command.join(' ');
+    if (line === 'cp -a /from/. /to/') {
+      if (this.failCopy)
+        return finish(1, "cp: error writing '/to/big.bin': No space left on device");
+      const from = mounted('/from').volume;
+      const to = writable('/to');
       for (const [path, content] of from.files) to.files.set(path, content);
       return finish(0);
     }
-    if (line === "find /to -mindepth 1 -delete") {
-      writable("/to").files.clear();
+    if (line === 'find /to -mindepth 1 -delete') {
+      writable('/to').files.clear();
       return finish(0);
     }
-    if (command[0] === "find" && command[1] === "/data" && command.includes("-delete")) {
-      const data = writable("/data");
-      const patterns = command.flatMap((arg, index) => (arg === "-path" ? [command[index + 1]] : []));
-      const matches = (path: string) => patterns.some((pattern) => {
-        const regex = new RegExp(`^${pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`);
-        return regex.test(`/data/${path}`);
-      });
+    if (command[0] === 'find' && command[1] === '/data' && command.includes('-delete')) {
+      const data = writable('/data');
+      const patterns = command.flatMap((arg, index) =>
+        arg === '-path' ? [command[index + 1]] : [],
+      );
+      const matches = (path: string) =>
+        patterns.some((pattern) => {
+          const regex = new RegExp(
+            `^${pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
+          );
+          return regex.test(`/data/${path}`);
+        });
       const deleted = [...data.files.keys()].filter(matches);
       for (const path of deleted) data.files.delete(path);
-      return finish(0, deleted.map((path) => `/data/${path}`).join("\n"));
+      return finish(0, deleted.map((path) => `/data/${path}`).join('\n'));
     }
-    if (line === "du -sk /data") {
-      const bytes = [...mounted("/data").volume.files.values()].reduce((sum, content) => sum + content.length, 0);
+    if (line === 'du -sk /data') {
+      const bytes = [...mounted('/data').volume.files.values()].reduce(
+        (sum, content) => sum + content.length,
+        0,
+      );
       return finish(0, `${Math.ceil(bytes / 1024)}\t/data\n`);
     }
-    if (command[0] === "tar" && command.includes("-czf")) {
-      const archive = command[command.indexOf("-czf") + 1];
-      if (!mounted("/state").readOnly) writeFileSync(join(this.stateDir, archive.replace("/state/", "")), JSON.stringify([...mounted("/data").volume.files]));
+    if (command[0] === 'tar' && command.includes('-czf')) {
+      const archive = command[command.indexOf('-czf') + 1];
+      if (!mounted('/state').readOnly)
+        writeFileSync(
+          join(this.stateDir, archive.replace('/state/', '')),
+          JSON.stringify([...mounted('/data').volume.files]),
+        );
       return finish(0);
     }
-    if (command[0] === "tar" && command.includes("-xzpf")) {
-      const archive = command[command.indexOf("-xzpf") + 1];
+    if (command[0] === 'tar' && command.includes('-xzpf')) {
+      const archive = command[command.indexOf('-xzpf') + 1];
       let entries: [string, string][];
       try {
-        entries = JSON.parse(readFileSync(join(this.stateDir, archive.replace("/state/", "")), "utf8")) as [string, string][];
+        entries = JSON.parse(
+          readFileSync(join(this.stateDir, archive.replace('/state/', '')), 'utf8'),
+        ) as [string, string][];
       } catch {
-        return finish(2, "tar: This does not look like a tar archive");
+        return finish(2, 'tar: This does not look like a tar archive');
       }
-      const data = writable("/data");
+      const data = writable('/data');
       for (const [path, content] of entries) data.files.set(path, content);
       return finish(0);
     }
-    if (command[0] === "bwrap") return finish(this.probe.code, this.probe.output);
+    if (command[0] === 'bwrap') return finish(this.probe.code, this.probe.output);
     return finish(127, `unknown helper command: ${line}`);
   }
 }

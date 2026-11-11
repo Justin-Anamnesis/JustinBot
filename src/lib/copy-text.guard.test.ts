@@ -1,11 +1,11 @@
-import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 
 // A direct navigator.clipboard.writeText fails silently where Chromium refuses (or never settles) the write.
-const SRC = join(dirname(fileURLToPath(import.meta.url)), "..");
-const HELPER = "lib/copy-text.ts";
+const SRC = join(dirname(fileURLToPath(import.meta.url)), '..');
+const HELPER = 'lib/copy-text.ts';
 const DIRECT_WRITE = /navigator\s*\??\.\s*clipboard\s*\??\.\s*writeText/;
 
 function sourceFiles(dir: string): string[] {
@@ -16,18 +16,30 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
-describe("clipboard writes", () => {
-  const files = sourceFiles(SRC).map((path) => ({ name: relative(SRC, path).split("\\").join("/"), text: readFileSync(path, "utf8") }));
+describe('clipboard writes', () => {
+  const files = sourceFiles(SRC).map((path) => ({
+    name: relative(SRC, path).split('\\').join('/'),
+    text: readFileSync(path, 'utf8'),
+  }));
 
-  it("go through copyText, never navigator.clipboard.writeText directly", () => {
-    const direct = files.filter((file) => file.name !== HELPER && DIRECT_WRITE.test(file.text)).map((file) => file.name);
+  it('go through copyText, never navigator.clipboard.writeText directly', () => {
+    const direct = files
+      .filter((file) => file.name !== HELPER && DIRECT_WRITE.test(file.text))
+      .map((file) => file.name);
     expect(direct).toEqual([]);
   });
 
-  it("scans the real sources: the helper itself is the one direct write it finds", () => {
+  it('scans the real sources: the helper itself is the one direct write it finds', () => {
     expect(files.length).toBeGreaterThan(100);
-    expect(files.filter((file) => DIRECT_WRITE.test(file.text)).map((file) => file.name)).toEqual([HELPER]);
-    for (const sample of ["navigator.clipboard.writeText(x)", "navigator.clipboard?.writeText(x)", "navigator?.clipboard?.writeText", "navigator.clipboard\n      .writeText(code)"]) {
+    expect(files.filter((file) => DIRECT_WRITE.test(file.text)).map((file) => file.name)).toEqual([
+      HELPER,
+    ]);
+    for (const sample of [
+      'navigator.clipboard.writeText(x)',
+      'navigator.clipboard?.writeText(x)',
+      'navigator?.clipboard?.writeText',
+      'navigator.clipboard\n      .writeText(code)',
+    ]) {
       expect(DIRECT_WRITE.test(sample), sample).toBe(true);
     }
   });

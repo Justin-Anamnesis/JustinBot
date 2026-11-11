@@ -1,15 +1,15 @@
 // Wire shapes of the usage trace view, shared by the server's builder and the renderer.
-import { TOOL_NAMESPACE, toolSurfaceKind } from "./tool-surface.ts";
-import { isConnectedAppsServer, OWN_APPS_SERVER } from "./own-apps.ts";
+import { TOOL_NAMESPACE, toolSurfaceKind } from './tool-surface.ts';
+import { isConnectedAppsServer, OWN_APPS_SERVER } from './own-apps.ts';
 
 /** Who or what started a root. */
-export type TraceSource = "person" | "owner" | "routine" | "bot" | "helper";
+export type TraceSource = 'person' | 'owner' | 'routine' | 'bot' | 'helper';
 
 /** `ended`: the tool was still open when its turn ended. */
-export type TraceStatus = "ok" | "error" | "interrupted" | "ended";
+export type TraceStatus = 'ok' | 'error' | 'interrupted' | 'ended';
 
 /** `partial`: the engine reported some token fields but not all; `unavailable`: none. Neither is ever shown as 0. */
-export type TraceUsageStatus = "complete" | "partial" | "unavailable";
+export type TraceUsageStatus = 'complete' | 'partial' | 'unavailable';
 
 export interface TraceParent {
   threadId: string;
@@ -26,11 +26,27 @@ export interface TraceTokens {
 }
 
 export type TraceToolIcon =
-  | "search" | "web" | "browser" | "computer" | "phone" | "files" | "terminal" | "memory" | "routine"
-  | "page" | "widget" | "bots" | "plan" | "image" | "data" | "app" | "mcp" | "tool";
+  | 'search'
+  | 'web'
+  | 'browser'
+  | 'computer'
+  | 'phone'
+  | 'files'
+  | 'terminal'
+  | 'memory'
+  | 'routine'
+  | 'page'
+  | 'widget'
+  | 'bots'
+  | 'plan'
+  | 'image'
+  | 'data'
+  | 'app'
+  | 'mcp'
+  | 'tool';
 
 export interface TraceTool {
-  kind: "tool";
+  kind: 'tool';
   id: string;
   name: string;
   icon: TraceToolIcon;
@@ -46,12 +62,12 @@ export interface TraceTool {
   status: TraceStatus;
   error?: string;
   /** Who measured it: OMB's own tools are timed by the server on every engine. */
-  timedBy: "engine" | "omb";
+  timedBy: 'engine' | 'omb';
   running?: boolean;
 }
 
 export interface TraceStep {
-  kind: "step";
+  kind: 'step';
   id: string;
   startedAt: number;
   endedAt?: number;
@@ -65,7 +81,7 @@ export interface TraceStep {
 
 /** Consecutive uses of one kind of tool, folded into one row with a count and a total. */
 export interface TraceGroup {
-  kind: "group";
+  kind: 'group';
   id: string;
   icon: TraceToolIcon;
   app?: string;
@@ -80,7 +96,7 @@ export interface TraceGroup {
 }
 
 export interface TraceTurn {
-  kind: "turn";
+  kind: 'turn';
   id: string;
   threadId: string;
   turnId?: string;
@@ -96,7 +112,7 @@ export interface TraceTurn {
   status: TraceStatus;
   reason?: string;
   costUsd: number | null;
-  costSource?: "reported" | "estimated";
+  costSource?: 'reported' | 'estimated';
   tokens: TraceTokens;
   usageStatus: TraceUsageStatus;
   contextTokens?: number;
@@ -149,37 +165,75 @@ export function traceRootId(threadId: string, turnId: string): string {
   return `${encodeURIComponent(threadId)}~${encodeURIComponent(turnId)}`;
 }
 
-const SERVER_ICONS: Readonly<Record<string, TraceToolIcon>> = { phone: "phone", data: "data", dweb: "web", browser: "browser", computer: "computer" };
-const OWN_SERVERS = new Set(["agents", "ogb", "composio", OWN_APPS_SERVER, ...Object.keys(SERVER_ICONS)]);
+const SERVER_ICONS: Readonly<Record<string, TraceToolIcon>> = {
+  phone: 'phone',
+  data: 'data',
+  dweb: 'web',
+  browser: 'browser',
+  computer: 'computer',
+};
+const OWN_SERVERS = new Set([
+  'agents',
+  'ogb',
+  'composio',
+  OWN_APPS_SERVER,
+  ...Object.keys(SERVER_ICONS),
+]);
 const COMPOSIO_ACTION = /^([A-Z][A-Z0-9]+)_[A-Z0-9_]+$/;
 const BUILT_IN_ICONS: ReadonlyArray<[RegExp, TraceToolIcon]> = [
-  [/^(?:websearch|web_search|search_web|google_search|x_search|research)$/, "search"],
-  [/^(?:webfetch|web_fetch|fetch|open_url|read_url|fetch_url)$/, "web"],
-  [/^(?:bash|shell|terminal|run_command|execute|exec|vm_exec|computer_exec|run_shell_command|local_shell|killshell|bashoutput)$/, "terminal"],
-  [/^(?:read|read_file|write|write_file|create_file|edit|multiedit|str_replace|apply_patch|notebookedit|delete|grep|glob|find|ls|list_files|attach_file|view|tool_result_read)$/, "files"],
-  [/^(?:memory|remember|recall|memory_[a-z_]+|search_memory|save_memory|session_search|session_read)$/, "memory"],
-  [/^(?:routine|routines|schedule|cron)(?:_[a-z_]+)?$|^[a-z_]*(?:routine|trigger)[a-z_]*$/, "routine"],
-  [/^(?:publish_page|unpublish_page|[a-z_]*page_publish[a-z_]*|pages?_[a-z_]+)$/, "page"],
-  [/^(?:show_html|show_widget|render_widget|show_chart|show_table|show_card|widget|[a-z_]*_card)$/, "widget"],
-  [/^(?:coordinate_bots|ask_bots?|delegate|task|agent|assignment_status|send_to_bot|select_computer|create_bot)$/, "bots"],
-  [/^(?:(?:open|start|list|close|retry)_threads?|list_bots|list_rooms|list_room_targets|post_to_room|create_room|manage_room)$/, "bots"],
-  [/^(?:phone|android|adb)(?:_[a-z_]+)?$/, "phone"],
-  [/^(?:todowrite|update_plan|plan|think)$/, "plan"],
-  [/^(?:generate_image|image_generation|imagegen|create_image)$/, "image"],
+  [/^(?:websearch|web_search|search_web|google_search|x_search|research)$/, 'search'],
+  [/^(?:webfetch|web_fetch|fetch|open_url|read_url|fetch_url)$/, 'web'],
+  [
+    /^(?:bash|shell|terminal|run_command|execute|exec|vm_exec|computer_exec|run_shell_command|local_shell|killshell|bashoutput)$/,
+    'terminal',
+  ],
+  [
+    /^(?:read|read_file|write|write_file|create_file|edit|multiedit|str_replace|apply_patch|notebookedit|delete|grep|glob|find|ls|list_files|attach_file|view|tool_result_read)$/,
+    'files',
+  ],
+  [
+    /^(?:memory|remember|recall|memory_[a-z_]+|search_memory|save_memory|session_search|session_read)$/,
+    'memory',
+  ],
+  [
+    /^(?:routine|routines|schedule|cron)(?:_[a-z_]+)?$|^[a-z_]*(?:routine|trigger)[a-z_]*$/,
+    'routine',
+  ],
+  [/^(?:publish_page|unpublish_page|[a-z_]*page_publish[a-z_]*|pages?_[a-z_]+)$/, 'page'],
+  [
+    /^(?:show_html|show_widget|render_widget|show_chart|show_table|show_card|widget|[a-z_]*_card)$/,
+    'widget',
+  ],
+  [
+    /^(?:coordinate_bots|ask_bots?|delegate|task|agent|assignment_status|send_to_bot|select_computer|create_bot)$/,
+    'bots',
+  ],
+  [
+    /^(?:(?:open|start|list|close|retry)_threads?|list_bots|list_rooms|list_room_targets|post_to_room|create_room|manage_room)$/,
+    'bots',
+  ],
+  [/^(?:phone|android|adb)(?:_[a-z_]+)?$/, 'phone'],
+  [/^(?:todowrite|update_plan|plan|think)$/, 'plan'],
+  [/^(?:generate_image|image_generation|imagegen|create_image)$/, 'image'],
 ];
 
 /** What a tool call should look like in a trace: an icon, and the app or MCP server it belongs to. */
-export function traceToolLook(name: string): { icon: TraceToolIcon; app?: string; server?: string } {
+export function traceToolLook(name: string): {
+  icon: TraceToolIcon;
+  app?: string;
+  server?: string;
+} {
   const server = /^mcp__(.+?)__/.exec(name)?.[1];
-  const bare = name.replace(TOOL_NAMESPACE, "");
+  const bare = name.replace(TOOL_NAMESPACE, '');
   const composio = COMPOSIO_ACTION.exec(bare);
-  if (composio && composio[1] !== "COMPOSIO") return { icon: "app", app: composio[1]!.toLowerCase() };
-  if ((server && isConnectedAppsServer(server)) || composio) return { icon: "app" };
+  if (composio && composio[1] !== 'COMPOSIO')
+    return { icon: 'app', app: composio[1]!.toLowerCase() };
+  if ((server && isConnectedAppsServer(server)) || composio) return { icon: 'app' };
   const surface = toolSurfaceKind(name);
   if (surface) return { icon: surface };
   const lower = bare.toLowerCase();
   for (const [pattern, icon] of BUILT_IN_ICONS) if (pattern.test(lower)) return { icon };
   if (server && SERVER_ICONS[server]) return { icon: SERVER_ICONS[server]! };
-  if (server && !OWN_SERVERS.has(server)) return { icon: "mcp", server };
-  return { icon: "tool" };
+  if (server && !OWN_SERVERS.has(server)) return { icon: 'mcp', server };
+  return { icon: 'tool' };
 }

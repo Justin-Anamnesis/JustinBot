@@ -3,7 +3,10 @@
 // slots each, because a harness also listens one above its own port. Outside a worker a port stays as it was picked.
 const SLOTS = 32;
 
-export function forWorker(port: number, poolId: string | undefined = process.env.VITEST_POOL_ID): number {
+export function forWorker(
+  port: number,
+  poolId: string | undefined = process.env.VITEST_POOL_ID,
+): number {
   const id = Number(poolId);
   if (!Number.isSafeInteger(id) || id < 1) return port;
   return port - (port % SLOTS) + ((id - 1) % (SLOTS / 2)) * 2;

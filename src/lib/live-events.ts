@@ -1,14 +1,14 @@
 // EventSource hides SSE comment keepalives, so liveness comes from the server's visible `ping` frame.
-import type { ServerFrame } from "../../shared/wire";
-import { cloudAsleep, markCloudAsleep, onCloudPower, sleepingFrame } from "./cloud-power";
-import { recordBotTextMessage, recordRuntimeEvent } from "./voice-latency-probe";
-import { noteTurnEvent } from "@/state/turn-status";
+import type { ServerFrame } from '../../shared/wire';
+import { cloudAsleep, markCloudAsleep, onCloudPower, sleepingFrame } from './cloud-power';
+import { recordBotTextMessage, recordRuntimeEvent } from './voice-latency-probe';
+import { noteTurnEvent } from '@/state/turn-status';
 
-export const LIVE_EVENTS_PATH = "/api/events";
+export const LIVE_EVENTS_PATH = '/api/events';
 export const LIVE_EVENTS_STALE_MS = 40_000;
 export const LIVE_EVENTS_RETRY_MIN_MS = 500;
 export const LIVE_EVENTS_RETRY_MAX_MS = 10_000;
-const RETRY_LIVE_EVENTS = "omb:retry-live-events";
+const RETRY_LIVE_EVENTS = 'omb:retry-live-events';
 
 export function retryLiveEvents(): void {
   window.dispatchEvent(new Event(RETRY_LIVE_EVENTS));
@@ -61,8 +61,8 @@ export interface LiveEventsHandlers {
 /** `screens: false` asks the server to leave out live screen frames. */
 export function liveEventsUrl(options?: { since?: string | null; screens?: boolean }): string {
   const params = new URLSearchParams();
-  if (options?.since) params.set("since", options.since);
-  if (options?.screens === false) params.set("screens", "off");
+  if (options?.since) params.set('since', options.since);
+  if (options?.screens === false) params.set('screens', 'off');
   const query = params.toString();
   return query ? `${LIVE_EVENTS_PATH}?${query}` : LIVE_EVENTS_PATH;
 }
@@ -91,9 +91,9 @@ export function listenLiveFrames(listener: LiveFrameListener): () => void {
 
 /** A frame kept for later (before the first snapshot is drawn) needs no pixels: viewers saw them as it arrived. */
 export function withoutScreenPixels(frame: ServerFrame): ServerFrame {
-  if (frame.kind !== "screen") return frame;
+  if (frame.kind !== 'screen') return frame;
   const { png: _png, ...rest } = frame;
-  return { ...rest, png: "" };
+  return { ...rest, png: '' };
 }
 
 export function publishLiveFrame(frame: ServerFrame): void {
@@ -104,8 +104,8 @@ export function publishMissedFrames(): void {
   for (const listener of liveFrameListeners) listener.onMissedFrames?.();
 }
 
-export function isLivePing(frame: Pick<LiveFrame, "kind">): boolean {
-  return frame.kind === "ping";
+export function isLivePing(frame: Pick<LiveFrame, 'kind'>): boolean {
+  return frame.kind === 'ping';
 }
 
 export function shouldReconnectLiveEvents(
@@ -132,16 +132,21 @@ function parseLiveFrame(data: string): LiveFrame | null {
   };
   if (candidate.kind !== String(candidate.kind)) return null;
   if (candidate.cursor !== undefined && candidate.cursor !== String(candidate.cursor)) return null;
-  if (candidate.resumed !== undefined && candidate.resumed !== Boolean(candidate.resumed)) return null;
+  if (candidate.resumed !== undefined && candidate.resumed !== Boolean(candidate.resumed))
+    return null;
   return candidate as LiveFrame;
 }
 
 function tapLiveFrame(frame: ServerFrame): void {
-  if (frame.kind === "runtime") {
+  if (frame.kind === 'runtime') {
     // The chat's status line reads every live runtime frame; none of them is stored.
     noteTurnEvent(frame.event);
     recordRuntimeEvent(frame.event);
-  } else if (frame.kind === "message" && frame.message?.role === "bot" && frame.message?.kind === "text") {
+  } else if (
+    frame.kind === 'message' &&
+    frame.message?.role === 'bot' &&
+    frame.message?.kind === 'text'
+  ) {
     recordBotTextMessage(frame.message, frame.threadId);
   }
 }
@@ -176,7 +181,8 @@ function browserPlatform(overrides: Partial<LiveEventsPlatform>): LiveEventsPlat
       (browserWindow
         ? {
             addEventListener: (type, listener) => browserWindow.addEventListener(type, listener),
-            removeEventListener: (type, listener) => browserWindow.removeEventListener(type, listener),
+            removeEventListener: (type, listener) =>
+              browserWindow.removeEventListener(type, listener),
           }
         : undefined),
     documentTarget:
@@ -184,11 +190,13 @@ function browserPlatform(overrides: Partial<LiveEventsPlatform>): LiveEventsPlat
       (browserDocument
         ? {
             addEventListener: (type, listener) => browserDocument.addEventListener(type, listener),
-            removeEventListener: (type, listener) => browserDocument.removeEventListener(type, listener),
+            removeEventListener: (type, listener) =>
+              browserDocument.removeEventListener(type, listener),
           }
         : undefined),
     isVisible:
-      overrides.isVisible ?? (() => !browserDocument || browserDocument.visibilityState === "visible"),
+      overrides.isVisible ??
+      (() => !browserDocument || browserDocument.visibilityState === 'visible'),
     isOnline: overrides.isOnline ?? (() => globalThis.navigator?.onLine !== false),
     now: overrides.now ?? Date.now,
   };
@@ -247,7 +255,14 @@ export function openLiveEvents(
   let connect: () => void;
   const scheduleReconnect = () => {
     // A Cloud home that went to sleep: reconnecting would wake it. The person's next action does (src/lib/cloud-power.ts).
-    if (stopped || retryTimer !== null || !platform.isOnline() || !platform.isVisible() || cloudAsleep()) return;
+    if (
+      stopped ||
+      retryTimer !== null ||
+      !platform.isOnline() ||
+      !platform.isVisible() ||
+      cloudAsleep()
+    )
+      return;
     const exponent = Math.min(retryAttempt, 20);
     const delay = Math.min(retryMaxMs, retryMinMs * 2 ** exponent);
     retryAttempt += 1;
@@ -270,7 +285,9 @@ export function openLiveEvents(
     let current: LiveEventSourceLike;
     try {
       sourceScreens = screensWanted();
-      current = platform.createEventSource(liveEventsUrl({ since: cursor, screens: sourceScreens }));
+      current = platform.createEventSource(
+        liveEventsUrl({ since: cursor, screens: sourceScreens }),
+      );
     } catch {
       handlers.onError?.();
       scheduleReconnect();
@@ -298,7 +315,7 @@ export function openLiveEvents(
         return;
       }
 
-      if (frame.kind === "hello") {
+      if (frame.kind === 'hello') {
         // Replay frames follow `resumed:true`: advancing to hello's cursor now could skip one if the socket dies mid-replay.
         if (frame.resumed === false) {
           const generation = ++snapshotGeneration;
@@ -316,12 +333,7 @@ export function openLiveEvents(
               loaded = false;
             }
             const pending = pendingSnapshot;
-            if (
-              stopped ||
-              source !== current ||
-              !pending ||
-              pending.generation !== generation
-            ) {
+            if (stopped || source !== current || !pending || pending.generation !== generation) {
               return;
             }
             if (!loaded) {
@@ -351,7 +363,7 @@ export function openLiveEvents(
         return;
       }
 
-      if (frame.kind !== "hello") {
+      if (frame.kind !== 'hello') {
         tapLiveFrame(frame as ServerFrame);
         handlers.onFrame(frame);
       }
@@ -386,18 +398,22 @@ export function openLiveEvents(
     if (platform.isVisible() && !cloudAsleep()) reconnectNow(true);
   };
 
-  const onScreenWish = () => queueMicrotask(() => {
-    if (source && cursor && !pendingSnapshot && screensWanted() !== sourceScreens) reconnectNow(false);
-  });
+  const onScreenWish = () =>
+    queueMicrotask(() => {
+      if (source && cursor && !pendingSnapshot && screensWanted() !== sourceScreens)
+        reconnectNow(false);
+    });
   screenWishListeners.add(onScreenWish);
   connect();
   const staleTimer = setInterval(recover, staleCheckMs);
   // The person is back after the Cloud slept: reconnect at once, which wakes it.
-  const stopPower = onCloudPower((asleep) => { if (!asleep) reconnectNow(false); });
-  platform.windowTarget?.addEventListener("online", onOnline);
-  platform.windowTarget?.addEventListener("focus", onFocus);
+  const stopPower = onCloudPower((asleep) => {
+    if (!asleep) reconnectNow(false);
+  });
+  platform.windowTarget?.addEventListener('online', onOnline);
+  platform.windowTarget?.addEventListener('focus', onFocus);
   platform.windowTarget?.addEventListener(RETRY_LIVE_EVENTS, onRetry);
-  platform.documentTarget?.addEventListener("visibilitychange", onVisibilityChange);
+  platform.documentTarget?.addEventListener('visibilitychange', onVisibilityChange);
 
   return () => {
     if (stopped) return;
@@ -407,9 +423,9 @@ export function openLiveEvents(
     clearInterval(staleTimer);
     clearRetry();
     closeSource();
-    platform.windowTarget?.removeEventListener("online", onOnline);
-    platform.windowTarget?.removeEventListener("focus", onFocus);
+    platform.windowTarget?.removeEventListener('online', onOnline);
+    platform.windowTarget?.removeEventListener('focus', onFocus);
     platform.windowTarget?.removeEventListener(RETRY_LIVE_EVENTS, onRetry);
-    platform.documentTarget?.removeEventListener("visibilitychange", onVisibilityChange);
+    platform.documentTarget?.removeEventListener('visibilitychange', onVisibilityChange);
   };
 }

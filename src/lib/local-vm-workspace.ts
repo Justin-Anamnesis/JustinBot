@@ -1,22 +1,22 @@
-import { z } from "zod";
-import type { JsonValue } from "../../shared/json";
-import { t } from "./i18n";
+import { z } from 'zod';
+import type { JsonValue } from '../../shared/json';
+import { t } from './i18n';
 
 export interface LocalVmWorkspaceBot {
   id: string;
-  computer?: "cloud" | "vm" | "local" | "browser" | "off";
+  computer?: 'cloud' | 'vm' | 'local' | 'browser' | 'off';
   hidden?: boolean;
 }
 
 export type LocalVmWorkspaceSlots = [string | null, string | null];
 
 export interface LocalVmWorkspaceStatus {
-  mode: "shared" | "per-bot" | "pool" | "unknown";
+  mode: 'shared' | 'per-bot' | 'pool' | 'unknown';
   maxInstances: number;
-  container: "running" | "stopped" | "missing" | "unknown";
-  network: "loopback" | "unsafe" | "unknown";
-  security: "hardened" | "unsafe" | "unknown";
-  persistence: "durable" | "unsafe" | "unknown";
+  container: 'running' | 'stopped' | 'missing' | 'unknown';
+  network: 'loopback' | 'unsafe' | 'unknown';
+  security: 'hardened' | 'unsafe' | 'unknown';
+  persistence: 'durable' | 'unsafe' | 'unknown';
   desktopReady: boolean;
   ready: boolean;
 }
@@ -24,7 +24,7 @@ export interface LocalVmWorkspaceStatus {
 export interface LocalVmWorkspaceControlSnapshot {
   held: boolean;
   helpReason: string | null;
-  help?: import("../../shared/wire").ComputerHelpRef | null;
+  help?: import('../../shared/wire').ComputerHelpRef | null;
   owned?: boolean;
   acquired?: boolean;
   released?: boolean;
@@ -73,8 +73,8 @@ export function nativeViewOverlayIntersects(
 }
 
 export type LocalVmWorkspaceControlResult =
-  | { status: "controlled"; botId: string; snapshot: LocalVmWorkspaceControlSnapshot }
-  | { status: "held-elsewhere"; botId: string; snapshot: LocalVmWorkspaceControlSnapshot };
+  | { status: 'controlled'; botId: string; snapshot: LocalVmWorkspaceControlSnapshot }
+  | { status: 'held-elsewhere'; botId: string; snapshot: LocalVmWorkspaceControlSnapshot };
 
 export async function switchLocalVmWorkspaceControl(
   port: LocalVmWorkspaceControlPort,
@@ -89,9 +89,9 @@ export async function switchLocalVmWorkspaceControl(
 
   // Atomic on the server: a read followed by a take cannot prove ownership.
   const taken = await port.take(nextBotId);
-  if (!taken.held) throw new Error(t("vm.workspace.holdNotAcquired"));
+  if (!taken.held) throw new Error(t('vm.workspace.holdNotAcquired'));
   if (taken.owned !== true) {
-    return { status: "held-elsewhere", botId: nextBotId, snapshot: taken };
+    return { status: 'held-elsewhere', botId: nextBotId, snapshot: taken };
   }
   try {
     await port.setInteractive(nextContextId);
@@ -101,7 +101,7 @@ export async function switchLocalVmWorkspaceControl(
     await port.release(nextBotId).catch(() => {});
     throw error;
   }
-  return { status: "controlled", botId: nextBotId, snapshot: taken };
+  return { status: 'controlled', botId: nextBotId, snapshot: taken };
 }
 
 export async function releaseLocalVmWorkspaceControl(
@@ -114,9 +114,7 @@ export async function releaseLocalVmWorkspaceControl(
 }
 
 export function eligibleLocalVmBotIds(bots: readonly LocalVmWorkspaceBot[]): string[] {
-  return bots
-    .filter((bot) => bot.computer === "vm" && bot.hidden !== true)
-    .map((bot) => bot.id);
+  return bots.filter((bot) => bot.computer === 'vm' && bot.hidden !== true).map((bot) => bot.id);
 }
 
 export function initialLocalVmWorkspaceSlots(
@@ -162,12 +160,12 @@ export function reconcileLocalVmWorkspaceSlots(
 }
 
 const localVmStatusPayloadSchema = z.object({
-  mode: z.enum(["shared", "per-bot", "pool"]).optional(),
+  mode: z.enum(['shared', 'per-bot', 'pool']).optional(),
   max_instances: z.number().int().positive().optional(),
-  container: z.enum(["running", "stopped", "missing"]).optional(),
-  network: z.enum(["loopback", "unsafe", "unknown"]).optional(),
-  security: z.enum(["hardened", "unsafe", "unknown"]).optional(),
-  persistence: z.enum(["durable", "unsafe", "unknown"]).optional(),
+  container: z.enum(['running', 'stopped', 'missing']).optional(),
+  network: z.enum(['loopback', 'unsafe', 'unknown']).optional(),
+  security: z.enum(['hardened', 'unsafe', 'unknown']).optional(),
+  persistence: z.enum(['durable', 'unsafe', 'unknown']).optional(),
   desktopReady: z.boolean().optional(),
   ready: z.boolean().optional(),
   viewer_url: z.string().min(1).optional(),
@@ -181,20 +179,20 @@ function parseLocalVmStatusPayload(raw: JsonValue) {
 /** UI-safe facts only: the response's secret-bearing viewer_url and diagnostics never reach React state. */
 export function sanitizeLocalVmWorkspaceStatus(raw: JsonValue): LocalVmWorkspaceStatus {
   const value = parseLocalVmStatusPayload(raw);
-  const mode = value?.mode ?? "unknown";
-  const container = value?.container ?? "unknown";
-  const network = value?.network ?? "unknown";
-  const security = value?.security ?? "unknown";
-  const persistence = value?.persistence ?? "unknown";
+  const mode = value?.mode ?? 'unknown';
+  const container = value?.container ?? 'unknown';
+  const network = value?.network ?? 'unknown';
+  const security = value?.security ?? 'unknown';
+  const persistence = value?.persistence ?? 'unknown';
   const maxInstances = value?.max_instances ?? 0;
   const desktopReady = value?.desktopReady === true;
   const ready = Boolean(
     value?.ready === true &&
-      container === "running" &&
-      network === "loopback" &&
-      security === "hardened" &&
-      persistence === "durable" &&
-      desktopReady,
+    container === 'running' &&
+    network === 'loopback' &&
+    security === 'hardened' &&
+    persistence === 'durable' &&
+    desktopReady,
   );
   return { mode, maxInstances, container, network, security, persistence, desktopReady, ready };
 }

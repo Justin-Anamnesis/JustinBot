@@ -1,5 +1,5 @@
-import type { ServerText } from "../../shared/server-text.ts";
-import { noticeFailure, type ChatNoticeKey } from "../chat-notices.ts";
+import type { ServerText } from '../../shared/server-text.ts';
+import { noticeFailure, type ChatNoticeKey } from '../chat-notices.ts';
 
 export class RuntimeNoticeError extends Error {
   readonly text: ServerText;
