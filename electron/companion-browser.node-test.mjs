@@ -6,8 +6,11 @@ import localOrigin from './local-origin.cjs';
 
 test('browser grant bridge is local-only and keeps the exact device and boolean', async () => {
   const source = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8');
-  const start = source.indexOf('ipcMain.handle("companion:browser-control"');
-  const end = source.indexOf('ipcMain.handle("companion:revoke"', start);
+  // The registration starts at the "ipcMain.handle(" line before the channel name once formatted.
+  const registration = (channel, from = 0) =>
+    source.lastIndexOf('ipcMain.handle(', source.indexOf(`'${channel}'`, from));
+  const start = registration('companion:browser-control');
+  const end = registration('companion:revoke', start);
   assert.ok(start >= 0 && end > start);
   let handle;
   const calls = [];

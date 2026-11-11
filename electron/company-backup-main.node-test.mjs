@@ -232,7 +232,7 @@ test("main hands the library a restarted runtime, the runtime's own messages and
     section('onReady(proc) {', 'routineWake.start();'),
     /\n\s*orgLibrary\?\.runtimeReady\(\);\n/,
   );
-  const messages = section('proc.on("message", (message) => {', 'proc.once("spawn"');
+  const messages = section("proc.on('message', (message) => {", "proc.once('spawn'");
   assert.match(
     messages,
     /if \(!serverSupervisor\.isCurrent\(proc\)\) return;/,
@@ -240,7 +240,7 @@ test("main hands the library a restarted runtime, the runtime's own messages and
   );
   assert.match(messages, /\n\s*if \(orgLibrary\?\.receive\(message\)\) return;\n/);
   assert.match(
-    section('app.on("before-quit"', 'managedDesktop?.close();'),
+    section("app.on('before-quit'", 'managedDesktop?.close();'),
     /\n\s*orgLibrary\?\.close\(\);\n/,
   );
 });

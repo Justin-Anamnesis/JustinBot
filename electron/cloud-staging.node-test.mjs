@@ -206,15 +206,16 @@ test("main keeps each Admin's sign-in, saved servers, Files state and Cloud name
   const main = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   assert.match(
     main,
-    /function environmentsFile\(\) \{\n  return path\.join\(app\.getPath\("userData"\), cloudTarget\(process\.env\)\.environments\);/,
+    /function environmentsFile\(\) \{\n  return path\.join\(app\.getPath\('userData'\), cloudTarget\(process\.env\)\.environments\);/,
   );
   assert.match(main, /stateDir: cloudTarget\(process\.env\)\.sync,/);
   assert.match(
     main,
-    /lookFile\(\(\) => path\.join\(app\.getPath\("userData"\), cloudTarget\(process\.env\)\.look\), fs\)/,
+    /lookFile\(\(\) => path\.join\(app\.getPath\('userData'\), cloudTarget\(process\.env\)\.look\), fs\)/,
   );
-  for (const name of ['"environments.json"', '"cloud-home-look.json"'])
-    assert.equal(main.includes(name), false, `no fixed ${name}`);
+  for (const file of ['environments.json', 'cloud-home-look.json'])
+    for (const name of [`'${file}'`, `"${file}"`])
+      assert.equal(main.includes(name), false, `no fixed ${name}`);
   const ensure = main.slice(
     main.indexOf('function ensureCloudAccount() {'),
     main.indexOf('\n}\n', main.indexOf('function ensureCloudAccount() {')),
@@ -222,12 +223,13 @@ test("main keeps each Admin's sign-in, saved servers, Files state and Cloud name
   assert.match(ensure, /store: cloudAccountStore\(\),/);
   assert.match(
     main,
-    /const cloudAccountStore = \(\) => \(activeSignIn \?\?= createCloudAccountStore\(\{ file: path\.join\(app\.getPath\("userData"\), cloudTarget\(process\.env\)\.file\)/,
+    /const cloudAccountStore = \(\) =>\s*\(activeSignIn \?\?= createCloudAccountStore\(\{\s*file: path\.join\(app\.getPath\('userData'\), cloudTarget\(process\.env\)\.file\)/,
   );
   assert.match(
     main,
-    /createCloudAccountStore\(\{ file: path\.join\(app\.getPath\("userData"\), cloudTarget\(process\.env\)\.saved\)/,
+    /createCloudAccountStore\(\{\s*file: path\.join\(app\.getPath\('userData'\), cloudTarget\(process\.env\)\.saved\)/,
   );
   assert.match(ensure, /origin: cloudTarget\(process\.env\)\.origin,/);
-  assert.equal(main.includes('"cloud-account.bin"'), false, 'no second, fixed token file');
+  for (const name of ["'cloud-account.bin'", '"cloud-account.bin"'])
+    assert.equal(main.includes(name), false, 'no second, fixed token file');
 });

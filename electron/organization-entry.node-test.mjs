@@ -104,12 +104,12 @@ test('desktop relaunch accepts every platform once, guards its sender, and prese
   const main = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8');
   const source =
     main.slice(
-      main.indexOf('ipcMain.handle("desktop:relaunch"'),
+      main.indexOf("ipcMain.handle(\n  'desktop:relaunch'"),
       main.indexOf('const talk = installTalk('),
     ) +
     main.slice(
       main.indexOf('function requireMainWindowSender('),
-      main.indexOf('ipcMain.handle("desktop-remote:state"'),
+      main.indexOf("ipcMain.handle('desktop-remote:state'"),
     );
   const argv = [
     '/fixture/OpenMausBot',
@@ -338,7 +338,7 @@ test('native entry checks owned server readiness before creating, sending to, or
     main.indexOf('  openLocalSettings: async () => {'),
     main.indexOf('  relaunch: relaunchAfterDesktopRemoteChange'),
   );
-  assert.match(navigation, /if \(!serverReady\) throw new Error\(/);
+  assert.match(navigation, /if \(!serverReady\)\s*throw new Error\(/);
   const guard = navigation.indexOf('if (!serverReady)');
   for (const action of ['createWindow(', 'win.webContents.send(', 'win.loadURL(']) {
     assert.ok(navigation.indexOf(action) > guard, `${action} must follow the owned-server guard`);
@@ -357,7 +357,7 @@ test('startup delivers a pending organisation action before default navigation a
   // A launch from the login item lending added opens no window: lending runs out of sight until the person opens it.
   assert.match(
     startup,
-    /if \(!hiddenStart && !restoredOrganizationEntry && !deliveredOrganizationEntry && !deliveredCloudEntry\) await showStartPlace\(\);/,
+    /if \(\s*!hiddenStart &&\s*!restoredOrganizationEntry &&\s*!deliveredOrganizationEntry &&\s*!deliveredCloudEntry\s*\)\s*await showStartPlace\(\);/,
   );
 });
 

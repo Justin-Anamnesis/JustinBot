@@ -558,7 +558,7 @@ test("the app waits for lending's last answers before it clears an account's ses
   const main = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8');
   assert.match(
     main,
-    /createDesktopRing\(\{[^\n]*lendingDone: \(\) => computerSharing\?\.goodbyesDone\(\)/,
+    /createDesktopRing\(\{[^]*?\n {2}lendingDone: \(\) => computerSharing\?\.goodbyesDone\(\)/,
   );
 });
 

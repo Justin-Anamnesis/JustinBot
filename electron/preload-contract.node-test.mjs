@@ -37,7 +37,7 @@ const contract = JSON.parse(
 const source = readFileSync(new URL('./preload.cjs', import.meta.url), 'utf8');
 const listed = (name) => {
   const match = new RegExp(`const ${name} = (?:new Set\\()?\\[([^\\]]*)\\]`).exec(source);
-  return match ? [...match[1].matchAll(/"([^"]+)"/g)].map((found) => found[1]) : [];
+  return match ? [...match[1].matchAll(/['"]([^'"]+)['"]/g)].map((found) => found[1]) : [];
 };
 const KEEP =
   `A Cloud or server page on ${contract.releases.join(' or ')} still calls it once this desktop updates ahead of that Cloud. ` +

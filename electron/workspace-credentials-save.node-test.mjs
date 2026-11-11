@@ -22,9 +22,10 @@ test('credential:set can save and clear every migrated workspace secret', () => 
 
 test('the external secret save never leaves a migrated secret in config.json', () => {
   for (const { section, field } of WORKSPACE_CREDENTIALS) {
-    assert.ok(
-      configRoutes.includes(
-        `if (persisted.${section}?.${field} !== undefined) persisted.${section}.${field} = "";`,
+    assert.match(
+      configRoutes,
+      new RegExp(
+        `if \\(persisted\\.${section}\\?\\.${field} !== undefined\\)\\s*persisted\\.${section}\\.${field} = '';`,
       ),
       `${section}.${field} has no tombstone in the secretStorage=external save`,
     );

@@ -9,9 +9,9 @@ const main = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'main.mj
   '\n',
 );
 const code = (line) => !/^\s*(?:\/\/|\/?\*)/.test(line);
-const declaration = main.findIndex((line) =>
-  /^const \{[^}]*\blocalOnly\b[^}]*\} = localOriginModule;/.test(line),
-);
+// The destructure spans several lines once formatted: find it in the whole text, then take its line.
+const declared = /^const \{[^}]*\blocalOnly\b[^}]*\} = localOriginModule;/m.exec(main.join('\n'));
+const declaration = declared ? main.join('\n').slice(0, declared.index).split('\n').length - 1 : -1;
 const firstUse = main.findIndex(
   (line) => code(line) && /\blocalOnly(?:Sync)?\(/.test(line) && !line.startsWith('const {'),
 );

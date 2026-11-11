@@ -580,8 +580,8 @@ test("the preload gives every page of the window the notices and the switch's st
   );
   assert.equal(preload(LOCAL, { saved: 'off' }).bridge.desktopAnalytics.enabled(), null);
   const safe = PRELOAD.match(/const REMOTE_SAFE = new Set\(\[([^\]]*)\]\)/)[1];
-  assert.ok(safe.includes('"desktopNotices"'));
-  assert.ok(safe.includes('"desktopAnalytics"'));
+  assert.ok(safe.includes("'desktopNotices'"));
+  assert.ok(safe.includes("'desktopAnalytics'"));
 });
 
 test('the preload gives every page of the window the app language this computer keeps', async () => {
@@ -624,7 +624,7 @@ test('the preload gives every page of the window the app language this computer 
   }
   assert.equal(preload(VPS, { language: 7 }).bridge.desktopLanguage.choice(), null);
   const safe = PRELOAD.match(/const REMOTE_SAFE = new Set\(\[([^\]]*)\]\)/)[1];
-  assert.ok(safe.includes('"desktopLanguage"'));
+  assert.ok(safe.includes("'desktopLanguage'"));
 });
 
 test("production wiring: main answers this computer's page, My Cloud's own page and the active saved server's own page, and no other", async () => {
@@ -636,7 +636,7 @@ test("production wiring: main answers this computer's page, My Cloud's own page 
   );
   assert.deepEqual([...DESKTOP_PORTS], [8799, 18799, 28799]);
   const start = main.indexOf('  desktopPrefs = nativeText.prefs;'),
-    end = main.indexOf('\n', main.indexOf('page:', start));
+    end = main.indexOf('\n', main.indexOf('\n    });', main.indexOf('page:', start)) + 1);
   assert.ok(start >= 0 && end > start, 'main.mjs registers the desktop prefs');
   let options = null;
   const localFrame = { url: `${LOCAL}/` },
@@ -720,7 +720,7 @@ test("production wiring: main answers this computer's page, My Cloud's own page 
     context.nativeText.prefs,
     'the record main read before the tray and the startup screen',
   );
-  assert.match(main, /const nativeText = createDesktopText\(app\), nativeT = nativeText\.t;/);
+  assert.match(main, /const nativeText = createDesktopText\(app\),\s*nativeT = nativeText\.t;/);
   assert.equal(
     options.localConfig(),
     '/home/.openmausbot/config.json',

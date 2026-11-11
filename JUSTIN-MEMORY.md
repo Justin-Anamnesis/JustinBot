@@ -84,9 +84,19 @@ git switch justin-main && git merge main-fmt
   - 体积棘轮 `scripts/testing/file-size-ratchet.test.ts`：折行后超 1000 行的文件从 30 个变成 103 个，`LINES` 表按格式化后的行数重新定基线。上游每个版本都会改这张表，同步时这里必冲突，解法是取上游的测试逻辑、再重算整张表。
   - 两个生成物 `shared/mascot-bodies.ts`、`shared/carved-bodies.ts`：上游测试会重跑生成器逐字比对，所以不格式化，保持上游原样；已加进格式化脚本的 `EXCLUDED_FILES`。
   - `server/local-computer-proxy.test.ts` 那次失败是机器繁忙时的超时，重跑通过，没改。
-- 同步上游后的固定动作：跑单元测试，新冒出来的「读源码文本」失败照上面三类处理。每次会新增多少没测过，第一次同步时记下数字。
+- Electron 的 node 测试（`pnpm test:electron`，174 个文件，不在 vitest 里，上午漏跑）：未格式化的 `main` 上 0 失败，格式化后 53 个失败（28 个文件），同样是读 `electron/main.mjs` 等源码文本。已按同样办法修完，1983 通过 0 失败。
+- broker 测试（`pnpm broker:test`）121 个全过。打包后服务端的冒烟测试（`pnpm test:packaged-server`）还没跑。
+- 从源码跑通（2026-11-11）：`OMB_PORT=8899 OMB_DATA_DIR=<临时目录> pnpm dev:server` 加 `OMB_PORT=8899 pnpm dev`，浏览器开 `http://127.0.0.1:5199`，走完引导并收到 bot 的真实回复。已装的应用占着 8799，所以换端口。一句「收到」的回合用了 6.9 万输入 token。Electron 桌面壳没单独启动过。
+- 同步上游后的固定动作：跑 `pnpm exec vitest run --exclude '**/*e2e*'`（设 `OMB_VITEST_WORKERS=4`）和 `pnpm test:electron`，新冒出来的「读源码文本」失败照上面三类处理。每次会新增多少没测过，第一次同步时记下数字。
 - e2e 测试（378 个文件）没跑。上游默认一次只跑一个文件，全量串行要 2 小时以上。
 - 未格式化的基线 worktree 在 `/Users/mac/Desktop/Study/.tmp/worktrees/JustinBot/main`，`node_modules` 软链到主工作区，用来对照「格式化前是否就失败」。
+
+## 打包与自动更新
+
+- 明昊的打算（2026-11-11）：本地跑通后卸载现在装的 OpenMausBot，换成我们打的包。所以 `appId`、应用名、数据目录 `~/.openmausbot` 都保持上游的，他的 bot 和历史记录直接沿用。
+- 自动更新已关（2026-11-11）：更新源是上游的 GitHub releases，我们的包会被更新回上游版本。`electron/main.mjs` 改从 `electron/fork-updater.mjs` 导入一个空的 `startUpdater`，上游的 `electron/updater.mjs` 没改。更新器不启动，菜单里的检查更新与安装更新没有动作。
+- 服务端的版本检查（`server/update-check.ts`）没关：它只提示上游有新版本，不替换应用。
+- 打包还没试过。`pnpm package:mac` 默认打 arm64 和 x64 两套、dmg 和 zip 各一份，并下载内置浏览器等二进制；自用只需要 arm64 的目录版。
 
 ## 改动约定
 

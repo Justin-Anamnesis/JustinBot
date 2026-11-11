@@ -20,7 +20,9 @@ test("main's Cloud account factory keeps the same client in the current app lang
     read: () => ({ language: 'en' }),
     write: () => assert.fail('unexpected preference write'),
   });
-  const initialization = MAIN.match(/^const nativeText = .+$/m)?.[0];
+  const initialization = MAIN.match(
+    /^const nativeText = [^;]+;\nconst createCloudAccountClient = .+;$/m,
+  )?.[0];
   assert.ok(initialization, 'main initializes its native text and Cloud account factory');
   const { text, createClient } = vm.runInNewContext(
     `${initialization}\n({ text: nativeText, createClient: createCloudAccountClient })`,

@@ -246,7 +246,7 @@ test('main asks through its dialog, remembers on the record and clears a refusal
     mainSource,
     /activeRemoteMicrophone: \(\) => activeEnvironment\(environmentsState\)\?\.microphone === true,/,
   );
-  assert.match(mainSource, /\n    askRemoteMicrophone,\n/);
+  assert.match(mainSource, /\n {6}askRemoteMicrophone,\n/);
   assert.match(mainSource, /persistEnvironments\(withMicrophone\(environmentsState, env\.id\)\)/);
   assert.match(
     mainSource,
@@ -254,7 +254,7 @@ test('main asks through its dialog, remembers on the record and clears a refusal
   );
   assert.match(
     mainSource,
-    /buttons: \[nativeT\("native\.dialog\.mic\.allow"\), nativeT\("native\.dialog\.mic\.deny"\)\],\n        defaultId: 1,\n        cancelId: 1,\n        message: nativeT\("native\.dialog\.mic\.title", \{ name: env\.name \}\)/,
+    /buttons: \[nativeT\('native\.dialog\.mic\.allow'\), nativeT\('native\.dialog\.mic\.deny'\)\],\n        defaultId: 1,\n        cancelId: 1,\n        message: nativeT\('native\.dialog\.mic\.title', \{ name: env\.name \}\)/,
     "Don't Allow is the default",
   );
 });

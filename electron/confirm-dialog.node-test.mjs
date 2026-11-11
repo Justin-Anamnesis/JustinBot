@@ -38,8 +38,8 @@ function fixture(response = 0) {
     nativeT: nativeText.englishText.t,
   });
   vm.runInContext(
-    section('const workspaceOnly =', 'ipcMain.handle("organization:settings-opened"') +
-      section('ipcMain.handle("dialog:confirm"', 'ipcMain.handle("environments:state"'),
+    section('const workspaceOnly =', "ipcMain.handle(\n  'organization:settings-opened'") +
+      section("ipcMain.handle(\n  'dialog:confirm'", "ipcMain.handle(\n  'environments:state'"),
     context,
   );
   return {

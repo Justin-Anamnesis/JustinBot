@@ -168,7 +168,7 @@ test('a consumed launch link is not replayed by the companion or updater relaunc
   takeCloudDeepLink(argv);
   const calls = [];
   runInNewContext(
-    `${between('function relaunchAfterDesktopRemoteChange()', 'ipcMain.handle("desktop-remote:state"')}\nrelaunchAfterDesktopRemoteChange();`,
+    `${between('function relaunchAfterDesktopRemoteChange()', "ipcMain.handle('desktop-remote:state'")}\nrelaunchAfterDesktopRemoteChange();`,
     {
       desktopShutdownStarted: false,
       process: { argv },
@@ -199,10 +199,10 @@ test('main takes the link from launch arguments, open-url and a second instance'
     'the launch argument is consumed before anything can relaunch',
   );
   assert.match(
-    between('app.on("open-url"', '});'),
-    /!queueOrganizationEntry\(url\) && !cloudEntry\.fromUrl\(url\) && !queuePackageInstall\(url\)/,
+    between("app.on('open-url'", '});'),
+    /!queueOrganizationEntry\(url\) &&\s+!cloudEntry\.fromUrl\(url\) &&\s+!queuePackageInstall\(url\)/,
   );
-  const secondInstance = between('app.on("second-instance"', '\n});');
+  const secondInstance = between("app.on('second-instance'", '\n});');
   assert.ok(
     secondInstance.indexOf('if (cloudEntry.fromArgs(commandLine)) return;') >
       secondInstance.indexOf('takeOrganizationDeepLink(commandLine)'),
@@ -230,12 +230,12 @@ test('startup delivers a pending Cloud link before default navigation', () => {
 
 test('the Cloud entry checks the owned server, waits for the saved sign-in, and never asks', () => {
   const entry = between('async function openCloudEntry()', '\n}\n');
-  const guard = entry.indexOf('if (!serverReady) throw new Error(');
+  const guard = entry.search(/if \(!serverReady\)\s+throw new Error\(/);
   const restored = entry.indexOf('await cloudAccountRestored();');
   assert.ok(guard !== -1 && restored > guard);
   assert.match(
     between('function cloudAccountRestored()', '\n}\n'),
-    /Promise\.race\(\[cloudAccountStarted, new Promise\(resolve => setTimeout\(resolve, 5_000\)/,
+    /Promise\.race\(\[\s*cloudAccountStarted,\s+new Promise\(\(resolve\) => setTimeout\(resolve, 5_000\)/,
   );
   for (const action of [
     'createWindow(',
@@ -249,13 +249,13 @@ test('the Cloud entry checks the owned server, waits for the saved sign-in, and 
     );
   }
   assert.ok(
-    entry.indexOf('if (desktopRemoteAccess) throw') < guard,
+    entry.search(/if \(desktopRemoteAccess\)\s+throw/) < guard,
     'companion client mode is not changed by the link',
   );
   assert.doesNotMatch(entry, /dialog\.|confirm/);
   assert.match(
     entry,
-    /const action = cloudLinkOpensSheet\(cloudAccount\?\.state\(\)\) \? "cloud-add" : "cloud";/,
+    /const action = cloudLinkOpensSheet\(cloudAccount\?\.state\(\)\) \? 'cloud-add' : 'cloud';/,
   );
   assert.match(
     entry,
@@ -264,7 +264,7 @@ test('the Cloud entry checks the owned server, waits for the saved sign-in, and 
   );
   assert.deepEqual(
     [...entry.matchAll(/webContents\.send\(([^)]*)\)/g)].map((match) => match[1]),
-    ['"app:open-settings", action'],
+    ["'app:open-settings', action"],
   );
   assert.deepEqual(
     [...entry.matchAll(/loadURL\((.*)\);/g)].map((match) => match[1]),
@@ -292,10 +292,10 @@ test("Add a Cloud… is always the sheet on this computer's page, never a native
     add.indexOf('persistEnvironments(withActive(environmentsState, LOCAL_ID))') <
       add.indexOf('win.webContents.send('),
   );
-  assert.match(add, /const action = source === "app_howto" \? "cloud-add-howto" : "cloud-add";/);
+  assert.match(add, /const action = source === 'app_howto' \? 'cloud-add-howto' : 'cloud-add';/);
   assert.deepEqual(
     [...add.matchAll(/webContents\.send\(([^)]*)\)/g)].map((match) => match[1]),
-    ['"app:open-settings", action'],
+    ["'app:open-settings', action"],
   );
   assert.deepEqual(
     [...add.matchAll(/loadURL\((.*)\);/g)].map((match) => match[1]),

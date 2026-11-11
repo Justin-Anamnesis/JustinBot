@@ -62,15 +62,21 @@ test("the local page's copyText sends only the text, on the one explicit channel
 
 // The production registration line from main.mjs, with the real localOnly and writeClipboardText and a fake ipcMain.
 function productionHandler() {
-  const lines = mainSource.split('\n').filter((line) => line.includes('"clipboard:write-text"'));
-  assert.equal(lines.length, 1, 'exactly one registration of the channel in main.mjs');
+  const blocks =
+    mainSource.match(/^ipcMain\.handle\(\n {2}'clipboard:write-text',[\s\S]*?\n\);$/gm) ?? [];
+  assert.equal(blocks.length, 1, 'exactly one registration of the channel in main.mjs');
+  assert.equal(
+    mainSource.split('\n').filter((line) => line.includes("'clipboard:write-text'")).length,
+    2,
+    'the channel appears only in that registration and its localOnly name',
+  );
   assert.match(
-    lines[0],
-    /^ipcMain\.handle\("clipboard:write-text", localOnly\("clipboard:write-text", /,
+    blocks[0],
+    /^ipcMain\.handle\(\n {2}'clipboard:write-text',\n {2}localOnly\('clipboard:write-text', /,
   );
   const handlers = new Map();
   const written = [];
-  vm.runInNewContext(lines[0], {
+  vm.runInNewContext(blocks[0], {
     ipcMain: { handle: (channel, handler) => handlers.set(channel, handler) },
     localOnly: localOrigin.localOnly,
     writeClipboardText,

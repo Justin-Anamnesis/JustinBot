@@ -197,7 +197,7 @@ test('both external-link entry points use the policy and IPC retains the local-o
   const main = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8');
   assert.match(
     main,
-    /ipcMain\.handle\("desktop:open-external", localOnly\("desktop:open-external"/,
+    /ipcMain\.handle\(\s*'desktop:open-external',\s*localOnly\('desktop:open-external'/,
   );
   assert.match(main, /shell\.openExternal\(externalLinkUrl\(rawUrl\)\)/);
   assert.match(main, /shell\.openExternal\(externalLinkUrl\(url\)\)/);
@@ -483,10 +483,10 @@ test('the app installs these handlers, with its one rule for My Cloud and a wait
   assert.match(main, /setPermissionCheckHandler\(appPermissions\.check\)/);
   assert.match(
     main,
-    /ipcMain\.handle\("perm:status", \(event\) => \(\{[^}]*pageMic: appPermissions\?\.pageMicrophone\(event\) \?\? "refused",/s,
+    /ipcMain\.handle\('perm:status', \(event\) => \(\{[^}]*pageMic: appPermissions\?\.pageMicrophone\(event\) \?\? 'refused',/s,
   );
   assert.match(main, /^let appPermissions = null;$/m);
-  assert.match(main, /^  appPermissions = appPermissionHandlers\(\{$/m);
+  assert.match(main, /^ {4}appPermissions = appPermissionHandlers\(\{$/m);
   assert.doesNotMatch(main, /(const|let|var) appPermissions = appPermissionHandlers/);
   assert.match(main, /cloudHomeOrigin: myCloud,\n/);
   assert.match(
@@ -496,15 +496,15 @@ test('the app installs these handlers, with its one rule for My Cloud and a wait
   );
   assert.match(
     main,
-    /cloudHomeRestoring: \(\) => cloudAccountRestoring \? cloudAccountRestored\(\) : null,\n/,
+    /cloudHomeRestoring: \(\) => \(cloudAccountRestoring \? cloudAccountRestored\(\) : null\),\n/,
   );
   assert.equal(main.match(/myCloudOrigin\(/g)?.length, 1);
-  assert.match(main, /cloudPageSenderAllowed\(event, \{ contents, homeOrigin: myCloud\(\),/);
+  assert.match(main, /cloudPageSenderAllowed\(event, \{\s*contents,\s*homeOrigin: myCloud\(\),/);
   assert.doesNotMatch(main, /rememberedHome\??\.accountId/);
   assert.doesNotMatch(main, /remembered: true/);
   assert.match(
     main,
-    /cloudAccountRestoring = true;\n\s+cloudAccountStarted = ensureCloudAccount\(\)\.start\(\)\.catch\(\(\) => \{\}\)\.then\(\(\) => accountRing\(\)\?\.start\(\)\)\.finally\(\(\) => \{ cloudAccountRestoring = false; \}\);/,
+    /cloudAccountRestoring = true;\n\s+cloudAccountStarted = ensureCloudAccount\(\)\s*\.start\(\)\s*\.catch\(\(\) => \{\}\)\s*\.then\(\(\) => accountRing\(\)\?\.start\(\)\)\s*\.finally\(\(\) => \{\s*cloudAccountRestoring = false;\s*\}\);/,
   );
 });
 

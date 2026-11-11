@@ -69,7 +69,7 @@ test('personal Cloud bridge is desktop-local, contains no capability access, and
 test('production personal Cloud IPC guards exact local main frame and forwards no arguments', async () => {
   const source = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8'),
     start = source.indexOf('const workspaceOnly ='),
-    end = source.indexOf('ipcMain.handle("organization:settings-opened"', start);
+    end = source.indexOf("ipcMain.handle(\n  'organization:settings-opened'", start);
   assert.ok(start >= 0 && end > start);
   const handlers = new Map(),
     calls = [],
@@ -132,7 +132,7 @@ test("a team's Cloud opens from the page by its id alone: the team comes from th
   assert.deepEqual(f.invoked, [['cloud-account:openTeam', 'team-acme']]);
   const source = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8'),
     start = source.indexOf('const workspaceOnly ='),
-    end = source.indexOf('ipcMain.handle("organization:settings-opened"', start);
+    end = source.indexOf("ipcMain.handle(\n  'organization:settings-opened'", start);
   const handlers = new Map(),
     shown = [],
     cancelled = [],
@@ -205,7 +205,7 @@ test("main opens a checkout only for a plan the offer sells now and one of this 
   const { CHECKOUT_SOURCES } = await import('./cloud-account.mjs');
   const source = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8'),
     start = source.indexOf('const workspaceOnly ='),
-    end = source.indexOf('ipcMain.handle("organization:settings-opened"', start);
+    end = source.indexOf("ipcMain.handle(\n  'organization:settings-opened'", start);
   const handlers = new Map(),
     calls = [],
     frame = { url: `${origin}/` },
@@ -291,7 +291,7 @@ test("Cancel and Keep my plan from Settings carry only the survey's words, and o
   ]);
   const source = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8'),
     start = source.indexOf('const workspaceOnly ='),
-    end = source.indexOf('ipcMain.handle("organization:settings-opened"', start);
+    end = source.indexOf("ipcMain.handle(\n  'organization:settings-opened'", start);
   const handlers = new Map(),
     calls = [],
     frame = { url: `${origin}/` },

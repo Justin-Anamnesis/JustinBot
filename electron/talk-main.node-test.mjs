@@ -206,18 +206,18 @@ test("every list of the app's windows leaves the talk box out", () => {
 test("main hands the talk wiring its speech sinks, this computer's own server and window, and closes it first on quit", () => {
   assert.match(
     main,
-    /const talk = installTalk\(\{ ipcMain, localOnly, localOrHome, BrowserWindow, appleSpeech: nativeActions\.appleSpeech,\s*speech: \{ start: startSpeech, stop: stopSpeech, finish: finishSpeech, busy: speechBusy \},/,
+    /const talk = installTalk\(\{\s*ipcMain,\s*localOnly,\s*localOrHome,\s*BrowserWindow,\s*appleSpeech: nativeActions\.appleSpeech,\s*speech: \{ start: startSpeech, stop: stopSpeech, finish: finishSpeech, busy: speechBusy \},/,
   );
   assert.match(
     main,
-    /packaged: app\.isPackaged, devUrl: DEV_URL, nativeImage, iconPath: APP_ICON, openLink: queueChatLink, reveal: revealForLink, log: slog, t: nativeT \}\);/,
+    /packaged: app\.isPackaged,\s*devUrl: DEV_URL,\s*nativeImage,\s*iconPath: APP_ICON,\s*openLink: queueChatLink,\s*reveal: revealForLink,\s*log: slog,\s*t: nativeT,?\s*\}\);/,
   );
   assert.match(
     main,
-    /talk\.start\(\{ globalShortcut, screen, prefs: desktopPrefs, remote: \(\) => Boolean\(desktopRemoteAccess\), away: \(\) => homeWindow\.current\(\)\.kind !== "computer", starting: \(\) => !serverReady, localRequest: localServerRequest, dataDir: \(\) => runningDataDir \}\);/,
+    /talk\.start\(\{\s*globalShortcut,\s*screen,\s*prefs: desktopPrefs,\s*remote: \(\) => Boolean\(desktopRemoteAccess\),\s*away: \(\) => homeWindow\.current\(\)\.kind !== 'computer',\s*starting: \(\) => !serverReady,\s*localRequest: localServerRequest,\s*dataDir: \(\) => runningDataDir,?\s*\}\);/,
   );
-  assert.match(main, /app\.on\("before-quit", \(e\) => \{\s*talk\.close\(\);/);
-  assert.doesNotMatch(main, /ipcMain\.handle\("(?:speech|talk-shortcut|call):/);
+  assert.match(main, /app\.on\('before-quit', \(e\) => \{\s*talk\.close\(\);/);
+  assert.doesNotMatch(main, /ipcMain\.handle\(\s*'(?:speech|talk-shortcut|call):/);
 });
 
 test('main tells the talk wiring when home changes and which skin the app painted, and counts a talk ask as busy for a quiet update', () => {
@@ -227,11 +227,11 @@ test('main tells the talk wiring when home changes and which skin the app painte
   );
   assert.match(
     main,
-    /ipcMain\.handle\("desktop:skin", \(event, skin\) => \{\s*if \(!isKnownSkin\(skin\)\) return false;\s*if \(chromeRail\.owns\(event\)\) return true;\s*try \{\s*talk\.skin\(skin\);/,
+    /ipcMain\.handle\('desktop:skin', \(event, skin\) => \{\s*if \(!isKnownSkin\(skin\)\) return false;\s*if \(chromeRail\.owns\(event\)\) return true;\s*try \{\s*talk\.skin\(skin\);/,
   );
   assert.match(
     main,
-    /busy: \(\) => \(\(oneHome\.oneHome\.busy\(\) \|\| ownHome\?\.busy\(\)\) && "move"\) \|\| \(computerSharing\?\.busy\(\) && "lending"\) \|\| \(talk\.busy\(\) && "talk"\) \|\|/,
+    /busy: \(\) =>\s*\(\(oneHome\.oneHome\.busy\(\) \|\| ownHome\?\.busy\(\)\) && 'move'\) \|\|\s*\(computerSharing\?\.busy\(\) && 'lending'\) \|\|\s*\(talk\.busy\(\) && 'talk'\) \|\|/,
   );
 });
 
@@ -239,7 +239,7 @@ test("the talk bridge keys stay off other servers' pages; a call can be reported
   const list = (name) =>
     preload.match(new RegExp(`const ${name} = (?:new Set\\()?\\[([^\\]]*)\\]`))[1];
   assert.doesNotMatch(list('REMOTE_SAFE'), /talkShortcut|callActive/);
-  assert.match(list('HOME_PAGE'), /"callActive"/);
+  assert.match(list('HOME_PAGE'), /'callActive'/);
   assert.doesNotMatch(list('HOME_PAGE'), /talkShortcut/);
 });
 

@@ -173,11 +173,11 @@ describe('attachment download destination', () => {
 
   it('is installed on the default session before the primary window is created', () => {
     const main = fs.readFileSync(new URL('./main.mjs', import.meta.url), 'utf8');
-    const handler = main.indexOf('session.defaultSession.on("will-download"');
+    const handler = main.indexOf("session.defaultSession.on('will-download'");
     assert.notEqual(handler, -1);
     assert.match(main.slice(handler), /item\.setSavePath\(collisionFreeDownloadPath\(/);
     assert.match(main.slice(handler), /revealDownloadWhenDone\(item, /);
-    assert.ok(handler < main.indexOf('!deliveredCloudEntry) await showStartPlace();'));
+    assert.ok(handler < main.search(/!deliveredCloudEntry\s*\)\s*await showStartPlace\(\);/));
   });
 
   it('reveals only a completed download at its actual save path', () => {
@@ -538,9 +538,9 @@ describe('openLogsFolder', () => {
     const main = fs.readFileSync(new URL('./main.mjs', import.meta.url), 'utf8');
     assert.match(
       main,
-      /ipcMain\.handle\("desktop:open-logs", localOrHome\("desktop:open-logs", \(\) => openLogsFolder\(LOG_DIR, \{ open: \(folder\) => shell\.openPath\(folder\) \}\)\)\);/,
+      /ipcMain\.handle\(\s*'desktop:open-logs',\s*localOrHome\('desktop:open-logs', \(\) =>\s*openLogsFolder\(LOG_DIR, \{ open: \(folder\) => shell\.openPath\(folder\) \}\),?\s*\),?\s*\);/,
     );
-    assert.match(main, /const LOG_DIR = app\.getPath\("logs"\);/);
+    assert.match(main, /const LOG_DIR = app\.getPath\('logs'\);/);
   });
 });
 
@@ -615,7 +615,7 @@ describe('openHtmlCopy (#4406)', () => {
     const main = fs.readFileSync(new URL('./main.mjs', import.meta.url), 'utf8');
     assert.match(
       main,
-      /ipcMain\.handle\("desktop:open-html", localOnly\("desktop:open-html", \(_event, source, name\) =>\s*openHtmlCopy\(source, name, \{ dir: path\.join\(app\.getPath\("userData"\), "open-html"\)/,
+      /ipcMain\.handle\(\s*'desktop:open-html',\s*localOnly\('desktop:open-html', \(_event, source, name\) =>\s*openHtmlCopy\(source, name, \{\s*dir: path\.join\(app\.getPath\('userData'\), 'open-html'\)/,
     );
   });
 });

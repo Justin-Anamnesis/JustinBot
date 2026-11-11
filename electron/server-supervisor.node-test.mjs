@@ -28,7 +28,7 @@ test('main retires an unavailable window only after recovery navigation succeeds
   const source = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8');
   assert.match(
     source,
-    /void win\.loadURL\(`http:\/\/127\.0\.0\.1:\$\{SERVER_PORT\}`\)\.then\(\(\) => \{\s*serverUnavailableWindows\.delete\(win\);/,
+    /void win\s*\.loadURL\(`http:\/\/127\.0\.0\.1:\$\{SERVER_PORT\}`\)\s*\.then\(\(\) => \{\s*serverUnavailableWindows\.delete\(win\);/,
   );
   assert.doesNotMatch(source, /serverUnavailableWindows\.delete\(win\);\s*void win\.loadURL/);
 });
@@ -218,8 +218,8 @@ test('local switching in main rejects dev mode and overlaps, and adopts the roll
   const start = source.indexOf('async function switchLocalEnvironmentTo(');
   const body = source.slice(start, source.indexOf('\nasync function switchEnvironment', start));
   assert.ok(start > 0 && body.length > 0, 'the switch helper exists');
-  assert.match(body, /if \(!app\.isPackaged\) return \{ ok: false, error: "dev" \};/);
-  assert.match(body, /if \(localSwitchInFlight\) return \{ ok: false, error: "busy" \};/);
+  assert.match(body, /if \(!app\.isPackaged\) return \{ ok: false, error: 'dev' \};/);
+  assert.match(body, /if \(localSwitchInFlight\) return \{ ok: false, error: 'busy' \};/);
   assert.match(body, /if \(restored\.proc\) serverSupervisor\.ready\(restored\.proc\);/);
   const busyCheck = body.indexOf('if (localSwitchInFlight)');
   const flagSet = body.indexOf('localSwitchInFlight = true;');
@@ -240,7 +240,7 @@ test('local switching in main rejects dev mode and overlaps, and adopts the roll
   );
   assert.match(
     source,
-    /function createLocalEnvironment\(name, dataDir\) \{\s*if \(!app\.isPackaged\) return \{ ok: false, error: "dev", state: environmentsState \};/,
+    /function createLocalEnvironment\(name, dataDir\) \{\s*if \(!app\.isPackaged\) return \{ ok: false, error: 'dev', state: environmentsState \};/,
   );
 });
 
@@ -561,5 +561,5 @@ test('boot reads the environment decision before the boot lease and never create
     'the missing-dir decision must precede the boot lease',
   );
   assert.match(boot, /activeId: LOCAL_ID/);
-  assert.match(boot, /showErrorBox\(nativeT\("native\.boot\.folderMissing\.title"\)/);
+  assert.match(boot, /showErrorBox\(\s*nativeT\('native\.boot\.folderMissing\.title'\)/);
 });

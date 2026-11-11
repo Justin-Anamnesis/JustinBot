@@ -271,7 +271,7 @@ test("main's own wiring: This computer's page reads and changes its own colour, 
     /\r\n/g,
     '\n',
   );
-  const start = source.indexOf('installPlaceLook({ ipcMain, guard: workspaceOnly'),
+  const start = source.indexOf('installPlaceLook({\n  ipcMain,\n  guard: workspaceOnly,'),
     end = source.indexOf('const lendingDialogs = createLendingDialogs(', start);
   assert.ok(start >= 0 && end > start, "main installs the colour's channels");
   const handlers = new Map(),

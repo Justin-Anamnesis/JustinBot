@@ -246,7 +246,7 @@ test('the page shows reply text as plain text, never HTML', () => {
 test("the page's bridge is open and dismiss, and they count only from this box", async () => {
   const preload = readFileSync(new URL('./talk-panel-preload.cjs', import.meta.url), 'utf8');
   assert.deepEqual(
-    [...preload.matchAll(/ipcRenderer\.(\w+)\("([^"]+)"/g)].map((m) => [m[1], m[2]]),
+    [...preload.matchAll(/ipcRenderer\.(\w+)\(['"]([^'"]+)['"]/g)].map((m) => [m[1], m[2]]),
     [
       ['send', 'talk-panel:open'],
       ['send', 'talk-panel:dismiss'],

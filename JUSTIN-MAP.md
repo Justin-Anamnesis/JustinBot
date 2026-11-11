@@ -132,6 +132,8 @@
 | 2026-11-11 | 28 个 `*.test.*` 文件 | 查找源码文本的字符串与正则改成能匹配格式化后的写法 | 上游测试把源码当文本读，格式化后 49 个失败；清单见 `git log` 里的 `test: match formatted source text` 提交 |
 | 2026-11-11 | `scripts/testing/file-size-ratchet.test.ts` | `LINES` 表按格式化后的行数重算（30 → 103 个文件） | 折行使行数增加；同步上游时这张表必冲突，重算即可 |
 | 2026-11-11 | `shared/mascot-bodies.ts`、`shared/carved-bodies.ts` | 不格式化，保持上游原样 | 生成器产物，上游测试逐字比对 |
+| 2026-11-11 | `electron/main.mjs`、`electron/fork-updater.mjs` | `startUpdater` 改从新文件导入，是个空函数 | 关掉自动更新，否则会被换回上游版本；`main.mjs` 受体积棘轮约束，行数不能增 |
+| 2026-11-11 | 28 个 `electron/*.node-test.mjs` | 同上面的测试修复，针对 node 测试运行器那一套 | 格式化后 53 个失败 |
 
 ## 常用命令
 
@@ -158,5 +160,5 @@ pnpm dlx oxlint@1.80.0 --deny-warnings .             # 上游自己的 lint，�
 在仓根运行，输出为空即全部有效：
 
 ```
-awk -F'|' '/^\| / && $3 ~ /`/ && $4 ~ /`/ {f=$3; s=$4; gsub(/^ *`|` *$/,"",f); gsub(/^ *`|` *$/,"",s); print f "\t" s}' JUSTIN-MAP.md | while IFS=$'\t' read -r f s; do rg -qF -- "$s" "$f" || echo "STALE: $f :: $s"; done
+awk -F'|' '/^\| / && $2 !~ /^ *20[0-9][0-9]-/ && $3 ~ /`/ && $4 ~ /`/ {f=$3; s=$4; gsub(/^ *`|` *$/,"",f); gsub(/^ *`|` *$/,"",s); print f "\t" s}' JUSTIN-MAP.md | while IFS=$'\t' read -r f s; do rg -qF -- "$s" "$f" || echo "STALE: $f :: $s"; done
 ```

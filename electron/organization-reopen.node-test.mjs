@@ -60,7 +60,7 @@ function section(start, end) {
   assert.ok(from >= 0 && to > from, `Main-process test section moved: ${start}`);
   return mainSource.slice(from, to);
 }
-const registrations = section('const workspaceOnly =', 'ipcMain.on("company-backups:client-state"');
+const registrations = section('const workspaceOnly =', "ipcMain.on('company-backups:client-state'");
 
 function main() {
   const handlers = new Map(),

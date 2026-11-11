@@ -46,7 +46,6 @@ import { linuxDisablesGpu, SOFTWARE_RENDERING_ARG } from './linux-gpu.mjs';
 import { pasteMenuItem } from './paste-menu-item.mjs';
 import {
   attachUpdaterWindow,
-  startUpdater,
   registerUpdaterIpc,
   sendUpdaterState,
   reopenedOutOfSight,
@@ -93,6 +92,7 @@ import { createActivityWindow } from './lending-activity-window.mjs';
 import { missingPermissions } from './lent-screen-failures.mjs';
 import { createScreenControl } from './screen-control.mjs';
 import { createAskPrompt } from './ask-prompt.mjs';
+import { startUpdater } from './fork-updater.mjs';
 let startupScreen = null;
 let desktopTray = null;
 import {

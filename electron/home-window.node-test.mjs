@@ -909,7 +909,7 @@ test("only the verified Cloud, open as this window's active server, counts as th
 const MAIN = readFileSync(new URL('./main.mjs', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 const PAGE_IPC = MAIN.slice(
   MAIN.indexOf('function myCloud() {'),
-  MAIN.indexOf('const savedWorkspace = id =>'),
+  MAIN.indexOf('const savedWorkspace = (id) =>'),
 );
 
 const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -1104,7 +1104,7 @@ test("Settings on the person's own Cloud shows the plan read only, says when it 
 
 test('main shows the switcher at home only with somewhere else to go: My Cloud alone has none', () => {
   const start = MAIN.indexOf('const homeAlone = '),
-    end = MAIN.indexOf('\n', start);
+    end = MAIN.indexOf(';\n', start) + 1;
   assert.ok(start > 0 && end > start);
   const cloud = { id: 'c', kind: 'remote', name: 'My Cloud', origin: CLOUD },
     office = { id: 'o', kind: 'remote', name: 'Office', origin: 'https://office.example.test' };

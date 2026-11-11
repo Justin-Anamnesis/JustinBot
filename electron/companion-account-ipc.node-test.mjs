@@ -97,7 +97,7 @@ test('prepare is local-only, takes nothing from the page, and an organisation ca
     }),
   });
   vm.runInContext(
-    slice('ipcMain.handle("companion-account:state"', 'const workspaceOnly ='),
+    slice("ipcMain.handle(\n  'companion-account:state'", 'const workspaceOnly ='),
     context,
   );
   const prepare = handlers.get('companion-account:prepare');

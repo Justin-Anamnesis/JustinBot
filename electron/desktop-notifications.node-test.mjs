@@ -250,11 +250,11 @@ test("main opens a thread only from the window's own load, and a page gets the b
   const source = (name) => readFileSync(new URL(name, import.meta.url), 'utf8');
   assert.match(
     source('./main.mjs'),
-    /did-stop-loading", \(\) => \{[^}]*desktopNotifications\.arrived\(\)/,
+    /did-stop-loading', \(\) => \{[^}]*desktopNotifications\.arrived\(\)/,
   );
   assert.match(
     source('./preload.cjs'),
-    /const REMOTE_SAFE = new Set\(\[[^\]]*"desktopNotifications"/,
+    /const REMOTE_SAFE = new Set\(\[[^\]]*'desktopNotifications'/,
   );
 });
 
