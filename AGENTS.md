@@ -25,3 +25,5 @@ name, a type, an extracted function, one shared helper. A rule ("never X",
 rule that guards correctness; fix the code.
 
 More specific `AGENTS.md` files override this note within their directories.
+
+This fork: code entry points are in `JUSTIN-MAP.md`; project background, branch rules and open questions are in `JUSTIN-MEMORY.md`.

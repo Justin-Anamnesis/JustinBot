@@ -1,0 +1,25 @@
+{
+  "name": "justin",
+  "private": true,
+  "type": "module",
+  "description": "Justin 改造代码的独立工程基座：规则零 override，来自 @cognirail/eslint-config。不在上游 pnpm workspace 内，自带锁文件。",
+  "packageManager": "pnpm@11.21.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "lint": "eslint",
+    "lint:fix": "eslint --fix . && prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -p tsconfig.json",
+    "format:tree": "node scripts/format-source-tree.ts",
+    "format:tree:check": "node scripts/format-source-tree.ts --check"
+  },
+  "devDependencies": {
+    "@cognirail/eslint-config": "3.1.1",
+    "@types/node": "24.13.5",
+    "eslint": "10.10.0",
+    "prettier": "3.9.7",
+    "typescript": "6.0.3"
+  }
+}
