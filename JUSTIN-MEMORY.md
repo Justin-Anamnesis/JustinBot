@@ -117,6 +117,7 @@ git switch justin-main && git merge main-fmt
   CSC_IDENTITY_AUTO_DISCOVERY=false pnpm exec electron-builder --mac dir --arm64 --publish never
   ```
 
+- 2026-11-14 已替换正式安装：`/Applications/OpenMausBot.app` 现在是我们的包（临时签名，0.1.155），上游版本留在 `~/Desktop/OpenMausBot-upstream.app`，数据备份在 `~/.openmausbot.bak-1114`。点「检查更新」后界面显示「你已是我们已知的最新版本」，`~/Library/Logs/OpenMausBot/updater.log` 没有新增记录，即更新器没有运行。
 - 不碰已装应用地试跑打出来的包：`OMB_DATA_DIR=<临时目录> release/mac-arm64/OpenMausBot.app/Contents/MacOS/OpenMausBot --user-data-dir=<另一个临时目录>`。实测能启动、建出默认 bot、服务端起在 18799；带自定义 `--user-data-dir` 时钥匙串查询报 -25320（凭据库不可用），正式安装后是否还报没测过。
 - 打包后的服务端冒烟测试 `node scripts/smoke-packaged-server.mjs` 通过。
 - 目录版的包里没有 `app-update.yml`（更新源配置），加上上面关掉的更新器，是两层保险；以后若改打 dmg 或 zip，这个文件会出现，关更新的代码仍然生效。
