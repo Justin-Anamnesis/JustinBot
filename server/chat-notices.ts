@@ -15,6 +15,8 @@ export const CHAT_NOTICE = {
   'chat.notice.resumingAfterRestart': 'Resuming after a restart',
   'chat.notice.cutOffByRestart': '{name} was cut off by a restart; resuming',
   'chat.notice.stalled': 'no activity for {minutes} minutes — the turn was stopped',
+  'chat.notice.stalledCommand':
+    'the command `{command}` ran for {minutes} minutes without finishing and looks stuck — the turn was stopped',
   'chat.notice.followupInterrupted':
     'Queued follow-up interrupted by restart or restore — it may have already run. Review the result before sending it again.',
   'chat.notice.usageLimit':
@@ -42,6 +44,10 @@ export const CHAT_NOTICE = {
     "{provider} refused this turn because this model takes at most {limit} tools and this bot offers more, even with its tool lists trimmed, so nothing ran. Turn off some of this bot's apps or MCP servers, or switch the bot to another model.",
   'chat.notice.toolCountUnknown':
     "{provider} refused this turn because this model takes at most a limited number of tools and this bot offers more, even with its tool lists trimmed, so nothing ran. Turn off some of this bot's apps or MCP servers, or switch the bot to another model.",
+  'chat.notice.modelNoRoute':
+    "{provider} can't use the model {model} here, so choose another model for this bot.",
+  'chat.notice.modelNoRouteUnnamed':
+    "{provider} can't use this bot's model here, so choose another model for this bot.",
   'chat.notice.goalRetry': "{name}'s turn did not settle ({why}) — retrying once.",
   'chat.notice.part.providerFailed': 'provider failed',
   'chat.notice.part.dispatchFailed': 'dispatch failed',
@@ -268,5 +274,8 @@ export function noticeTool<T extends object>(
 }
 
 export function failedNoticeTool(key: ChatNoticeKey, params?: ServerTextParams): FailedTurnTool {
-  return failedTurnTool(chatNotice(key, params), { text: { key, ...(params ? { params } : {}) } });
+  const safe = params && redactParams(params);
+  return failedTurnTool(chatNotice(key, safe), {
+    text: { key, ...(safe ? { params: safe } : {}) },
+  });
 }

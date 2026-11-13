@@ -18,7 +18,9 @@ import {
   type WelcomeView,
 } from '@/lib/cloud-setup';
 import {
+  dropFinishedWelcome,
   endWelcomeHere,
+  keepFinishedWelcome,
   markWelcomeSeen,
   saveWelcomeHints,
   stepAsideWelcome,
@@ -98,7 +100,10 @@ export function CloudWelcome() {
   const navigated = useRef(false);
   const visible = state.bots.filter((bot) => !bot.hidden);
   const bot = visible.find((candidate) => candidate.chiefOfStaff) ?? visible[0] ?? null;
-  const cloudHasWork = visible.length > 1 || state.groups.length > 0;
+  const team = Boolean(state.config?.team);
+  const cloudHasWork =
+    visible.filter((candidate) => !candidate.defaultBot?.person).length > 1 ||
+    state.groups.length > 0;
   const sendBridge = window.ogb?.remoteClient?.active ? undefined : window.ogb?.cloudSendPage;
   // An older app still offers Copy this computer by hand: it moves bots here by itself only once updated.
   const older = Boolean(sendBridge && window.ogb && 'cloudMove' in window.ogb);
@@ -125,6 +130,16 @@ export function CloudWelcome() {
     navigated.current = false;
     heading.current?.focus();
   }, [view]);
+
+  // A team's Owner reads the finished list once: it is recorded as it shows, and stays on screen until they leave it.
+  const finishedOnTeam = view === 'done' && team && !hintSeen(record, CLOUD_WELCOME_DONE);
+  const saved = state.config?.onboarding;
+  useEffect(() => {
+    if (!finishedOnTeam) return;
+    keepFinishedWelcome();
+    void saveWelcomeHints(saved, [CLOUD_WELCOME_DONE], dispatch);
+  }, [finishedOnTeam, saved, dispatch]);
+  useEffect(() => dropFinishedWelcome, []);
 
   const anchor = useRef<string | null>(null);
   const reanchor = useRef(false);
@@ -191,7 +206,7 @@ export function CloudWelcome() {
     content = (
       <WelcomeBring
         name={name}
-        team={Boolean(state.config?.team)}
+        team={team}
         desktop={Boolean(sendBridge)}
         older={older}
         cloudHasWork={cloudHasWork}
@@ -217,6 +232,7 @@ export function CloudWelcome() {
       <WelcomeDone
         name={name}
         bot={bot}
+        team={team}
         headingRef={heading}
         onSayHi={sayHi}
         onJob={giveJob}

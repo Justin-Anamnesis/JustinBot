@@ -218,7 +218,7 @@ it('the bot menu has one Move to item per team, none without a team or for a bot
   const confirm = html(menu);
   for (const said of [
     'Move Scout to Acme?',
-    "Everyone in Acme can use Scout. Only Acme's admins can change it.",
+    "Only you and Acme's admins can use Scout until you share it.",
     'Goes with Scout: instructions, skills, files, routines, and your chats with Scout',
     'Your chats stay private there: only you can see them.',
     'Stays on My Cloud: what Scout remembers, your connections, and MausBot',

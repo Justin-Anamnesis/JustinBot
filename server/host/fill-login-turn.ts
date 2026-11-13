@@ -173,6 +173,7 @@ export function createFillLoginTurn(deps: FillLoginTurnDeps) {
             {
               ...deps.loginInput(session, spec, env),
               remember: deps.remember,
+              turnActive: () => deps.turnActive?.(capability) !== false,
               ...(deps.mailCodes
                 ? {
                     emailCode: (ask) =>

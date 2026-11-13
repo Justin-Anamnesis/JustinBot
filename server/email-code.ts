@@ -167,6 +167,7 @@ async function look(
   read: Map<string, Extracted>,
 ): Promise<Round & { codes: Set<string> }> {
   const round: Round & { codes: Set<string> } = { codes: new Set() };
+  if (options.active?.() === false) return round;
   let listed: MailSummary[];
   try {
     listed = await box.list(options.askedAt - CLOCK_SKEW_MS);
@@ -174,6 +175,7 @@ async function look(
     round.failed = true;
     return round;
   }
+  if (options.active?.() === false) return round;
   const recent = listed.filter((mail) => mail.at >= options.askedAt - CLOCK_SKEW_MS);
   round.wrongSender = recent.some(
     (mail) => !sentBySite(mail.from, options.site) && CODE_MAIL_SUBJECT.test(mail.subject),
@@ -182,6 +184,7 @@ async function look(
     .filter((mail) => sentBySite(mail.from, options.site))
     .slice(0, BODIES_PER_MAILBOX);
   for (const mail of theirs) {
+    if (options.active?.() === false) return round;
     let result = read.get(mail.id);
     if (!result) {
       let text: string | null = null;
@@ -190,6 +193,7 @@ async function look(
       } catch {
         text = null;
       }
+      if (options.active?.() === false) return round;
       if (text === null) {
         round.unreadable = true;
         continue;
@@ -221,9 +225,11 @@ export async function waitForEmailCode(
     unreadable = false,
     failedRounds = 0;
   for (;;) {
+    if (options.active?.() === false) break;
     const rounds = await Promise.all(
       mailboxes.map((box, index) => look(box, options, read[index]!)),
     );
+    if (options.active?.() === false) break;
     const codes = new Set(rounds.flatMap((round) => [...round.codes]));
     if (rounds.some((round) => round.ambiguous) || codes.size > 1)
       return { kind: 'miss', why: 'ambiguous' };
@@ -232,8 +238,7 @@ export async function waitForEmailCode(
     used ||= rounds.some((round) => round.used);
     unreadable ||= rounds.some((round) => round.unreadable);
     failedRounds = rounds.every((round) => round.failed) ? failedRounds + 1 : 0;
-    if (failedRounds >= FAILED_ROUNDS || options.now() >= deadline || options.active?.() === false)
-      break;
+    if (failedRounds >= FAILED_ROUNDS || options.now() >= deadline) break;
     await options.sleep(pollMs);
   }
   if (failedRounds >= FAILED_ROUNDS || unreadable) return { kind: 'miss', why: 'unreadable' };

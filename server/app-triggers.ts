@@ -87,10 +87,12 @@ export interface AppTriggerManagerOptions {
       deliveryId: string;
       receivedAt: number;
       eventSource: 'app';
+      sameConversation?: boolean;
     }): { id: string };
     merge(
       triggerId: string,
       eventId: string,
+      sameConversation: boolean,
       merge: (prompt: string) => string | null,
     ): { id: string } | null;
     receipt(triggerId: string, eventId: string): { id: string } | null;
@@ -148,6 +150,7 @@ const storedSchema = z.object({
     .optional()
     .catch(undefined),
   sourceThreadId: z.string().optional(),
+  sameConversation: z.boolean().optional().catch(undefined),
   received: z.number().int().nonnegative(),
   filtered: z.number().int().nonnegative(),
   skipped: skippedSchema.optional().catch(undefined),
@@ -193,6 +196,7 @@ export interface AppTriggerInput {
   runOn?: RoutineRunOn;
   enabled?: boolean;
   sourceThreadId?: string;
+  sameConversation?: boolean;
   /** Another server's automation, made here under its own id. */
   id?: string;
 }
@@ -204,6 +208,7 @@ export interface AppTriggerPatch {
   filter?: AppTriggerFilter | null;
   config?: Record<string, unknown>;
   enabled?: boolean;
+  sameConversation?: boolean;
   /** Undo: the config exactly as it was saved, filter already folded in. */
   restoreConfig?: Record<string, unknown>;
 }
@@ -392,6 +397,7 @@ export class AppTriggerManager {
       ...(filter ? { filter } : {}),
       remote: { state: 'pending' },
       ...(input.sourceThreadId ? { sourceThreadId: input.sourceThreadId } : {}),
+      ...(input.sameConversation ? { sameConversation: true } : {}),
       received: 0,
       filtered: 0,
       createdAt: now,
@@ -430,6 +436,7 @@ export class AppTriggerManager {
         runOn: record.runOn,
         filter: record.filter ?? null,
         config,
+        sameConversation: record.sameConversation === true,
       }))!;
     }
     return this.create({
@@ -445,6 +452,7 @@ export class AppTriggerManager {
       runOn: record.runOn,
       enabled: false,
       ...(record.sourceThreadId ? { sourceThreadId: record.sourceThreadId } : {}),
+      ...(record.sameConversation ? { sameConversation: true } : {}),
     });
   }
 
@@ -490,6 +498,8 @@ export class AppTriggerManager {
       });
       if (filter) trigger.filter = filter;
       else delete trigger.filter;
+      if (patch.sameConversation === true) trigger.sameConversation = true;
+      else if (patch.sameConversation === false) delete trigger.sameConversation;
       if (patch.enabled === false)
         this.options.runs.cancelQueued(
           trigger.id,
@@ -601,6 +611,7 @@ export class AppTriggerManager {
       deliveryId: eventId,
       receivedAt: this.now(),
       eventSource: 'app',
+      sameConversation: trigger.sameConversation,
       prompt: eventPrompt(
         trigger.prompt,
         eventBlock(trigger, { id: eventId, receivedAt: this.now(), test: true, data }),
@@ -709,8 +720,11 @@ export class AppTriggerManager {
         test: event.kind === 'test',
         data,
       });
-      const joined = this.options.runs.merge(trigger.id, event.id, (prompt) =>
-        mergeEventBlock(prompt, block),
+      const joined = this.options.runs.merge(
+        trigger.id,
+        event.id,
+        trigger.sameConversation === true,
+        (prompt) => mergeEventBlock(prompt, block),
       );
       let runId = joined?.id;
       if (!runId) {
@@ -730,6 +744,7 @@ export class AppTriggerManager {
           deliveryId: event.id,
           receivedAt: event.receivedAt,
           eventSource: 'app',
+          sameConversation: trigger.sameConversation,
         }).id;
       }
       trigger.received += 1;

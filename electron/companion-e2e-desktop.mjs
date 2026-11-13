@@ -19,6 +19,7 @@ export function createDesktopCompanionE2E({
   updateCredentials,
   powerMonitor,
   log,
+  onState,
 }) {
   let client = null;
   try {
@@ -39,6 +40,7 @@ export function createDesktopCompanionE2E({
     companionState,
     post: postCompanionMessage,
     log,
+    onState,
   });
   setCompanionE2EHooks({
     initialMessage: () => e2e.message(),

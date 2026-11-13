@@ -2,6 +2,7 @@ import { botOwner, nameFromEmail } from '../shared/bot-owner.ts';
 import {
   canManage,
   hasAuthority,
+  inChargeOfEvery,
   peerName,
   renderRoster,
   reachablePeers,
@@ -48,6 +49,7 @@ export function chiefOfStaffSystemPrompt(
   bots: ChiefTeamMember[],
   canDelegate: boolean,
   also?: (bot: ChiefTeamMember) => boolean,
+  departments?: readonly string[],
 ): string {
   const chief = bots.find((bot) => bot.id === chiefId);
   const chiefSection = sectionKey(chief?.section);
@@ -77,6 +79,12 @@ export function chiefOfStaffSystemPrompt(
     : 'Your current engine cannot contact teammates. Be honest about that limitation and ask the user to choose a delegation-compatible engine before promising coordinated work.';
 
   const isChief = !chief?.defaultBot || chief.chiefOfStaff === true;
+  const everywhere = Boolean(chief && departments && inChargeOfEvery(chief, departments));
+  const responsibleFor = everywhere
+    ? 'every department, and each new department becomes yours as it is added'
+    : chief?.managedSections?.length
+      ? `these departments: ${chief.managedSections.map((s) => peerName(s) || 'General').join(', ')}`
+      : '';
   return [
     isChief
       ? person
@@ -85,11 +93,11 @@ export function chiefOfStaffSystemPrompt(
       : chief?.defaultBot?.person
         ? `You hold a Chief of Staff's tools for the ${sectionName} department, but you are not the Chief: the daily brief and team incidents stay with the Chief.`
         : `You hold a Chief of Staff's tools for the ${sectionName} department, but you are not the Chief: team incidents stay with the Chief. Keeping an eye on the person's day and their daily brief are yours.`,
-    chief?.managedSections?.length
-      ? `The owner also made you responsible for these departments: ${chief.managedSections.map((s) => peerName(s) || 'General').join(', ')}. You supervise their bots and may propose setup changes there. You remain the user's single point of contact. This does not grant other bots your access, change their tool permissions, or expose unrelated conversation history.`
+    responsibleFor
+      ? `The owner also made you responsible for ${responsibleFor}. You supervise their bots and may propose setup changes there. You remain the user's single point of contact. This does not grant other bots your access, change their tool permissions, or expose unrelated conversation history.`
       : '',
     canDelegate &&
-      'Every other bot on this team, in any department, is reachable too: consult it or hand it work with coordinate_bots whenever a job needs it, without asking anyone to set anything up. Reaching a bot gives you no authority over it: its setup, its threads and its incidents stay with its own Chief, so ask rather than direct.',
+      `Every other bot on this team, in any department, is reachable too: consult it or hand it work with coordinate_bots whenever a job needs it, without asking anyone to set anything up. Reaching a bot${responsibleFor || person ? ' outside your team' : ''} gives you no authority over it: its setup, its threads and its incidents stay with its own Chief, so ask rather than direct.`,
     "Do the work yourself, bring in a teammate when one fits the job, and return one concise consolidated answer. Never invent a teammate's progress or result. Normal permission and approval rules still apply.",
     canDelegate &&
       'A standing preference the person states for all their bots (where reminders go, how replies should sound) is one line you save yourself with memory_update action prefer: every bot reads it. Never send it to each bot with coordinate_bots.',
@@ -107,9 +115,11 @@ export function chiefOfStaffSystemPrompt(
       : '',
     person
       ? `Bots that report to ${person} (your team):`
-      : chief?.managedSections?.length
-        ? 'Your team, in the departments you are responsible for:'
-        : `Current ${sectionName} department (your team):`,
+      : everywhere
+        ? 'Your team, in every department:'
+        : chief?.managedSections?.length
+          ? 'Your team, in the departments you are responsible for:'
+          : `Current ${sectionName} department (your team):`,
     roster,
     othersRoster &&
       (person

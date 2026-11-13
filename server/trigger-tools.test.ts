@@ -179,6 +179,22 @@ describe('parseTriggerRequest', () => {
       kind: 'app',
       operation: { action: 'update', triggerId: 'a1', changes: { filter: { from: 'acme' } } },
     });
+    expect(
+      parseTriggerRequest(
+        { ...source, action: 'update', triggerId: 'a1', changes: { sameConversation: true } },
+        isSchedule,
+      ),
+    ).toMatchObject({ ok: true, kind: 'app', operation: { changes: { sameConversation: true } } });
+    expect(
+      parseTriggerRequest(
+        { ...source, action: 'update', triggerId: 'w1', changes: { sameConversation: false } },
+        isSchedule,
+      ),
+    ).toMatchObject({
+      ok: true,
+      kind: 'webhook',
+      operation: { webhookId: 'w1', changes: { sameConversation: false } },
+    });
   });
 
   it("refuses a field the trigger's kind does not have, and unknown shapes", () => {
@@ -202,6 +218,15 @@ describe('parseTriggerRequest', () => {
     ).toMatchObject({
       ok: false,
       error: expect.stringContaining('delete it and create a new one'),
+    });
+    expect(
+      parseTriggerRequest(
+        { ...source, action: 'update', triggerId: 'r1', changes: { sameConversation: true } },
+        isSchedule,
+      ),
+    ).toMatchObject({
+      ok: false,
+      error: 'same_conversation applies only to app-event and webhook triggers',
     });
     expect(
       parseTriggerRequest({ ...source, action: 'create', kind: 'email', routine: {} }, isSchedule),

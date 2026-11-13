@@ -14,6 +14,7 @@ import {
   KEY_SECTIONS,
   keyEntry,
   keyForInstance,
+  keyHidden,
   keyMatches,
   looksLikeOtherKey,
   savedState,
@@ -30,6 +31,7 @@ const NOT_A_PERSONS_KEY: Record<string, string> = {
   OMB_CLOUD_DECIDER_TOKEN: "MausBot Cloud's included decisions",
   OMB_CLOUD_AI_TOKEN: "MausBot Cloud's included AI",
   OMB_CLOUD_X_TOKEN: "MausBot Cloud's included X research",
+  OMB_CLOUD_HOSTING_TOKEN: "MausBot Cloud's included app hosting",
   OMB_CLOUD_CONNECTED_APPS_GRANT: "MausBot Cloud's connected apps",
   OMB_BROWSER_CONNECTION: "the app's own browser, not a credential",
   OMB_USER_DATA: "the app's own data folder, not a credential",
@@ -164,6 +166,24 @@ describe('searching the keys', () => {
     expect(found('gmail')).toEqual(['composio']);
     expect(found('gemini')).toEqual(['openaiCompat', 'geminiTts', 'imageGemini']);
     expect(found('no such key anywhere')).toEqual([]);
+  });
+
+  it('matches the Live key row by the provider Live calls use', () => {
+    const shown = (query: string, provider: 'fish' | 'azure') =>
+      KEY_CATALOG.filter((entry) => keyMatches(entry, query, { live: { provider } } as never)).map(
+        (entry) => entry.id,
+      );
+    expect(shown('fish', 'fish')).toEqual(expect.arrayContaining(['fishAudio', 'liveKey']));
+    expect(shown('azure', 'azure')).toContain('liveKey');
+    expect(found('fish')).not.toContain('liveKey');
+  });
+
+  it('hides the Live calls row while Live calls use Azure or Fish Audio', () => {
+    expect(keyHidden('liveCalls', { live: { provider: 'fish' } } as never)).toBe(true);
+    expect(keyHidden('liveCalls', { live: { provider: 'azure' } } as never)).toBe(true);
+    expect(keyHidden('liveCalls', { live: { provider: 'openai' } } as never)).toBe(false);
+    expect(keyHidden('liveCalls', null)).toBe(false);
+    expect(keyHidden('liveKey', { live: { provider: 'fish' } } as never)).toBe(false);
   });
 });
 

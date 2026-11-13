@@ -43,22 +43,30 @@ export function TeamPrivateHeader() {
   );
 }
 
-/** Who can read a team bot's shared chats (its main chat, a routine's report). */
-export function sharedChatAudience(team: string, onlyPeopleAdded?: boolean): string {
+/** Who can read a team bot's shared chats (its main chat, a routine's report, a conversation its person shared); `sharedWith`
+ * the one other person a conversation shared with one person is read by. */
+export function sharedChatAudience(
+  team: string,
+  onlyPeopleAdded?: boolean,
+  sharedWith?: string,
+): string {
+  if (sharedWith !== undefined) return t('teamSide.sharedWith', { name: sharedWith });
   return onlyPeopleAdded ? t('team.sharedHeaderPeople') : t('team.sharedHeader', { team });
 }
 
 export function TeamSharedHeader({
   team,
   onlyPeopleAdded,
+  sharedWith,
 }: {
   team: { name: string };
   onlyPeopleAdded?: boolean;
+  sharedWith?: string;
 }) {
   return (
     <ChatHeadAudience
       icon={<Users size={12} aria-hidden='true' className='shrink-0' />}
-      label={sharedChatAudience(team.name, onlyPeopleAdded)}
+      label={sharedChatAudience(team.name, onlyPeopleAdded, sharedWith)}
       data-chathead-shared=''
     />
   );

@@ -143,6 +143,7 @@ import { installCredentialStoreIpc, readSecureCredentials } from './secure-crede
 import { createControlPlaneClient } from './control-plane-client.mjs';
 import {
   companionAccountCleanupPending,
+  companionTunnelRetired,
   createCompanionAccountService,
   managedEndpointNeed,
   resolveCompanionControlPlaneURL,
@@ -151,6 +152,9 @@ import capabilitiesModule from './capabilities.cjs';
 import environmentsModule from './environments.cjs';
 import { pairingPageUrl } from './server-address.mjs';
 import { createServerConnect } from './server-probe.mjs';
+import { createTailnetShare, remotePolicyAllows } from './tailnet-share.mjs';
+import { checkTailscale } from './tailscale-check.mjs';
+import { onTailnet } from './tailnet.mjs';
 import { checkServer, createServerStatus, installServerStatus } from './server-status.mjs';
 import localOriginModule from './local-origin.cjs';
 import { buildApplicationMenu } from './menu.mjs';
@@ -191,6 +195,7 @@ import {
 } from './desktop-prefs.mjs';
 import { createDesktopIncludedX } from './included-x.mjs';
 import { createDesktopIncludedPages } from './included-pages.mjs';
+import { createPhoneLinkFact } from './phone-link-fact.mjs';
 import {
   cloudPageSenderAllowed,
   cloudPlanDisk,
@@ -226,6 +231,7 @@ import { createPlaceInboxWatch } from './place-inbox-watch.mjs';
 import { homeLook, otherOwnClouds, withoutOldCloudHome } from './cloud-list.mjs';
 import { installPlaceLook } from './place-look.mjs';
 import { CHROME_RAIL_PATH, createChromeRail } from './chrome-rail.mjs';
+import { openComputerSettings } from './open-computer-settings.mjs';
 import { createWindowStateFile } from './window-state-file.mjs';
 import { createEnvironmentsFile, ENVIRONMENTS_SAVE_FAILED } from './environments-file.mjs';
 import { createOrgLibrary } from './org-library.mjs';
@@ -476,6 +482,11 @@ const includedX = createDesktopIncludedX({
     account: () => cloudAccount,
     server: () => serverProc,
     log: slog,
+  }),
+  phoneLinkFact = createPhoneLinkFact({
+    retired: () => companionTunnelRetired(secureCredentialState?.read() ?? secureCredentials),
+    server: () => (serverReady ? serverProc : null),
+    log: slog,
   });
 const cloudPower = createCloudPowerGate({
   power: () => cloudAccount?.power() ?? null,
@@ -502,6 +513,7 @@ const serverSupervisor = createServerSupervisor({
     syncManagedComposioCredentials();
     includedX.serverStarted();
     includedPages.serverStarted();
+    phoneLinkFact.serverStarted();
     railChanged();
     reportOwnListeners(proc);
     orgLibrary?.runtimeReady();
@@ -671,6 +683,7 @@ import {
   companionBrowserControlAccess,
   companionRevoke,
   companionRunning,
+  companionSettings,
   companionState,
   rememberCompanionKeepAwake,
   setCompanionHostedUrl,
@@ -818,7 +831,11 @@ function publicManagedCompanionState() {
 
 function decorateDesktopCompanionState(state) {
   syncCompanionKeepAwake(state.enabled && !state.error, state.keepAwake === true);
-  return { ...state, managedConnection: publicManagedCompanionState() };
+  return {
+    ...state,
+    managedConnection: publicManagedCompanionState(),
+    tailnetShare: tailnetShare.state(),
+  };
 }
 
 async function desktopCompanionState() {
@@ -922,16 +939,26 @@ async function startDesktopCompanion({
 async function stopDesktopCompanion({ remember = true } = {}) {
   companionDesiredThisLaunch = false;
   companionLaunchGeneration += 1;
-  if (remember)
+  if (remember) {
     for (const route of ['wifi', 'relay', 'tailscale', 'https'])
       await rememberCompanionRoute(route, false);
+    await tailnetShare.apply(companionSettings().routes.tailscale);
+  }
   syncCompanionKeepAwake(false, false);
   await managedCompanionConnector?.stop();
   await stopCompanion();
   return desktopCompanionState();
 }
 
+const tailnetShare = createTailnetShare({
+  check: checkTailscale,
+  allowed: () =>
+    remotePolicyAllows({ managed: app.isPackaged && !desktopRemoteAccess, client: managedDesktop }),
+  markerFile: () => path.join(app.getPath('userData'), 'tailnet-serve.marker'),
+  log: slog,
+});
 const phoneLinkRoutes = createPhoneLinkRoutes({
+  shareChanged: () => tailnetShare.apply(companionSettings().routes.tailscale),
   rememberRoute: rememberCompanionRoute,
   routeOn: companionRouteOn,
   dismissNotice: dismissCompanionNotice,
@@ -1258,6 +1285,7 @@ function ensureManagedDesktop() {
     openBrowser: (url) => shell.openExternal(url),
     onState: (state) => {
       if (state.status === 'license-expired') companyBackupController?.abort();
+      void tailnetShare.recheck();
       const lost = ['signed-out', 'reauth-required'].includes(state.status),
         withoutStorage = state.status === 'connected' && !state.cloudBackups;
       if (lost || withoutStorage) {
@@ -1702,7 +1730,12 @@ async function startServerOn(
       if (trustedApprovalMode.receive(proc, message)) return;
       if (managedDesktopRelay.receive(proc, message)) return;
       if (orgLibrary?.receive(message)) return;
-      if (receivePhoneSecretSave(proc, message) || oneHome.receive(proc, message)) return;
+      if (
+        receivePhoneSecretSave(proc, message) ||
+        oneHome.receive(proc, message) ||
+        tailnetShare.receive(message)
+      )
+        return;
     } catch (error) {
       slog(`desktop private sync rejected: ${error?.message ?? error}`);
     }
@@ -1711,6 +1744,7 @@ async function startServerOn(
     slog(`spawned pid=${proc.pid}`);
     if (!serverSupervisor.isCurrent(proc)) return;
     syncDesktopMutationToken(proc);
+    void tailnetShare.attach(proc, port, companionSettings().routes.tailscale);
     syncPhoneSecretKey(proc);
     grantLocalComputer(proc, (child) => serverSupervisor.isCurrent(child));
   });
@@ -2683,6 +2717,7 @@ async function addServerFromClipboard() {
 const serverConnect = createServerConnect({
   fetch: (...args) => session.defaultSession.fetch(...args),
   t: nativeT,
+  tailnet: () => onTailnet(os.networkInterfaces()),
   ownEnvironmentId: async () =>
     (await (await localServerRequest('/.well-known/openmausbot/environment')).json())
       ?.environmentId ?? null,
@@ -4084,6 +4119,7 @@ const oneHome = installOneHome({
   log: slog,
   other: () => ownHome,
   accountsHere: () => accountRing()?.count() ?? 1,
+  chooses: true,
   t: nativeT,
 });
 ownHome = installOwnHome({
@@ -4327,12 +4363,30 @@ const placeSwitch = createPlaceSwitch({
       });
   },
 });
+const openPlace = (id, stale) =>
+  workspaceMenuAction(async () => {
+    if (id === LOCAL_ID) await cleanWorkspace.settled();
+    if (!stale()) await switchEnvironment(id, stale);
+  });
 const chromeRail = createChromeRail({
   createView: (options) => new WebContentsView(options),
   preload: path.join(__dirname, 'preload.cjs'),
   log: slog,
   prefs: () => desktopPrefs,
   changed: () => rail.changed(),
+  openComputer: (page) =>
+    openComputerSettings(
+      {
+        window: () => mainWindow,
+        onLocal: (win) => senderIsLocal({ sender: win.webContents }),
+        showLocal: () =>
+          placeSwitch.ask(LOCAL_ID, (stale) => {
+            localProfiles.cancel();
+            return openPlace(LOCAL_ID, stale);
+          }),
+      },
+      page,
+    ),
   args: () => [
     ...desktopCompanionRendererArguments(rendererOrigin(), desktopRemoteAccess),
     ...(app.isPackaged && !desktopRemoteAccess ? ['--omb-company-desktop=1'] : []),
@@ -4440,11 +4494,7 @@ const rail = installCloudRail({
   places: railList,
   ask: placeSwitch.ask,
   switching: placeSwitch.target,
-  open: (id, stale) =>
-    workspaceMenuAction(async () => {
-      if (id === LOCAL_ID) await cleanWorkspace.settled();
-      if (!stale()) await switchEnvironment(id, stale);
-    }),
+  open: openPlace,
   makeHome: (id) => ownHome.start(id),
   forget: (id) => forgetEnvironment(id, false, true),
   openProfile: (id, stale = () => false) =>
@@ -5001,6 +5051,7 @@ app
       updateCredentials: updateSecureCredentialDocument,
       powerMonitor,
       log: slog,
+      onState: phoneLinkFact.observe,
     });
     void companionE2E.start();
     desktopRemoteAccess = desktopCompanionAccess(secureCredentials);
@@ -5054,7 +5105,23 @@ app
     }
     registerCuaIpc();
     androidDevice.registerIpc(ipcMain);
-    registerUpdaterIpc({ pageAllowed: updaterPageAllowed });
+    registerUpdaterIpc({
+      pageAllowed: updaterPageAllowed,
+      serverPage: (event) => activePageOrigin(event),
+      confirmRestart: async (version, server) =>
+        Boolean(mainWindow && !mainWindow.isDestroyed()) &&
+        (
+          await dialog.showMessageBox(mainWindow, {
+            type: 'question',
+            message: nativeT('native.update.forServer', { version, server }),
+            detail: nativeT('native.update.forServerDetail'),
+            buttons: [nativeT('native.update.restartNow'), nativeT('native.update.notNow')],
+            defaultId: 0,
+            cancelId: 1,
+            noLink: true,
+          })
+        ).response === 0,
+    });
     desktopPrefs = nativeText.prefs;
     updatesConsent = registerDesktopPrefs({
       ipcMain,
@@ -5174,11 +5241,13 @@ app
       }
     }
     if (desktopShutdownStarted) return;
-    if (app.isPackaged && !desktopRemoteAccess)
+    if (app.isPackaged && !desktopRemoteAccess) {
       void ensureManagedDesktop()
         .start()
         .then(() => companyBackupSchedule.start())
         .catch(() => {});
+      void managedDesktop.whenRestored().then(() => tailnetShare.recheck());
+    }
     // Fresh local use never makes a Cloud request; start only restores an existing grant.
     if (app.isPackaged && !desktopRemoteAccess) {
       cloudAccountRestoring = true;
@@ -5363,5 +5432,8 @@ function releaseDesktopDataDirLease() {
 
 // before-quit is too early (this app defers it); will-quit is Electron's last boundary, and the process hook covers app.exit().
 app.on('will-quit', releaseDesktopDataDirLease);
-app.on('will-quit', () => desktopTray?.destroy());
+app.on('will-quit', () => {
+  desktopTray?.destroy();
+  void tailnetShare.stop();
+});
 process.once('exit', releaseDesktopDataDirLease);

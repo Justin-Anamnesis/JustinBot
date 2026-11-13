@@ -29,6 +29,8 @@ export interface BotAccessRouteDeps {
   audienceChanged(): void;
   /** Settings → Activity: the request is client-scoped, so the admin audit never sees it. */
   record?(auth: RequestAuth, row: Omit<AdminActionRow, 'at' | 'actor'>): void;
+  /** The sharing was written: whoever it newly names is told. */
+  shared?(auth: RequestAuth, bot: BotRecord, before: BotAccess, after: BotAccess): void;
 }
 
 /** The bot's sharing with `next` applied: the owner is never listed (they always edit), and nobody new comes in from
@@ -96,6 +98,7 @@ export function createBotAccessRoutes(deps: BotAccessRouteDeps): RouteHandler {
         before: { access: before },
         after: { access: settled.access },
       });
+      deps.shared?.(auth, updated, before, settled.access);
     }
     return updated
       ? json(res, 200, { bot: deps.wireBot(updated) })

@@ -58,6 +58,8 @@ export interface AppTrigger {
   };
   problem?: AppTriggerProblem;
   sourceThreadId?: string;
+  /** Each run continues this automation's previous run conversation instead of starting a new one. */
+  sameConversation?: boolean;
   /** Events that started a run or joined one. */
   received: number;
   filtered: number;
@@ -137,10 +139,15 @@ export interface AppTriggerDefinition {
   filter?: AppTriggerFilter;
   config?: Record<string, unknown>;
   runOn?: RoutineRunOn;
+  /** Each run continues the automation's previous run conversation. */
+  sameConversation?: boolean;
 }
 
 export type AppTriggerChange = Partial<
-  Pick<AppTriggerDefinition, 'name' | 'instructions' | 'filter' | 'config' | 'runOn'>
+  Pick<
+    AppTriggerDefinition,
+    'name' | 'instructions' | 'filter' | 'config' | 'runOn' | 'sameConversation'
+  >
 >;
 
 export type AppTriggerRequestOperation =
@@ -177,6 +184,7 @@ export interface AppTriggerRequestCardData {
       enabled: boolean;
       filter?: AppTriggerFilter;
       config: Record<string, unknown>;
+      sameConversation?: boolean;
     };
   };
 }

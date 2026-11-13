@@ -100,7 +100,7 @@ function viewMaker() {
   return { made, createView };
 }
 
-function world({ wanted = true, hidden = false, frame = true } = {}) {
+function world({ wanted = true, hidden = false, frame = true, openComputer = null } = {}) {
   const { win, page, children } = appWindow();
   const { made, createView } = viewMaker();
   const state = { wanted, hidden, changes: 0 };
@@ -121,6 +121,7 @@ function world({ wanted = true, hidden = false, frame = true } = {}) {
     changed: () => {
       state.changes++;
     },
+    openComputer,
   });
   const handlers = new Map();
   rail.install({ handle: (channel, handler) => handlers.set(channel, handler) });
@@ -314,6 +315,39 @@ test("only the page beside the rail, in its main frame, offers the button: never
     );
   }
   assert.deepEqual([w.state.hidden, w.rail.shown()], [false, true], 'nothing hidden, nothing kept');
+});
+
+test("Switch to This computer: only the page beside the rail may ask, and main gets a settings page's plain name or nothing", () => {
+  const opened = [];
+  const w = world({
+    openComputer: (page) => {
+      opened.push(page);
+    },
+  });
+  w.rail.attach(w.win);
+  const [view] = w.made,
+    other = appWindow().page;
+  for (const event of [
+    { sender: view.webContents, senderFrame: view.webContents.mainFrame },
+    { sender: w.page, senderFrame: { id: 'an-iframe' } },
+    { sender: other, senderFrame: other.mainFrame },
+  ]) {
+    assert.throws(
+      () => w.handlers.get('rail:open-computer')(event, 'phone'),
+      /only available to the page beside the window's rail/,
+    );
+  }
+  w.ask('rail:open-computer', 'phone');
+  w.ask('rail:open-computer', 'https://evil.example/');
+  w.ask('rail:open-computer', 7);
+  assert.deepEqual(opened, ['phone', '', '']);
+  const bare = world();
+  bare.rail.attach(bare.win);
+  assert.throws(
+    () => bare.ask('rail:open-computer', 'phone'),
+    /not available/,
+    "without main's way there, nothing opens",
+  );
 });
 
 test("after the page moves on, a hidden rail waits a few seconds for the new page's button: this app's page keeps it hidden, an older one gets it back", (t) => {
@@ -659,6 +693,7 @@ test("every page beside the rail, from any server, gets the button's bridge, lea
     'drawsFrame',
     'setHidden',
     'onState',
+    'openComputer',
   ]);
   /** A value made in the page's own context, as this one sees it. */
   const plain = (value) => JSON.parse(JSON.stringify(value));
@@ -672,6 +707,11 @@ test("every page beside the rail, from any server, gets the button's bridge, lea
     /Choose to hide or show/,
     "a server's page hides it only from the person's click",
   );
+  await assert.rejects(
+    remote.bridge.rail.openComputer('phone'),
+    /Choose Switch to This computer/,
+    "a Cloud's page opens This computer only from the person's click",
+  );
   remote.navigator.userActivation.isActive = true;
   assert.deepEqual(plain(await remote.bridge.rail.setHidden(true)), {
     available: true,
@@ -679,12 +719,20 @@ test("every page beside the rail, from any server, gets the button's bridge, lea
   });
   await remote.bridge.rail.drawsFrame();
   await remote.bridge.rail.drawsFrame(false);
-  assert.deepEqual(plain(remote.invoked), [
-    ['rail:offer'],
-    ['rail:hide', true],
-    ['rail:draws-frame', true],
-    ['rail:draws-frame', false],
-  ]);
+  await remote.bridge.rail.openComputer('phone');
+  await remote.bridge.rail.openComputer('../../etc');
+  assert.deepEqual(
+    plain(remote.invoked),
+    [
+      ['rail:offer'],
+      ['rail:hide', true],
+      ['rail:draws-frame', true],
+      ['rail:draws-frame', false],
+      ['rail:open-computer', 'phone'],
+      ['rail:open-computer', ''],
+    ],
+    "only a settings page's plain name goes to main",
+  );
   const heard = [];
   const stop = remote.bridge.rail.onState((state) => heard.push(state));
   remote.hear('rail:state', { available: true, hidden: false, places: ['home'] });
@@ -697,6 +745,7 @@ test("every page beside the rail, from any server, gets the button's bridge, lea
     'drawsFrame',
     'setHidden',
     'onState',
+    'openComputer',
     'expand',
     'onSkin',
     'onFramed',

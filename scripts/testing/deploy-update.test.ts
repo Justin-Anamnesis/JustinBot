@@ -119,9 +119,13 @@ function install(target: Record<string, unknown> = {}, extra: Record<string, unk
   const state = () => JSON.parse(readFileSync(join(fake, 'state.json'), 'utf8'));
   const run = (
     args: string[] = [],
-    options: { input?: string; env?: Record<string, string> } = {},
+    options: { input?: string; env?: Record<string, string>; umask?: string } = {},
   ) => {
-    const result = spawnSync('bash', [join(deploy, 'update.sh'), ...args], {
+    const script = [join(deploy, 'update.sh'), ...args];
+    const command = options.umask
+      ? ['-c', `umask ${options.umask}; exec bash "$0" "$@"`, ...script]
+      : script;
+    const result = spawnSync('bash', command, {
       encoding: 'utf8',
       input: options.input ?? '',
       timeout: 60_000,
@@ -562,11 +566,15 @@ services:
     writeFileSync(join(box.deploy, 'compose.yaml'), oldCompose);
     writeFileSync(join(box.deploy, 'Caddyfile'), oldCaddyfile);
     expect(box.run(['--check']).stdout).toContain('It would also move Caddy to its own container');
-    const done = box.run();
+    // Under umask 000, as a root shell may have it: the files root starts from are still the owner's alone to change.
+    const done = box.run([], { umask: '000' });
     expect(done.status, done.stdout).toBe(0);
     expect(done.said).toContain(
       'Caddy moves to its own container, so HTTPS stays up whenever the server restarts on its own.',
     );
+    for (const file of ['compose.yaml', 'Caddyfile'])
+      expect((statSync(join(box.deploy, file)).mode & 0o777).toString(8), file).toBe('644');
+    expect((statSync(join(box.deploy, '.update')).mode & 0o777).toString(8)).toBe('700');
     const compose = readFileSync(join(box.deploy, 'compose.yaml'), 'utf8');
     expect(compose).not.toContain('network_mode');
     expect(compose).toContain('- edge:/run/openmausbot');

@@ -1166,3 +1166,26 @@ test('reports when the saved enrollment has been read', async (t) => {
     'the saved policy applied before the Admin answered',
   );
 });
+
+test('the saved policy counts as known only once it has been read', async (t) => {
+  const f = fixture(t, { saved: null });
+  assert.equal(f.client.policyKnown(), false);
+  await f.client.start();
+  assert.equal(f.client.policyKnown(), true);
+  const unreadable = fixture(t, {
+    store: {
+      read: async () => {
+        throw new Error('locked');
+      },
+      write: async () => {},
+      remove: async () => {},
+      clear: async () => {},
+    },
+  });
+  await unreadable.client.start();
+  assert.equal(
+    unreadable.client.policyKnown(),
+    false,
+    "a store that can't be read says nothing about the policy",
+  );
+});

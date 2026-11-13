@@ -63,7 +63,10 @@ export function pingWasWarm(read: number, write: number): boolean {
 
 export function createCacheKeepWarm(deps: KeepWarmDeps) {
   const windows = new Map<string, Window>();
-  const lastPing = new Map<string, NonNullable<KeepWarmStatus['last']>>();
+  const lastPing = new Map<
+    string,
+    { target: KeepWarmTarget; ping: NonNullable<KeepWarmStatus['last']> }
+  >();
   const stoppedWhy = new Map<string, string>();
   let disposed = false;
 
@@ -136,10 +139,8 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
     }
     const warm = pingWasWarm(result.cacheRead, result.cacheWrite);
     lastPing.set(w.target.threadId, {
-      at: now,
-      read: result.cacheRead,
-      write: result.cacheWrite,
-      costUsd: result.costUsd,
+      target: { ...w.target },
+      ping: { at: now, read: result.cacheRead, write: result.cacheWrite, costUsd: result.costUsd },
     });
     if (!warm) {
       return end(
@@ -178,7 +179,7 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
       turn: { ok: boolean; stopReason?: string | null; contextTokens?: number },
     ): void {
       if (disposed) return;
-      const existing = windows.get(target.threadId);
+      let existing = windows.get(target.threadId);
       const hadStopped = stoppedWhy.delete(target.threadId);
       const windowMs = deps.windowMs(target.botId);
       const quiet = (w: Window | undefined) => {
@@ -189,6 +190,21 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
       if (windowMs === null || !turn.ok) return quiet(existing);
       if ((turn.contextTokens ?? 0) < MIN_CONTEXT_TOKENS) return quiet(existing);
       if (deps.ineligible(target)) return quiet(existing);
+      const previousPing = lastPing.get(target.threadId);
+      if (
+        previousPing &&
+        (previousPing.target.botId !== target.botId ||
+          previousPing.target.instanceId !== target.instanceId)
+      ) {
+        lastPing.delete(target.threadId);
+      }
+      if (
+        existing &&
+        (existing.target.botId !== target.botId || existing.target.instanceId !== target.instanceId)
+      ) {
+        end(existing, null);
+        existing = undefined;
+      }
       const now = deps.now();
       const w: Window = existing ?? {
         target,
@@ -225,7 +241,7 @@ export function createCacheKeepWarm(deps: KeepWarmDeps) {
 
     status(threadId: string): KeepWarmStatus | undefined {
       const w = windows.get(threadId);
-      const last = lastPing.get(threadId);
+      const last = lastPing.get(threadId)?.ping;
       if (w) {
         return {
           state: 'warm',

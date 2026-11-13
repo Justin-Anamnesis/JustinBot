@@ -236,7 +236,7 @@ test("its confirm says what the page's confirm says, word for word", () => {
   assert.equal(words.message, fill('teamMove.title'));
   assert.equal(words.buttons[0], fill('teamMove.confirm'));
   for (const key of [
-    'teamMove.everyone',
+    'teamMove.yours',
     'teamMove.goes',
     'teamMove.private',
     'teamMove.staysOnMyCloud',
@@ -258,7 +258,7 @@ test("the native confirm and IPC refusals follow the app's current language", as
     assert.deepEqual(asked[1], {
       message: 'Mover Atlas para Acme?',
       detail: [
-        'Todos em Acme podem usar Atlas. Só os administradores de Acme podem alterá-lo.',
+        'Só você e os administradores de Acme podem usar Atlas até você compartilhar.',
         'Vão com Atlas: instruções, habilidades, arquivos, rotinas e suas conversas com Atlas',
         'Suas conversas continuam privadas lá: só você pode vê-las.',
         'Ficam no My Cloud: o que Atlas lembra, suas conexões e o MausBot',

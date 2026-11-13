@@ -106,6 +106,8 @@ export interface PackageImportDeps {
   /** The most bots this workspace holds, every plan alike. */
   maxBots?: number;
   presets?: PresetRegistry;
+  /** A Team Cloud: the member adding the package, who looks after its bots. */
+  createdBy?: string;
 }
 
 export interface OrgImportContext {
@@ -441,6 +443,7 @@ function runImport(
           modelSelection: selection,
           section,
           ...(options.visibility ? { visibility: options.visibility } : {}),
+          ...(deps.createdBy ? { createdBy: deps.createdBy } : {}),
         },
         { seedMessages: false },
       );

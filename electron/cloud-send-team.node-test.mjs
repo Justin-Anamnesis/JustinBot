@@ -193,7 +193,8 @@ test('a bot moving into a team carries its own things only: no apps, keys, login
   assert.deepEqual(report.secrets, { equal: [], differs: [], missing: [] });
   assert.ok(
     calls.some(
-      ([method, route]) => method === 'GET' && route === '/api/cloud-send/manifest?bot=scout',
+      ([method, route]) =>
+        method === 'GET' && /^\/api\/cloud-send\/manifest\?(?:[\w=&]+&)?bot=scout$/u.test(route),
     ),
   );
 });

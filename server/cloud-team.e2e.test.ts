@@ -45,7 +45,10 @@ beforeAll(async () => {
   admin = (await team.pair(ADMIN)).token!;
   ada = (await team.pair(MEMBER_A)).token!;
   cleo = (await team.pair(MEMBER_C)).token!;
-  const created = await team.as(owner, 'POST', '/api/bots', { name: 'Scout' });
+  const created = await team.as(owner, 'POST', '/api/bots', {
+    name: 'Scout',
+    visibility: 'everyone',
+  });
   expect(created.status, JSON.stringify(created.body)).toBe(201);
   bot = created.body.bot;
 }, hostTimeout(120_000));
@@ -179,8 +182,11 @@ it(
     expect(sleep.body.busy).not.toContain('team');
     expect((await team.signed('GET', '/api/cloud/power')).status).toBe(200);
     expect((await team.signed('GET', '/api/cloud/health')).status).toBe(200);
-    // A member reaches nothing an admin does: the team's setup is the admins'.
-    expect((await team.as(ada, 'POST', '/api/bots', { name: 'Nope' })).status).toBe(403);
+    // A member reaches nothing an admin does: the team's setup is the admins', and so is what a bot may do.
+    expect((await team.as(ada, 'POST', '/api/webhooks', { name: 'Nope' })).status).toBe(403);
+    expect(
+      (await team.as(ada, 'POST', '/api/bots', { name: 'Nope', approvalMode: 'full' })).status,
+    ).toBe(403);
   },
   hostTimeout(90_000),
 );

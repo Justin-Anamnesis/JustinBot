@@ -2,12 +2,10 @@ import { useState } from 'react';
 import {
   CheckCheck,
   Loader2,
-  Network,
   Share2,
   SlidersHorizontal,
   SquarePen,
   Trash2,
-  UserRound,
   Users,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -15,8 +13,6 @@ import { departmentUnread, markDepartmentRead } from '@/lib/folder-read';
 import { t } from '@/lib/i18n';
 import { api, useStore } from '@/state/store';
 import { MENU_ITEM } from './menu-recipe';
-
-export { showWhoReportsToWhom } from './TeamOrgChart';
 
 /** A department's menu, from its line's ⋯ or a right-click on its name. */
 /** Reads every conversation of the department's bots and its group chats; shown only while something there is unread. */
@@ -75,8 +71,6 @@ export function TeamMenuItems({
   onShare,
   onDelete,
   onSetForAll,
-  onSetOwner,
-  onSeeReports,
   department,
   onRead,
 }: {
@@ -88,8 +82,6 @@ export function TeamMenuItems({
   onShare: () => void;
   onDelete: () => void;
   onSetForAll?: () => void;
-  onSetOwner?: () => void;
-  onSeeReports?: () => void;
 }) {
   const item = cn(MENU_ITEM, 'hover:bg-menu-hover [&>svg]:text-ink-secondary');
   return (
@@ -104,18 +96,6 @@ export function TeamMenuItems({
           className={cn(item, 'disabled:opacity-60')}
           onDone={onRead ?? (() => {})}
         />
-      )}
-      {onSetOwner && (
-        <button type='button' role='menuitem' className={item} onClick={onSetOwner}>
-          <UserRound size={16} />
-          {t('lookedAfter.setForAll')}
-        </button>
-      )}
-      {onSeeReports && (
-        <button type='button' role='menuitem' className={item} onClick={onSeeReports}>
-          <Network size={16} />
-          {t('lookedAfter.seeWho')}
-        </button>
       )}
       {onSetForAll && (
         <button type='button' role='menuitem' className={item} onClick={onSetForAll}>

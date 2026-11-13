@@ -54,7 +54,7 @@ export class PageBundleError extends Error {
   }
 }
 
-const containedBy = (root: string, candidate: string) => {
+export const containedBy = (root: string, candidate: string) => {
   const suffix = relative(root, candidate);
   return (
     suffix === '' || (suffix !== '..' && !suffix.startsWith(`..${sep}`) && !isAbsolute(suffix))
@@ -69,7 +69,7 @@ const pageName = (name: string) => SEGMENT.test(name) && !name.endsWith('.');
 const carried = (name: string, videos?: boolean) =>
   servable(name) || Boolean(videos && isVideo(name));
 
-async function canonicalRoots(roots: readonly string[]): Promise<string[]> {
+export async function canonicalRoots(roots: readonly string[]): Promise<string[]> {
   const found = await Promise.all(
     roots.map(async (root) => {
       try {
@@ -146,7 +146,7 @@ const openedPath = (handle: FileHandle) => readlink(`/proc/self/fd/${handle.fd}`
 /** The file at `real`, read only when the file opened is inside `root`. On Linux the kernel names the opened file, so a
  * folder on the way swapped for a link before, during or after the open cannot hand over a file from elsewhere; other
  * systems check that the path still resolves inside `root` to the same file. Null when it moved. */
-async function readContained(real: string, root: string): Promise<Buffer | null> {
+export async function readContained(real: string, root: string): Promise<Buffer | null> {
   const handle = await open(real, 'r');
   try {
     const inside = (path: string | null): path is string =>

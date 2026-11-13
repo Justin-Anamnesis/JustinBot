@@ -4,6 +4,7 @@ import type {
   DriverCreateInput,
   ModelCatalog,
   ProviderInstance,
+  ProviderSnapshot,
   RuntimeEvent,
   RuntimeEventListener,
   SendTurnInput,
@@ -177,6 +178,7 @@ interface RuntimeOptions<Config> {
     model: string,
     messages: OpenAIChatMessage[],
     stream: boolean,
+    variant?: string,
   ): Record<string, unknown>;
   httpErrorLabel: string;
   /** A refusal this provider words itself: the sentence the person sees instead of the HTTP line, or undefined. */
@@ -202,10 +204,12 @@ interface RuntimeOptions<Config> {
   computerUse?: boolean;
   /** A text-only model keeps the computer and browser tools but never receives a screenshot or attachment. */
   imageInput?: (model: string) => boolean;
-  /** False for a model its server says cannot call tools: its turns go without them instead of being refused. */
-  toolUse?: (model: string) => boolean;
+  /** Some models list `variants`; the picked one reaches `requestBody`. */ modelVariants?: boolean;
+  /** False for a model its server says cannot call tools: its turns go without them instead of being refused. */ toolUse?: (
+    model: string,
+  ) => boolean;
   /** Why the server cannot answer now (not running, nothing to run), asked before the key is. */
-  serverUnavailable?: () => Promise<string | null>;
+  serverUnavailable?: () => Promise<Pick<ProviderSnapshot, 'reason' | 'ollama'> | null>;
   /** The name to send for a model, when its server knows it by another. */
   servedModel?: (model: string) => Promise<string>;
   /** Smaller models announce a step and end the turn without calling a tool; such a reply gets a nudge, at most three
@@ -378,6 +382,7 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
     onDelta?: (delta: string, kind: 'assistant_text' | 'reasoning_text') => void,
     tools: ChatToolDefinition[] = [],
     onUsage?: TextGenerationOptions['onUsage'],
+    variant?: string,
   ): Promise<Completion> => {
     const timeoutController = new AbortController();
     let idleTimer: NodeJS.Timeout | null = null;
@@ -407,9 +412,10 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
               tools,
               replay: (message) => responseOutputs.get(message),
               summaries: routes.summaries(model),
+              effort: options.requestBody(served, messages, stream, variant).reasoning_effort,
             })
           : {
-              ...options.requestBody(served, messages, stream),
+              ...options.requestBody(served, messages, stream, variant),
               ...(route === 'chat-reasoning-off' ? { reasoning_effort: 'none' } : {}),
               ...(tools.length ? { tools } : {}),
             },
@@ -647,6 +653,7 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
     onDelta?: (delta: string, kind: 'assistant_text' | 'reasoning_text') => void,
     tools: ChatToolDefinition[] = [],
     onUsage?: TextGenerationOptions['onUsage'],
+    variant?: string,
   ): Promise<Completion> => {
     for (;;) {
       let replied = false;
@@ -664,6 +671,7 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
             }),
           tools,
           onUsage,
+          variant,
         );
       } catch (error) {
         if (!(error instanceof ModelRouteRefused) || replied || signal?.aborted) throw error;
@@ -936,6 +944,8 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
                   if (shown) delta(shown, streamKind);
                 },
                 tools.definitions,
+                undefined,
+                turn.variant,
               );
               // A reply cut off at the token limit may be a call cut short; running half of one is worse than saying so.
               const written =
@@ -1478,7 +1488,7 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
     ...(options.refreshModels ? { refreshModels: options.refreshModels } : {}),
     snapshot: async () => {
       const down = await options.serverUnavailable?.();
-      if (down) return { state: 'unavailable', reason: down };
+      if (down) return { state: 'unavailable', ...down };
       if (!options.apiKey) return { state: 'unavailable', reason: options.unavailableReason };
       if (keyRejected(options.apiUrl, options.apiKey))
         return {
@@ -1506,6 +1516,7 @@ export function createOpenAIChatRuntime<Config>(options: RuntimeOptions<Config>)
               images: true,
             }
           : {}),
+        ...(options.modelVariants ? { modelVariants: true } : {}),
         sessionModelSwitch: 'in-session',
         customMcp: options.tools !== false,
         agentsMcp: options.tools !== false,

@@ -353,6 +353,41 @@ function checkSpec(spec: OmbChartSpec): void {
     fail('chart.stack must be true or false');
 }
 
+function topNCtes(xExpr: string, measureExpr: string, n: number): Cte[] {
+  return [
+    {
+      name: 'kept',
+      body: `
+  SELECT ${xExpr} AS x
+  FROM src
+  GROUP BY ALL
+  ORDER BY ${measureExpr} DESC NULLS LAST, x
+  LIMIT ${n}
+`,
+    },
+    {
+      name: 'other_bucket',
+      // At most n labels are retained, so n + 1 candidates guarantee a free name.
+      // Keep the usual "other" label unless it would merge into a real category.
+      body: `
+  SELECT label
+  FROM (
+    SELECT i, CASE WHEN i = 0 THEN 'other' ELSE 'other (' || CAST(i + 1 AS VARCHAR) || ')' END AS label
+    FROM range(${n + 1}) candidates(i)
+  ) labels
+  WHERE NOT EXISTS (SELECT 1 FROM kept WHERE x = label)
+  ORDER BY i
+  LIMIT 1
+`,
+    },
+  ];
+}
+
+function foldToOther(xExpr: string): string {
+  // NULL retains the existing behavior of joining the folded tail.
+  return `CASE WHEN ${xExpr} IN (SELECT x FROM kept) THEN ${xExpr} ELSE (SELECT label FROM other_bucket) END`;
+}
+
 function planCartesian(
   spec: OmbChartSpec,
   x: Resolved,
@@ -372,22 +407,12 @@ function planCartesian(
   let xExpr = dim.expr;
   let reduction = dim.reduction;
   if (x.cls === 'categorical' || x.cls === 'boolean') {
-    // `IN (subquery)` is NULL for a NULL category, so NULL lands in "other" with the tail.
     const n = spec.limit ?? TOP_N_DEFAULT;
-    ctes.push({
-      name: 'kept',
-      body: `
-  SELECT ${xExpr} AS x
-  FROM src
-  GROUP BY ALL
-  ORDER BY ${m.expr} DESC NULLS LAST, x
-  LIMIT ${n}
-`,
-    });
-    xExpr = `CASE WHEN ${xExpr} IN (SELECT x FROM kept) THEN ${xExpr} ELSE 'other' END`;
+    ctes.push(...topNCtes(xExpr, m.expr, n));
+    xExpr = foldToOther(xExpr);
     reduction = {
       method: 'topN',
-      note: `top ${n} of ${x.column.name} by ${m.title}, the rest as "other"`,
+      note: `top ${n} of ${x.column.name} by ${m.title}, the rest grouped separately`,
     };
   }
 
@@ -486,19 +511,8 @@ function planPie(spec: OmbChartSpec, x: Resolved, y: Resolved | undefined): Plan
   const m = measure(spec, y);
   const n = spec.limit ?? TOP_N_DEFAULT;
   const xExpr = `CAST(${x.id} AS VARCHAR)`;
-  const ctes: Cte[] = [
-    {
-      name: 'kept',
-      body: `
-  SELECT ${xExpr} AS x
-  FROM src
-  GROUP BY ALL
-  ORDER BY ${m.expr} DESC NULLS LAST, x
-  LIMIT ${n}
-`,
-    },
-  ];
-  const folded = `CASE WHEN ${xExpr} IN (SELECT x FROM kept) THEN ${xExpr} ELSE 'other' END`;
+  const ctes = topNCtes(xExpr, m.expr, n);
+  const folded = foldToOther(xExpr);
   const orderBy =
     spec.sort === 'y' ? 'y' : spec.sort === '-x' ? 'x DESC' : spec.sort === 'x' ? 'x' : 'y DESC';
   const body = `SELECT ${folded} AS x,\n       ${m.expr} AS y\nFROM src\nGROUP BY ALL\nORDER BY ${orderBy}`;
@@ -521,7 +535,7 @@ function planPie(spec: OmbChartSpec, x: Resolved, y: Resolved | undefined): Plan
     vegaLite: vegaLiteSpec('arc', encoding, tooltip),
     reduction: {
       method: 'topN',
-      note: `top ${n} of ${x.column.name} by ${m.title}, the rest as "other"`,
+      note: `top ${n} of ${x.column.name} by ${m.title}, the rest grouped separately`,
     },
   };
 }

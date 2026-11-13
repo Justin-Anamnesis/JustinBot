@@ -28,6 +28,7 @@ import {
   type InstanceInfo,
   type ModelSelection,
 } from '@/state/store';
+import { sameFields, useStoreActions, useStoreSelector } from '@/state/store-select';
 import type { EffortLevel } from '../../shared/wire';
 import { filterCustomModels, partitionCustomModels, suggestedModels } from '@/lib/custom-models';
 import {
@@ -374,11 +375,18 @@ export function ModelPicker({
   size?: 'sm' | 'md';
 }) {
   const {
-    state,
-    dispatch: storeDispatch,
-    refreshInstances,
-    refreshModels: refreshInstanceModels,
-  } = useStore();
+      dispatch: storeDispatch,
+      refreshInstances,
+      refreshModels: refreshInstanceModels,
+    } = useStoreActions(),
+    state = useStoreSelector(
+      (s) => ({
+        instances: s.instances,
+        modelVariantSessions: s.modelVariantSessions,
+        profile: s.bots.find((candidate) => candidate.id === shown.id),
+      }),
+      sameFields,
+    );
   const [open, setOpen] = useState(false);
   const { bot, dispatch } = useAiSwitch({
     bot: shown,
@@ -692,7 +700,7 @@ export function ModelPicker({
     setFullView(false);
   };
 
-  const profile = state.bots.find((candidate) => candidate.id === bot.id) ?? bot;
+  const profile = (state.profile?.id === bot.id ? state.profile : undefined) ?? bot;
   const follows = threadId
     ? profile.tasks?.find((task) => task.threadId === threadId)?.followsBotModel
     : undefined;
@@ -934,7 +942,9 @@ export function ModelPicker({
           ? t('model.signInRequired')
           : currentOption?.orgBlocked
             ? t('model.orgBlocked')
-            : undefined;
+            : currentOption?.needsCliUpdate
+              ? t('engines.updateClaude')
+              : undefined;
   const summary = active
     ? `${engineDisplayName(active)} · ${modelLabel(active, selection.model)}${
         modelProvider(active, selection.model) ? ` · ${modelProvider(active, selection.model)}` : ''

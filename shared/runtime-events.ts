@@ -133,7 +133,12 @@ export type RuntimeEvent = RuntimeEventBase &
         alt?: string;
         fromTool?: true;
       }
-    | { type: 'content.delta'; streamKind: 'assistant_text' | 'reasoning_text'; delta: string }
+    | {
+        type: 'content.delta';
+        streamKind: 'assistant_text' | 'reasoning_text';
+        delta: string;
+        /** A room reply as it goes out: the member speaking. */ botId?: string;
+      }
     | {
         type: 'request.opened';
         requestType: 'permission' | 'question';

@@ -218,6 +218,7 @@ export function clashes<T extends CalendarEvent>(
     .filter(
       (meeting) =>
         qualifies(meeting) &&
+        !meeting.transparent &&
         meeting.end > input.now &&
         localDate(meeting.start, input.timeZone) === today,
     )

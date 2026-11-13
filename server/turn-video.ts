@@ -94,7 +94,7 @@ async function extractFrame(
       '-q:v',
       '4',
       '-vf',
-      "scale='min(1024,iw)':-2",
+      "scale=w='min(1024,iw)':h='min(1024,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
       '-y',
       outPath,
     ],

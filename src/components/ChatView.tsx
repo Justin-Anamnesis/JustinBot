@@ -41,6 +41,11 @@ import {
 import { copyText } from '@/lib/copy-text';
 import { ReactAction, ReactionChips } from '@/components/Reactions';
 import { useBotMessageMenu, userMessageMenu } from '@/components/message-menu';
+import {
+  savesToTeamMemory,
+  TEAM_MEMORY_ITEM,
+  TeamMemorySavesContext,
+} from '@/components/conversation-share/conversation-share';
 import { useSpeech } from '@/lib/tts/useSpeech';
 import { localSystemVoiceActive } from '@/lib/local-voice';
 import { computerStartLine, useScreensWhile } from '@/lib/computer-start';
@@ -49,7 +54,6 @@ import { useCaptionChrome, useDesktopCapabilities } from '@/components/DesktopCa
 import {
   api,
   currentTaskBot,
-  useStore,
   formatTime,
   openRoomThread,
   openThread,
@@ -106,10 +110,18 @@ import { BotAvatar } from './Avatar';
 import { TurnPresence } from './TurnPresence';
 import { showToolCallsEnabled, skillAuthoringEnabled } from '@/lib/feature-flags';
 import { normalizeState, stateForBot } from '@/lib/mascot';
-import { peerLine, peerRequest, type PeerLine } from '@/lib/peer-message';
+import { peerLine, peerPreview, peerRequest, type PeerLine } from '@/lib/peer-message';
+import { PEER_HOW, PeerCompactRow, PeerMessagesContext, PeerOpenedActions } from './PeerExchange';
 import { showWorkingDots } from '@/lib/turn-tail';
 import { lastNonReceipt } from '@/lib/receipts';
 import { useTurnLive } from '@/state/turn-status';
+import {
+  isLiveReply,
+  StreamingReplyContext,
+  streamedReply,
+  useHasLiveReply,
+  useLiveTranscript,
+} from '@/state/live-reply';
 import { useTurnNow } from './NowCard';
 import { useThreadRoutineRun } from '@/state/older-routine-runs';
 import { ChatMarkdown } from './ChatMarkdown';
@@ -162,8 +174,11 @@ import { RenameTitle } from './RenameTitle';
 import { ChatHeadRole, chiefOfStaffBadge } from './BotRole';
 import { BotActivityPicker } from './TaskPicker';
 import { ChatHeadPill } from './ChatHeadPill';
+import { HeaderShare } from './bot-access/HeaderShare';
 import { ThreadPresenceFaces } from './TeamPresence';
 import { useStoreRef } from '@/state/store-ref';
+import { sameFields, useStoreDispatch, useStoreSelector } from '@/state/store-select';
+import { sameDrawnBots } from '@/lib/drawn-bots';
 import { ELEVATED_FLOAT, ELEVATED_HOVER } from './elevated';
 import { ModelPicker } from './ModelPicker';
 import { ChatHeaderMenu, ChatMoreMenu } from './ChatMoreMenu';
@@ -269,29 +284,6 @@ function useChatRows(): ChatRows {
   const rows = useContext(ChatRowsContext);
   if (!rows) throw new Error('a chat row outside ChatView');
   return rows;
-}
-
-const drawnBot = (bot: Bot) =>
-  [
-    bot.id,
-    bot.name,
-    bot.hidden,
-    bot.color,
-    bot.mascotBody,
-    bot.mascotExpression,
-    bot.mascotFaceColor,
-    bot.avatarUrl,
-    bot.avatarCrop,
-    bot.avatarZoom,
-    bot.avatarFocusX,
-    bot.avatarFocusY,
-  ].join('\u0001');
-
-function useDrawnBots(bots: readonly Bot[]): readonly Bot[] {
-  const signature = bots.map(drawnBot).join('\u0002');
-  const cache = useRef({ signature, bots });
-  if (cache.current.signature !== signature) cache.current = { signature, bots };
-  return cache.current.bots;
 }
 
 export function ErrorRow({
@@ -404,14 +396,17 @@ function PlaceFailedRow({
   threadId?: string;
   onRetry?: () => void;
 }) {
-  const { state, dispatch } = useStore();
+  const dispatch = useStoreDispatch(),
+    config = useStoreSelector((state) => state.config);
   const { capabilities } = useDesktopCapabilities();
-  const seat = usePlaceSeat(state.config, capabilities);
-  const bot = state.bots.find((candidate) => candidate.id === botId);
+  const seat = usePlaceSeat(config, capabilities);
+  const computer = useStoreSelector(
+    (state) => state.bots.find((candidate) => candidate.id === botId)?.computer,
+  );
   const view = placeRowViewFor(
     place,
     seat,
-    worksOnSimpleLabel(bot?.computer, capabilities.host.platform),
+    worksOnSimpleLabel(computer, capabilities.host.platform),
   );
   const id = view.action?.id;
   const onClick = !id
@@ -440,7 +435,7 @@ function TrialCreditFailedRow({
   kind: TrialCreditRefusal;
   onRetry?: () => void;
 }) {
-  const { dispatch } = useStore();
+  const dispatch = useStoreDispatch();
   if (kind === 'used_up' || kind === 'ended') return <TrialCreditNotice kind={kind} />;
   if (kind === 'paused') return <ErrorRow message={t(TRIAL_CREDIT_LINE[kind])} onRetry={onRetry} />;
   return (
@@ -579,7 +574,8 @@ const Bubble = memo(function Bubble({
   const user = message.role === 'user' && !peer;
   const speaker = user ? otherSpeaker(message, speakerViewer ?? null) : null;
   const ownBubbleStyle = speaker ? undefined : bubbleStyle;
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(false),
+    [folded, setFolded] = useState(false);
   const focusedSearch = focus?.messageId === message.id && Boolean(focus.matchText);
   const [viewRaw, setViewRaw] = useState(false);
   const speech = useSpeech();
@@ -589,6 +585,7 @@ const Bubble = memo(function Bubble({
   const botMenu = useBotMessageMenu({
     text,
     botId,
+    threadId,
     messageId: message.id,
     voiceId,
     tts,
@@ -617,7 +614,7 @@ const Bubble = memo(function Bubble({
   const generatedPaths = attached.images;
   const linkedFiles = useMemo(
     () =>
-      user
+      user || isLiveReply(message)
         ? []
         : [
             ...attached.files,
@@ -629,7 +626,10 @@ const Bubble = memo(function Bubble({
     [user, text, attached],
   );
   const group = useMemo(
-    () => (!user && text.trim() ? replyAttachmentGroup(text, message.attachments) : null),
+    () =>
+      !user && !isLiveReply(message) && text.trim()
+        ? replyAttachmentGroup(text, message.attachments)
+        : null,
     [user, text, message.attachments],
   );
   const voiceNotes = useMemo(
@@ -645,6 +645,7 @@ const Bubble = memo(function Bubble({
     text,
     message.at,
     openedAt,
+    message.id,
   );
   const split = reply.segments.length > 1;
   // Simple mode draws each table of a reply as its own card between the reply's prose bubbles.
@@ -675,8 +676,9 @@ const Bubble = memo(function Bubble({
     (visibleText.length > USER_COLLAPSE_CHARS ||
       visibleText.split('\n').length > USER_COLLAPSE_LINES);
   useEffect(() => {
-    if (focusedSearch && collapsible) setExpanded(true);
-  }, [focusedSearch, collapsible, focus?.nonce]);
+    setFolded(false);
+    if (focusedSearch && (collapsible || peer)) setExpanded(true);
+  }, [focusedSearch, collapsible, Boolean(peer), focus?.nonce]);
 
   if (user && editing && !webhookView && !hasAttachments) {
     return (
@@ -691,6 +693,15 @@ const Bubble = memo(function Bubble({
     );
   }
 
+  // A long request from another bot is one line until opened.
+  const peerLong = peer ? peerPreview(text) : null;
+  if (peer && peerLong && !expanded && (!focusedSearch || folded))
+    return (
+      <div {...{ [MESSAGE_ROW]: '' }} className='group flex w-full flex-col items-start'>
+        <PeerLabel peer={peer} />
+        <PeerCompactRow preview={peerLong} onOpen={() => setExpanded(true)} />
+      </div>
+    );
   const forks = user && versions ? versions : [message];
   const versionIndex = forks.findIndex((v) => v.id === message.id);
   const switchTo = (v: Message | undefined) => {
@@ -750,6 +761,7 @@ const Bubble = memo(function Bubble({
               ...(simple ? replyAndCopy(() => onReply(message), visibleText) : []),
               ...userMessageMenu({
                 messageId: message.id,
+                save: botMenu.filter((item) => item.key === TEAM_MEMORY_ITEM),
                 onEdit:
                   !speaker &&
                   message.kind === 'text' &&
@@ -774,7 +786,7 @@ const Bubble = memo(function Bubble({
             simple
               ? !tabled && SIMPLE_BUBBLE_MAX
               : 'max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl text-[15px] leading-relaxed',
-            emerging && 'turn-answer',
+            emerging && !streamedReply(message.id) && 'turn-answer',
             user && webhookView
               ? cn(
                   'overflow-hidden border border-accent/25 bg-card text-ink',
@@ -1016,6 +1028,18 @@ const Bubble = memo(function Bubble({
         align={user ? 'end' : 'start'}
         canReact={canReact}
       />
+      {peer && expanded && peerLong && (
+        <PeerOpenedActions
+          peer={peer}
+          bots={bots}
+          botId={botId}
+          botName={botName}
+          onFold={() => {
+            setExpanded(false);
+            setFolded(true);
+          }}
+        />
+      )}
       {forks.length > 1 && (
         <div className='mt-1 flex items-center gap-0.5 pr-1 text-[12px] text-ink-secondary'>
           <button
@@ -1044,26 +1068,23 @@ const Bubble = memo(function Bubble({
 function PeerLabel({ peer }: { peer: PeerLine }) {
   const { bots } = useChatRows();
   const author = bots.find((b) => b.id === peer.botId) ?? bots.find((b) => b.name === peer.name);
-  const how =
-    peer.delivery === 'delegate_bot'
-      ? t('chat.peer.handedTask')
-      : peer.delivery === 'start_thread'
-        ? t('chat.peer.openedThread')
-        : peer.delivery === 'coordinate_bots'
-          ? t('chat.peer.requested')
-          : t('chat.peer.asked');
+  const how = t(PEER_HOW[peer.delivery]);
   return (
     <div className='mb-1 flex items-center gap-1.5 pl-0.5' data-testid='peer-label'>
       <BotAvatar
         bot={author ?? { name: peer.name, color: 'blue' }}
         state={normalizeState(author?.mascotExpression) ?? 'happy'}
-        size={16}
+        size={20}
         motion='none'
         motionKey={0}
         animated={false}
       />
-      <span className='text-[11px] font-medium text-ink-secondary'>{peer.name}</span>
-      <span className='text-[11px] text-ink-tertiary'>· {how}</span>
+      <span
+        className={cn('text-[13px] font-semibold', author ? 'bot-identity' : 'text-ink-secondary')}
+        data-bot-color={author?.color}>
+        {peer.name}
+      </span>
+      <span className='text-[12px] text-ink-tertiary'>· {how}</span>
     </div>
   );
 }
@@ -1116,7 +1137,7 @@ const RoomHandoffChip = ({
   );
 };
 const MessagesList = memo(function MessagesList({
-  messages,
+  messages: saved,
   transcript,
   lookups,
   place,
@@ -1167,6 +1188,7 @@ const MessagesList = memo(function MessagesList({
       simple = false,
     } = useChatRows(),
     busy = use(ChatBusyContext);
+  const messages = useLiveTranscript(threadId, saved, transcript);
   // A finished turn keeps the bot's progress lines and folds only its tool steps under "Worked for", in both modes.
   const items = useMemo(() => groupTranscript(messages), [messages, locale]);
   const newestMessageId = messages.at(-1)?.id;
@@ -1192,7 +1214,7 @@ const MessagesList = memo(function MessagesList({
     return <NewMessagesDivider fading={unreadDividerFading} />;
   };
   return (
-    <>
+    <PeerMessagesContext value={transcript}>
       {items.map((item, i) => {
         const previous = items[i - 1];
         const prev =
@@ -1375,7 +1397,7 @@ const MessagesList = memo(function MessagesList({
             {divider}
             {m.automation && <AutomationCaption message={m} line={m.automation} botId={botId} />}
             {m.inbox && <InboxCaption message={m} />}
-            {row}
+            {isLiveReply(m) ? <StreamingReplyContext value>{row}</StreamingReplyContext> : row}
             {m.inbox?.answers && <InboxAnswers message={m} />}
             {m.inbox && <InboxCardSlot threadId={threadId} messageId={m.id} />}
             {m.setupOffer && (
@@ -1385,15 +1407,30 @@ const MessagesList = memo(function MessagesList({
           </div>
         );
       })}
-    </>
+    </PeerMessagesContext>
   );
 });
 
 const CHATHEAD_PILL = `flex min-w-0 items-center gap-2 rounded-full py-0.5 pl-1.5 text-ink ${ELEVATED_FLOAT}`;
 
-export function ChatView({ bot: profile }: { bot: Bot }) {
+export const ChatView = memo(function ChatView({ bot: profile }: { bot: Bot }) {
   const bot = useMemo(() => currentTaskBot(profile), [profile]);
-  const { state, dispatch } = useStore();
+  const state = useStoreSelector(
+      (s) => ({
+        computerStart: s.computerStarts[profile.id],
+        mascotMotion: s.mascotMotion?.botId === profile.id ? s.mascotMotion : null,
+        instances: s.instances,
+        config: s.config,
+        focusMessage: s.focusMessage,
+        settingsOpen: s.settingsOpen,
+        computerOpen: s.computerOpen,
+        error: s.error,
+        notice: s.notice,
+      }),
+      sameFields,
+    ),
+    dispatch = useStoreDispatch(),
+    store = useStoreRef();
   const showThreads = useShowThreads();
   const remoteClient = window.ogb?.remoteClient?.active === true;
   const { dragProps: headerDragProps, noDragStyle: headerNoDragStyle } = useCaptionChrome();
@@ -1407,9 +1444,9 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const simpleHead = !advanced && !remoteClient;
   const canWrite = useCanWriteIn(bot.threadId, bot.yourAccess);
 
-  const computerStarting = computerStartLine(state.computerStarts[bot.id], bot.name);
+  const computerStarting = computerStartLine(state.computerStart, bot.name);
   useScreensWhile(Boolean(computerStarting));
-  const mascotMotion = state.mascotMotion?.botId === bot.id ? state.mascotMotion : null;
+  const mascotMotion = state.mascotMotion;
   const [findOpen, setFindOpen] = useState(false);
   const { replyTo, selectReply, clearReply, consumeReply, restoreReply } = useReplyDraft(
     bot.threadId,
@@ -1459,6 +1496,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
     topSentinelRef,
     transcriptKey,
     following,
+    showJumpToLatest,
     windowedMessages,
     hiddenCount,
     laterCount,
@@ -1480,7 +1518,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   );
   const unreadDivider = useUnreadDivider({ threadId: bot.threadId, messages, following });
 
-  const bots = useDrawnBots(state.bots);
+  const bots = useStoreSelector((s) => s.bots, sameDrawnBots);
   const teammates = useTeammates();
   const mentionPeers = useMemo(
     () => [...bots.filter((peer) => peer.id !== bot.id), ...teammates.peers],
@@ -1563,7 +1601,9 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const currentTask = bot.tasks?.find((task) => task.threadId === bot.threadId),
     place = effectivePlace(bot, currentTask),
     team = state.config?.team,
-    privateChat = Boolean(team) && (currentTask?.private === true || ownChatStarted(bot.threadId)),
+    privateChat =
+      Boolean(team) &&
+      (currentTask?.private === true || (ownChatStarted(bot.threadId) && !currentTask?.shared)),
     ownHelper = Boolean(team) && !privateChat && Boolean(bot.defaultBot?.person),
     sharedChat = Boolean(team) && !privateChat && !ownHelper;
 
@@ -1633,7 +1673,8 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const presenceVisible = waiting || popping !== null || teammatesWorking,
     sharedRun = useSharedRun(bot, advanced);
   const lastShownRow = windowedMessages.findLast((message) => !quietRow(message, showToolCalls));
-  const presenceUnderBubble = Boolean(lastShownRow && isBotTextRow(lastShownRow, bot.id));
+  const presenceUnderBubble =
+    useHasLiveReply(bot.threadId) || Boolean(lastShownRow && isBotTextRow(lastShownRow, bot.id));
   const announcement = useMemo((): TranscriptSnapshot => {
     const approval = pendingApprovals(messages)[0];
     return {
@@ -1685,13 +1726,15 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
       ? routineRun
       : undefined;
   const resultsThreadId = routineExecution?.resultsThreadId ?? routineExecution?.sourceThreadId;
-  const canOpenResults =
-    resultsThreadId &&
-    [...state.bots, ...state.groups].some(
-      (owner) =>
-        owner.threadId === resultsThreadId ||
-        owner.tasks?.some((task) => task.threadId === resultsThreadId),
-    );
+  const canOpenResults = useStoreSelector(
+    (s) =>
+      Boolean(resultsThreadId) &&
+      [...s.bots, ...s.groups].some(
+        (owner) =>
+          owner.threadId === resultsThreadId ||
+          owner.tasks?.some((task) => task.threadId === resultsThreadId),
+      ),
+  );
 
   return (
     <ThreadLinkContext value={threadLink}>
@@ -1746,6 +1789,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
                                   kind: 'shared',
                                   team: team.name,
                                   onlyPeopleAdded: bot.onlyPeopleAdded,
+                                  sharedWith: currentTask?.sharedWith?.name,
                                 }
                               : null
                       }
@@ -1838,7 +1882,11 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
                   {!simpleHead && privateChat && <TeamPrivateHeader />}
                   {!simpleHead && ownHelper && <TeamOwnHelperHeader />}
                   {!simpleHead && sharedChat && team && (
-                    <TeamSharedHeader team={team} onlyPeopleAdded={bot.onlyPeopleAdded} />
+                    <TeamSharedHeader
+                      team={team}
+                      onlyPeopleAdded={bot.onlyPeopleAdded}
+                      sharedWith={currentTask?.sharedWith?.name}
+                    />
                   )}
                   {!simpleHead && !bot.busy && bot.waitingForTeammates && (
                     <span className='truncate text-[12px] text-ink-secondary' role='status'>
@@ -1884,7 +1932,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
                   <LiveCallChip
                     currentBotId={bot.id}
                     onOpen={(botId, threadId) =>
-                      openThread(dispatch, { botId, threadId }, state, showThreads)
+                      openThread(dispatch, { botId, threadId }, store.state(), showThreads)
                     }
                   />
                   {!phoneMenu && (
@@ -1930,6 +1978,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
                       )}
                     </button>
                   )}
+                  <HeaderShare bot={bot} />
                   {phoneMenu ? (
                     <ChatMoreMenu bot={bot} phoneHeader />
                   ) : (
@@ -1955,7 +2004,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
                       openThread(
                         dispatch,
                         { botId: bot.id, threadId: resultsThreadId },
-                        state,
+                        store.state(),
                         showThreads,
                       )
                     }
@@ -2038,38 +2087,40 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
               ) : null}
               {windowedMessages.length === 0 && !bot.busy && <EmptyChat bot={bot} />}
               <ChatRowsContext.Provider value={rows}>
-                <LiveToolsContext value={liveTools}>
-                  <ChatBusyContext value={busy}>
-                    <PagePaneContext value={pagePane}>
-                      <MessagesList
-                        messages={windowedMessages}
-                        transcript={messages}
-                        lookups={lookups}
-                        place={place}
-                        pinnedMessageId={bot.pinnedMessageId}
-                        today={localDay(Date.now())}
-                        editingId={editingId}
-                        lastBotTextId={lastBotTextId}
-                        emergingId={popping}
-                        canRetryLast={
-                          !bot.busy &&
-                          Boolean(lastUserMessage) &&
-                          sharedRun.mayAct(lastUserMessage?.sender)
-                        }
-                        engine={state.instances.find(
-                          (i) => i.instanceId === bot.modelSelection.instanceId,
-                        )}
-                        unreadDividerId={unreadDivider.messageId}
-                        unreadDividerFading={unreadDivider.fading}
-                        onStartEdit={startEdit}
-                        onCancelEdit={cancelEdit}
-                        onSubmitEdit={submitEdit}
-                        onRegenerate={regenerate}
-                        onReply={selectReply}
-                      />
-                    </PagePaneContext>
-                  </ChatBusyContext>
-                </LiveToolsContext>
+                <TeamMemorySavesContext value={savesToTeamMemory(bot, Boolean(team))}>
+                  <LiveToolsContext value={liveTools}>
+                    <ChatBusyContext value={busy}>
+                      <PagePaneContext value={pagePane}>
+                        <MessagesList
+                          messages={windowedMessages}
+                          transcript={messages}
+                          lookups={lookups}
+                          place={place}
+                          pinnedMessageId={bot.pinnedMessageId}
+                          today={localDay(Date.now())}
+                          editingId={editingId}
+                          lastBotTextId={lastBotTextId}
+                          emergingId={popping}
+                          canRetryLast={
+                            !bot.busy &&
+                            Boolean(lastUserMessage) &&
+                            sharedRun.mayAct(lastUserMessage?.sender)
+                          }
+                          engine={state.instances.find(
+                            (i) => i.instanceId === bot.modelSelection.instanceId,
+                          )}
+                          unreadDividerId={unreadDivider.messageId}
+                          unreadDividerFading={unreadDivider.fading}
+                          onStartEdit={startEdit}
+                          onCancelEdit={cancelEdit}
+                          onSubmitEdit={submitEdit}
+                          onRegenerate={regenerate}
+                          onReply={selectReply}
+                        />
+                      </PagePaneContext>
+                    </ChatBusyContext>
+                  </LiveToolsContext>
+                </TeamMemorySavesContext>
               </ChatRowsContext.Provider>
               {stopNoticeDue(messages, stoppedAt, busy) && (
                 <CancelledTurnRow name={PERSON_STOPPED_TURN_NAME} />
@@ -2151,7 +2202,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
                   />
                 </div>
               )}
-            {!following && (
+            {showJumpToLatest && (
               <div className='relative'>
                 <JumpToLatestButton
                   onClick={jumpToLatest}
@@ -2200,4 +2251,4 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
       </main>
     </ThreadLinkContext>
   );
-}
+});

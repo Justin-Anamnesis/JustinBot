@@ -131,6 +131,10 @@ export const TeamMapPage = lazyScreen(
   'TeamMapPage',
   async () => (await import('./TeamMapPage')).TeamMapPage,
 );
+export const PublishedAppsPage = lazyScreen(
+  'PublishedAppsPage',
+  async () => (await import('./published-apps/PublishedAppsPage')).PublishedAppsPage,
+);
 
 // Rarely opened, so never fetched ahead. The team library is what brings the YAML parser in.
 export const CloudAddDialog = lazyScreen(
@@ -171,6 +175,7 @@ const SCREENS = [
   RemoteDesktopPanel,
   RoomPanel,
   TeamMapPage,
+  PublishedAppsPage,
 ];
 
 if (

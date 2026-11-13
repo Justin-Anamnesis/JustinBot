@@ -100,6 +100,7 @@ export const ENGINE = [
   'copilot',
   'command_code',
   'kiro',
+  'omp',
 ] as const;
 export type Engine = (typeof ENGINE)[number];
 
@@ -133,6 +134,7 @@ const ENGINE_BY_DRIVER = new Map<string, Engine>(
     copilotAgent: 'copilot',
     commandCodeAgent: 'command_code',
     kiroAgent: 'kiro',
+    ompAgent: 'omp',
   } satisfies Record<string, Engine>),
 );
 

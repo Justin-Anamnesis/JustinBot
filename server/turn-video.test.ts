@@ -30,13 +30,13 @@ describe.skipIf(!hasFfmpeg())('video frame sampling', () => {
   };
 
   // A generated test pattern, not a sample file in the repo: duration and a readable-by-ffmpeg guarantee come free.
-  const syntheticClip = (root: string, seconds: number): TurnVideoInput => {
+  const syntheticClip = (root: string, seconds: number, size = '320x240'): TurnVideoInput => {
     const path = join(root, 'clip.mp4');
     const result = spawnSync('ffmpeg', [
       '-f',
       'lavfi',
       '-i',
-      `testsrc=duration=${seconds}:size=320x240:rate=5`,
+      `testsrc=duration=${seconds}:size=${size}:rate=5`,
       '-pix_fmt',
       'yuv420p',
       '-y',
@@ -81,6 +81,37 @@ describe.skipIf(!hasFfmpeg())('video frame sampling', () => {
 
     expect(frames).toHaveLength(2);
   });
+
+  it.each([
+    ['256x2048', 128, 1024],
+    ['2048x256', 1024, 128],
+    ['1600x1600', 1024, 1024],
+    ['320x240', 320, 240],
+  ])(
+    'fits %s frames within both image dimensions without upscaling',
+    async (size, width, height) => {
+      const frames = await videoFrameImages([syntheticClip(store(), 1, size)], 1);
+      expect(frames).toHaveLength(1);
+      const metadata = JSON.parse(
+        execFileSync(
+          'ffprobe',
+          [
+            '-v',
+            'error',
+            '-select_streams',
+            'v:0',
+            '-show_entries',
+            'stream=width,height',
+            '-of',
+            'json',
+            frames[0]!.path,
+          ],
+          { encoding: 'utf8' },
+        ),
+      ) as { streams: Array<{ width: number; height: number }> };
+      expect(metadata.streams).toEqual([{ width, height }]);
+    },
+  );
 
   it('stops at the frame limit, and samples nothing when the turn has no room left', async () => {
     const root = store();

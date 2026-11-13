@@ -120,6 +120,7 @@ export interface AppTriggerDraft {
   account?: string;
   filter?: AppTriggerFilter;
   config?: Record<string, unknown>;
+  sameConversation?: boolean;
 }
 
 const put = (trigger: AppTrigger) =>
@@ -138,9 +139,9 @@ export const appTriggerApi = {
   },
   async update(
     id: string,
-    patch: Partial<Pick<AppTrigger, 'name' | 'prompt' | 'enabled' | 'config'>> & {
-      filter?: AppTriggerFilter | null;
-    },
+    patch: Partial<
+      Pick<AppTrigger, 'name' | 'prompt' | 'enabled' | 'config' | 'sameConversation'>
+    > & { filter?: AppTriggerFilter | null },
   ) {
     const { trigger } = await api<{ trigger: AppTrigger }>(`/api/app-triggers/${id}`, {
       method: 'PATCH',

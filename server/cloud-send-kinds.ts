@@ -88,7 +88,9 @@ const WEBHOOK_FIELDS = [
   'delivery',
   'groupId',
   'eventTypes',
+  'payloadFilter',
   'maxPendingRuns',
+  'sameConversation',
   'resultsThreadId',
   'createdAt',
 ] as const;
@@ -103,6 +105,7 @@ const APP_EVENT_FIELDS = [
   'config',
   'filter',
   'sourceThreadId',
+  'sameConversation',
 ] as const;
 /** Prose that may name this computer's data folder. */
 const TEXTS = ['prompt', 'description', 'output', 'error'] as const;

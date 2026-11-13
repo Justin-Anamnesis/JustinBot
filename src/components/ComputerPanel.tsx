@@ -45,6 +45,8 @@ import { useCaptionChrome } from '@/components/DesktopCapabilities';
 import { usePageVisible } from '@/lib/page-visible';
 import { listenLiveFrames } from '@/lib/live-events';
 import { CloudScreenPreview } from './CloudScreenPreview';
+import { ResetCloudComputerButton } from './ResetCloudComputerButton';
+import { CloudComputerRecoveryRow } from './CloudComputerRecovery';
 import { isActiveTurnRefusal, isRemoteScreenshotContention } from '@/lib/remote-desktop';
 import { CloudBackendPicker } from './CloudBackendPicker';
 import { SimpleVpsChoices } from './SimpleVpsChoices';
@@ -65,6 +67,7 @@ import {
   browserAvailable,
   browserUnavailableReason,
   builtInBrowserEnabled,
+  usbPhoneTakeoverEnabled,
 } from '@/lib/feature-flags';
 import {
   parseComputerHelp,
@@ -111,6 +114,7 @@ import {
 import { approvalModeFor } from '../../shared/approval-mode';
 import {
   openPlaceAction,
+  panelCloudRefusal,
   placeBlocked,
   placeFacts,
   placeHasIssue,
@@ -118,12 +122,7 @@ import {
   usePlaceSeat,
   worksOnSimpleLabel,
 } from '@/lib/place-view';
-import {
-  cloudRefusal,
-  type PlaceActionId,
-  type PlaceFacts,
-  type PlaceView,
-} from '../../shared/place-view';
+import type { PlaceActionId, PlaceFacts, PlaceView } from '../../shared/place-view';
 import { t } from '@/lib/i18n';
 import { LocalizedPanelError, panelErrorText } from '@/lib/computer-messages';
 
@@ -371,7 +370,7 @@ export function ComputerPanel({
   const requestedDataResult =
     state.dataResultFocus?.botId === bot.id ? state.dataResultFocus : undefined;
   const [dataRequest, setDataRequest] = useState<{ id: string; requestId: number }>();
-  const androidStatus = useAndroidUsbDevices();
+  const androidStatus = useAndroidUsbDevices(usbPhoneTakeoverEnabled(state.config));
   const androidConnected = androidStatus.devices.length > 0;
   const panelTabs = computerPanelTabs({ advanced, androidConnected });
   const panelView = resolveComputerPanelView(storedPanelView, { advanced, androidConnected });
@@ -831,12 +830,23 @@ export function ComputerPanel({
   }, [phase, threadPath, profileBot.busy, livePlace]);
 
   const control = state.computerControl[bot.id] ?? { held: false, helpReason: null };
+  const liveTarget = !computerStatusCurrent
+    ? null
+    : phase === 'vm' && vmStatus?.viewer_url && vmStatus.target_key
+      ? viewerTargetId({ key: vmStatus.target_key })
+      : cloudPreviewReady && cloudBackend === 'vps'
+        ? `vps/${bot.id}`
+        : null;
   const requestControl = useCallback(
     async (action: ComputerControlAction, controlLeaseId?: string) => {
       const snap = computerControlSnapshotSchema.parse(
-        await api(`/api/bots/${bot.id}/computer/control`, {
+        await api(threadPath('computer/control'), {
           method: 'POST',
-          body: JSON.stringify({ action, ...(controlLeaseId ? { controlLeaseId } : {}) }),
+          body: JSON.stringify({
+            action,
+            ...(controlLeaseId ? { controlLeaseId } : {}),
+            ...(liveTarget ? { target: liveTarget } : {}),
+          }),
         }),
       );
       dispatch({
@@ -848,15 +858,8 @@ export function ComputerPanel({
       });
       return snap;
     },
-    [bot.id, dispatch],
+    [bot.id, dispatch, threadPath, liveTarget],
   );
-  const liveTarget = !computerStatusCurrent
-    ? null
-    : phase === 'vm' && vmStatus?.viewer_url && vmStatus.target_key
-      ? viewerTargetId({ key: vmStatus.target_key })
-      : cloudPreviewReady && cloudBackend === 'vps'
-        ? `vps/${bot.id}`
-        : null;
   const takeover = useComputerTakeover({
     botId: bot.id,
     session: `${viewerConnectionKey}:${panelView}`,
@@ -1096,7 +1099,7 @@ export function ComputerPanel({
     : bot.name;
   useEffect(() => {
     let alive = true;
-    api(`/api/bots/${bot.id}/computer/control`)
+    api(threadPath('computer/control'))
       .then((raw) => {
         if (!alive) return;
         const snap = computerControlSnapshotSchema.parse(raw);
@@ -1114,7 +1117,7 @@ export function ComputerPanel({
     };
     // prettier-ignore
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bot.id]);
+  }, [bot.id, threadPath]);
 
   const setNativeBrowserControl = useCallback(async (): Promise<boolean> => true, []);
 
@@ -1183,7 +1186,6 @@ export function ComputerPanel({
       await openProviderDesktop({
         botId: bot.id,
         title: t('computer.viewerTitle', { name: bot.name }),
-        held: control.held,
         request: requestControl,
         join: (signal) =>
           api(threadPath('computer/join'), {
@@ -1494,13 +1496,7 @@ export function ComputerPanel({
     phase === 'error' &&
     error &&
     !(error instanceof LocalizedPanelError)
-      ? cloudRefusal(
-          {
-            message: errorText ?? '',
-            status: Number((error as { status?: unknown }).status ?? 0) || undefined,
-          },
-          state.config?.box?.included === true,
-        )
+      ? panelCloudRefusal(error, errorText ?? '', state.config?.box?.included === true)
       : undefined;
   const cloudView = viewOf('cloud', cloudRefused);
   const autoView = viewOf('auto');
@@ -1785,7 +1781,10 @@ export function ComputerPanel({
           <div
             {...tabPanelProps('android')}
             className={cn('flex-1 overflow-y-auto px-4 pt-2', TAB_PANEL_FOCUS)}>
-            <AndroidDevicePanel status={androidStatus} />
+            <AndroidDevicePanel
+              status={androidStatus}
+              serverPhones={usbPhoneTakeoverEnabled(state.config)}
+            />
           </div>
         ) : (
           <div
@@ -1930,6 +1929,24 @@ export function ComputerPanel({
                     (phase === 'unconfigured' || phase === 'error') &&
                     cloudView.action?.id !== 'add-boat-key' &&
                     placeActionButton(cloudView)}
+                  <ResetCloudComputerButton
+                    botId={bot.id}
+                    botName={bot.name}
+                    onReset={() => {
+                      setError(null);
+                      setRetry((n) => n + 1);
+                    }}
+                    view={{
+                      computer: bot.computer,
+                      cloudBackend,
+                      canManage: canManageCloud,
+                      busy: profileBot.busy === true,
+                      pending: pending !== null,
+                      phase,
+                      boatState,
+                      refusal: cloudRefused?.state,
+                    }}
+                  />
                   {phase === 'local' && !isLinux && localMisses >= 3 && (
                     <button
                       onClick={() => window.ogb?.permOpenSettings?.('screen')}
@@ -2120,7 +2137,11 @@ export function ComputerPanel({
             {(cloudPreviewReady || phase === 'vm' || currentTeamComputer) && control.held && (
               <div className='mt-3 rounded-xl border border-accent/25 bg-accent/10 p-4'>
                 <div className='text-[13px] leading-relaxed text-ink'>
-                  {t('computer.youHaveWheel')}
+                  {t(
+                    phase === 'vm' && !takeover.here
+                      ? 'canvasComputers.inUseTitle'
+                      : 'computer.youHaveWheel',
+                  )}
                   {cloudPreviewReady &&
                     !liveTarget &&
                     ` ${t(advanced ? 'computer.useOpenDesktop' : 'computer.simple.useFullScreen')}`}
@@ -2262,7 +2283,13 @@ export function ComputerPanel({
                 )}
               </div>
             )}
-
+            {canManageCloud &&
+              cloudBackend !== 'vps' &&
+              phase !== 'unconfigured' &&
+              phase !== 'team-boat' &&
+              teamComputer?.botId !== bot.id && (
+                <CloudComputerRecoveryRow botId={bot.id} name={bot.name} always={advanced} />
+              )}
             {phase !== 'team-boat' && (bot.computer !== undefined || computerStatusCurrent) && (
               <>
                 <LocalScreenPreview />

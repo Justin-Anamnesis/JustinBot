@@ -38,6 +38,9 @@ export function fleetRequest(
       (res) => {
         let text = '';
         res.setEncoding('utf8');
+        res.on('error', (error: Error) => {
+          reject(new Error(`fleet agent: ${error.message}`));
+        });
         res.on('data', (chunk: string) => {
           if (text.length < 1_000_000) text += chunk;
         });

@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useContext, useRef, useState, type ReactNode } from 'react';
 import { ArrowUpRight, Gauge, Loader2, X } from 'lucide-react';
 
 import type {
@@ -10,7 +10,7 @@ import type {
 import type { CloudUsage, CloudUsageMeter } from '../../electron/cloud-home.mjs';
 import { cloudPlanChanged, useCloudPlanSnapshot } from './CloudTrialNotice';
 import { ConfirmDialog } from './ConfirmDialog';
-import { Card, SIMPLE_CARD } from './SettingsPrimitives';
+import { Card, SettingsLook, SIMPLE_CARD } from './SettingsPrimitives';
 import { localDesktopPage } from './onboarding/WelcomeGate';
 import { cloudPlanLabel } from '@/lib/cloud-plan';
 import { cn } from '@/lib/cn';
@@ -75,6 +75,8 @@ export function MeterBar({
 }) {
   const percent = meterPercent(meter),
     band = meterBand(percent);
+  // Settings draws its bars in ink on an ink 8% track: accent is only for links there.
+  const settings = useContext(SettingsLook);
   return (
     <div
       role='progressbar'
@@ -85,9 +87,13 @@ export function MeterBar({
       aria-valuetext={meterAmounts(meter)}
       data-meter={meter.kind}
       data-band={band}
-      className={cn('w-full overflow-hidden rounded-full bg-inset', compact ? 'h-1.5' : 'h-2')}>
+      className={cn(
+        'w-full overflow-hidden rounded-full',
+        settings ? 'bg-ink/[0.08]' : 'bg-inset',
+        compact ? 'h-1.5' : 'h-2',
+      )}>
       <div
-        className={cn('h-full rounded-full', BAR[band])}
+        className={cn('h-full rounded-full', settings && band === 'ok' ? 'bg-ink' : BAR[band])}
         style={{ width: `${Math.max(percent, meter.used > 0 ? 2 : 0)}%` }}
       />
     </div>
@@ -490,10 +496,12 @@ export function UpgradeButton({
   usage,
   upgrade,
   className,
+  secondary = false,
 }: {
   usage: CloudUsage;
   upgrade: UpgradeUi;
   className?: string;
+  secondary?: boolean;
 }) {
   const path = upgradePath(usage),
     target = nextPlan(usage);
@@ -501,7 +509,7 @@ export function UpgradeButton({
   return (
     <button
       type='button'
-      className={cn('ui-button ui-button-primary gap-1.5', className)}
+      className={cn('ui-button gap-1.5', !secondary && 'ui-button-primary', className)}
       disabled={upgrade.busy !== null}
       onClick={() => upgrade.onUpgrade()}>
       {upgrade.busy === 'preview' && (

@@ -13,6 +13,7 @@ import { redactSecretsInText } from './redact.ts';
 import { chiefLevel } from './chief-level.ts';
 import { defaultBotRefusal } from './default-bot.ts';
 import type { BotRecord, OptionCardData } from './store.ts';
+import { outsideDepartmentReason } from './peer-roster.ts';
 import type {
   TeamSetupFields,
   TeamSetupOperation,
@@ -173,6 +174,8 @@ interface Options {
   ownsThread(botId: string, threadId: string): boolean;
   /** `request` only for a reviewed deletion; Undo of a creation deletes without one. */
   deleteBot(botId: string, revalidate: () => void, request?: TeamSetupRequest): Promise<void>;
+  /** Why deleting this bot would be refused now, as a person's hold reaches it; null when it would not. */
+  deletionRefusal(botId: string): string | null;
 }
 
 type RequestFrom = { botId: string; name: string; color: string };
@@ -306,8 +309,10 @@ export class TeamSetupRequestService {
             'Each new bot needs a name, title, soul instructions, and exact model selection',
           );
       } else {
-        if (!target || target.hidden || !this.options.hasTeamAuthority(chief, target.section))
+        if (!target || target.hidden)
           throw new TeamSetupError("A target bot is outside this Chief's authorized team", 403);
+        if (!this.options.hasTeamAuthority(chief, target.section))
+          throw new TeamSetupError(outsideDepartmentReason(chief, target), 403);
         if (teamSetupRevision(target, operation.fields) !== operation.expectedRevision)
           throw new TeamSetupError(
             `@${target.name} changed. This setup was cancelled; review a new proposal.`,
@@ -329,10 +334,7 @@ export class TeamSetupRequestService {
       if (confirming && target) this.options.validateChange?.(target, fields);
       const destination = fields.section ?? target?.section ?? chief.section;
       if (!allowed(destination))
-        throw new TeamSetupError(
-          "The destination team is outside this Chief's authorized scope",
-          403,
-        );
+        throw new TeamSetupError(outsideDepartmentReason(chief, { section: destination }), 403);
       if (
         !request.newTeams.includes(section(destination)) &&
         !existingTeams.has(section(destination))
@@ -387,13 +389,10 @@ export class TeamSetupRequestService {
     }
     if (request.deletion) {
       const target = this.options.store.bot(request.deletion.botId);
-      if (
-        !target ||
-        target.hidden ||
-        target.id === chief.id ||
-        !this.options.hasTeamAuthority(chief, target.section)
-      )
+      if (!target || target.hidden || target.id === chief.id)
         throw new TeamSetupError('This deletion target is no longer an authorized teammate', 403);
+      if (!this.options.hasTeamAuthority(chief, target.section))
+        throw new TeamSetupError(outsideDepartmentReason(chief, target), 403);
       if (target.defaultBot) throw new TeamSetupError(defaultBotRefusal(target.name), 409);
       if (
         teamSetupRevision(target) !== request.deletion.expectedRevision ||
@@ -814,6 +813,10 @@ export class TeamSetupRequestService {
     if (changed(ids)) return { ...cannot(UNDO_STALE), stale: true };
     if (ids.some((id) => this.options.targetBusy(id)))
       return cannot('Wait for the bots this setup changed to finish their work, then undo.');
+    const refusal = created
+      .map((id) => this.options.deletionRefusal(id))
+      .find((reason) => reason !== null);
+    if (refusal) return cannot(refusal);
     try {
       for (const id of created)
         await this.options.deleteBot(id, () => {

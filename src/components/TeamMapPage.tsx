@@ -27,8 +27,6 @@ import { useShowThreads } from '@/lib/thread-preferences';
 import { useCaptionChrome } from '@/components/DesktopCapabilities';
 import { placeOffered } from '@/lib/place';
 import { TeamCanvas } from './TeamCanvas';
-import { MapModeToggle, TeamOrgChart, useMapMode } from './TeamOrgChart';
-import { useTeamPeople } from '@/state/team-people';
 import { TeamDialog } from './TeamDialog';
 import { TeamMemoryDialog } from './TeamMemoryDialog';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -319,9 +317,7 @@ export function TeamMapPage() {
   const { state, dispatch } = useStore();
   const { dragProps } = useCaptionChrome();
   const remoteClient = window.ogb?.remoteClient?.active === true;
-  const teamPeople = useTeamPeople();
   const admin = useOwnerOrAdmin();
-  const reportsChart = useMapMode() === 'people' && teamPeople !== null;
   const [snapshot, setSnapshot] = useState<TeamMapSnapshot>(EMPTY_TEAM_MAP_SNAPSHOT);
   const [error, setError] = useState<string | null>(null);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -443,7 +439,6 @@ export function TeamMapPage() {
           </div>
           <p className='mt-1 text-[12px] text-ink-secondary'>{t('canvas.description')}</p>
         </div>
-        {teamPeople && <MapModeToggle />}
         {!remoteClient && (
           <div className='flex items-center gap-2'>
             <button
@@ -552,63 +547,59 @@ export function TeamMapPage() {
       )}
       <div className='relative flex min-h-0 flex-1'>
         <div className='relative flex min-h-0 min-w-0 flex-1'>
-          {reportsChart ? (
-            <TeamOrgChart bots={bots} />
-          ) : (
-            <TeamCanvas
-              sections={sections}
-              canManage={!remoteClient && admin !== false}
-              onMove={requestMove}
-              taggedBotIds={taggedBotIds}
-              sent={sent}
-              bottomInset={bots.length ? 96 : 0}
-              connectedBotIds={
-                state.settingsOpen
-                  ? edges.flatMap((edge) =>
-                      edge.sourceBotId === state.selectedId
-                        ? [edge.targetBotId]
-                        : edge.targetBotId === state.selectedId
-                          ? [edge.sourceBotId]
-                          : [],
-                    )
-                  : []
+          <TeamCanvas
+            sections={sections}
+            canManage={!remoteClient && admin !== false}
+            onMove={requestMove}
+            taggedBotIds={taggedBotIds}
+            sent={sent}
+            bottomInset={bots.length ? 96 : 0}
+            connectedBotIds={
+              state.settingsOpen
+                ? edges.flatMap((edge) =>
+                    edge.sourceBotId === state.selectedId
+                      ? [edge.targetBotId]
+                      : edge.targetBotId === state.selectedId
+                        ? [edge.sourceBotId]
+                        : [],
+                  )
+                : []
+            }
+            onComputer={(bot) => openBotSettings(dispatch, 'access', { botId: bot.id })}
+            computers={
+              showComputers && computersChoiceLoaded && !remoteClient
+                ? mapComputers.computers
+                : undefined
+            }
+            computerFrames={mapComputers.frames}
+            onOpenComputer={(computer) =>
+              computer.kind === 'team'
+                ? setComputersOpen(true)
+                : dispatch({ type: 'toggleComputer', open: true, botId: computer.id })
+            }
+            teamComputers={Object.fromEntries(
+              computers
+                .filter((computer) => computer.section !== null)
+                .map((computer) => [
+                  computer.section!,
+                  { name: computer.name, state: computer.state },
+                ]),
+            )}
+            onTeamComputer={() => setComputersOpen(true)}
+            onComputerDrop={(id, section) => {
+              if (!remoteClient) {
+                setComputersOpen(true);
+                setComputerDrop({ id, section });
               }
-              onComputer={(bot) => openBotSettings(dispatch, 'access', { botId: bot.id })}
-              computers={
-                showComputers && computersChoiceLoaded && !remoteClient
-                  ? mapComputers.computers
-                  : undefined
-              }
-              computerFrames={mapComputers.frames}
-              onOpenComputer={(computer) =>
-                computer.kind === 'team'
-                  ? setComputersOpen(true)
-                  : dispatch({ type: 'toggleComputer', open: true, botId: computer.id })
-              }
-              teamComputers={Object.fromEntries(
-                computers
-                  .filter((computer) => computer.section !== null)
-                  .map((computer) => [
-                    computer.section!,
-                    { name: computer.name, state: computer.state },
-                  ]),
-              )}
-              onTeamComputer={() => setComputersOpen(true)}
-              onComputerDrop={(id, section) => {
-                if (!remoteClient) {
-                  setComputersOpen(true);
-                  setComputerDrop({ id, section });
-                }
-              }}
-              onInstructions={(section, label) => setContextEditor({ section, label })}
-              onMemory={(section, label) => setMemoryEditor({ section, label })}
-              onEditTeam={(section, rename) => setTeamEditor({ section, rename })}
-              onDeleteTeam={setDeletingTeam}
-              isEmpty={(key) =>
-                ![...state.bots, ...state.groups].some((record) => record.section?.trim() === key)
-              }
-            />
-          )}
+            }}
+            onInstructions={(section, label) => setContextEditor({ section, label })}
+            onMemory={(section, label) => setMemoryEditor({ section, label })}
+            onEditTeam={(section, rename) => setTeamEditor({ section, rename })}
+            onDeleteTeam={setDeletingTeam}
+            isEmpty={(key) =>
+              ![...state.bots, ...state.groups].some((record) => record.section?.trim() === key)
+            }
+          />
           {bots.length > 0 && (
             <MapComposer
               bots={bots}

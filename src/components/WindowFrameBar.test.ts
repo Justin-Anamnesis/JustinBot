@@ -115,7 +115,7 @@ describe("the window frame's top bar", () => {
     expect(
       buttons,
       "the rail's button, then the app's settings; no update while there is none",
-    ).toEqual(['Hide your computers', 'App settings']);
+    ).toEqual(['Hide your computers', 'Settings']);
     expect(bar()!.querySelector('[data-rail-toggle]')!.className).toContain('size-[22px]');
   });
 
@@ -238,7 +238,7 @@ describe("the window frame's top bar", () => {
     expect(order, 'right before Settings, at the right end').toEqual([
       'Hide your computers',
       'bell',
-      'App settings',
+      'Settings',
     ]);
     await act(async () => bell().click());
     expect(fixture.dispatch).toHaveBeenCalledWith({ type: 'toggleNotifications' });
@@ -283,7 +283,7 @@ describe("the window frame's top bar", () => {
     expect(order, 'before Settings, at the right end').toEqual([
       'Hide your computers',
       'update',
-      'App settings',
+      'Settings',
     ]);
     fixture.update = { status: 'downloaded', version: '0.1.136' };
     await act(async () => root!.render(createElement(WindowFrameBar)));

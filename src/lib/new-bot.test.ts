@@ -11,7 +11,7 @@ import type { Action, Bot } from '@/state/store';
 import { setTeamChats } from '@/state/team-chats';
 import { setTeamPeople, type TeamPeople } from '@/state/team-people';
 import { botLimitReason, closeBotLimit, createdPausedBot } from './bot-limit';
-import { makeNewBot, type BotDefaultsAnswer } from './new-bot';
+import { makeNewBot, setNewBotNameAsker, type BotDefaultsAnswer } from './new-bot';
 
 const ME = { email: 'ada@acme.test', name: 'Ada', role: 'member', you: true as const };
 const BOB = { email: 'bob@acme.test', name: 'Bob', role: 'admin' };
@@ -86,6 +86,7 @@ afterEach(() => {
   setTeamPeople(null);
   setTeamChats(null);
   closeBotLimit();
+  setNewBotNameAsker(null);
 });
 
 describe('New bot', () => {
@@ -121,11 +122,12 @@ describe('New bot', () => {
     expect(botLimitReason()).toBeNull();
   });
 
-  it('makes nothing for a User on a team, however it was asked for', async () => {
+  it("makes a User's own bot on a team with one bare request: no defaults read, no department, nobody named to look after it", async () => {
     setTeamPeople({ ...team, admin: false });
     const { calls, request } = server();
-    expect(await newBot(request)).toEqual([]);
-    expect(calls).toEqual([]);
+    const sent = await newBot(request, { section: 'Sales' });
+    expect(calls).toEqual([{ method: 'POST', path: '/api/bots', body: {} }]);
+    expect(sent[0]).toMatchObject({ type: 'botAdded', bot: { id: 'created' } });
   });
 
   it('makes a bot at once from the New bot defaults and opens its chat', async () => {
@@ -151,6 +153,34 @@ describe('New bot', () => {
       },
     ]);
     expect(fixture.track.mock.calls).toEqual([['bot_created', { source: 'blank' }]]);
+  });
+
+  it("on a team, asks for the bot's name before making anything, and makes nothing when the person backs out", async () => {
+    setTeamPeople(team);
+    const ask = vi
+      .fn<() => Promise<string | null>>()
+      .mockResolvedValueOnce('Quotes')
+      .mockResolvedValueOnce(null);
+    setNewBotNameAsker(ask);
+    const named = server();
+    const sent = await newBot(named.request);
+    expect(named.created()).toMatchObject({ name: 'Quotes' });
+    expect(sent.slice(0, 2), 'nothing is under way while the person types').toEqual([
+      { type: 'botCreationPending', on: false },
+      { type: 'botCreationPending', on: true },
+    ]);
+    const cancelled = server();
+    expect(await newBot(cancelled.request)).toEqual([{ type: 'botCreationPending', on: false }]);
+    expect(cancelled.calls).toEqual([]);
+  });
+
+  it('off a team, never asks: the bot is made at once with a suggested name', async () => {
+    const ask = vi.fn(async () => 'Quotes');
+    setNewBotNameAsker(ask);
+    const { request, created } = server();
+    await newBot(request);
+    expect(ask).not.toHaveBeenCalled();
+    expect(created()).toMatchObject({ name: 'Pixel' });
   });
 
   it('names the bot so it never repeats one already here', async () => {

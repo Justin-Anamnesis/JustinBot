@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   tailscaleServe: vi.fn(),
   tailscaleStop: vi.fn(),
   clearLeftoverTailscaleServe: vi.fn(),
+  tailnetListenFallback: vi.fn(),
   createTunnelAccount: vi.fn(),
   createTunnelOrigin: vi.fn(),
   cleanupTunnelOrigin: vi.fn(),
@@ -46,6 +47,7 @@ vi.mock('node:fs', async (original) => {
 vi.mock('./tailscale.ts', () => ({
   tailscaleStatus: mocks.tailscaleStatus,
   tailscaleServe: mocks.tailscaleServe,
+  tailnetListenFallback: mocks.tailnetListenFallback,
   clearLeftoverTailscaleServe: mocks.clearLeftoverTailscaleServe,
   explainTailscaleFailure: (failure: string) => failure,
 }));
@@ -128,6 +130,7 @@ beforeEach(() => {
     stop: mocks.tailscaleStop,
   });
   mocks.tailscaleStop.mockResolvedValue(undefined);
+  mocks.tailnetListenFallback.mockReturnValue(null);
   mocks.clearLeftoverTailscaleServe.mockResolvedValue(false);
   mocks.createTunnelAccount.mockReturnValue({
     credentials: { status: 'available', read: () => ({}) },
@@ -189,6 +192,40 @@ describe('CLI startup lifecycle', () => {
     );
     expect(mocks.tailscaleServe).toHaveBeenCalledOnce();
     expect(mocks.tailscaleStop).toHaveBeenCalledOnce();
+  });
+
+  it("starts the server on the tailnet when tailscale serve can't front it, with nothing of Tailscale's to stop", async () => {
+    mocks.tailscaleServe.mockResolvedValue({ failure: 'https-not-enabled' });
+    mocks.tailnetListenFallback.mockReturnValue({
+      origin: 'http://fixture.tail.ts.net:18451',
+      env: { OMB_TAILNET_NAME: 'fixture.tail.ts.net' },
+      line: 'tailscale: listening',
+    });
+    let started: NodeJS.ProcessEnv = {};
+    mocks.spawn.mockImplementation(
+      (_command: string, _args: string[], spawned: { env: NodeJS.ProcessEnv }) => {
+        started = spawned.env;
+        throw new Error('Fixture spawn failure');
+      },
+    );
+    const log = vi.fn();
+    await expect(runServe({ ...options, tailscale: true }, log)).rejects.toThrow(
+      'Fixture spawn failure',
+    );
+    expect(started).toMatchObject({
+      OMB_TAILNET_NAME: 'fixture.tail.ts.net',
+      OMB_PUBLIC_URL: 'http://fixture.tail.ts.net:18451',
+    });
+    expect(log).toHaveBeenCalledWith('tailscale: listening');
+    expect(mocks.tailscaleStop).not.toHaveBeenCalled();
+  });
+
+  it("stops with Tailscale's reason when listening on the tailnet can't help either", async () => {
+    mocks.tailscaleServe.mockResolvedValue({ failure: 'unknown' });
+    await expect(runServe({ ...options, tailscale: true }, vi.fn())).rejects.toThrow(
+      '--tailscale: ',
+    );
+    expect(mocks.spawn).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -18,6 +18,9 @@ vi.mock('react', async (original) => ({
   useEffect: (effect: EffectCallback, deps?: DependencyList) => {
     fixture.effects.push({ effect, deps });
   },
+  useLayoutEffect: (effect: EffectCallback, deps?: DependencyList) => {
+    fixture.effects.push({ effect, deps });
+  },
   useRef: (initial: unknown) => (fixture.refs[fixture.ref++] ??= { current: initial }),
 }));
 vi.mock('@/state/store', async (importOriginal) => {

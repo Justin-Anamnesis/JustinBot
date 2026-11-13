@@ -112,6 +112,7 @@ describe('what a bridged turn is listed', () => {
       'attach_file',
       'publish_page',
       'post_to_room',
+      'post_to_thread',
       'request_credential',
       'request_sign_in',
       'fill_login',
@@ -132,6 +133,7 @@ describe('what a bridged turn is listed', () => {
       'attach_file',
       'publish_page',
       'post_to_room',
+      'post_to_thread',
       'request_credential',
       'request_sign_in',
       'fill_login',
@@ -148,12 +150,12 @@ describe('what a bridged turn is listed', () => {
       everyProfile().flatMap(({ profile: turn }) => names(availableTools(turn))),
     );
     for (const hot of BRIDGE_HOT_TOOL_NAMES) expect(everyName.has(hot), hot).toBe(true);
-    // 12 to 15 of them on any one turn, always fewer than the turn has
+    // 12 to 16 of them on any one turn, always fewer than the turn has
     for (const { name, profile: turn } of everyProfile()) {
       const tools = availableTools(turn);
       const hot = createToolBridge(tools as BridgeTool[]).listed.length - 2;
       expect(hot, name).toBeGreaterThanOrEqual(12);
-      expect(hot, name).toBeLessThanOrEqual(15);
+      expect(hot, name).toBeLessThanOrEqual(16);
       expect(hot, name).toBeLessThan(tools.length / 2);
     }
   });
@@ -166,6 +168,10 @@ describe('what a bridged turn is listed', () => {
     );
     expect(names(bridgeFor().listed)).not.toContain('create_options_card');
     expect(names(bridgeFor({ memory: false }).listed)).not.toContain('memory_update');
+    // A changed instruction replaces the older note instead of sitting beside it.
+    expect(bridgeFor().listed.find((tool) => tool.name === 'memory_update')!.description).toContain(
+      'supersede, not append, a changed fact or instruction',
+    );
     // A role and the other features change only what sits behind use_tool.
     for (const options of [
       { chief: true },
@@ -222,7 +228,7 @@ describe('what a bridged turn is listed', () => {
       names(availableTools(profile({ ...FULL_CHIEF }))).filter((tool) =>
         reportedAs(tool).some(isOutboundTool),
       ),
-    ).toEqual(['publish_page', 'post_to_room', 'send_voice_note']);
+    ).toEqual(['publish_page', 'post_to_room', 'post_to_thread', 'send_voice_note']);
     // and the bridge's own two names are not outward either
     for (const spelling of [...reportedAs(USE_TOOL), ...reportedAs(FIND_TOOL)])
       expect(isOutboundTool(spelling), spelling).toBe(false);

@@ -45,7 +45,7 @@ describe('VPS SSH connection sharing supplied by the app', () => {
     });
     await expect(
       ensureVpsSshMaster({ configPath: null, path: 'missing-ssh' }, 'fixture-vps'),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe(0);
     expect(existsSync(join(data, 'ssh'))).toBe(false);
   });
 });

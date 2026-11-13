@@ -142,6 +142,7 @@ const SCHEMA_KEYWORD_MAPS = [
   'properties',
   '$defs',
   'definitions',
+  'dependencies',
   'dependentSchemas',
   'patternProperties',
 ];

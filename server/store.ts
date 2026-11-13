@@ -22,11 +22,12 @@ import {
 import { parseToolScope, toolScopeWidens } from '../shared/tool-scope.ts';
 import { grantScopedApps } from '../shared/connector-scopes.ts';
 import { dropRetiredApps } from './retired-apps.ts';
-import { reorderStable } from '../shared/bot-order.ts';
+import { reorderInPlace } from '../shared/bot-order.ts';
 import { trimOutboundPolicy } from '../shared/outbound.ts';
 import { botOwner, chiefConflict, chiefScope, ownerEmail } from '../shared/bot-owner.ts';
 import { reshowWhenMoved } from '../shared/default-bot.ts';
 import { ensureSections, readSections, changeEmptySection } from './section-context.ts';
+import { grantNewDepartments } from './department-grants.ts';
 import type { TeamComputers } from './team-computers.ts';
 import { removeBotFolder, soulFile, soulHash, writeSoulMirror } from './bot-folder.ts';
 import type { BotProfilePatch } from './bot-profile.ts';
@@ -81,6 +82,12 @@ import { sameModelSelection } from '../shared/thread-model.ts';
 import { initialGreetingMessage } from './initial-greeting.ts';
 import { createDefaultBot, defaultBotRefusal, type DefaultBotIntro } from './default-bot.ts';
 import { appsFromCreator } from './inherited-apps.ts';
+import {
+  newBotOwner,
+  sharedAsMaker,
+  sharedUnlessRestricted,
+  type NewBotSharingRule,
+} from './new-bot-sharing.ts';
 import { ThreadCache, type ThreadState } from './thread-cache.ts';
 import { titleFromMessage, UNTITLED_TASK } from './thread-title.ts';
 export { titleFromMessage, UNTITLED_TASK } from './thread-title.ts';
@@ -264,8 +271,9 @@ export type StoreChange =
   | { type: 'thread.deleted'; threadId: string }
   | { type: 'bot'; botId: string }
   | { type: 'bot.deleted'; botId: string }
-  /** The fleet was reordered as a whole; the broadcast carries every id in its new place. */
+  /** The fleet or the rooms were reordered as a whole; the broadcast carries every id in its new place. */
   | { type: 'bots.order' }
+  | { type: 'groups.order' }
   | { type: 'group'; groupId: string }
   | { type: 'group.deleted'; groupId: string };
 
@@ -447,6 +455,8 @@ export class Store {
   private driverKindOf: (instanceId: string) => string | undefined;
   private initialLanguage: string | (() => string);
   private personName: () => string | undefined;
+  /** How a new bot is shared; a Team Cloud sets its own rule. */
+  newBotSharing: NewBotSharingRule = sharedUnlessRestricted;
   private listeners = new Set<(change: StoreChange) => void>();
   private registeringInitialSections = true;
   private readonly botsFile = new OwnedFile(BOTS_FILE, { mode: 0o600 });
@@ -966,7 +976,11 @@ export class Store {
 
   private rememberSections(names: (string | undefined)[]) {
     try {
-      if (ensureSections(names)) this.emit({ type: 'sections' });
+      const added = ensureSections(names); // a name an older save left unregistered at startup is not a new department
+      if (added.length) {
+        this.emit({ type: 'sections' });
+        if (!this.registeringInitialSections) grantNewDepartments(this, added);
+      }
     } catch (error) {
       if (!this.registeringInitialSections) throw error;
       console.warn(
@@ -1818,10 +1832,7 @@ export class Store {
       mascotFaceColor: profile.mascotFaceColor ?? undefined,
       ...(profile.mascotExpression ? { mascotExpression: profile.mascotExpression } : {}),
       ...(profile.mascotBody ? { mascotBody: profile.mascotBody } : {}),
-      // Restricted from its first frame: no one else is ever told it exists.
-      ...(profile.visibility && profile.visibility !== 'everyone'
-        ? { visibility: structuredClone(profile.visibility) }
-        : {}),
+      ...this.newBotSharing(profile.visibility, newBotOwner(profile)),
       ...(toolScope.scope ? { toolScope: toolScope.scope } : {}),
       unread: false,
       modelSelection: this.newBotSelection(profile.modelSelection),
@@ -1914,10 +1925,7 @@ export class Store {
           ...operation.fields,
           modelSelection,
           autoApprove: false,
-          // A restricted Chief never creates a bot everyone sees.
-          ...(chief.visibility && chief.visibility !== 'everyone'
-            ? { visibility: structuredClone(chief.visibility) }
-            : {}),
+          ...sharedAsMaker(chief),
           // A Chief's new specialist reports to the Chief's own person.
           ...(botOwner(chief) ? { createdBy: botOwner(chief)! } : {}),
           tasks: [
@@ -2752,18 +2760,22 @@ export class Store {
     return bot.projects;
   }
 
-  /** A stable partial reorder of the fleet (shared/bot-order.ts): the listed bots take, in the order given, the positions
+  /** A stable partial reorder of the fleet, or with reorderGroups of the rooms (shared/bot-order.ts): the listed bots take, in the order given, the positions
    * they already share; every other bot stays put. Empty, repeated or unknown ids change nothing and give null. */
   reorderBots(botIds: string[]): BotRecord[] | null {
-    if (!botIds.length || new Set(botIds).size !== botIds.length) return null;
-    const byId = new Map(this.bots.map((bot) => [bot.id, bot]));
-    if (botIds.some((id) => !byId.has(id))) return null;
-    const next = reorderStable(this.bots, botIds);
-    // Mutate in place: schedulers and other consumers hold this array and its records.
-    this.bots.splice(0, this.bots.length, ...next);
+    if (!reorderInPlace(this.bots, botIds)) return null;
     this.saveBots();
     this.emit({ type: 'bots.order' });
     return this.bots;
+  }
+
+  reorderGroups(groupIds: string[]): GroupRecord[] | null {
+    const next = [...this.groups];
+    if (!reorderInPlace(next, groupIds)) return null; // saved before the live list changes
+    this.saveGroups(next, false);
+    this.groups.splice(0, this.groups.length, ...next);
+    this.emit({ type: 'groups.order' });
+    return this.groups;
   }
 
   deleteProject(botId: string, projectId: string): BotRecord | null {
@@ -3213,6 +3225,6 @@ export class Store {
         chief: (id) => this.setChiefOfStaff(id),
         ...(intro ? { intro } : {}),
       });
-    else this.setChiefOfStaff(this.createBot().id);
+    else this.setChiefOfStaff(this.createBot({ visibility: 'everyone' }).id);
   }
 }

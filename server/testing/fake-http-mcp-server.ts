@@ -54,6 +54,7 @@ export interface FakeHttpMcpOptions {
   cursorLoop?: boolean;
   /** during each tools/call, first send the client a request with this method and wait for its reply */
   askOnCall?: string;
+  askId?: string | number;
   /** serve https:// with this key and certificate */
   tls?: { key: string; cert: string };
   /** the loopback address to listen on (default 127.0.0.1; "::1" for IPv6) */
@@ -199,7 +200,7 @@ export async function startFakeHttpMcp(options: FakeHttpMcpOptions = {}): Promis
     });
     return {
       waiting,
-      frame: `event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: 'server-ask-1', method: options.askOnCall, params: {} })}\n\n`,
+      frame: `event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: options.askId ?? 'server-ask-1', method: options.askOnCall, params: {} })}\n\n`,
     };
   };
   const answerFor = (frame: { id?: unknown; method?: unknown; params?: unknown }) => {

@@ -1,33 +1,43 @@
 import { useRef, useState } from 'react';
 import { api, useStore, type ConfigStatus } from '@/state/store';
 import { t } from '@/lib/i18n';
-import { Card, Switch } from './SettingsPrimitives';
+import { LearnMore, SettingRow, SettingsRows, Switch } from './SettingsPrimitives';
 import { Select } from './Select';
 
 type Recovery = NonNullable<ConfigStatus['automaticRecovery']>;
 
+/** Backup model: one card of rows. It saves as you go (§6.11): turning it off saves at once, and turning it on saves as
+ * soon as a model is chosen; until then the model row says what is missing. The provider and model rows show only while
+ * the switch is on. */
 export function AutomaticRecoverySettings() {
   const { state, dispatch } = useStore();
   const [draft, setDraft] = useState<Recovery | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [more, setMore] = useState(false);
   const inFlight = useRef(false);
   const value = draft ?? state.config?.automaticRecovery ?? { enabled: false };
   const engines = state.instances.filter(
     (instance) => instance.snapshot.state === 'available' && !instance.policy,
   );
-  const engine = engines.find((instance) => instance.instanceId === value.backup?.instanceId);
-  const models =
-    engine?.models.options.filter(
-      (model) => !model.orgBlocked && (engine.snapshot.authenticated !== false || model.custom),
-    ) ?? [];
-  const ready = models.some((model) => model.id === value.backup?.model);
-  const change = (next: Recovery) => {
-    setDraft(next);
-    setError('');
+  const engineOf = (next: Recovery) =>
+    engines.find((instance) => instance.instanceId === next.backup?.instanceId);
+  const modelsOf = (next: Recovery) => {
+    const found = engineOf(next);
+    return (
+      found?.models.options.filter(
+        (model) =>
+          !model.orgBlocked &&
+          !model.needsCliUpdate &&
+          (found.snapshot.authenticated !== false || model.custom),
+      ) ?? []
+    );
   };
-  const save = async () => {
-    if (!draft || inFlight.current || (value.enabled && !ready)) return;
+  const engine = engineOf(value);
+  const models = modelsOf(value);
+  const ready = models.some((model) => model.id === value.backup?.model);
+  const save = async (next: Recovery) => {
+    if (inFlight.current) return;
     inFlight.current = true;
     setSaving(true);
     setError('');
@@ -36,8 +46,8 @@ export function AutomaticRecoverySettings() {
         method: 'PUT',
         body: JSON.stringify({
           automaticRecovery: {
-            enabled: draft.enabled,
-            ...(draft.backup?.model ? { backup: draft.backup } : {}),
+            enabled: next.enabled,
+            ...(next.backup?.model ? { backup: next.backup } : {}),
           },
         }),
       });
@@ -50,47 +60,66 @@ export function AutomaticRecoverySettings() {
       setSaving(false);
     }
   };
+  const change = (next: Recovery) => {
+    setDraft(next);
+    setError('');
+    const complete =
+      !next.enabled || modelsOf(next).some((model) => model.id === next.backup?.model);
+    if (complete) void save(next);
+  };
+  const status = error ? (
+    <span role='alert' className='text-danger'>
+      {error}
+    </span>
+  ) : saving ? (
+    <span role='status'>{t('settings.threads.saving')}</span>
+  ) : value.enabled && !ready ? (
+    t('settings.recovery.required')
+  ) : undefined;
   return (
-    <Card title={t('settings.recovery.title')}>
-      <div className='flex items-center justify-between gap-4'>
-        <label htmlFor='automatic-recovery-enabled' className='text-[13px] font-medium text-ink'>
-          {t('settings.recovery.enable')}
-        </label>
+    <SettingsRows selectWidth={200}>
+      <SettingRow
+        title={t('settings.recovery.enable')}
+        subtitle={
+          <span id='automatic-recovery-help'>
+            {t('settings.recovery.short')} <LearnMore onClick={() => setMore((open) => !open)} />
+          </span>
+        }
+        message={
+          more || (!value.enabled && error) ? (
+            <span data-recovery-more='' className='flex flex-col gap-1'>
+              {more && (
+                <>
+                  <span id='automatic-recovery-scope'>{t('settings.recovery.help')}</span>
+                  <span>{t('settings.recovery.scopeHanded')}</span>
+                  <span id='automatic-recovery-own'>{t('settings.recovery.ownBackups')}</span>
+                  <span>{t('settings.recovery.charges')}</span>
+                </>
+              )}
+              {!value.enabled && error && (
+                <span role='alert' className='text-danger'>
+                  {error}
+                </span>
+              )}
+            </span>
+          ) : undefined
+        }>
         <Switch
           id='automatic-recovery-enabled'
           checked={value.enabled}
           disabled={saving || !state.config}
-          aria-describedby='automatic-recovery-help automatic-recovery-scope automatic-recovery-own'
+          aria-label={t('settings.recovery.enable')}
+          aria-describedby='automatic-recovery-help'
           onClick={() => change({ ...value, enabled: !value.enabled })}
         />
-      </div>
-      <p
-        id='automatic-recovery-help'
-        className='mt-2 text-[12px] leading-relaxed text-ink-secondary'>
-        {t('settings.recovery.help')}
-      </p>
-      <p
-        id='automatic-recovery-scope'
-        className='mt-2 text-[12px] leading-relaxed text-ink-secondary'>
-        {t('settings.recovery.scopeHanded')}
-      </p>
-      <p
-        id='automatic-recovery-own'
-        className='mt-2 text-[12px] leading-relaxed text-ink-secondary'>
-        {t('settings.recovery.ownBackups')}
-      </p>
-      <div className='mt-4 grid gap-3 sm:grid-cols-2'>
-        <div className='min-w-0'>
-          <label
-            htmlFor='automatic-recovery-engine'
-            className='block text-[13px] font-medium text-ink'>
-            {t('settings.recovery.engine')}
-          </label>
+      </SettingRow>
+      {value.enabled && (
+        <SettingRow title={t('settings.recovery.engine')}>
           <Select
-            className='mt-2 w-full'
             id='automatic-recovery-engine'
+            aria-label={t('settings.recovery.engine')}
             value={value.backup?.instanceId ?? ''}
-            disabled={saving || !value.enabled}
+            disabled={saving}
             onChange={(event) =>
               change({
                 enabled: value.enabled,
@@ -118,18 +147,15 @@ export function AutomaticRecoverySettings() {
               </option>
             ))}
           </Select>
-        </div>
-        <div className='min-w-0'>
-          <label
-            htmlFor='automatic-recovery-model'
-            className='block text-[13px] font-medium text-ink'>
-            {t('settings.recovery.model')}
-          </label>
+        </SettingRow>
+      )}
+      {value.enabled && (
+        <SettingRow title={t('settings.recovery.model')} message={status}>
           <Select
-            className='mt-2 w-full'
             id='automatic-recovery-model'
+            aria-label={t('settings.recovery.model')}
             value={value.backup?.model ?? ''}
-            disabled={saving || !value.enabled || !engine}
+            disabled={saving || !engine}
             onChange={(event) =>
               change({
                 enabled: value.enabled,
@@ -148,31 +174,8 @@ export function AutomaticRecoverySettings() {
               </option>
             ))}
           </Select>
-        </div>
-      </div>
-      <p className='mt-2 text-[12px] leading-relaxed text-ink-secondary'>
-        {t('settings.recovery.charges')}
-      </p>
-      {value.enabled && !ready && (
-        <p className='mt-2 text-[12px] text-ink-secondary'>{t('settings.recovery.required')}</p>
+        </SettingRow>
       )}
-      <button
-        type='button'
-        disabled={!draft || saving || (value.enabled && !ready)}
-        onClick={() => void save()}
-        className='mt-3 cursor-pointer rounded-lg bg-accent px-3 py-2 text-[13px] font-medium text-white disabled:opacity-50'>
-        {saving ? t('settings.threads.saving') : t('common.save')}
-      </button>
-      {saving && (
-        <span role='status' className='sr-only'>
-          {t('settings.threads.saving')}
-        </span>
-      )}
-      {error && (
-        <p role='alert' className='mt-2 text-[12px] text-danger'>
-          {error}
-        </p>
-      )}
-    </Card>
+    </SettingsRows>
   );
 }

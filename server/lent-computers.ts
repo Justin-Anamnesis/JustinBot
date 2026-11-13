@@ -184,6 +184,31 @@ export const lendScreenSteps = (device: 'PC' | 'Mac' | 'computer') =>
 
 const dateText = (at: number) => new Date(at).toISOString().slice(0, 16).replace('T', ' ') + ' UTC';
 
+/** Every computer the person lent, as this turn's prompt tells it: names are theirs and may hold anything, so controls go. */
+export function lentComputersLine(
+  known: ReadonlyArray<{
+    name: string;
+    platform: LentPlatform | null;
+    online?: boolean;
+    lent?: boolean;
+    lastSeenAt?: number;
+  }>,
+): string {
+  const statuses = known.flatMap((computer) => {
+    if (computer.online === undefined) return [];
+    // prettier-ignore
+    // eslint-disable-next-line no-control-regex
+    const name = computer.name.replace(/[\u0000-\u001f\u007f\u202a-\u202e\u2066-\u2069]/g, " ").slice(0, 80);
+    const state = computer.online
+      ? 'online'
+      : computer.lent === false
+        ? 'no longer lent'
+        : `offline since ${dateText(computer.lastSeenAt ?? 0)}`;
+    return [`${name} (${deviceWord(computer.platform)}): ${state}`];
+  });
+  return statuses.length ? ` Their computers right now: ${statuses.join('; ')}.` : '';
+}
+
 /**
  * What list_shared_computers adds for a bot when a computer it knows is not online: the computer by name and kind, since
  * when, and the one sentence to say. Nothing when every known computer is online.
@@ -197,13 +222,15 @@ export function awayNotice(
   say?: string;
 } {
   const away = known.filter((computer) => !online.has(computer.id));
-  if (!away.length || known.some((computer) => online.has(computer.id))) return {};
+  if (!away.length) return {};
   const offline = away.slice(0, 3).map((computer) => ({
     name: computer.name,
     device: deviceWord(computer.platform),
     lastOnline: dateText(computer.lastSeenAt),
     lent: computer.stoppedAt === null,
   }));
+  // The sentence to say is for a person whose every computer is away: with one online, the bot uses that one.
+  if (known.some((computer) => online.has(computer.id))) return { offline };
   const latest = away[0]!;
   const device = deviceWord(latest.platform);
   const ask = askTool

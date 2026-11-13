@@ -95,6 +95,11 @@ describe('browser tool shaping', () => {
     expect(Object.keys(slimRead!.inputSchema.properties)).toEqual(['filter']);
     expect(slimRead!.inputSchema.required).toEqual([]);
     expect(Object.keys(slimOpen!.inputSchema.properties)).toEqual(['url']);
+    // agent-browser's own description offers the hidden url; the bot reads the open page's instead (email bug 1a1cb892)
+    expect((slimRead as { description?: string }).description).toBe(
+      'Read the page open in this browser as agent-readable text. To read another address, open it with agent_browser_open first.',
+    );
+    expect(slimOpen).not.toHaveProperty('description');
     expect(
       readsAroundBrowser({
         name: 'agent_browser_read',

@@ -24,6 +24,10 @@ export interface AcpDiscoveryOptions {
   custom?: boolean;
   /** Switch to each model to read its own variants. False stops after session/new. */
   variants?: boolean;
+  /** Above this catalog size, read only the current model's variants and skip per-model switches. */
+  variantLimit?: number;
+  /** Maximum advertised models accepted before discovery refuses the catalog. */
+  maxModels?: number;
   /** The catalog default when the agent offers it; otherwise the session's current model. */
   default?: string;
   /** Sent as `clientCapabilities._meta` in initialize, as a turn session sends it, so both see the same model list. */
@@ -264,7 +268,7 @@ export async function discoverAcpModels(
     const modelOption = acpModelOption(initial);
     if (!modelOption?.options.length)
       throw new Error('The ACP agent did not advertise any models. The previous catalog was kept.');
-    if (modelOption.options.length > MAX_MODELS)
+    if (modelOption.options.length > (discovery.maxModels ?? MAX_MODELS))
       throw new Error('The ACP model catalog exceeded the discovery limit.');
     const mark = discovery.custom ? { custom: true } : {};
     const { passthrough } = discovery;
@@ -278,7 +282,10 @@ export async function discoverAcpModels(
       let confirmed: unknown;
       if (model.id === modelOption.currentValue) {
         confirmed = initial;
-      } else if (discovery.variants !== false) {
+      } else if (
+        discovery.variants !== false &&
+        modelOption.options.length <= (discovery.variantLimit ?? Number.POSITIVE_INFINITY)
+      ) {
         const previousUpdate = updateSequence;
         try {
           const response = modelOption.configId

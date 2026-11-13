@@ -18,7 +18,7 @@ it("a bot's connect link opens the page that connects it and leaves the address 
   expect(takeConnectRequest('https://omb-u-1.fly.dev/?x=1')).toBeNull();
 });
 
-it("a Team admin link from the Admin opens a Team Cloud's apps, MCP servers, keys or engines", () => {
+it("a Team admin link from the Admin opens a Team Cloud's apps, MCP servers, keys, engines or Bot access", () => {
   expect(takeConnectRequest('https://omb-t-1.fly.dev/?connect=apps')).toEqual({
     rest: '/',
     surface: 'apps',
@@ -34,6 +34,10 @@ it("a Team admin link from the Admin opens a Team Cloud's apps, MCP servers, key
   expect(takeConnectRequest('https://omb-t-1.fly.dev/?connect=ai')).toEqual({
     rest: '/',
     section: 'engines',
+  });
+  expect(takeConnectRequest('https://omb-t-1.fly.dev/?connect=bots&x=1')).toEqual({
+    rest: '/?x=1',
+    teamAdminSection: 'botAccess',
   });
   expect(takeConnectRequest('https://omb-t-1.fly.dev/?connect=mcp%3ABad%20Name')).toEqual({
     rest: '/',

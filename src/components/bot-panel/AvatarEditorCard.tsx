@@ -12,7 +12,8 @@ import {
   PICKABLE_STATES,
   type MausState,
 } from '@/lib/mascot';
-import type { Bot } from '@/state/store';
+import { useStore, type Bot } from '@/state/store';
+import { mayRename, useTeamPeople } from '@/state/team-people';
 import { MASCOT_BODY_IDS } from '../../../shared/mascot-bodies';
 import { FESTIVAL_IDS, FESTIVALS, isCarvedBody, type BotBodyId } from '../../../shared/bot-body';
 import { useFestivalDress, wornBody } from '@/lib/festival-dress';
@@ -85,6 +86,14 @@ export function AvatarEditorCard({
   const pickMascot = (patch: AvatarPatch) =>
     onPatch(crop === 'mascot' ? patch : { ...patch, avatarCrop: 'mascot' });
   const body = bot.mascotBody ?? 'cursor';
+  const { state, dispatch } = useStore();
+  const team = useTeamPeople();
+  const othersToMatch = state.bots.filter(
+    (other) =>
+      other.id !== bot.id &&
+      (other.mascotBody ?? 'cursor') !== body &&
+      (team ? mayRename(other, team) : !state.config?.team),
+  );
   const festival = useFestivalDress();
   const costume = wornBody(bot.mascotBody, bot.color, festival);
   const [moreLooks, setMoreLooks] = useState(
@@ -169,6 +178,19 @@ export function AvatarEditorCard({
             <div className='grid grid-cols-5 gap-1.5'>
               {MASCOT_BODY_IDS.map((id) => bodyButton(id, bodyName(id)))}
             </div>
+            {!showsImage && othersToMatch.length > 0 && (
+              <button
+                type='button'
+                data-avatar-body-everywhere
+                disabled={busy}
+                onClick={() => {
+                  for (const other of othersToMatch)
+                    dispatch({ type: 'updateBot', botId: other.id, patch: { mascotBody: body } });
+                }}
+                className='mx-auto mt-2 flex rounded-full px-2.5 py-1 text-[12px] text-ink-secondary hover:bg-ink/[0.04] hover:text-ink disabled:opacity-50'>
+                {t('botPanel.avatar.bodyEverywhere', { count: othersToMatch.length })}
+              </button>
+            )}
             <div className='flex flex-wrap justify-center gap-2 px-1 pb-1 pt-3.5'>
               {MAUS_COLOR_NAMES.map((color) => (
                 <button

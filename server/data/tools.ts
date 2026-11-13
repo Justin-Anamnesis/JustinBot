@@ -18,6 +18,7 @@ import {
   type OmbChartSpec,
 } from '../../shared/data-surface.ts';
 import { compileToolSchema, schemaProblems } from '../mcp-schema-validator.ts';
+import { tableIdentifierParts } from './identifiers.ts';
 import type { DataSheetStore } from './sheet.ts';
 import {
   DataFailure,
@@ -896,9 +897,11 @@ export function planLoad(input: LoadInput): LoadPlan[] {
       if (!entry.isFile()) continue;
       const reader = readerFor(extensionOf(entry.name), undefined);
       if (!reader || reader === 'sqlite' || reader === 'xlsx') continue;
-      (families.get(reader) ?? families.set(reader, new Set()).get(reader)!).add(
-        extensionOf(entry.name).toLowerCase(),
-      );
+      // Keep compression in the suffix even though it does not select the reader.
+      const suffix = (
+        extensionOf(entry.name) + (COMPRESSION.exec(entry.name)?.[0] ?? '')
+      ).toLowerCase();
+      (families.get(reader) ?? families.set(reader, new Set()).get(reader)!).add(suffix);
     }
     if (!families.size)
       throw fail('source_unsupported', `${local} holds no csv, tsv, json or parquet files.`);
@@ -906,7 +909,12 @@ export function planLoad(input: LoadInput): LoadPlan[] {
     // DuckDB globs take forward slashes on every platform and no braces: one glob per extension.
     const folder = local.replace(/\\/g, '/');
     return [...families.entries()].map(([reader, exts]) => {
-      const globs = [...exts].map((ext) => `${folder}/**/*${ext}`);
+      // One case-independent pattern per suffix avoids both missing .CSV on
+      // Linux and overlapping .csv/.CSV patterns on case-insensitive filesystems.
+      const globs = [...exts].map(
+        (ext) =>
+          `${folder}/**/*${ext.replace(/[a-z]/g, (letter) => `[${letter}${letter.toUpperCase()}]`)}`,
+      );
       return {
         kind: 'folder' as const,
         source: local,
@@ -1071,8 +1079,6 @@ export async function loadData(ctx: DataContext, input: LoadInput): Promise<Load
   return { tables, warnings, elapsedMs: Date.now() - started };
 }
 
-const IDENTIFIER_LIKE = /^\s*("[^"]+"|[A-Za-z_][\w$]*)(\.("[^"]+"|[A-Za-z_][\w$]*)){0,2}\s*$/;
-
 export interface DescribeOutput {
   name?: string;
   sql?: string;
@@ -1087,7 +1093,7 @@ export async function describeTarget(ctx: DataContext, target: string): Promise<
   let relation: string;
   let name: string | undefined;
   let sql: string | undefined;
-  if (IDENTIFIER_LIKE.test(target)) {
+  if (tableIdentifierParts(target)) {
     name = await ctx.database.resolveTable(target.trim());
     relation = name;
   } else {
@@ -1536,6 +1542,12 @@ function realIntent(path: string): string {
   return join(realpathSync.native(dir), ...rest);
 }
 
+const pendingExportPaths = new Set<string>();
+function exportPathKey(path: string): string {
+  const real = realIntent(path);
+  return process.platform === 'win32' ? real.toLowerCase() : real;
+}
+
 /** Confined to `roots`: throws invalid_input for a path outside every root. */
 export function resolveExportPath(
   roots: string[],
@@ -1568,10 +1580,28 @@ export function resolveExportPath(
     );
   }
   let unique = target;
-  for (let n = 2; existsSync(unique); n++)
+  for (let n = 2; existsSync(unique) || pendingExportPaths.has(exportPathKey(unique)); n++)
     unique = join(dirname(target), `${basename(target, extname(target))}-${n}${extname(target)}`);
   mkdirSync(dirname(unique), { recursive: true });
   return unique;
+}
+
+async function atExportPath(
+  ctx: DataContext,
+  input: ExportInput,
+  stem: string,
+  write: (path: string) => Promise<ExportOutput>,
+): Promise<ExportOutput> {
+  const path = resolveExportPath(ctx.exportRoots(), input.path, stem, input.format);
+  const key = exportPathKey(path);
+  // Rendering and COPY both await before creating the file; another export must
+  // not choose the same destination in that interval, even through a symlink.
+  pendingExportPaths.add(key);
+  try {
+    return await write(path);
+  } finally {
+    pendingExportPaths.delete(key);
+  }
 }
 
 async function chartRows(ctx: DataContext, card: DataCard): Promise<RunResult> {
@@ -1609,14 +1639,16 @@ export async function exportData(ctx: DataContext, input: ExportInput): Promise<
   if (input.id && !card) throw fail('card_not_found', `No card ${input.id} on the sheet.`);
   if (input.format === 'png' || input.format === 'svg') {
     if (!card) throw fail('invalid_input', 'png and svg render a chart card: pass its id.');
-    const path = resolveExportPath(ctx.exportRoots(), input.path, card.title, input.format);
-    const image = await renderCard(ctx, card, input.format, {
-      theme: input.theme,
-      width: input.width,
-      scale: input.scale,
+    const format = input.format;
+    return atExportPath(ctx, input, card.title, async (path) => {
+      const image = await renderCard(ctx, card, format, {
+        theme: input.theme,
+        width: input.width,
+        scale: input.scale,
+      });
+      writeFileSync(path, image);
+      return { path, bytes: statSync(path).size };
     });
-    writeFileSync(path, image);
-    return { path, bytes: statSync(path).size };
   }
   let relation: string;
   let stem: string;
@@ -1635,23 +1667,24 @@ export async function exportData(ctx: DataContext, input: ExportInput): Promise<
     relation = `(${input.sql})`;
     stem = 'query';
   }
-  const path = resolveExportPath(ctx.exportRoots(), input.path, stem, input.format);
   const format =
     input.format === 'csv'
       ? 'FORMAT csv, HEADER true'
       : input.format === 'xlsx'
         ? 'FORMAT xlsx, HEADER true'
         : 'FORMAT parquet';
-  const copied = await ctx.database.run(
-    `COPY (SELECT * FROM ${relation}) TO ${quoteLiteral(path)} (${format})`,
-    runOptions(ctx, { maxRows: 1, extensions: input.format === 'xlsx' ? ['excel'] : [] }),
-  );
-  const count = Number(copied.rows[0]?.[0]);
-  return {
-    path,
-    bytes: statSync(path).size,
-    ...(Number.isFinite(count) ? { rowCount: count } : {}),
-  };
+  return atExportPath(ctx, input, stem, async (path) => {
+    const copied = await ctx.database.run(
+      `COPY (SELECT * FROM ${relation}) TO ${quoteLiteral(path)} (${format})`,
+      runOptions(ctx, { maxRows: 1, extensions: input.format === 'xlsx' ? ['excel'] : [] }),
+    );
+    const count = Number(copied.rows[0]?.[0]);
+    return {
+      path,
+      bytes: statSync(path).size,
+      ...(Number.isFinite(count) ? { rowCount: count } : {}),
+    };
+  });
 }
 
 export type DataToolResult = {

@@ -24,6 +24,7 @@ const fixture = vi.hoisted(() => ({
   appSettingsOpen: false,
   openBot: vi.fn(),
   close: vi.fn(),
+  teamName: null as string | null,
 }));
 vi.mock('@/state/thread-navigation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/state/thread-navigation')>()),
@@ -66,13 +67,18 @@ vi.mock('@/state/store', async (importOriginal) => {
     api: fixture.api,
     BotEditorStore: () => null,
     useStore: () => ({
-      state: { ...store.initialState, appSettingsOpen: fixture.appSettingsOpen },
+      state: {
+        ...store.initialState,
+        appSettingsOpen: fixture.appSettingsOpen,
+        ...(fixture.teamName ? { config: { team: { id: 'acme', name: fixture.teamName } } } : {}),
+      },
       dispatch: fixture.dispatch,
     }),
   };
 });
 import { NewBotDialog } from './NewBotDialog';
 import { setTeamChats } from '@/state/team-chats';
+import { setTeamPeople } from '@/state/team-people';
 import { Select } from './Select';
 import type { BotCreationDraft } from '@/lib/bot-creation-draft';
 
@@ -133,11 +139,13 @@ beforeEach(() => {
   fixture.appSettingsOpen = false;
   fixture.openBot.mockReset();
   fixture.close.mockReset();
+  fixture.teamName = null;
   fixture.api.mockReturnValue(new Promise(() => {}));
 });
 afterEach(() => {
   vi.unstubAllGlobals();
   setTeamChats(null);
+  setTeamPeople(null);
 });
 
 describe('bot draft dialog', () => {
@@ -304,6 +312,39 @@ describe('bot draft dialog', () => {
     expect(fixture.openBot.mock.invocationCallOrder[0]).toBeGreaterThan(
       fixture.dispatch.mock.invocationCallOrder[added],
     );
+  });
+
+  it("on a team's Cloud, says who can use the new bot, preset to Just me, and asks the server for no sharing of its own", async () => {
+    const ada = {
+      email: 'ada@acme.test',
+      name: 'Ada',
+      role: 'admin' as const,
+      you: true as const,
+      here: true,
+    };
+    setTeamPeople({ people: [ada], me: ada, admin: true, needsYou: [] });
+    fixture.teamName = 'Acme';
+    fixture.admin = true;
+    vi.stubGlobal('window', {});
+    fixture.ready = true;
+    fixture.create.mockResolvedValue({ bot: { id: 'created', name: 'Fixture' }, warnings: [] });
+    const dialog = render();
+    const choice = dialog.nodes.find(named('WhoCanUse'))!;
+    expect(choice.props).toMatchObject({ team: 'Acme', everyone: false });
+    const select = output(choice).find((node) => node.type === Select)!;
+    expect((select.props as unknown as { value: string }).value).toBe('me');
+    expect(renderToStaticMarkup(choice)).toContain('Just me');
+    expect(renderToStaticMarkup(choice)).toContain('Everyone in Acme');
+    expect(dialog.html, 'the older Who can see it is not asked beside it').not.toContain(
+      'Who can see it',
+    );
+    dialog.nodes.filter((node) => node.type === 'button').at(-1)!.props.onClick!();
+    await vi.waitFor(() => expect(fixture.create).toHaveBeenCalledOnce());
+    expect(
+      fixture.create.mock.calls[0]![4],
+      "the server's own default decides: private",
+    ).toBeUndefined();
+    expect(fixture.create.mock.calls[0]![5]).toBe('ada@acme.test');
   });
 
   it("anywhere but a team's Cloud, leaves the new bot selected as it always was", async () => {

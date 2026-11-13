@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, TabletSmartphone } from 'lucide-react';
+import { Plus, Smartphone } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
 import { t } from '@/lib/i18n';
@@ -177,7 +177,7 @@ export function SidebarPhoneStatusButton({
         density === 'icons' && 'mx-auto',
         connected ? 'text-success' : 'text-ink-secondary hover:text-ink',
       )}>
-      <TabletSmartphone size={18} strokeWidth={1.8} />
+      <Smartphone size={18} strokeWidth={1.75} />
       {status.kind === 'unpaired' && (
         <span
           aria-hidden='true'

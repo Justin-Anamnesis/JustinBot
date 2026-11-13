@@ -22,6 +22,7 @@ import {
 import {
   installSkill,
   listBotSkillsWithOrigin,
+  listSkills,
   listStagedSkillWrites,
   parseSkillMd,
   removeSkill,
@@ -145,7 +146,7 @@ export function createBotSkillsRoutes(deps: BotSkillsRouteDeps): RouteHandler {
       if (
         bot &&
         listBotSkills(bot).some(
-          (skill) => skill.name === m![2] && (skill as { origin?: string }).origin === 'native',
+          (skill) => skill.name === m![2] && 'origin' in skill && skill.origin === 'native',
         )
       ) {
         const result = setNativeSkillEnabled(bot.id, m[2]!, parsed.data.enabled);
@@ -164,6 +165,8 @@ export function createBotSkillsRoutes(deps: BotSkillsRouteDeps): RouteHandler {
       const name = m[2]!;
       const removed = removeSkill(bot.id, name);
       if (!('error' in removed)) return json(res, 200, { ok: true });
+      if (listSkills(bot.id).some((skill) => skill.name === name))
+        return json(res, 409, { error: removed.error });
       if (skillsLibraryEnabled(cfg)) {
         const unassigned = unassignLibrarySkill(bot.id, name, bot.assignedSkills);
         if ('unassigned' in unassigned) {

@@ -14,7 +14,6 @@ import type { BotVisibility, ModelSelection } from '../shared/wire.ts';
 import { ATTACHMENTS_DIR, FILE_MAX_BYTES, saveNamedAttachment } from './attachments.ts';
 import { audienceEquals, narrowestAudience } from './bot-visibility.ts';
 import {
-  activePath,
   addSentChats,
   attachmentNames,
   ATTACHMENT_NAME,
@@ -24,6 +23,15 @@ import {
 } from './cloud-chat-merge.ts';
 import { threadHeads, threadRowNumbers, threadRowsFrom } from './message-db.ts';
 import { ownerStamp, unstamped, type CloudOwner } from './cloud-owner-lines.ts';
+import {
+  attachmentNamesOf,
+  linkedPath,
+  linksOf,
+  storedRows,
+  threadLinks,
+  type ThreadLinks,
+} from './cloud-send-rows.ts';
+import { roomGoes } from './cloud-send-scope.ts';
 import type { RequestAuth } from './request-auth.ts';
 import type { RouteContext } from './routes/table.ts';
 import type {
@@ -270,14 +278,10 @@ export function conversationSettings(
 
 /** Each stored attachment the conversations' rows name, with its size. */
 async function attachmentSizes(
-  store: ChatStore,
   dataDir: string,
   heads: readonly ChatHead[],
 ): Promise<Array<{ name: string; size: number }>> {
-  const names = new Set<string>();
-  for (const head of heads)
-    for (const row of store.messagesFor(head.threadId))
-      for (const name of attachmentNames(row, dataDir)) names.add(name);
+  const names = attachmentNamesOf(new Set(heads.map((head) => head.threadId)), dataDir);
   const out: Array<{ name: string; size: number }> = [];
   for (const name of names) {
     const info = await lstat(join(ATTACHMENTS_DIR, name)).catch(() => null);
@@ -437,6 +441,8 @@ export interface CloudSendChatsDeps {
   approvalSupported?(selection: ModelSelection, mode: ApprovalMode): boolean;
   /** A move of this one bot into a team: its conversations only. */
   bot?: string;
+  /** A move of only these bots: their conversations, and the rooms that go with all their bots. */
+  scope?: ReadonlySet<string>;
   /** This Cloud's owner's person key, as their lines here carry it: a bot moving into a team tells the team whose lines
    * become the mover's. */
   ownerKey?: string;
@@ -456,6 +462,27 @@ const ownerOf = (store: Pick<ChatStore, 'bots' | 'groups'>, threadId: string) =>
   };
 };
 
+/** ownerOf for every conversation at once, for a request about many of them. */
+function ownerIndex(
+  store: Pick<ChatStore, 'bots' | 'groups'>,
+): Map<string, { bot?: BotRecord; room?: Room }> {
+  const index = new Map<string, { bot?: BotRecord; room?: Room }>();
+  for (const bot of store.bots)
+    for (const threadId of [bot.threadId, ...(bot.tasks ?? []).map((task) => task.threadId)])
+      if (!index.has(threadId)) index.set(threadId, { bot });
+  for (const room of store.groups)
+    for (const threadId of roomThreads(room))
+      if (!index.has(threadId)) index.set(threadId, { room });
+  return index;
+}
+
+/** A conversation's links as messages.db holds them, or as the store holds a conversation messages.db has no row of. */
+const linksFor = (
+  store: Pick<ChatStore, 'messagesFor' | 'activeLeaf'>,
+  threadId: string,
+): ThreadLinks =>
+  threadLinks(threadId) ?? linksOf(store.messagesFor(threadId), store.activeLeaf(threadId));
+
 /** A conversation's rows after a point, a page at a time, as main sends them on; null when no bot or room here has it. */
 export function chatPage(
   { store, dataDir }: CloudSendChatsDeps,
@@ -465,9 +492,7 @@ export function chatPage(
 ) {
   const { bot, room } = ownerOf(store, threadId);
   if ((!bot && !room) || !Number.isSafeInteger(after) || after < 0) return null;
-  const path = activePath(store.messagesFor(threadId), store.activeLeaf(threadId)).map(
-    (row) => row.id,
-  );
+  const path = linkedPath(linksFor(store, threadId));
   const page = threadRowsAfter(threadId, after, afterId, CHAT_ROWS_PAGE, CHAT_PAGE_BYTES, path);
   const task = bot
     ? taskOf(bot, threadId)
@@ -493,14 +518,14 @@ export function chatPage(
 export function chatIds({ store }: CloudSendChatsDeps, threadId: string, from: number) {
   const { bot, room } = ownerOf(store, threadId);
   if ((!bot && !room) || !Number.isSafeInteger(from) || from < 0) return null;
-  const rows = store.messagesFor(threadId);
-  const path = activePath(rows, store.activeLeaf(threadId)).map((row) => row.id);
+  const links = linksFor(store, threadId);
+  const path = linkedPath(links);
   return {
     v: 1,
-    ids: rows.slice(from, from + VERIFY_IDS).map((row) => row.id),
+    ids: links.ids.slice(from, from + VERIFY_IDS),
     path: path.slice(from, from + VERIFY_IDS),
     leaf: path.at(-1) ?? null,
-    more: from + VERIFY_IDS < Math.max(rows.length, path.length),
+    more: from + VERIFY_IDS < Math.max(links.ids.length, path.length),
   };
 }
 
@@ -550,12 +575,15 @@ export function stampHeld(
 ): { stamped: number; threads: string[] } {
   let stamped = 0;
   const threads = new Set<string>();
+  const owners = ownerIndex(store);
   for (const { threadId, ids } of conversations) {
-    const where = ownerOf(store, threadId);
-    if (!where.bot && !where.room) continue;
+    if (!owners.has(threadId)) continue;
     const named = new Set(ids);
-    for (const row of store.messagesFor(threadId)) {
-      const stamp = named.has(row.id) ? ownerStamp(row, owner) : null;
+    const rows = threadLinks(threadId)
+      ? storedRows(threadId, [...named], { owners: true })
+      : store.messagesFor(threadId).filter((row) => named.has(row.id));
+    for (const row of rows) {
+      const stamp = ownerStamp(row, owner);
       if (!stamp || !store.patchMessage(threadId, row.id, stamp)) continue;
       stamped++;
       threads.add(threadId);
@@ -600,20 +628,22 @@ export function verifyChats(
   store: ChatStore,
   conversations: z.infer<typeof verifySchema>['conversations'],
 ) {
-  return conversations.map(({ threadId, ids, path }) => {
-    const rows = store.messagesFor(threadId);
-    const byId = new Map(rows.map((row) => [row.id, row]));
-    const bot = Boolean(ownerOf(store, threadId).bot);
-    const visible = path ? activePath(rows, store.activeLeaf(threadId)).map((row) => row.id) : [];
+  const owners = ownerIndex(store);
+  return conversations.map(({ threadId, ids = [], path }) => {
+    const stored = threadLinks(threadId);
+    const links = stored ?? linksOf(store.messagesFor(threadId), store.activeLeaf(threadId));
+    const held = new Set(ids.filter((id) => links.parent.has(id)));
+    const rows =
+      !owners.get(threadId)?.bot || !held.size
+        ? []
+        : stored
+          ? storedRows(threadId, [...held], { owners: true })
+          : store.messagesFor(threadId).filter((row) => held.has(row.id));
+    const visible = path ? linkedPath(links) : [];
     return {
       threadId,
-      missing: (ids ?? []).filter((id) => !byId.has(id)),
-      unstamped: bot
-        ? (ids ?? []).filter((id) => {
-            const row = byId.get(id);
-            return row !== undefined && unstamped(row);
-          }).length
-        : 0,
+      missing: ids.filter((id) => !links.parent.has(id)),
+      unstamped: rows.filter((row) => unstamped(row)).length,
       ...(path
         ? {
             path: {
@@ -636,12 +666,16 @@ export async function cloudSendChatsRoute(
   const { store } = deps;
   // This computer's side: what each conversation has, and its rows after a point.
   if (path === PREFIX && method === 'GET') {
+    const chosen = deps.scope;
+    const rooms = chosen
+      ? store.groups.filter((room) => roomGoes(room, chosen, (id) => store.bot(id)))
+      : store.groups;
     const heads = deps.bot
       ? chatHeads(
           store.bots.filter((bot) => bot.id === deps.bot),
           [],
         )
-      : chatHeads(store.bots, store.groups);
+      : chatHeads(chosen ? store.bots.filter((bot) => chosen.has(bot.id)) : store.bots, rooms);
     json(res, 200, {
       v: 1,
       dataDir: deps.dataDir,
@@ -650,9 +684,9 @@ export async function cloudSendChatsRoute(
         ...head,
         settings: conversationSettings(store, head),
       })),
-      rooms: deps.bot ? [] : emptyRooms(store.groups, heads),
+      rooms: deps.bot ? [] : emptyRooms(rooms, heads),
       ...(url.searchParams.get('attachments') === '1'
-        ? { attachments: await attachmentSizes(store, deps.dataDir, heads) }
+        ? { attachments: await attachmentSizes(deps.dataDir, heads) }
         : {}),
     });
     return true;

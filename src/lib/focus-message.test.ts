@@ -11,6 +11,9 @@ vi.mock('react', () => ({
     fixture.effect = effect;
   },
 }));
+vi.mock('@/state/store-select', async () =>
+  (await import('@/testing/plain-store-select')).plainStoreSelect(),
+);
 vi.mock('@/state/store', () => ({
   api: vi.fn(),
   useStore: () => ({

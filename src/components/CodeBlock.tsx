@@ -183,6 +183,8 @@ export interface CodeBlockProps {
   code: string;
   lang: string;
   initialWrap?: boolean;
+  /** The fence is still being written: no colouring and no actions until it closes. */
+  open?: boolean;
 }
 
 const PLATE_BUTTON =
@@ -253,13 +255,13 @@ export function CodePlate({
   );
 }
 
-export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
+export function CodeBlock({ code, lang, initialWrap = false, open = false }: CodeBlockProps) {
   const simple = !useAdvancedMode();
   const frame = useRef<HTMLDivElement>(null);
   // A long chat can hold dozens of blocks: coloured ones are thousands of spans to style and lay out on every switch,
   // so a block is coloured only once it comes near the screen.
   const near = useNearScreen(frame);
-  const highlightable = code.length <= HIGHLIGHT_MAX_CHARS;
+  const highlightable = !open && code.length <= HIGHLIGHT_MAX_CHARS;
   const [html, setHtml] = useState<string | null>(() =>
     highlightable && near ? (highlightCache.get(highlightKey(lang, code)) ?? null) : null,
   );
@@ -325,36 +327,38 @@ export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
         ref={frame}
         dir='ltr'
         className='chat-code-block group/code relative my-2.5 overflow-hidden rounded-xl bg-ink/[0.04]'>
-        <CodePlate
-          copied={copied}
-          onCopy={copy}
-          copyLabel={t('code.copyTitle')}
-          items={[
-            {
-              key: 'wrap',
-              label: t('code.wrapLines'),
-              icon: <WrapText size={14} aria-hidden='true' />,
-              active: wrapLines,
-              onSelect: () => setWrapLines((wrap) => !wrap),
-            },
-            {
-              key: 'save',
-              label: t('code.saveAsFile'),
-              icon: <Download size={14} aria-hidden='true' />,
-              onSelect: download,
-            },
-            {
-              key: 'about',
-              label: t('code.caption', {
-                language: displayLanguage,
-                lines: formatLineCount(lineCount),
-              }),
-              disabled: true,
-              separatorBefore: true,
-              onSelect: () => {},
-            },
-          ]}
-        />
+        {!open && (
+          <CodePlate
+            copied={copied}
+            onCopy={copy}
+            copyLabel={t('code.copyTitle')}
+            items={[
+              {
+                key: 'wrap',
+                label: t('code.wrapLines'),
+                icon: <WrapText size={14} aria-hidden='true' />,
+                active: wrapLines,
+                onSelect: () => setWrapLines((wrap) => !wrap),
+              },
+              {
+                key: 'save',
+                label: t('code.saveAsFile'),
+                icon: <Download size={14} aria-hidden='true' />,
+                onSelect: download,
+              },
+              {
+                key: 'about',
+                label: t('code.caption', {
+                  language: displayLanguage,
+                  lines: formatLineCount(lineCount),
+                }),
+                disabled: true,
+                separatorBefore: true,
+                onSelect: () => {},
+              },
+            ]}
+          />
+        )}
         {body('leading-5 [&_pre]:px-3 [&_pre]:py-2', 'text-ink-secondary')}
       </div>
     );
@@ -378,7 +382,12 @@ export function CodeBlock({ code, lang, initialWrap = false }: CodeBlockProps) {
             </span>
           )}
         </div>
-        <div className='chat-code-actions flex shrink-0 items-center gap-1 whitespace-nowrap'>
+        <div
+          className={cn(
+            'chat-code-actions flex shrink-0 items-center gap-1 whitespace-nowrap',
+            open && 'invisible',
+          )}
+          inert={open || undefined}>
           <button
             type='button'
             onClick={() => setWrapLines((w) => !w)}

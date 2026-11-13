@@ -60,8 +60,8 @@ export function WindowFrameBar({ notifications = false }: { notifications?: bool
         <button
           type='button'
           data-frame-settings
-          aria-label={t('sidebar.appSettings')}
-          title={t('sidebar.appSettings')}
+          aria-label={t('sidebar.menu.settings')}
+          title={t('sidebar.menu.settings')}
           onClick={() => dispatch({ type: 'toggleAppSettings', open: true })}
           className={FRAME_BAR_BUTTON}>
           <Settings size={15} strokeWidth={1.75} aria-hidden='true' />

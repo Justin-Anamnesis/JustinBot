@@ -119,6 +119,11 @@ function fixture() {
       f.clientOptions = options;
       return client;
     },
+    tailnetShare: {
+      recheck: () => {
+        f.tailnetRechecks = (f.tailnetRechecks ?? 0) + 1;
+      },
+    },
     createOrgLibrary: (options) => {
       f.libraryOptions = options;
       return f.library;
@@ -630,6 +635,13 @@ for (const state of [
     );
   });
 }
+
+test("every change to the organization's state reaches the tailnet share, which follows its policy", () => {
+  const f = fixture();
+  f.onState({ status: 'connected', cloudBackups: true });
+  f.onState({ status: 'connected', cloudBackups: true });
+  assert.equal(f.tailnetRechecks, 2);
+});
 
 test("backup IPC requires the local main window's exact main frame", async () => {
   const f = fixture();

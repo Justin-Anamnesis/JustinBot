@@ -12,7 +12,7 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, LifeBuoy, Plus } from 'lucide-react';
 
 import { cn } from '@/lib/cn';
-import { configuredModelInstances } from '@/lib/engine-rail';
+import { backupNote, configuredModelInstances } from '@/lib/engine-rail';
 import { t } from '@/lib/i18n';
 import type { Typeahead } from '@/lib/menu-keys';
 import { pickerPlacement, type PickerPlacement } from '@/lib/picker-placement';
@@ -170,11 +170,13 @@ function BackupChooser({
       loading,
       refreshing,
     });
-    const groups = built.groups.map((group) =>
-      group.instance.instanceId === bot.modelSelection.instanceId
-        ? { ...group, note: t('botPanel.backups.sameAccount') }
-        : group,
+    const main = state.instances.find(
+      (instance) => instance.instanceId === bot.modelSelection.instanceId,
     );
+    const groups = built.groups.map((group) => {
+      const note = backupNote(main, group.instance);
+      return note ? { ...group, note } : group;
+    });
     return { ...built, groups, ...(current ? {} : { current: null }) };
   };
 

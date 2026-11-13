@@ -17,6 +17,8 @@ interface Snapshot {
   seen: boolean;
   /** The welcome ended here but the Cloud could not save it: this device keeps it until the Cloud does. */
   doneHere: boolean;
+  /** Its last page is on screen and already recorded as done: it stays until the person leaves that screen. */
+  finishing: boolean;
 }
 
 const DONE_HERE = 'omb.cloudWelcome.done';
@@ -42,6 +44,7 @@ const initial = (): Snapshot => {
     requested: null,
     seen: false,
     doneHere,
+    finishing: false,
   };
 };
 let snapshot: Snapshot = initial();
@@ -80,6 +83,12 @@ export function endWelcomeHere(): void {
 export function markWelcomeSeen(): void {
   if (!snapshot.seen) update({ seen: true });
 }
+export function keepFinishedWelcome(): void {
+  if (!snapshot.finishing) update({ finishing: true });
+}
+export function dropFinishedWelcome(): void {
+  if (snapshot.finishing) update({ finishing: false });
+}
 export function noteWelcomeHints(ids: readonly string[]): void {
   update({ early: [...new Set([...snapshot.early, ...ids])] });
 }
@@ -98,10 +107,12 @@ export function withEarlyHints(
 
 export function cloudWelcomeShown(
   stage: string,
-  welcome: Pick<Snapshot, 'aside' | 'ended' | 'seen'>,
+  welcome: Pick<Snapshot, 'aside' | 'ended' | 'seen'> & { finishing?: boolean },
 ): boolean {
   return (
-    (stage === 'pending' || (stage === 'waiting' && welcome.seen)) &&
+    (stage === 'pending' ||
+      (stage === 'waiting' && welcome.seen) ||
+      (stage === 'ended' && welcome.finishing === true)) &&
     !welcome.aside &&
     !welcome.ended
   );
@@ -115,7 +126,7 @@ export function cloudWelcomeVisible(
     enginesKnown: boolean;
     onboarding: OnboardingStatus | undefined;
   },
-  welcome: Pick<Snapshot, 'aside' | 'ended' | 'seen' | 'early'>,
+  welcome: Pick<Snapshot, 'aside' | 'ended' | 'seen' | 'early'> & { finishing?: boolean },
 ): boolean {
   return cloudWelcomeShown(
     cloudWelcomeStage({ ...facts, onboarding: withEarlyHints(facts.onboarding, welcome.early) }),

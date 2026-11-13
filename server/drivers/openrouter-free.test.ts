@@ -471,6 +471,8 @@ describe('OpenRouter failures in plain words', () => {
       expect(bodies.map((body) => body.model)).toEqual([
         'deepseek/deepseek-v4.1-flash-1017',
         PREFERRED,
+        PREFERRED,
+        PREFERRED,
       ]);
     } finally {
       recorder.stop();

@@ -240,7 +240,7 @@ export function createLoginMailCodes(deps: LoginMailCodesDeps) {
       });
       if (answer.status === 200) {
         remember();
-        return { shown: true };
+        return answer.body.nothingToSignIn ? { shown: false } : { shown: true };
       }
       if (answer.status === 409 && onTeam) {
         if (person) remember();

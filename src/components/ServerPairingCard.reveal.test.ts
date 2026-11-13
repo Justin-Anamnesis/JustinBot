@@ -32,6 +32,7 @@ vi.mock('react', async (original) => ({
   },
 }));
 vi.mock('../lib/phone-pairing', () => ({
+  takePairOnOpen: () => false,
   revealPhonePairing: (root: unknown) => {
     if (!root) return false;
     f.revealed.push(root);

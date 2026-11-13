@@ -630,6 +630,13 @@ export function AccountsCard({
               )}
             </>
           )}
+          {group === 'chatgpt' && (
+            <p
+              data-codex-shared-setup
+              className='px-2 text-[12px] leading-relaxed text-ink-secondary'>
+              {t('accounts.chatgptSharedSetupNote')}
+            </p>
+          )}
         </div>
       )}
       {primary.snapshot.update && (

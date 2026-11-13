@@ -31,6 +31,8 @@ export interface ThreadAudiences {
   ): T;
   /** The person whose private chat a routine lives in (routine-home.ts), else null. */
   routineHome?(routine: RoutineRef): string | null;
+  /** The two people a conversation shared with one person is read by (host/conversation-shares.ts), else null. */
+  readers?(threadId: string): readonly string[] | null;
 }
 
 export type RoutineRef = {
@@ -340,13 +342,15 @@ export class VisibleSet {
 
   private audienceShows(threadId: string): boolean {
     const audience = this.audiences?.of(threadId);
+    if (audience === undefined) return true;
+    const person = this.audiences!.person;
     return (
-      audience === undefined ||
       audienceIncludes(audience, {
         admin: this.viewer.kind === 'all',
-        person: this.audiences!.person,
+        person,
         seesRoom: (groupId) => this.group(groupId),
-      })
+      }) ||
+      (person !== null && this.audiences!.readers?.(threadId)?.includes(person) === true)
     );
   }
 
@@ -415,7 +419,7 @@ export function pathSubject(path: string): PathSubject | null {
   m = /^\/api\/threads\/([\w-]+)(?:\/|$)/.exec(path);
   if (m) return { kind: 'thread', id: m[1]! };
   m = /^\/api\/groups\/([\w-]+)(?:\/|$)/.exec(path);
-  if (m) return { kind: 'group', id: m[1]! };
+  if (m && m[1] !== 'order') return { kind: 'group', id: m[1]! };
   m = /^\/api\/routines\/([\w-]+)(?:\/|$)/.exec(path);
   if (m && m[1] !== 'wake') return { kind: 'routine', id: m[1]! };
   m = /^\/api\/routine-runs\/([\w-]+)\//.exec(path);
@@ -689,6 +693,12 @@ export function frameForMember(
         ? payload.botIds.filter((id): id is string => typeof id === 'string')
         : [];
       return { ...payload, botIds: botIds.filter((id) => visible.bot(id)) };
+    }
+    case 'groups.order': {
+      const groupIds = Array.isArray(payload.groupIds)
+        ? payload.groupIds.filter((id): id is string => typeof id === 'string')
+        : [];
+      return { ...payload, groupIds: groupIds.filter((id) => visible.group(id)) };
     }
     case 'message':
     case 'message.patch':

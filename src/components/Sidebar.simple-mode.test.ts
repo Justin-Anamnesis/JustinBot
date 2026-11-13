@@ -2,6 +2,7 @@ import {
   Children,
   createElement,
   isValidElement,
+  type ComponentProps,
   type KeyboardEvent,
   type MemoExoticComponent,
   type MouseEvent,
@@ -704,7 +705,11 @@ describe('bot-first sidebar', () => {
       };
       let tree: ReactNode;
       function Capture() {
-        tree = GroupListItem({ group, density, onMenu: vi.fn() });
+        tree = (
+          GroupListItem as unknown as {
+            type: (props: ComponentProps<typeof GroupListItem>) => ReactElement;
+          }
+        ).type({ group, density, onMenu: vi.fn() });
         return tree;
       }
       const markup = renderToStaticMarkup(createElement(Capture));

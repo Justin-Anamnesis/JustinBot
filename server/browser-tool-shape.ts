@@ -73,6 +73,9 @@ export function verifiedBrowserNavigation(args: unknown, observation: unknown): 
 const READ_TOOL = 'agent_browser_read';
 export const READ_OPEN_PAGE_ONLY =
   'agent_browser_read reads the page open in this browser. Open the address with agent_browser_open first, then call agent_browser_read without url.';
+/** agent-browser's own description ("Fetch a URL … Omit url to read the active tab.") offers the `url` hidden below. */
+const READ_DESCRIPTION =
+  'Read the page open in this browser as agent-readable text. To read another address, open it with agent_browser_open first.';
 
 export function readsAroundBrowser(params: unknown): boolean {
   return (
@@ -98,6 +101,7 @@ export function slimBrowserToolList(result: unknown): unknown {
       : schema.required;
     return {
       ...tool,
+      ...(tool.name === READ_TOOL ? { description: READ_DESCRIPTION } : {}),
       inputSchema: {
         ...schema,
         ...(properties === undefined ? {} : { properties }),

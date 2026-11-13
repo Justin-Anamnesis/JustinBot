@@ -16,17 +16,20 @@ export function useTeamName(): string | null {
   return typeof team?.name === 'string' && team.name ? team.name : null;
 }
 
-/** A bot's Share button on a team: opens who has access. `headerMenu` holds what else the button offers there. */
+/** A bot's Share button on a team: opens who has access. `headerMenu` holds what else the button offers there, and
+ * `leading` what sits before the button and opens the same dialog. */
 export function ShareBotButton({
   bot,
   className,
   headerMenu,
   iconSize = 16,
+  leading,
 }: {
   bot: Bot;
   className: string;
   headerMenu?: ReactNode;
   iconSize?: number;
+  leading?: (open: () => void) => ReactNode;
 }) {
   const teamName = useTeamName();
   const [open, setOpen] = useState(false);
@@ -35,6 +38,7 @@ export function ShareBotButton({
   if (!teamName) return null;
   return (
     <>
+      {leading?.(() => setOpen(true))}
       <button
         type='button'
         data-panel-share

@@ -84,6 +84,7 @@ export const HOME_SECRET_ENV = [
   'OMB_CLOUD_AI_TOKEN',
   'OMB_CLOUD_CONNECTED_APPS_GRANT',
   'OMB_CLOUD_X_TOKEN',
+  'OMB_CLOUD_HOSTING_TOKEN',
   'OMB_CLOUD_TUNNEL_TOKEN',
 ] as const;
 /** In the home: a read-only folder holding only `secrets.json`, root's alone. The launcher reads it at start. */

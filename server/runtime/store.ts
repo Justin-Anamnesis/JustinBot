@@ -111,6 +111,7 @@ const assignmentSchema = z.object({
   reportedAt: z.number().optional(),
   rework: z.boolean(),
   question: z.string().optional(),
+  remindedAt: z.number().optional(),
   decide: z.object({ default: z.string().optional() }).optional(),
   answer: z.string().optional(),
   answeredBy: z
@@ -137,6 +138,7 @@ const assignmentSchema = z.object({
   carrying: z.array(z.string()).optional(),
   approved: z.boolean().optional(),
   batchKey: z.string().optional(),
+  fanOut: z.string().optional(),
   version: z.literal(1),
 });
 

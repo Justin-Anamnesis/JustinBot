@@ -32,6 +32,7 @@ const EXPECTED: Record<string, EngineCapabilities> = {
   claudeAgent: { resume: true, nativeReviewer: true, full: true, edits: true, subagents: false },
   codex: { resume: true, nativeReviewer: true, full: true, edits: false, subagents: false },
   piAgent: bare,
+  ompAgent: bare,
   antigravityAgent: {
     resume: true,
     nativeReviewer: false,

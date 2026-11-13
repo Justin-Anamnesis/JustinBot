@@ -9,7 +9,9 @@ import {
   cloudFirstRun,
   cloudWelcomeShown,
   cloudWelcomeVisible,
+  dropFinishedWelcome,
   endWelcomeHere,
+  keepFinishedWelcome,
   markWelcomeSeen,
   noteWelcomeHints,
   resetCloudWelcome,
@@ -84,6 +86,19 @@ describe('the welcome in this session', () => {
     renderToStaticMarkup(createElement(Probe));
     return value!;
   };
+
+  it('a finished list recorded as it shows stays on screen, and is gone once the person ends it or leaves that screen', async () => {
+    expect(cloudWelcomeShown('ended', await read()), 'a welcome that ended before this page').toBe(
+      false,
+    );
+    keepFinishedWelcome();
+    expect(cloudWelcomeShown('ended', await read())).toBe(true);
+    dropFinishedWelcome();
+    expect(cloudWelcomeShown('ended', await read()), 'they opened another screen').toBe(false);
+    keepFinishedWelcome();
+    endWelcomeHere();
+    expect(cloudWelcomeShown('ended', await read())).toBe(false);
+  });
 
   it('shows while pending, steps aside when the person leaves it, and comes back where Continue setup asks', async () => {
     expect(cloudWelcomeShown('pending', await read())).toBe(true);

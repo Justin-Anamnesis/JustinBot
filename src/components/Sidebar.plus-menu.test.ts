@@ -6,6 +6,7 @@ const fixture = vi.hoisted(() => ({
   values: [] as unknown[],
   index: 0,
   admin: true as boolean | null,
+  team: false,
 }));
 vi.mock('react', async (original) => ({
   ...(await original<typeof import('react')>()),
@@ -58,12 +59,28 @@ vi.mock('@/lib/interface-mode', () => ({
   useAdvancedMode: () => false,
   setAdvancedMode: () => {},
 }));
+vi.mock('@/state/store-select', async (importOriginal) =>
+  (await import('@/testing/plain-store-select')).plainStoreSelect(await importOriginal()),
+);
 vi.mock('@/state/store', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/state/store')>();
-  return { ...original, useStore: () => ({ state: original.initialState, dispatch: vi.fn() }) };
+  return {
+    ...original,
+    useStore: () => ({
+      state: fixture.team
+        ? { ...original.initialState, config: { team: { id: 'acme', name: 'Acme' } } }
+        : original.initialState,
+      dispatch: vi.fn(),
+    }),
+  };
 });
 
 import { Sidebar } from './Sidebar';
+const drawSidebar = (
+  Sidebar as unknown as {
+    type: (props: import('react').ComponentProps<typeof Sidebar>) => import('react').ReactNode;
+  }
+).type;
 
 type Props = { children?: ReactNode; onClick?: () => void; role?: string; [key: string]: unknown };
 function nodes(value: ReactNode): ReactElement<Props>[] {
@@ -82,11 +99,12 @@ function words(value: ReactNode): string {
 }
 function render() {
   fixture.index = 0;
-  return nodes(Sidebar({ open: true, onClose: () => {} }));
+  return nodes(drawSidebar({ open: true, onClose: () => {} }));
 }
-function plusMenu(admin: boolean | null) {
+function plusMenu(admin: boolean | null, team = false) {
   fixture.values = [];
   fixture.admin = admin;
+  fixture.team = team;
   render().find(
     (node) => node.type === 'button' && String(node.props['aria-label']).startsWith('New'),
   )!.props.onClick!();
@@ -101,7 +119,12 @@ describe("the sidebar's + menu", () => {
       expect(plusMenu(admin)).toEqual(['New bot', 'New group chat', 'Templates']);
   });
 
-  it('offers neither to a User, who keeps New group chat', () => {
+  it("offers a team's User a new bot of their own, and templates only to its admins", () => {
+    expect(plusMenu(false, true)).toEqual(['New bot', 'New group chat']);
+    expect(plusMenu(true, true)).toEqual(['New bot', 'New group chat', 'Templates']);
+  });
+
+  it('offers neither to someone without the admin scope anywhere else, who keeps New group chat', () => {
     expect(plusMenu(false)).toEqual(['New group chat']);
   });
 });

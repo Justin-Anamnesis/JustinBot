@@ -121,11 +121,20 @@ const ownedImage = (path: string, attachmentsDir: string): TurnImageInput | null
 const ownedVideo = (path: string, attachmentsDir: string): TurnVideoInput | null =>
   ownedAttachment(path, attachmentsDir, OWNED_VIDEO_NAME, VIDEO_MIME_BY_EXTENSION, FILE_MAX_BYTES);
 
+/**
+ * Left where a replayed message's image was: the image itself rides on the current turn, so without this the model
+ * reads an old screenshot as part of the latest message.
+ */
+export const REPLAYED_IMAGE_NOTE =
+  '[An image was attached to this earlier message. It is attached again to this turn only so you can still see it; it is not new and was not sent with the latest message.]';
+
 export interface ExtractTurnImagesOptions {
   attachmentsDir?: string;
   maxCount?: number;
   maxBytes?: number;
   maxVideoCount?: number;
+  /** Text left in place of each admitted image tag. */
+  imageNote?: string;
 }
 
 /**
@@ -168,8 +177,9 @@ export function extractTurnImages(
 
   let providerText = text;
   const removedTags = admittedImages.map((item) => item.tag).sort((a, b) => b.start - a.start);
+  const note = options.imageNote ?? '';
   for (const tag of removedTags)
-    providerText = providerText.slice(0, tag.start) + providerText.slice(tag.end);
+    providerText = providerText.slice(0, tag.start) + note + providerText.slice(tag.end);
 
   return { text: providerText, images: admittedImages.map((item) => item.image), videos };
 }
@@ -222,6 +232,7 @@ export function extractReplayImages<T extends { role: 'user' | 'assistant'; text
       ...options,
       maxCount: Infinity,
       maxBytes: Infinity,
+      imageNote: REPLAYED_IMAGE_NOTE,
     });
     if (!item.images.length) continue;
     const bytes = item.images.reduce((total, image) => total + image.bytes, 0);

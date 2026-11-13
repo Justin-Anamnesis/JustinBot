@@ -227,12 +227,14 @@ async function withStallRetry<T>(
   }
 }
 
+const VIDEO_MIMES = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v'];
+
 /** Security: the server's MIME is required as well as the filename, so arbitrary bytes never become UI. */
 export function loadMessageVideo(
   file: GalleryFile,
   message: MessageAttachmentContext,
   signal: AbortSignal,
-): Promise<Blob> {
+): Promise<Blob | string> {
   return withStallRetry(signal, t('attach.videoUnavailable'), (attempt, progress) =>
     readMessageVideo(file, message, attempt, progress),
   );
@@ -243,11 +245,13 @@ async function readMessageVideo(
   message: MessageAttachmentContext,
   signal: AbortSignal,
   progress: () => void,
-): Promise<Blob> {
-  const response = await requestMessageFile(file.path, message, signal);
+): Promise<Blob | string> {
+  const response = await requestMessageFile(file.path, message, signal, { mediaLink: true });
   progress();
+  if (response.headers.get('x-openmausbot-media') === '1')
+    return messageVideoLink(await response.json().catch(() => null), message);
   const mime = response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
-  if (!mime || !['video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v'].includes(mime)) {
+  if (!mime || !VIDEO_MIMES.includes(mime)) {
     await response.body?.cancel();
     throw new Error(t('attach.videoUnavailable'));
   }
@@ -278,6 +282,22 @@ async function readMessageVideo(
     reader.releaseLock();
   }
   return new Blob(chunks, { type: mime });
+}
+
+/** Security: only this message's own file route, never a URL the response could point anywhere else. */
+function messageVideoLink(body: unknown, message: MessageAttachmentContext): string {
+  const { url, mime } = (body ?? {}) as { url?: unknown; mime?: unknown };
+  const route = `/api/threads/${encodeURIComponent(message.threadId)}/messages/${encodeURIComponent(message.messageId)}/file?media=`;
+  if (
+    typeof url !== 'string' ||
+    !url.startsWith(route) ||
+    !/^[\w-]+$/.test(url.slice(route.length)) ||
+    typeof mime !== 'string' ||
+    !VIDEO_MIMES.includes(mime)
+  ) {
+    throw new Error(t('attach.videoUnavailable'));
+  }
+  return url;
 }
 
 function megabytes(bytes: number): string {
@@ -311,7 +331,7 @@ function VideoAttachment({
   useEffect(() => {
     if (preview) videoRef.current?.focus();
     return () => {
-      if (preview) URL.revokeObjectURL(preview);
+      if (preview?.startsWith('blob:')) URL.revokeObjectURL(preview);
     };
   }, [preview]);
 
@@ -323,8 +343,9 @@ function VideoAttachment({
     setError('');
     setPreview(null);
     try {
-      const blob = await loadMessageVideo(file, message, controller.signal);
-      if (!controller.signal.aborted) setPreview(URL.createObjectURL(blob));
+      const source = await loadMessageVideo(file, message, controller.signal);
+      if (!controller.signal.aborted)
+        setPreview(typeof source === 'string' ? source : URL.createObjectURL(source));
     } catch (reason) {
       if (!controller.signal.aborted) {
         setError(reason instanceof Error ? reason.message : t('attach.videoUnavailable'));

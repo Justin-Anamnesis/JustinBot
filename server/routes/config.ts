@@ -108,6 +108,8 @@ export interface ConfigRouteDeps {
   localVmLifecycleBusy: { readonly size: number };
   localVmImageBusy: Pick<BusyFlag, 'get'>;
   localVmModeChangeBusy: Pick<BusyFlag, 'set'>;
+  /** Called before a Local VM mode change is saved; once it is saved, the returned call ends the holds no path reads any more. */
+  localVmModeChanging(): () => void;
   providerConfigBusy: BusyFlag;
   computerProviderConfigTransitions: Pick<Set<RemoteComputerProvider>, 'add' | 'delete'>;
   managedBoatOwners(): boat.ManagedBoatOwner[];
@@ -171,6 +173,7 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
     localVmLifecycleBusy,
     localVmImageBusy,
     localVmModeChangeBusy,
+    localVmModeChanging,
     providerConfigBusy,
     computerProviderConfigTransitions,
     managedBoatOwners,
@@ -769,6 +772,7 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
         });
         let configWriteCommitted = false;
         const enginesBefore = engineLaunches(providerConfigs());
+        const localVmModeChanged = changingLocalVmMode ? localVmModeChanging() : null;
         const externalSecretStorage = url.searchParams.get('secretStorage') === 'external';
         try {
           if (patch.live) patch.live = liveSavePatch(cfg.live, patch.live);
@@ -830,6 +834,7 @@ export function createConfigRoutes(deps: ConfigRouteDeps): RouteHandler {
           throw error;
         }
         for (const key of resetKeys) if (key) forgetKey(key);
+        localVmModeChanged?.();
         postiz?.configSaved(patch);
         // A saved key reaches an engine through the environment its status read uses, often with no reload.
         registry.forgetSnapshots();

@@ -97,6 +97,7 @@ export type KeyId =
   | 'deepseek'
   | 'opencodeGo'
   | 'opencodeProviders'
+  | 'ollama'
   | 'lmStudio'
   | 'openaiCompat'
   | 'liveCalls'
@@ -420,6 +421,17 @@ export const KEY_CATALOG: readonly KeyEntry[] = [
     status: (config) => ({ configured: (config.opencodeGo?.providerKeys?.length ?? 0) > 0 }),
   },
   {
+    id: 'ollama',
+    section: 'servers',
+    labelKey: 'ollama.title',
+    purposeKey: 'keys.purpose.ollama',
+    name: 'Ollama',
+    env: [],
+    words: ['ollama', 'local', 'llama', 'ollama pull'],
+    mark: provider('openai-compat', 'ollama'),
+    kind: 'panel',
+  },
+  {
     id: 'lmStudio',
     section: 'servers',
     labelKey: 'lmStudio.title',
@@ -440,7 +452,6 @@ export const KEY_CATALOG: readonly KeyEntry[] = [
     words: [
       'openai-compatible',
       'openai compatible',
-      'ollama',
       'together',
       'gemini',
       'google ai studio',
@@ -860,11 +871,23 @@ export function keyEntry(id: KeyId): KeyEntry {
   return entry;
 }
 
-/** With Azure OpenAI chosen for Live calls, the row for their key is about the Azure resource: required, and no OpenAI key. */
+/** With Azure OpenAI or Fish Audio chosen for Live calls, the row for their key is about that service: required, and no OpenAI
+ * key. With Fish Audio it is the Fish Audio key itself, which Fish voices use too. */
 export function shownKeyEntry(id: KeyId, config: ConfigStatus | null | undefined): KeyEntry {
   const entry = keyEntry(id);
-  if (id !== 'liveKey' || config?.live?.provider !== 'azure' || !entry.target) return entry;
+  const provider = config?.live?.provider;
+  if (id !== 'liveKey' || (provider !== 'azure' && provider !== 'fish') || !entry.target)
+    return entry;
   const { shape: _openAiShape, ...target } = entry.target;
+  if (provider === 'fish') {
+    return {
+      ...entry,
+      name: 'Fish Audio',
+      labelKey: 'keys.label.fishAudio',
+      purposeKey: 'keys.purpose.liveKeyFish',
+      target: keyEntry('fishAudio').target,
+    };
+  }
   return {
     ...entry,
     name: 'Azure OpenAI',
@@ -884,15 +907,23 @@ export function savedState(entry: KeyEntry, config: ConfigStatus | null | undefi
   return entry.target?.saved(config) ?? entry.status?.(config) ?? { configured: false };
 }
 
-export function keyMatches(entry: KeyEntry, query: string): boolean {
+/** With Azure or Fish Audio chosen, Live calls do not use the OpenAI key the Live calls row points at, so that row is hidden. */
+export function keyHidden(id: KeyId, config: ConfigStatus | null | undefined): boolean {
+  const provider = config?.live?.provider;
+  return id === 'liveCalls' && (provider === 'azure' || provider === 'fish');
+}
+
+/** With `config`, the row is matched as shown: the Live key row by the provider Live calls use. */
+export function keyMatches(entry: KeyEntry, query: string, config?: ConfigStatus | null): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
+  const shown = config ? shownKeyEntry(entry.id, config) : entry;
   return [
-    t(entry.labelKey),
-    t(entry.purposeKey),
-    t(keySection(entry).titleKey),
-    entry.name,
-    ...entry.words,
+    t(shown.labelKey),
+    t(shown.purposeKey),
+    t(keySection(shown).titleKey),
+    shown.name,
+    ...shown.words,
   ].some((part) => part.toLowerCase().includes(q));
 }
 

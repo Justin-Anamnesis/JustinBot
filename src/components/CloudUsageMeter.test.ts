@@ -29,6 +29,8 @@ vi.mock('react', async (original) => ({
     if (!(index in f.values)) f.values[index] = { current };
     return f.values[index];
   },
+  // Walked by hand outside a render, so the Settings look (a context) reads as unset.
+  useContext: () => false,
 }));
 import {
   CloudUsageCardView,

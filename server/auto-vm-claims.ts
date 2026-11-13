@@ -16,6 +16,8 @@ export interface AutoVmClaimSlot {
   failure?: string;
   /** What went wrong in the computer's own words, when `failure` is the line the person sees. */
   cause?: string;
+  /** The plan's limit that turned the computer away, as one sentence for the bot: said in place of `cause`. */
+  limit?: string;
   /** The failure took the conversation's automatic pick off this computer. */
   backOnAuto?: boolean;
   /** The last claim failed on the network; the next screen call claims again. */
@@ -116,15 +118,19 @@ export function startAutoVmClaim(
 
 /** What every screen call hears for the rest of a turn whose computer could not be claimed. */
 export function lazyClaimFailedText(
-  slot: Pick<AutoVmClaimSlot, 'label' | 'failure' | 'cause' | 'startsComputer' | 'backOnAuto'>,
+  slot: Pick<
+    AutoVmClaimSlot,
+    'label' | 'failure' | 'cause' | 'limit' | 'startsComputer' | 'backOnAuto'
+  >,
 ): string {
   const label = slot.label ?? 'this computer';
   const why = (slot.cause ?? slot.failure)?.trim().replace(/[\s.]+$/, '');
   if (!slot.startsComputer) {
     return `This turn could not claim ${label}${why ? ` (${why})` : ''}. This call was not performed. Do not retry computer work in this turn; tell the person what you could not do.`;
   }
+  const started = `${label.charAt(0).toUpperCase()}${label.slice(1)} could not be started`;
   return (
-    `${label.charAt(0).toUpperCase()}${label.slice(1)} could not be started${why ? `: ${why}` : ''}. This call was not performed.` +
+    `${slot.limit ? `${started}. ${slot.limit}` : `${started}${why ? `: ${why}` : ''}.`} This call was not performed.` +
     `${slot.backOnAuto ? ' This conversation is back on Auto.' : ''} Do not retry computer work in this turn; tell the person what you could not do.`
   );
 }

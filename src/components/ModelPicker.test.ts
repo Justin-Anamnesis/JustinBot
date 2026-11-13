@@ -571,6 +571,19 @@ describe('Claude provider and account selection', () => {
     instanceId: 'claude-work',
     driverKind: 'claudeAgent',
     displayName: 'Work',
+  };
+  const endpoint: InstanceInfo = {
+    ...engine(),
+    instanceId: 'claude-endpoint-1',
+    driverKind: 'claudeAgent',
+    displayName: 'My gateway',
+    access: 'custom',
+  };
+  const bedrock: InstanceInfo = {
+    ...engine(),
+    instanceId: 'claude-bedrock-1',
+    driverKind: 'claudeAgent',
+    displayName: 'Claude on Bedrock',
     access: 'custom',
   };
 
@@ -591,6 +604,21 @@ describe('Claude provider and account selection', () => {
       expect(markup).not.toContain('aria-label="Work"');
       expect(markup).toContain('w-14');
     }
+  });
+
+  it('gives a custom endpoint and Bedrock their own buttons, apart from the Claude accounts', () => {
+    const markup = renderToStaticMarkup(
+      createElement(ModelEngineRail, {
+        instances: [personal, work, endpoint, bedrock],
+        selectedInstance: endpoint,
+        onSelect: () => {},
+      }),
+    );
+    expect(markup.match(/aria-label="Claude"/g)).toHaveLength(1);
+    expect(markup).toContain('aria-label="Claude" aria-pressed="false"');
+    expect(markup).toContain('aria-label="My gateway" aria-pressed="true"');
+    expect(markup).toContain('aria-label="Claude on Bedrock" aria-pressed="false"');
+    expect(markup).not.toContain('aria-label="Work"');
   });
 
   it('opens the remembered concrete Claude account, falling back to the first account', () => {

@@ -1,4 +1,5 @@
 import { FileText, Loader2, Repeat2 } from 'lucide-react';
+import { showBotLimit } from '@/lib/bot-limit';
 import { cn } from '@/lib/cn';
 import { t } from '@/lib/i18n';
 import type { Routine, RoutineRun } from '@/lib/routines';
@@ -21,6 +22,7 @@ export function RoutineList({
   routines,
   runs,
   bots,
+  pausedBots,
   loading,
   error,
   onOpen,
@@ -30,6 +32,8 @@ export function RoutineList({
   routines: Routine[];
   runs: RoutineRun[];
   bots?: Bot[];
+  /** Bots a Starter Cloud has paused: a routine on one runs nothing until it is swapped in. */
+  pausedBots?: readonly string[];
   loading?: boolean;
   error?: boolean;
   onOpen: (routine: Routine) => void;
@@ -163,6 +167,19 @@ export function RoutineList({
             )}
             {routine.warning && (
               <p className='mt-2 text-[12px] leading-relaxed text-warning'>{routine.warning}</p>
+            )}
+            {routine.enabled && pausedBots?.includes(routine.botId) && (
+              <p
+                className='mt-2 text-[12px] leading-relaxed text-warning'
+                data-routine-bot-paused=''>
+                {t('routines.botPaused')}{' '}
+                <button
+                  type='button'
+                  className='cursor-pointer text-accent hover:underline'
+                  onClick={() => showBotLimit('paused')}>
+                  {t('routines.botPausedSwap')}
+                </button>
+              </p>
             )}
             {routine.heldFor && (
               <p className='mt-2 text-[12px] leading-relaxed text-ink-secondary'>

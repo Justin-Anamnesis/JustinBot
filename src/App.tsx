@@ -5,6 +5,8 @@ import { nextShortcutBot, shortcutBots, shownBotIds } from '@/lib/sidebar-shortc
 import { useShowThreads } from '@/lib/thread-preferences';
 import { useWelcomeViewer, WelcomeGate } from '@/components/onboarding/WelcomeGate';
 import { MausBotWelcome } from '@/components/MausBotWelcome';
+import { NewBotNameHost } from '@/components/NewBotName';
+import { MemberApps } from '@/components/MemberApps';
 import { CloudTimeZoneSync } from '@/components/CloudTimeZone';
 import { cloudSignInDue, spotlightsQuiet, type WelcomeViewer } from '@/lib/onboarding';
 import { FirstConversationTour } from '@/components/onboarding/FirstConversationTour';
@@ -13,6 +15,7 @@ import { LiveCallHost } from '@/components/LiveCallHost';
 import { ThreadRefsProvider } from '@/components/ThreadRefs';
 import { initAnalytics } from '@/lib/analytics';
 import { parseComputerHelp } from '@/lib/computer-control';
+import { viewerClosedRelease } from '@/components/computer-takeover';
 import { Sidebar } from '@/components/Sidebar';
 import { ChatView } from '@/components/ChatView';
 import { GroupView } from '@/components/GroupView';
@@ -34,6 +37,7 @@ import {
   LocalVmWorkspace,
   PluginsPanel,
   preloadScreens,
+  PublishedAppsPage,
   RemoteAgentSettingsPanel,
   RemoteDesktopPanel,
   RoomPanel,
@@ -79,7 +83,8 @@ import { cloudIntentDue, cloudIntentShown, useCloudIntent } from '@/lib/cloud-in
 import { CloudSetup } from '@/components/CloudSetup';
 import { CloudWelcome } from '@/components/cloud-welcome/CloudWelcome';
 import { TeamWelcome } from '@/components/TeamWelcome';
-import { teamWelcomeDue, useTeamWelcomeRecord } from '@/lib/team-welcome';
+import { ConversationShareDialogs } from '@/components/conversation-share/ConversationShareDialogs';
+import { invitedToTeam, teamWelcomeDue, useTeamWelcomeRecord } from '@/lib/team-welcome';
 import { WelcomeKeeper } from '@/components/cloud-welcome/WelcomeKeeper';
 import { EmptyChatShell } from '@/components/onboarding/EmptyChatShell';
 import { cloudFirstRun, cloudWelcomeVisible, useCloudWelcome } from '@/lib/cloud-welcome';
@@ -90,7 +95,9 @@ import { botCycleStep, shouldOpenKeyboardShortcuts } from '@/lib/keyboard-shortc
 import { effectiveLanguage, useLanguageChoice, usePageLanguage } from '@/lib/language-preference';
 import { botUnreadCount, showBrowserUnread } from '@/lib/bot-unread';
 import { phonePairingSettingsAction, takePhonePairingRequest } from '@/lib/phone-pairing';
-import { takeConnectRequest } from '@/lib/connect-link';
+import { useConnectLink } from '@/lib/use-connect-link';
+import { isSettingsPage } from '@/components/settings/settings-index';
+import { useBotListDrawer } from '@/hooks/use-bot-list-drawer';
 import { useDesktopNotificationOpens, useExternalChatLinks } from '@/hooks/use-external-chat-links';
 import { useUsageSnapshot } from '@/hooks/use-usage-snapshot';
 import { useReadShownChatOnFocus } from '@/hooks/use-read-shown-chat';
@@ -102,6 +109,7 @@ import { useChiefStepOpen } from '@/lib/default-bot';
 import { useSessionEnded } from '@/lib/session-ended';
 import { PairPage } from './pair/PairPage';
 import { WebPanelPage } from '@/components/WebPanelPage';
+import { AppPreviewPanel } from '@/components/published-apps/AppPreviewPanel';
 
 function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
   const { state, dispatch } = useStore();
@@ -165,22 +173,11 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
     window.history.replaceState(null, '', rest);
     dispatch(phonePairingSettingsAction());
   }, [dispatch]);
-  useEffect(() => {
-    // A bot's link to a connection that needs the person on My Cloud opens the page that connects it.
-    const request = takeConnectRequest(window.location.href);
-    if (!request) return;
-    window.history.replaceState(null, '', request.rest);
-    dispatch(
-      'section' in request
-        ? { type: 'toggleAppSettings', open: true, section: request.section }
-        : { type: 'togglePlugins', open: true, surface: request.surface },
-    );
-  }, [dispatch]);
+  useConnectLink(dispatch, Boolean(state.config?.team));
   useExternalChatLinks(state, dispatch);
   useDesktopNotificationOpens(state, dispatch);
   usePresence(state, dispatch);
   useTeamPresence(state);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   usePageLanguage(effectiveLanguage(useLanguageChoice(), state.config?.language), true);
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Stays mounted once opened: a Cloud bought in it can arrive after the sheet is closed.
@@ -201,6 +198,23 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
     group || chiefStep
       ? undefined
       : (state.bots.find((b) => b.id === state.selectedId) ?? state.bots[0]);
+  const {
+    open: drawerOpen,
+    show: openDrawer,
+    hide: hideDrawer,
+    noteAction: noteDrawerAction,
+  } = useBotListDrawer({
+    selectedId: state.selectedId,
+    botThread: bot?.threadId,
+    groupThread: group?.threadId,
+    view: state.activeView,
+    pluginsOpen: state.pluginsOpen,
+    settingsOpen: state.settingsOpen,
+  });
+  const closeDrawer = useCallback(() => {
+    hideDrawer();
+    menuButtonRef.current?.focus();
+  }, [hideDrawer]);
   const notificationFeed = useNotificationFeed() && !remoteClient;
   const advanced = useAdvancedMode();
   const roomPanelOpen = useRoomPanelShown({ group, state, simple: !advanced && !remoteClient });
@@ -250,12 +264,10 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
     signIn: cloudSignIn || cloudJobWaiting,
   });
   const team = state.config?.team ?? null;
-  const teamWelcomeRecord = useTeamWelcomeRecord(
-    team && viewer?.canSave === false ? team.id : null,
-  );
+  const invited = invitedToTeam(viewer);
+  const teamWelcomeRecord = useTeamWelcomeRecord(team && invited ? team.id : null);
   const teamWelcomeOn =
-    teamWelcomeDue({ team, canSave: viewer?.canSave, record: teamWelcomeRecord }) &&
-    state.activeView === 'chat';
+    teamWelcomeDue({ team, invited, record: teamWelcomeRecord }) && state.activeView === 'chat';
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -313,17 +325,6 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
   useUsageSnapshot();
 
   useEffect(() => preloadScreens(), []);
-
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [
-    state.selectedId,
-    bot?.threadId,
-    group?.threadId,
-    state.activeView,
-    state.pluginsOpen,
-    state.settingsOpen,
-  ]);
 
   useEffect(() => {
     if (state.activeView === 'routines' && previousViewRef.current !== 'routines') {
@@ -386,23 +387,26 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
   useEffect(() => {
     return window.ogb?.onOpenAppSettings?.((section) =>
       dispatch(
-        (section === 'cloud-add' || section === 'cloud-add-howto') &&
-          window.ogb?.cloudAccount &&
-          !remoteClient
-          ? { type: 'openCloudAdd', source: section === 'cloud-add' ? 'app_menu' : 'app_howto' }
-          : section === 'cloud' && window.ogb?.cloudAccount && !remoteClient
-            ? CLOUD_LINK_SETTINGS
-            : section === 'cloud-settings' &&
-                (window.ogb?.cloudAccount || window.ogb?.cloudPlan) &&
-                !remoteClient
-              ? { type: 'toggleAppSettings', open: true, section: 'cloudAccount' }
-              : {
-                  type: 'toggleAppSettings',
-                  open: true,
-                  ...(section === 'organization' && window.ogb?.organization && !remoteClient
-                    ? { section }
-                    : {}),
-                },
+        section === 'phone'
+          ? phonePairingSettingsAction()
+          : (section === 'cloud-add' || section === 'cloud-add-howto') &&
+              window.ogb?.cloudAccount &&
+              !remoteClient
+            ? { type: 'openCloudAdd', source: section === 'cloud-add' ? 'app_menu' : 'app_howto' }
+            : section === 'cloud' && window.ogb?.cloudAccount && !remoteClient
+              ? CLOUD_LINK_SETTINGS
+              : section === 'cloud-settings' &&
+                  (window.ogb?.cloudAccount || window.ogb?.cloudPlan) &&
+                  !remoteClient
+                ? { type: 'toggleAppSettings', open: true, section: 'cloudAccount' }
+                : {
+                    type: 'toggleAppSettings',
+                    open: true,
+                    ...((section === 'organization' && window.ogb?.organization && !remoteClient) ||
+                    isSettingsPage(section)
+                      ? { section }
+                      : {}),
+                  },
       ),
     );
   }, [dispatch]);
@@ -410,24 +414,26 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
   useEffect(() => {
     return window.ogb?.desktopViewer?.onState((viewer) => {
       if (viewer.open || !viewer.contextId) return;
-      const botId = viewer.contextId;
-      void fetch(`/api/bots/${botId}/computer/control`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'release' }),
-      })
-        .then((res) => (res.ok ? res.json() : null))
-        .then((snap) => {
-          if (snap)
-            dispatch({
-              type: 'computerControl',
-              botId,
-              held: snap.held === true,
-              helpReason: snap.helpReason ?? null,
-              help: parseComputerHelp(snap.help),
-            });
+      const botId = viewer.contextId,
+        release = viewerClosedRelease(botId);
+      if (release)
+        void fetch(`/api/bots/${botId}/computer/control`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(release),
         })
-        .catch(() => {});
+          .then((res) => (res.ok ? res.json() : null))
+          .then((snap) => {
+            if (snap)
+              dispatch({
+                type: 'computerControl',
+                botId,
+                held: snap.held === true,
+                helpReason: snap.helpReason ?? null,
+                help: parseComputerHelp(snap.help),
+              });
+          })
+          .catch(() => {});
       void fetch(`/api/bots/${botId}/computer/viewer-close`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -453,9 +459,13 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
     </>
   );
   return (
-    <div className={cn('flex h-full flex-col', framed && 'bg-frame')}>
+    <div
+      className={cn('flex h-full flex-col', framed && 'bg-frame')}
+      onClickCapture={drawerOpen ? noteDrawerAction : undefined}
+      onKeyDownCapture={drawerOpen ? noteDrawerAction : undefined}>
       <WindowFrameBar notifications={notificationTray} />
       <BotLimitPopup />
+      <ConversationShareDialogs />
       {!framed && strips}
       <div className='relative flex min-h-0 flex-1'>
         {!calendarFocus && (
@@ -464,7 +474,7 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
             ref={menuButtonRef}
             aria-label={t('app.openBotList')}
             aria-expanded={drawerOpen}
-            onClick={() => setDrawerOpen(true)}
+            onClick={openDrawer}
             className='absolute left-3 top-3 z-30 rounded-md p-1.5 text-ink-secondary hover:bg-raised hover:text-ink max-md:flex max-md:size-9 max-md:items-center max-md:justify-center max-md:rounded-full max-md:border max-md:border-hairline max-md:bg-card max-md:p-0 max-md:text-ink md:hidden'>
             <Menu size={18} className='max-md:hidden' />
             <ChevronLeft size={20} aria-hidden='true' className='hidden max-md:block' />
@@ -473,30 +483,26 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
         {drawerOpen && !calendarFocus && (
           <div
             aria-hidden
-            onMouseDown={(e) => e.target === e.currentTarget && setDrawerOpen(false)}
+            onMouseDown={(e) => e.target === e.currentTarget && hideDrawer()}
             className='absolute inset-0 z-30 bg-black/50 md:hidden'
           />
         )}
         {!calendarFocus && <PlacesRail />}
         <NewLocalFromMenu />
-        {/* A framed window shows the app, its sidebar and the chat or page, as one square pane under the top bar and beside
-          the window's rail, running to the window's right and bottom edges. */}
+        {/* A framed window shows the app, its sidebar and the chat or page, in a rounded card under the top bar and beside
+          the window's rail: its top corners and its bottom-left corner are round, and it runs to the window's right and
+          bottom edges. */}
         <div
           data-window-card={framed ? '' : undefined}
           className={
-            framed ? 'relative flex min-w-0 flex-1 flex-col overflow-hidden bg-app' : 'contents'
+            framed
+              ? 'relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-t-[12px] rounded-bl-[12px] bg-app'
+              : 'contents'
           }>
           {framed && strips}
           <div className={framed ? 'relative flex min-h-0 flex-1' : 'contents'}>
             {!calendarFocus && (
-              <Sidebar
-                collapseToIcons={collapseSidebar}
-                open={drawerOpen}
-                onClose={() => {
-                  setDrawerOpen(false);
-                  menuButtonRef.current?.focus();
-                }}
-              />
+              <Sidebar collapseToIcons={collapseSidebar} open={drawerOpen} onClose={closeDrawer} />
             )}
             {state.activeView === 'team-map' ? (
               <TeamMapPage />
@@ -504,6 +510,8 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
               <FilesView />
             ) : state.activeView === 'web-panel' ? (
               <WebPanelPage />
+            ) : state.activeView === 'published-apps' ? (
+              <PublishedAppsPage />
             ) : state.activeView === 'routines' ? (
               <TriggersPage onBack={closeCalendar} onOpenRoom={openCalendarRoom} />
             ) : !remoteClient && localVmWorkspaceBotId ? (
@@ -578,6 +586,7 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
                   onOpenVmWorkspace={openLocalVmWorkspace}
                 />
               ))}
+            <AppPreviewPanel />
             {roomPanelOpen && group && (
               <RoomPanel
                 key={`room:${group.id}`}
@@ -601,7 +610,8 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
         <CloudHowTo />
         <CloudSetup viewer={viewer} welcomeShown={welcomeOnScreen} />
         <WelcomeKeeper viewer={viewer} />
-        {state.pluginsOpen && <PluginsPanel />}
+        {state.pluginsOpen &&
+          (team && viewer?.canSave === false ? <MemberApps /> : <PluginsPanel />)}
         <AppGrantNotice />
         {state.shortcutsOpen && (
           <KeyboardShortcutsModal
@@ -642,6 +652,7 @@ function Application() {
         </ThreadRefsProvider>
         <WelcomeGate viewer={viewer} />
         <MausBotWelcome viewer={viewer} />
+        <NewBotNameHost />
         <CloudTimeZoneSync viewer={viewer} />
         <GuidedTour />
         <LiveCallHost />

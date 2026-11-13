@@ -242,6 +242,7 @@ type HandedBack = {
   evidence?: unknown;
   cards?: { question: string; ids: string[] };
   privateQuestion?: boolean;
+  approvalAsk?: string;
 };
 type Place = { child: string | null; parent: string | null };
 
@@ -270,6 +271,7 @@ export function privateHandBack<T extends HandedBack>(
       ? `NEEDS INPUT: ${question}`
       : `${outcome.ok ? 'Done' : 'It stopped before it finished'}. The result is in ${where}.`,
     ...(outcome.cards ? { cards: { ...outcome.cards, question } } : {}),
-    ...(asks || outcome.cards ? { privateQuestion: true } : {}),
+    ...(outcome.approvalAsk ? { approvalAsk: question } : {}),
+    ...(asks || outcome.cards || outcome.approvalAsk ? { privateQuestion: true } : {}),
   } as T;
 }

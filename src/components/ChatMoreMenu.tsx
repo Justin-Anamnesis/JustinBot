@@ -13,7 +13,9 @@ import {
   Search,
   Share,
   SquarePen,
+  UserPlus,
   UserRound,
+  Users,
 } from 'lucide-react';
 import { currentTaskBot, openBotThread, useStore, visibleMessages, type Bot } from '@/state/store';
 import { useAdvancedMode } from '@/lib/interface-mode';
@@ -39,6 +41,7 @@ import { ShareBotButton, useTeamName } from './bot-access/ShareBotButton';
 import { UsageBars } from './EngineUsage';
 import { useConversationSide } from './TeamSideSwitch';
 import { tasksOfSide } from '@/state/team-side';
+import { openConversationDialog, shareChoices } from './conversation-share/conversation-share';
 
 /** One item list for the chat's ⋯ menu wherever it sits; it lists the threads whenever the sidebar hides them. The
  * Simple bot panel draws the same items as rows, and its Share button holds the two that export. */
@@ -68,6 +71,35 @@ export function useChatMoreItems(
           (task) => !task.routineRunId,
         ),
       );
+  const sharing = shareChoices(
+    profile,
+    profile.tasks?.find((task) => task.threadId === bot.threadId),
+    Boolean(useTeamName()),
+  );
+  const shareItems: SidebarMenuItem[] = [
+    ...(sharing.team
+      ? [
+          {
+            key: 'share-team',
+            label: t('conversationShare.withTeam'),
+            icon: <Users size={16} />,
+            onSelect: () =>
+              openConversationDialog({ kind: 'team', botId: profile.id, threadId: bot.threadId }),
+          },
+        ]
+      : []),
+    ...(sharing.person
+      ? [
+          {
+            key: 'share-person',
+            label: t('conversationShare.withPerson'),
+            icon: <UserPlus size={16} />,
+            onSelect: () =>
+              openConversationDialog({ kind: 'person', botId: profile.id, threadId: bot.threadId }),
+          },
+        ]
+      : []),
+  ].map((item, index) => (index === 0 ? { ...item, separatorBefore: true } : item));
   const selection = profile.modelSelection;
   const modelName =
     phoneHeader && selection
@@ -161,6 +193,7 @@ export function useChatMoreItems(
       onSelect: () =>
         contextAction.run(`/api/bots/${profile.id}/start-fresh`, { threadId: bot.threadId }),
     },
+    ...shareItems,
     {
       key: 'copy',
       heading: t('chat.export.heading'),

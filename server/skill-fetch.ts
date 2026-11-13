@@ -108,6 +108,13 @@ function target(
   path: string,
   extra: Partial<Target> = {},
 ): Target | { error: string } {
+  try {
+    ref = ref === undefined ? undefined : decodeURIComponent(ref);
+  } catch {
+    return {
+      error: 'that does not look like a GitHub or skills.sh repository, folder, or SKILL.md URL',
+    };
+  }
   const decoded = decodedPath(path);
   if (
     !OWNER_OR_REPO.test(owner) ||

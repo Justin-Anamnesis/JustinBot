@@ -8,16 +8,16 @@ afterEach(() => {
   delete window.ogb;
 });
 
-it('the top bar names the place as the rail does: This computer, This Mac (or This PC) in a profile, My Cloud while home keeps that name', () => {
+it('the top bar names the place as the rail does: This computer, in a profile too, on any platform; My Cloud while home keeps that name', () => {
   expect(windowPlaceName({ local: true, name: 'This computer' }, undefined)).toBe('This computer');
   window.ogb = { platform: 'darwin' } as unknown as typeof window.ogb;
   expect(
     windowPlaceName({ local: true, name: 'This computer', profile: 'default' }, undefined),
-  ).toBe('This Mac');
+  ).toBe('This computer');
   window.ogb = { platform: 'win32' } as unknown as typeof window.ogb;
   expect(
     windowPlaceName({ local: true, name: 'This computer', profile: 'default' }, undefined),
-  ).toBe('This PC');
+  ).toBe('This computer');
   expect(windowPlaceName({ local: false, name: 'My Cloud', home: true }, undefined)).toBe(
     'My Cloud',
   );

@@ -251,7 +251,7 @@ export function importTeamBackup(
   routines: RoutineManager,
   input: unknown,
   selection: ModelSelection,
-  options: { visibility?: BotVisibility } = {},
+  options: { visibility?: BotVisibility; createdBy?: string } = {},
 ) {
   const backup = parseTeamBackup(input);
   const bots: BotRecord[] = [];
@@ -317,6 +317,7 @@ export function importTeamBackup(
           section: sectionFor(source.section),
           // who may see the imported team is the importing admin's choice
           ...(options.visibility ? { visibility: options.visibility } : {}),
+          ...(options.createdBy ? { createdBy: options.createdBy } : {}),
         },
         { seedMessages: false },
       );

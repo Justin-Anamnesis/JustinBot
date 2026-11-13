@@ -7,6 +7,7 @@ import { ProposalStatus } from './ProposalStatus';
 import { ThreadModelsLine } from '../ThreadModelsLine';
 import { t } from '@/lib/i18n';
 import { Select } from '../Select';
+import { backupNote } from '@/lib/engine-rail';
 
 export function ModelSection({ bot }: { bot: Bot }) {
   const { state, dispatch } = useStore();
@@ -135,7 +136,10 @@ export function FallbackChain({
     );
   const offeredBy = (instance: InstanceInfo | undefined) =>
     instance?.models.options.filter(
-      (model) => !model.orgBlocked && (instance.snapshot.authenticated !== false || model.custom),
+      (model) =>
+        !model.orgBlocked &&
+        !model.needsCliUpdate &&
+        (instance.snapshot.authenticated !== false || model.custom),
     ) ?? [];
   // The default too must be one the account offers now: not blocked, and signed in unless it is a custom model.
   const defaultOffered = (instance: InstanceInfo) => {
@@ -158,6 +162,13 @@ export function FallbackChain({
   const nameOf = (instanceId: string) =>
     state.instances.find((instance) => instance.instanceId === instanceId)?.displayName ??
     instanceId;
+  const main = state.instances.find(
+    (instance) => instance.instanceId === bot.modelSelection.instanceId,
+  );
+  const backupLabel = (instance: InstanceInfo) => {
+    const note = backupNote(main, instance);
+    return note ? `${instance.displayName} · ${note}` : instance.displayName;
+  };
   const modelsOf = (entry: NonNullable<Bot['fallback']>[number], index: number) => {
     const offered = offeredBy(
       state.instances.find((candidate) => candidate.instanceId === entry.instanceId),
@@ -228,9 +239,7 @@ export function FallbackChain({
             </option>
             {available.map((instance) => (
               <option key={instance.instanceId} value={instance.instanceId}>
-                {instance.instanceId === bot.modelSelection.instanceId
-                  ? `${instance.displayName} · ${t('botPanel.backups.sameAccount')}`
-                  : instance.displayName}
+                {backupLabel(instance)}
               </option>
             ))}
           </Select>

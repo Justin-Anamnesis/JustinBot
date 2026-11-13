@@ -37,7 +37,7 @@ describe('ThreadConcurrencySettings', () => {
     fixture.cloudStarter = undefined;
     expect(markup).toContain('value="1" selected=""');
     expect(markup).toContain('disabled');
-    expect(markup).toContain('Starter runs one thread at a time per bot');
+    expect(markup).toContain('Your plan runs one thread at a time per bot.');
   });
   it('shows the confirmed server value', () => {
     fixture.limit = 10;

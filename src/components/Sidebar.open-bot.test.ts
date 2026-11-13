@@ -1,6 +1,7 @@
 import {
   Children,
   isValidElement,
+  type ComponentProps,
   type EffectCallback,
   type ReactElement,
   type ReactNode,
@@ -66,6 +67,9 @@ vi.mock('./DesktopCapabilities', async () => {
 });
 vi.mock('@/lib/thread-preferences', () => ({ useShowThreads: () => fixture.showThreads }));
 vi.mock('@/lib/interface-mode', () => ({ useAdvancedMode: () => true, setAdvancedMode: () => {} }));
+vi.mock('@/state/store-select', async (importOriginal) =>
+  (await import('@/testing/plain-store-select')).plainStoreSelect(await importOriginal()),
+);
 vi.mock('@/state/store', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/state/store')>();
   return {
@@ -78,6 +82,9 @@ vi.mock('@/state/store', async (importOriginal) => {
 import { initialState } from '@/state/store';
 import { ConfirmDialog } from './ConfirmDialog';
 import { ArchivedBotsPanel, BotContextMenu, Sidebar } from './Sidebar';
+const drawSidebar = (
+  Sidebar as unknown as { type: (props: ComponentProps<typeof Sidebar>) => ReactNode }
+).type;
 
 const left = (id: string, extra: Partial<Bot> = {}): Bot => ({
   id,
@@ -204,7 +211,7 @@ describe.each([false, true])('with threads shown: %s', (shown) => {
     fixture.api.mockImplementation(async (_path: string, init: RequestInit) => ({
       bot: { ...left('scout'), ...JSON.parse(String(init.body)) },
     }));
-    const sidebar = () => render(() => Sidebar({ open: false, onClose: () => {} }));
+    const sidebar = () => render(() => drawSidebar({ open: false, onClose: () => {} }));
     sidebar().find((node) => node.type === BotContextMenu)!.props.onArchive!(
       fixture.state.bots[0]!,
     );

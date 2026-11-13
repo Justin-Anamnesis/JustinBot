@@ -56,8 +56,8 @@ describe('Settings → Import', () => {
     expect(shown).toContain('Move from Grok Bot');
     expect(markup).toContain('data-grok-move-open');
     expect(markup).not.toContain('data-grok-move=');
-    expect(markup.indexOf('data-import-section="apps"')).toBeLessThan(
-      markup.indexOf('data-import-section="grok"'),
+    expect(markup.indexOf('data-import-section="grok"')).toBeLessThan(
+      markup.indexOf('data-import-section="apps"'),
     );
   });
 

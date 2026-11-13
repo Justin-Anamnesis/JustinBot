@@ -68,7 +68,7 @@ import {
   type RoutineOwnerNotice,
 } from './routine-recovery.ts';
 import { activeMs, askOf, settleAsk, waitingFor, type RoutineRunAsk } from './routine-waits.ts';
-import { failsLikeLastOutcome, outcomesNewestFirst } from './routine-outcomes.ts';
+import { failsLikeLastOutcome, offAfterNoStarts, outcomesNewestFirst } from './routine-outcomes.ts';
 import {
   EVENT_RETRY_WINDOW_MS,
   loadEventReceipts,
@@ -82,6 +82,7 @@ import {
 } from './routine-attachments.ts';
 import { loadInstalledPackage, loadRequestReceipts, loadRoutine, loadRun } from './routine-load.ts';
 import { applyHolds, holdCauses, type AppliedHolds } from './routine-holds.ts';
+import { cancelUnfinishedRuns, interruptRunTurns } from './routine-stops.ts';
 import { sanitizeInput } from './routine-input.ts';
 import {
   applyCheckResult,
@@ -187,8 +188,9 @@ export interface RoutineRun extends RoutineLineCodes {
   /** Time spent waiting on the person's answers, which the run limit does not count. */
   waitedMs?: number;
   triggerSource?: RoutineRunTrigger;
-  /** "app": a connected-app event started it; "wait": a wait's follow-up did (its triggerSource stays "webhook", an outside event). */
+  /** "app": a connected-app event started it; "wait": a wait's follow-up did (its triggerSource stays "webhook", an outside event). sameConversation: its trigger keeps one conversation (routine-same-conversation.ts). */
   eventSource?: 'app' | 'wait';
+  sameConversation?: true;
   webhookId?: string;
   deliveryId?: string;
   sourceThreadId?: string;
@@ -362,6 +364,9 @@ export interface RoutineManagerOptions {
   ) => string | null;
   /** The turn in this thread is a routine's own, not one a person started there while its run waits on teammates. */
   routineTurn?: (threadId: string) => boolean;
+  /** The thread's latest turn is one a person started there by typing (false when not known, e.g. after a restart). */ personTurn?: (
+    threadId: string,
+  ) => boolean;
   /** When an engine's usage limit resets (epoch ms), or null while that is not known. */
   limitResetAt?: (engine: string) => number | null;
   /** The bot has a backup engine to continue on when its own engine's usage limit refuses a run, or it is signed out. */
@@ -824,7 +829,7 @@ export class RoutineManager {
     const destination = { ...routine, ...clean };
     if (destination.botId !== routine.botId) delete destination.resultsThreadId;
     const discardResults = this.applyResultsInput(destination, patch.resultsThreadId);
-    const cancelledRuns: RoutineRun[] = [];
+    let stopped: ReturnType<typeof cancelUnfinishedRuns> | undefined;
     this.commitMutation(() => {
       Object.assign(routine, clean, {
         resultsThreadId: destination.resultsThreadId,
@@ -854,19 +859,12 @@ export class RoutineManager {
       if (Object.hasOwn(patch, 'timeoutMinutes') && patch.timeoutMinutes == null) {
         delete routine.timeoutMinutes;
       }
-      if (patch.enabled === false) {
-        for (const run of this.runs) {
-          if (run.routineId !== routine.id || run.status !== 'queued') continue;
-          run.status = 'cancelled';
-          run.attention = undefined;
-          run.finishedAt = this.now();
-          run.error = 'The routine was paused before this run started';
-          cancelledRuns.push(run);
-        }
-      }
+      if (patch.enabled === false)
+        stopped = cancelUnfinishedRuns(this.runs, routine.id, this.now(), 'paused');
       if (request) this.rememberRoutineRequest(request, routine.id, now);
     }, discardResults);
-    for (const run of cancelledRuns) this.emitRun(run);
+    for (const run of stopped?.cancelled ?? []) this.emitRun(run);
+    interruptRunTurns(stopped?.waited ?? [], this.options);
     this.emitRoutine(routine);
     return this.routineWithHealth(routine);
   }
@@ -877,23 +875,26 @@ export class RoutineManager {
     const at = this.routines.findIndex((r) => r.id === id);
     if (at === -1) return false;
     const changedRuns: RoutineRun[] = [];
+    let stopped: ReturnType<typeof cancelUnfinishedRuns> | undefined;
     this.commitMutation(() => {
       this.routines.splice(at, 1);
       for (const run of this.runs) {
-        if (run.routineId !== id) continue;
-        if (run.status === 'queued') {
-          run.status = 'cancelled';
-          run.attention = undefined;
-          run.finishedAt = this.now();
-          changedRuns.push(run);
-        } else if (!run.seenAt && isRoutineProblemRun(run)) {
-          run.seenAt = this.now();
-          changedRuns.push(run);
-        }
+        if (
+          run.routineId !== id ||
+          run.status === 'queued' ||
+          run.status === 'waiting' ||
+          run.seenAt ||
+          !isRoutineProblemRun(run)
+        )
+          continue;
+        run.seenAt = this.now();
+        changedRuns.push(run);
       }
+      stopped = cancelUnfinishedRuns(this.runs, id, this.now(), 'deleted');
       if (request) this.rememberRoutineRequest(request, id, this.now());
     });
-    for (const run of changedRuns) this.emitRun(run);
+    for (const run of [...stopped!.cancelled, ...changedRuns]) this.emitRun(run);
+    interruptRunTurns(stopped!.waited, this.options);
     this.options.emit?.({ kind: 'routine.deleted', routineId: id });
     return true;
   }
@@ -919,10 +920,7 @@ export class RoutineManager {
       run.error =
         routineId === undefined ? 'The assigned bot was deleted' : 'The routine was deleted';
       this.emitRun(run);
-      if (run.threadId && run.target === 'room-goal')
-        void this.options.interruptGoal?.(run.groupId, run.threadId).catch(() => {});
-      else if (run.threadId)
-        void this.options.interruptTurn?.(run.botId, run.threadId).catch(() => {});
+      interruptRunTurns([run], this.options);
     }
     const kept = this.runs.filter(
       (run) => run.botId !== botId || (routineId !== undefined && run.routineId !== routineId),
@@ -1030,6 +1028,7 @@ export class RoutineManager {
     deliveryId: string;
     receivedAt: number;
     eventSource?: 'app' | 'wait';
+    sameConversation?: boolean;
     /** Where the run reports, instead of the event's own results chat. */
     resultsThreadId?: string;
   }): { id: string } {
@@ -1057,6 +1056,7 @@ export class RoutineManager {
       createdAt: this.now(),
       resultsThreadId: input.resultsThreadId ?? this.options.eventResultsThread?.(input),
       ...(input.eventSource ? { eventSource: input.eventSource } : {}),
+      ...(input.sameConversation ? { sameConversation: true } : {}),
     };
     this.commitEvent(run, input.deliveryId, () => {
       this.runs.push(run);
@@ -1065,10 +1065,11 @@ export class RoutineManager {
   }
 
   /** Adds an outside event to its trigger's run that has not started yet, so a burst becomes one run. Null when there
-   *  is no such run or `merge` declines (the run is full). */
+   *  is no such run with the same conversation setting, or `merge` declines (the run is full). */
   mergeIntoQueuedRun(
     webhookId: string,
     deliveryId: string,
+    sameConversation: boolean,
     merge: (prompt: string) => string | null,
   ): { id: string } | null {
     this.assertWritable();
@@ -1076,7 +1077,10 @@ export class RoutineManager {
     if (existing) return existing;
     const run = this.runs.findLast(
       (candidate) =>
-        candidate.webhookId === webhookId && candidate.status === 'queued' && !candidate.threadId,
+        candidate.webhookId === webhookId &&
+        candidate.status === 'queued' &&
+        !candidate.threadId &&
+        (candidate.sameConversation === true) === sameConversation,
     );
     const merged = run?.prompt === undefined ? null : merge(run.prompt);
     if (!run || merged === null) return null;
@@ -1557,7 +1561,7 @@ export class RoutineManager {
           continue;
         }
         const sameRoutineWorking =
-          triggerSource === 'schedule' &&
+          (triggerSource === 'schedule' || run.sameConversation) &&
           this.runs.some(
             (other) =>
               other.id !== run.id &&
@@ -1979,13 +1983,23 @@ export class RoutineManager {
       error: redactSecretsInText(message).slice(0, 500),
       finishedAt: this.now(),
     } satisfies Partial<RoutineRun>);
+    const off = offAfterNoStarts(
+      this.routines.find((routine) => routine.id === run.routineId),
+      this.runs,
+      run,
+      this.now(),
+    );
     this.saveLater();
     this.emitRun(run);
+    if (off) this.emitRoutine(off.routine);
     const repeat =
       failsLikeLastOutcome(this.runs, run) ||
       (run.checkKey !== undefined &&
         outcomesNewestFirst(this.runs, run.routineId, run.id)[0]?.status === 'failed');
-    this.options.onRunFailed?.(cloneRun(run), alert === undefined && repeat ? null : alert);
+    this.options.onRunFailed?.(
+      cloneRun(run),
+      off?.alert ?? (alert === undefined && repeat ? null : alert),
+    );
   }
 
   private advancePastOccurrence(routine: Routine, now: number, occurrence: number) {

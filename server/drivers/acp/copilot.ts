@@ -306,6 +306,22 @@ const SUPPORT: AcpSupport = {
   buildPromptText: (turn) => (turn.system ? `${turn.system}\n\n${turn.text}` : turn.text),
 };
 
+// Copilot refuses every function in the reserved `browser` and `computer` namespaces with an HTTP 400 on each turn,
+// and names an MCP server's namespace after its config key: only those two keys get a prefix, so other servers keep theirs.
+const COPILOT_RESERVED_SERVER_NAMES: ReadonlySet<string> = new Set(['browser', 'computer']);
+
+/** The config key Copilot gets for each server, in order: a reserved name becomes `maus_<name>` (numbered if taken). */
+export function copilotServerNames(names: readonly string[]): string[] {
+  const taken = new Set(names);
+  return names.map((name) => {
+    if (!COPILOT_RESERVED_SERVER_NAMES.has(name.toLowerCase())) return name;
+    let key = `maus_${name}`;
+    for (let n = 2; taken.has(key); n++) key = `maus_${name}_${n}`;
+    taken.add(key);
+    return key;
+  });
+}
+
 export const CopilotAgentDriver = {
   ...createAcpDriver(SUPPORT),
   /** Creates an instance with thread-isolated launcher config files, removed when the instance is disposed. */
@@ -322,9 +338,10 @@ export const CopilotAgentDriver = {
             directory,
             `${createHash('sha256').update(threadId).digest('hex')}.json`,
           );
+          const names = copilotServerNames(mcpServers.map((server) => server.name));
           const servers = Object.fromEntries(
-            mcpServers.map((server) => [
-              server.name,
+            mcpServers.map((server, index) => [
+              names[index],
               'command' in server
                 ? {
                     type: 'local',

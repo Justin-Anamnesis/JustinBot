@@ -2,7 +2,7 @@
 // own MausBot with its chats and notes, their private chats with every bot (messages, notifications, the files only
 // those chats used, and the files they uploaded and never sent), the routines that live in those chats, their memory
 // layers, their
-// engine home (its transcripts), their "About you", their own connections, their own browsers, and every session and
+// engine home (its transcripts), their "About you", their own connections and saved secrets, their own browsers, and every session and
 // phone of theirs. Nothing of it is handed to an admin. A routine they wrote for a shared place keeps running, as the
 // routine of whoever looks after its bot now (the Admins when nobody does), and admin activity says it was handed over.
 // They come off every bot's sharing and "Looked after by" (what they looked after falls to the Admins), so joining again
@@ -53,6 +53,8 @@ export interface TeamMemberLeftDeps {
   openedBy(person: string): string[];
   /** The person a conversation is private to (audience.ts), else null. */
   privateTo(threadId: string): string | null;
+  /** Their conversations shared with one person become that person's own, before their private chats go. */
+  sharesLeft?(person: string): void;
   /** Ends every session and open pairing code of this address; how many sessions ended. */
   revokeSessions(email: string): number;
   busy(botId: string, threadId: string): boolean;
@@ -69,6 +71,8 @@ export interface TeamMemberLeftDeps {
   eraseBrowsers(audience: Audience): Promise<boolean>;
   /** Their own connections, keys and MCP sign-ins (team-connections.ts). */
   forgetConnections(person: string): void | Promise<void>;
+  /** The secrets they typed into cards in their own chats (vault-store.ts). */
+  forgetSecrets(person: string): void;
   /** Every routine: `home` is the person whose private chat it lives in (routine-home.ts), `writer` who last wrote it,
    * `files` the attachments/ names it carries. */
   routines(): ReadonlyArray<{
@@ -134,6 +138,7 @@ export function createTeamMemberLeft(
       });
     }
     for (const routine of ownRoutines) deps.deleteRoutine(routine.id);
+    deps.sharesLeft?.(person);
     const mine = new Set(
       deps.openedBy(person).filter((threadId) => deps.privateTo(threadId) === person),
     );
@@ -206,6 +211,13 @@ export function createTeamMemberLeft(
         `[team] a leaving member's connections were not all removed: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
+    try {
+      deps.forgetSecrets(person);
+    } catch (error) {
+      console.warn(
+        `[team] a leaving member's saved secrets were not removed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     const browsers = await deps.eraseBrowsers(memberAudience(person)).catch(() => false);
     // Counts of shared things only: nothing here says what was theirs alone.
     deps.record({

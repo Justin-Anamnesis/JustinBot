@@ -16,11 +16,11 @@ type Line =
   | { kind: 'profile'; name?: string };
 
 /** The words for main's one line: a team this person is no longer in, that the clean workspace isn't where their bots went (`saved`: the account they moved with is signed in here too, one click away on the rail), or that a workspace of this computer's own opened from the rail is separate from My Cloud (`name`: one added from ＋, separate from the rest). */
-export function homeLineText(line: Line, platform?: string): string {
+export function homeLineText(line: Line): string {
   if (line.kind === 'profile')
     return line.name
       ? t('homeLine.local', { name: line.name })
-      : t('homeLine.profile', { name: computerName({ profile: 'default' }, platform) });
+      : t('homeLine.profile', { name: computerName({ profile: 'default' }) });
   if (line.kind === 'clean') return t(line.saved ? 'homeLine.cleanSaved' : 'homeLine.clean');
   return t('homeLine.left', { name: line.name });
 }
@@ -101,7 +101,7 @@ export function HomeLine() {
       ) : (
         <Users size={14} aria-hidden='true' />
       )}
-      {words && <span dir='auto'>{homeLineText(line, window.ogb?.platform)}</span>}
+      {words && <span dir='auto'>{homeLineText(line)}</span>}
       {aiMissing && <ConnectAiLink />}
       {informational && words && (
         <button

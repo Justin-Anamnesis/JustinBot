@@ -15,6 +15,7 @@ export interface TimelineMessage {
     | 'signin'
     | 'routine.run'
     | 'goal.run'
+    | 'burst'
     | 'digest'
     | 'compaction'
     | 'call'

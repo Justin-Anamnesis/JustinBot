@@ -11,6 +11,7 @@ import {
   LOCAL_VIEWER,
   markWelcomeFinished,
   WELCOME_VERSION,
+  type WelcomeViewer,
 } from '@/lib/onboarding';
 import { setLocale } from '@/lib/i18n';
 
@@ -58,11 +59,12 @@ const maus = (turns: number) => ({
   ],
 });
 let host: HTMLDivElement, root: Root;
-const show = async () => {
+const showAs = async (viewer: WelcomeViewer) => {
   await act(async () => {
-    root.render(createElement(MausBotWelcome, { viewer: LOCAL_VIEWER }));
+    root.render(createElement(MausBotWelcome, { viewer }));
   });
 };
+const show = () => showAs(LOCAL_VIEWER);
 const opened = () => f.welcoming.mock.calls.some(([id]) => id === 'maus');
 beforeEach(() => {
   setLocale('en');
@@ -97,6 +99,24 @@ afterEach(async () => {
 it('opens once the welcome is done and a bot has answered, though the app tour was never taken', async () => {
   await show();
   expect(opened()).toBe(true);
+});
+
+it("says it has a Chief of Staff's powers, off a team", async () => {
+  await show();
+  expect(document.body.textContent).toContain("Has a Chief of Staff's powers over your bots.");
+});
+
+it('on a team, never opens for a member, and tells the Owner nothing about a Chief of Staff', async () => {
+  f.state = {
+    ...f.state,
+    config: { ...(f.state.config as object), team: { id: 'team-acme', name: 'Acme' } },
+  };
+  await showAs({ hosted: false, canSave: false, cloudHome: true, teamRole: 'member' });
+  expect(opened()).toBe(false);
+  await showAs({ hosted: false, canSave: true, cloudHome: true, teamRole: 'owner' });
+  expect(opened()).toBe(true);
+  expect(document.body.textContent).toContain('Your helper for everything in the app.');
+  expect(document.body.textContent).not.toContain('Chief of Staff');
 });
 
 it('claims the launch when it opens, so the Cloud Pro popup and the updates question wait for a later one', async () => {

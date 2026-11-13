@@ -284,7 +284,7 @@ test('a payment the Admin is still confirming shows the setup screen too, at its
   await w.says(ready());
   assert.deepEqual(
     w.went.at(-1),
-    [`${CLOUD}/?desktop-settings=phone`, CLOUD],
+    [`${CLOUD}/?desktop-settings=phone&pair=open`, CLOUD],
     'what was asked for (its phone pairing) is what opens',
   );
   assert.equal(w.cloudLookups(), 3, 'looked up only once ready: its look, its session, its page');

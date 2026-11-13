@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
-import { teamWelcomeShownThisLaunch } from '@/lib/team-welcome';
+import {
+  invitedToTeam,
+  teamWelcomeShownThisLaunch,
+  useTeamWelcomeRecord,
+  type TeamWelcomeRecord,
+} from '@/lib/team-welcome';
 import { createPortal } from 'react-dom';
 import { BookOpen, Crown, Pencil, Sparkles, Wand2 } from 'lucide-react';
 
@@ -77,13 +82,23 @@ export function mausBotWelcomeDue(input: {
   );
 }
 
-/** On a team the team's welcome introduced things, and a run under way is never interrupted by the card. */
-export const teamQuiet = (state: {
-  config?: { team?: unknown } | null;
-  bots: ReadonlyArray<{ busy?: boolean }>;
-}): boolean =>
-  Boolean(state.config?.team) &&
-  (teamWelcomeShownThisLaunch() || state.bots.some((candidate) => candidate.busy));
+/** On a team a member never gets the card: the team's welcome is their introduction. Its admins get it, never over that
+ * welcome (`welcome`: their record of it, undefined while it is read) nor a run under way. */
+export function teamQuiet(
+  state: { config?: { team?: unknown } | null; bots: ReadonlyArray<{ busy?: boolean }> },
+  viewer: WelcomeViewer | null,
+  welcome: TeamWelcomeRecord | null | undefined,
+): boolean {
+  if (!state.config?.team) return false;
+  const welcomeFirst =
+    invitedToTeam(viewer) && (welcome === undefined || welcome?.welcomedAt === null);
+  return (
+    viewer?.canSave === false ||
+    welcomeFirst ||
+    teamWelcomeShownThisLaunch() ||
+    state.bots.some((candidate) => candidate.busy)
+  );
+}
 
 /** MausBot's first-launch card is due now (mausBotWelcomeDue), and, like the Cloud Pro popup and the product-updates
  * question, waits for the first reply (unknown until the bots load), for a launch after the one whose welcome finished, and
@@ -94,6 +109,10 @@ export function useMausBotWelcomeDue(viewer: WelcomeViewer | null): {
 } {
   const { state } = useStore();
   const bot = myDefaultBot(state.bots, useViewerEmail());
+  const teamId = state.config?.team?.id ?? null;
+  const teamWelcome = useTeamWelcomeRecord(
+    teamId && viewer?.canSave && invitedToTeam(viewer) ? teamId : null,
+  );
   // The app tour runs only when Settings starts it; one never taken does not hold this back.
   const touring = state.tourOpen;
   const onboardingDue =
@@ -111,7 +130,7 @@ export function useMausBotWelcomeDue(viewer: WelcomeViewer | null): {
     firstReplyPending(state) === false &&
     !welcomeFinishedThisLaunch() &&
     launchDialogShown() !== 'notices' &&
-    !teamQuiet(state);
+    !teamQuiet(state, viewer, teamWelcome);
   return { bot, due };
 }
 
@@ -140,8 +159,18 @@ export function MausBotWelcome({ viewer }: { viewer: WelcomeViewer | null }) {
   );
 }
 
+const LINES = [
+  [Sparkles, 'mausbotWelcome.line.helper'],
+  [BookOpen, 'mausbotWelcome.line.knows'],
+  [Wand2, 'mausbotWelcome.line.setup'],
+  [Crown, 'mausbotWelcome.line.powers'],
+] as const;
+
 export function MausBotWelcomeCard({ bot, onClose }: { bot: Bot; onClose: () => void }) {
-  const { dispatch } = useStore();
+  const { state, dispatch } = useStore();
+  const lines = state.config?.team
+    ? LINES.filter(([, key]) => key !== 'mausbotWelcome.line.powers')
+    : LINES;
   const advanced = useAdvancedMode();
   const reduced = usePrefersReducedMotion();
   const [draft, setDraft] = useState<WelcomeDraft>(() => draftOf(bot));
@@ -286,14 +315,7 @@ export function MausBotWelcomeCard({ bot, onClose }: { bot: Bot; onClose: () => 
             {t('mausbotWelcome.title', { name })}
           </h2>
           <ul className='mt-3 space-y-1.5 text-left text-[14px] leading-snug text-ink-secondary'>
-            {(
-              [
-                [Sparkles, 'mausbotWelcome.line.helper'],
-                [BookOpen, 'mausbotWelcome.line.knows'],
-                [Wand2, 'mausbotWelcome.line.setup'],
-                [Crown, 'mausbotWelcome.line.powers'],
-              ] as const
-            ).map(([Icon, key]) => (
+            {lines.map(([Icon, key]) => (
               <li key={key} className='flex items-start gap-2.5'>
                 <Icon size={15} className='mt-0.5 shrink-0 text-ink-tertiary' aria-hidden='true' />
                 {t(key)}

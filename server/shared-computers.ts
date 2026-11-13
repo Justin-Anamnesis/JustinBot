@@ -149,9 +149,12 @@ export type KnownLentComputer = {
     chrome: boolean;
   };
 };
+/** The bot an action is for, so the lent computer's menu can name it with its colour. */
+export type ActingBot = { name: string; color: string };
 type Job = {
   id: string;
   operation: Operation;
+  by?: ActingBot;
   active: () => boolean;
   sent: boolean;
   leased: boolean;
@@ -301,7 +304,9 @@ export class SharedComputers {
     if (!/^[a-f0-9]{64}$/.test(secret)) throw failure('Invalid computer credential', 400);
     const key = SharedComputers.key(owner.session, registration.id);
     const old = this.computers.get(key);
-    if (old) {
+    // Same session, same person: refresh it. Its person changed (a server that became, or stopped being, one person's own):
+    // it is replaced below, so it is found under the key its session has now.
+    if (old && old.owner.person === owner.person) {
       this.authorize(registration.id, owner.session, secret);
       // Its link was let in for the internet connection and Chrome as lent then: lent or taken back since, the link starts over.
       if (
@@ -315,6 +320,8 @@ export class SharedComputers {
       this.changed();
       return;
     }
+    // Its person changed: the former person's record of it is no longer lent, not merely away.
+    if (old) this.lent?.stopped(old.owner.person, registration.id);
     this.reap();
     // A new id from the same session replaces its entry; no other session can reach, replace or squat this key.
     for (const [stale, entry] of this.computers) {
@@ -608,8 +615,14 @@ export class SharedComputers {
       }));
   }
   /** The newest poll wins: one whose client dropped never takes the next job, and the reconnecting desktop is not refused. */
-  async poll(id: string, session: string, secret: string, gone?: AbortSignal) {
+  /** `person`: who the polling session is now; when it is no longer who registered, the computer is dropped (403) so the
+   * desktop connects again under its current key. */
+  async poll(id: string, session: string, secret: string, gone?: AbortSignal, person?: string) {
     const entry = this.authorize(id, session, secret);
+    if (person !== undefined && person !== entry.owner.person) {
+      this.disconnect(id, session, secret);
+      throw failure("This computer's access changed. Connect it again.", 403);
+    }
     const mine = ++entry.polls;
     entry.wake?.();
     entry.seen = Date.now();
@@ -623,7 +636,7 @@ export class SharedComputers {
         }
         if (!job.sent) {
           this.send(entry, job);
-          return { id: job.id, operation: job.operation };
+          return { id: job.id, operation: job.operation, ...(job.by ? { by: job.by } : {}) };
         }
       }
       return null;
@@ -698,6 +711,7 @@ export class SharedComputers {
     operation: Operation,
     principal: string | null,
     active: () => boolean,
+    by?: ActingBot | null,
   ): Promise<unknown> {
     if (!principal)
       throw failure(
@@ -775,6 +789,7 @@ export class SharedComputers {
       const job: Job = {
         id,
         operation: forDesktop,
+        ...(by ? { by: { name: by.name, color: by.color } } : {}),
         active,
         sent: false,
         leased: false,

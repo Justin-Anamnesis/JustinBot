@@ -16,7 +16,7 @@ import {
   type ConnectionHandoffWhat,
   type LoginHandoffResult,
 } from './login-handoff.ts';
-import type { VaultStore } from './vault-store.ts';
+import type { VaultReader, VaultStore } from './vault-store.ts';
 import type { OnePasswordLogins } from './onepassword.ts';
 import type { LoginRouteDeps } from './routes/logins.ts';
 import {
@@ -180,14 +180,14 @@ export class BotLogins {
     return this.providers.flatMap((provider) => linkedSecrets(provider));
   }
 
-  /** The names of the secrets the bot may use, for its prompt: never a value. */
-  secretNamesFor(botId: string): Array<{ name: string; refOnly?: true }> {
+  /** The names of the secrets the bot may use in a turn `reader` names, for its prompt: never a value. */
+  secretNamesFor(botId: string, reader: VaultReader): Array<{ name: string; refOnly?: true }> {
     const linked = this.providers.flatMap((provider) =>
       linkedSecrets(provider, botId).flatMap((secret) =>
         linkedSecretNames(secret).map(({ name }) => ({ name })),
       ),
     );
-    return [...this.store.secretNamesFor(botId), ...linked];
+    return [...this.store.secretNamesFor(botId, reader), ...linked];
   }
 
   /** A secret a linked manager holds for the bot by this name, read from it now; its id is safe as a file name. */
@@ -266,6 +266,20 @@ export class BotLogins {
           this.store.setOnePasswordGrant(vaultId, bots);
           return this.onePassword.status();
         },
+        grantItem: async (item, bots) => {
+          // Handing an item back to its vault's choice is kept even while 1Password cannot be read.
+          if (bots !== null) {
+            const read = await this.onePassword.readsItem(item);
+            if (read !== true) return read;
+          }
+          this.store.setOnePasswordItemGrant(item, bots);
+          return true;
+        },
+        // Kept whole, even for an item not loaded here yet: it then opens no wider than the computer that chose it.
+        setItemGrants: (grants, keep) =>
+          this.store.setOnePasswordItemGrants(
+            keep ? { ...this.store.onePasswordItemGrants(), ...grants } : grants,
+          ),
       },
     };
   }

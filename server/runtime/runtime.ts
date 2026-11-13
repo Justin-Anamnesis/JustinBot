@@ -318,6 +318,7 @@ export class Runtime {
     const lineage = parent ? path(this.store, parent) : [];
     const root = lineage[0];
     const target = req.assignee;
+    let sameCall = false;
     const ancestors = ownThread(lineage, target, req.ownThread) ? lineage.slice(0, -1) : lineage;
     if (
       !answersSender(parent, mode, { botId: target.botId, ...target.destination }) &&
@@ -332,21 +333,21 @@ export class Runtime {
       return refuse('Cannot assign work back to an ancestor; results return automatically');
     }
     if (parent) {
-      const existing = this.store
-        .children(parent.id)
-        .findLast(
-          (c) =>
-            c.brief === brief &&
-            c.mode === mode &&
-            c.assignee.botId === target.botId &&
-            c.assignee.destination.threadId === target.destination.threadId &&
-            c.assignee.destination.groupId === target.destination.groupId,
-        );
+      const siblings = this.store.children(parent.id);
+      const existing = siblings.findLast(
+        (c) =>
+          c.brief === brief &&
+          c.mode === mode &&
+          c.assignee.botId === target.botId &&
+          c.assignee.destination.threadId === target.destination.threadId &&
+          c.assignee.destination.groupId === target.destination.groupId,
+      );
       if (existing && !(req.rework && isTerminal(existing)))
         return { ok: true, assignment: existing, duplicate: true };
       if (parent.depth + 1 > this.limits.depth)
         return refuse(`Assignment depth limit reached (${this.limits.depth})`);
-      if (root?.budgets && root.budgets.requests + 1 > this.limits.requests) {
+      sameCall = req.fanOut !== undefined && siblings.some((c) => c.fanOut === req.fanOut);
+      if (!sameCall && root?.budgets && root.budgets.requests + 1 > this.limits.requests) {
         this.store.update(root, {
           kind: 'budget',
           at: now,
@@ -390,6 +391,7 @@ export class Runtime {
       rework: Boolean(req.rework),
       ...(req.approved !== undefined ? { approved: req.approved } : {}),
       ...(req.batchKey !== undefined ? { batchKey: req.batchKey } : {}),
+      ...(req.fanOut !== undefined ? { fanOut: req.fanOut } : {}),
       version: 1,
     };
     if (!parent) {
@@ -401,7 +403,7 @@ export class Runtime {
     if (problem) return refuse(problem);
     this.store.transaction(() => {
       this.store.insert(node, { kind: 'enqueued', at: now, detail: 'queued' });
-      if (root?.budgets) {
+      if (root?.budgets && !sameCall) {
         root.budgets.requests += 1;
         this.store.update(root);
       }
@@ -447,12 +449,8 @@ export class Runtime {
         now - this.since(n.lastActivityAt) > this.limits.queueMs
       ) {
         this.cancelTree(n, n.executions > 0 ? 'not resumed' : 'never started', 'failed', 'expired');
-      } else if (
-        n.status === 'needs_input' &&
-        this.inputExpires(n) &&
-        now - this.since(n.lastActivityAt) > this.limits.inputWaitMs
-      ) {
-        this.cancelTree(n, 'the person did not answer', 'failed', 'expired');
+      } else if (n.status === 'needs_input' && this.inputExpires(n)) {
+        this.chaseParked(n, now);
       } else if (n.status === 'running') {
         const turn = this.turns.get(n.id);
         if (turn && mono - turn.activeAt > this.limits.turnStallMs) {
@@ -788,6 +786,7 @@ export class Runtime {
       n.status = 'needs_input';
       n.question = clip(result.question, BRIEF_MAX);
       n.lastActivityAt = now;
+      delete n.remindedAt;
       if (result.cards?.length) n.cards = result.cards;
       else delete n.cards;
       const choice = result.decide?.default?.trim();
@@ -1023,7 +1022,8 @@ export class Runtime {
     for (const child of this.store.children(n.id)) {
       if (isTerminal(child)) continue;
       const fresh = this.store.get(child.id);
-      if (fresh && !isTerminal(fresh)) this.cancelTree(fresh, reason, status, outcome);
+      if (fresh && !isTerminal(fresh))
+        this.cancelTree(fresh, STOPPED_WITH_REQUEST, status, outcome);
     }
     const fresh = this.store.get(n.id);
     if (fresh && !isTerminal(fresh)) this.settle(fresh, status, outcome, reason);
@@ -1162,7 +1162,29 @@ export class Runtime {
   }
 
   private inputExpires(n: Assignment): boolean {
-    return Number.isFinite(this.limits.inputWaitMs) && !(n.cards && n.cards.length > 0);
+    return Number.isFinite(this.limits.inputWaitMs) && n.parentId !== undefined;
+  }
+
+  /** One reminder, then expiry. Not on this.since(): a window every boot reopened would never close on a host that restarts. A
+   * question its requester decides asks the person nothing, so it gets no reminder. */
+  private chaseParked(n: Assignment, now: number): void {
+    const { inputWaitMs, inputRemindMs } = this.limits;
+    const closesAt = n.lastActivityAt + inputWaitMs;
+    if (n.remindedAt === undefined && Number.isFinite(inputRemindMs) && !n.decide) {
+      if (now - n.lastActivityAt <= inputRemindMs) return;
+      n.remindedAt = now;
+      this.store.update(n, { kind: 'reminded', at: now, detail: 'waiting on the person' });
+      this.touch(n);
+      this.safe('remind', () =>
+        this.runner.remind?.(n, Math.max(closesAt, now + inputWaitMs - inputRemindMs)),
+      );
+      return;
+    }
+    const notBefore =
+      n.remindedAt === undefined
+        ? closesAt
+        : Math.max(closesAt, n.remindedAt + inputWaitMs - inputRemindMs);
+    if (now > notBefore) this.cancelTree(n, 'the person did not answer', 'failed', 'expired');
   }
 
   /** Whether its requester takes a turn for its question: a one-way notice's never does, nor a `poll` root. */

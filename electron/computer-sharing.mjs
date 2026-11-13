@@ -29,6 +29,7 @@ import { createComputerAsks } from './computer-asks.mjs';
 import { LINK_ASLEEP, linkPath } from './device-link-protocol.mjs';
 import { shareableDrive } from './shared-drives.mjs';
 import nativeText from './native-text.cjs';
+import { actingBot } from './lending-indicator.mjs';
 
 const uuid = (value) =>
   typeof value === 'string' &&
@@ -364,6 +365,8 @@ const WHY_NOT_LENT = Object.freeze({
 const whyNotLent = (problem) => WHY_NOT_LENT[problem] ?? 'native.lendTray.whyUnreachable';
 /** The link carried bytes this recently: the tray says the computer is in use. */
 const IN_USE_MS = 5_000;
+/** The menu keeps naming the bot that acted here this long after its last action, so it doesn't flicker between steps. */
+const ACTING_MS = 30_000;
 /** A site opened through this computer goes into its activity once per outcome in this long, so a page's many
  * connections are one line. */
 const BROWSE_NOTE_MS = 10 * 60_000;
@@ -455,6 +458,35 @@ export function createComputerSharing({
   /** The Clouds whose device link is open now. */
   const linked = new Set();
   const inUse = new Map();
+  /** Each bot that acted here lately, by Cloud and bot name, until ACTING_MS after its last action ends (`held` while it runs). */
+  const acting = new Map();
+  const actedFor = (id, by, held = false) => {
+    const key = `${id}\n${by.name}`;
+    clearTimeout(acting.get(key)?.timer);
+    const timer = held
+      ? null
+      : setTimeout(() => {
+          acting.delete(key);
+          changed();
+        }, ACTING_MS);
+    timer?.unref?.();
+    acting.set(key, { env: id, by, timer });
+  };
+  const forgetHeld = (id, by) => {
+    const key = `${id}\n${by.name}`;
+    if (acting.get(key)?.timer === null) acting.delete(key);
+  };
+  const forgetActing = (id) => {
+    for (const [key, entry] of acting)
+      if (id === undefined || entry.env === id) {
+        clearTimeout(entry.timer);
+        acting.delete(key);
+      }
+  };
+  const actingOn = (env) =>
+    status.get(env.id)?.connected
+      ? [...acting.values()].filter((entry) => entry.env === env.id)
+      : [];
   let closed = false;
   let maintainerOff = false;
   let executing = null;
@@ -473,7 +505,13 @@ export function createComputerSharing({
             (records[env.id]?.cloud || records[env.id]?.own) && records[env.id]?.enabled === true,
         );
     const using = lent.filter(
-      (env) => executing?.env === env.id || (inUse.has(env.id) && linked.has(env.id)),
+      (env) =>
+        executing?.env === env.id ||
+        actingOn(env).length ||
+        (inUse.has(env.id) && linked.has(env.id)),
+    );
+    const bots = using.flatMap((env) =>
+      actingOn(env).map(({ by }) => ({ ...by, cloud: env.name })),
     );
     const problems = lendingProblems(lent);
     return {
@@ -494,6 +532,7 @@ export function createComputerSharing({
         .map((env) => env.name),
       ...(problems.length ? { problems } : {}),
       using: using.map((env) => env.name),
+      ...(bots.length ? { bots } : {}),
       paused,
       ...(pauseError ? { pauseError } : {}),
       terminal: terminalAccount !== null && terminalAccount === signedInAccount(),
@@ -868,6 +907,7 @@ export function createComputerSharing({
       running.delete(id);
     }
     status.set(id, { connected: false });
+    forgetActing(id);
   };
   const run = (env, grant) => {
     stop(env.id);
@@ -994,7 +1034,9 @@ export function createComputerSharing({
               });
               continue;
             }
+            const by = actingBot(job.by);
             executing = { env: env.id, action: job.operation.action };
+            if (by) actedFor(env.id, by, true);
             changed();
             const jobAbort = new AbortController();
             const jobSignal = AbortSignal.any([signal, jobAbort.signal]);
@@ -1065,7 +1107,13 @@ export function createComputerSharing({
               if (control) presence.acted(job.operation.tool_name, job.operation.arguments);
               await renewal?.catch(() => {});
               await control?.release().catch(() => {});
+              // A stopped or replaced run must not name its bot again after stop() cleared it.
               executing = null;
+              if (by) {
+                if (!closed && !signal.aborted && running.get(env.id) === live)
+                  actedFor(env.id, by);
+                else forgetHeld(env.id, by);
+              }
               changed();
             }
             activity.record({
@@ -1783,6 +1831,7 @@ export function createComputerSharing({
     },
     close() {
       closed = true;
+      forgetActing();
       for (const id of running.keys()) stop(id);
       syncAsking();
       asks.close();

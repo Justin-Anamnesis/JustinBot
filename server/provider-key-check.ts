@@ -66,7 +66,7 @@ export function providerModelsUrl(provider: ProviderKeyKind, base?: string | nul
   return `${root}/models`;
 }
 
-function modelIds(body: unknown): string[] {
+function modelIds(body: unknown): string[] | null {
   const record =
     body && typeof body === 'object' ? (body as { data?: unknown; models?: unknown }) : null;
   const list = Array.isArray(body)
@@ -75,7 +75,8 @@ function modelIds(body: unknown): string[] {
       ? record.data
       : Array.isArray(record?.models)
         ? record.models
-        : [];
+        : null;
+  if (!list) return null;
   const ids: string[] = [];
   for (const entry of list) {
     const item =
@@ -137,7 +138,10 @@ export async function checkProviderKey(
         return { ok: false, reason: 'unexpected', status: response.status };
       return { ok: true, check: 'authentication', models: [], freeTier };
     }
-    return { ok: true, check: 'models', models: modelIds(body) };
+    const models = modelIds(body);
+    return models === null
+      ? { ok: false, reason: 'unexpected', status: response.status }
+      : { ok: true, check: 'models', models };
   } catch {
     return { ok: false, reason: 'unreachable' };
   } finally {

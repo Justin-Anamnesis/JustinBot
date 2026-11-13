@@ -18,6 +18,7 @@ type Flow = {
   busy: boolean;
   starting: boolean;
   revoked: boolean;
+  revision: number;
 };
 
 const failure = (message: string, status: number) => Object.assign(new Error(message), { status });
@@ -63,6 +64,7 @@ export class ProviderAuthSessions {
           busy: false,
           starting: false,
           revoked: false,
+          revision: 0,
         };
     flow.busy = true;
     flow.starting = true;
@@ -107,8 +109,15 @@ export class ProviderAuthSessions {
     const flow = this.owned(instanceId, owner, flowId);
     if (!flow.instance.getAuthentication)
       throw failure('Sign-in status is unavailable for this provider.', 404);
+    const revision = flow.revision;
     const status = await flow.instance.getAuthentication(flowId);
-    if (flow.revoked) throw failure('This sign-in session ended.', 404);
+    if (
+      flow.revoked ||
+      this.flows.get(instanceId) !== flow ||
+      flow.flowId !== flowId ||
+      flow.revision !== revision
+    )
+      throw failure('This sign-in session ended.', 404);
     if (status.phase !== 'waiting') flow.expiresAt = 0;
     if (status.phase === 'succeeded') this.signedIn(instanceId);
     return status;
@@ -121,7 +130,9 @@ export class ProviderAuthSessions {
     flow.busy = true;
     try {
       await flow.instance.completeAuthentication(flowId, callbackUrl);
-      if (this.flows.get(instanceId) === flow) this.flows.delete(instanceId);
+      if (flow.revoked || this.flows.get(instanceId) !== flow)
+        throw failure('This sign-in session ended.', 404);
+      this.flows.delete(instanceId);
       this.signedIn(instanceId);
     } finally {
       flow.busy = false;
@@ -131,6 +142,8 @@ export class ProviderAuthSessions {
   async cancel(instanceId: string, owner: string, flowId: string) {
     const flow = this.owned(instanceId, owner, flowId);
     flow.busy = true;
+    // Invalidate polls already in flight, but let a later poll read the provider's cancelled status.
+    flow.revision++;
     try {
       await flow.instance.cancelAuthentication?.();
     } finally {
@@ -161,6 +174,7 @@ export class ProviderAuthSessions {
       busy: true,
       starting: false,
       revoked: false,
+      revision: 0,
     };
     this.flows.set(instance.instanceId, flow);
     try {
