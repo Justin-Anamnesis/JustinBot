@@ -61,11 +61,19 @@ git log --oneline justin-main..main-fmt
 git switch justin-main && git merge main-fmt
 ```
 
-第二步的命令是按 git 语义写的，第一次真实同步时要验证一遍（2026-11-11 只做过从零生成，没做过增量同步）。上游提交很密（2026-11-07 到 11-10 发了 5 个版本），逐个 cherry-pick 不现实；Justin 的建议是按「合并到某个上游提交为止」来取，并在下表记下取到哪。
+这三步在 2026-11-13 实测过一次。实测补充：
+
+- `main` 分支检出在基线 worktree（`/Users/mac/Desktop/Study/.tmp/worktrees/JustinBot/main`）里，第一步在那里做。`git push origin main` 被明昊的守卫拦，要他自己执行。
+- 体积棘轮表冲突的解法：`git checkout --theirs scripts/testing/file-size-ratchet.test.ts`，再按测试里同样的过滤条件重算整张 `LINES` 表。
+- 合并后在主工作区跑 `OMB_SKIP_HOOKS=1 pnpm install --frozen-lockfile`（上游几乎每次都改锁文件），再跑类型检查、lint 和两套测试。
+- 13 个与格式无关的失败是本机环境造成的，同步前后都在，不用处理：`node` 只经 mise 安装、测试的受限 PATH 里找不到（10 个，`engine-install` 与 `harness/registry`）；系统代理用 fake-IP DNS，把 `*.test` 这类名字解析成 `198.18.x.x`（2 个，`egress`）；本机装了 `pi` 命令行（1 个，`control-omb`）。
+
+上游提交很密（两天 550 个提交），逐个 cherry-pick 不现实；按「合并到某个上游提交为止」来取，并在下表记下取到哪。
 
 | 日期 | 上游提交 | 纯格式化提交 | 备注 |
 | --- | --- | --- | --- |
 | 2026-11-11 | `2e1ff4bc0` | `097ce520b` | 首次全仓格式化 |
+| 2026-11-13 | `4b8c82c73`（0.1.155，655 个提交，1395 个文件） | `d2809aecb` | 第一次增量同步，流程按上面三步实测可用。合并冲突 2 个文件（体积棘轮表、`src/lib/glass-surface.test.ts`）；新冒出 14 个读源码文本的测试失败，分布在 6 个文件，其中 9 个同一原因；Electron node 测试 0 失败 |
 
 ## 格式与 lint
 

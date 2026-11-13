@@ -77,7 +77,7 @@ describe("the lent computer's menu dots", () => {
       )?.[1] ?? '';
     expect(
       Object.fromEntries(
-        [...table.matchAll(/(\w+): "(#[0-9A-F]{6})"/gi)].map(([, name, hex]) => [name, hex]),
+        [...table.matchAll(/(\w+): ["'](#[0-9A-F]{6})["']/gi)].map(([, name, hex]) => [name, hex]),
       ),
     ).toEqual(MAUS_COLORS);
   });

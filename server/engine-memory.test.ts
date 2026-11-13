@@ -994,7 +994,8 @@ describe("an engine's adapter on a Cloud home", () => {
         const source = readFileSync(join(drivers, file), 'utf8');
         if (!source.includes('createOpenAIChatRuntime(')) return [];
         const kind =
-          /driverKind: "([^"]+)"/.exec(source)?.[1] ?? /DRIVER_KIND = "([^"]+)"/.exec(source)?.[1];
+          /driverKind: ["']([^"']+)["']/.exec(source)?.[1] ??
+          /DRIVER_KIND = ["']([^"']+)["']/.exec(source)?.[1];
         return kind ? [kind] : [`no kind found in ${file}`];
       });
     expect(kinds.length).toBeGreaterThanOrEqual(8);

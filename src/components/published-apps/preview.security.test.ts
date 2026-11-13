@@ -182,8 +182,8 @@ describe('the sandbox a published site runs in', () => {
   it("runs in a window whose preload never loads into a frame and which never frames the app's own server", () => {
     const main = source('electron/main.mjs');
     const preferences = main.slice(
-      main.indexOf('preload: path.join(__dirname, "preload.cjs")') - 200,
-      main.indexOf('preload: path.join(__dirname, "preload.cjs")') + 600,
+      main.indexOf("preload: path.join(__dirname, 'preload.cjs')") - 200,
+      main.indexOf("preload: path.join(__dirname, 'preload.cjs')") + 600,
     );
     expect(preferences).toContain('contextIsolation: true');
     for (const opening of [
@@ -196,10 +196,10 @@ describe('the sandbox a published site runs in', () => {
     ])
       expect(main, opening).not.toContain(opening);
     expect(main).toMatch(
-      /will-frame-navigate[\s\S]{0,700}target === rendererOrigin\(\) \|\| allowedOrigins\(environmentsState, rendererOrigin\(\)\)\.has\(target\)[\s\S]{0,80}preventDefault/,
+      /will-frame-navigate[\s\S]{0,700}target === rendererOrigin\(\) \|\|\s*allowedOrigins\(environmentsState, rendererOrigin\(\)\)\.has\(target\)[\s\S]{0,80}preventDefault/,
     );
     expect(main).toMatch(
-      /setWindowOpenHandler\(\(\{ url \}\) => \{[\s\S]{0,300}return \{ action: "deny" \};/,
+      /setWindowOpenHandler\(\(\{ url \}\) => \{[\s\S]{0,300}return \{ action: ["']deny["'] \};/,
     );
   });
 

@@ -43,8 +43,8 @@ function mainRule() {
   expect(start).toBeGreaterThanOrEqual(0);
   expect(end).toBeGreaterThan(start);
   expect(
-    source.includes(
-      'registerUpdaterIpc({ pageAllowed: updaterPageAllowed, serverPage: event => activePageOrigin(event), confirmRestart: ',
+    /registerUpdaterIpc\(\{\s*pageAllowed: updaterPageAllowed,\s*serverPage: \(?event\)? => activePageOrigin\(event\),\s*confirmRestart: /.test(
+      source,
     ),
     'main.mjs wires the updater to updaterPageAllowed',
   ).toBe(true);
