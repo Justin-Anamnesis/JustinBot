@@ -126,7 +126,7 @@ beforeAll(async () => {
   ada = (await team.pair(ADA)).token!;
   cleo = (await team.pair(CLEO)).token!;
   for (const name of ['Scout', 'Pilot']) {
-    const created = await team.as(owner, 'POST', '/api/bots', { name });
+    const created = await team.as(owner, 'POST', '/api/bots', { name, visibility: 'everyone' });
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     if (name === 'Scout') scout = created.body.bot;
     else pilot = created.body.bot;
@@ -303,7 +303,10 @@ it(
       expect(await order(token), "an Admin's order is the default too").toEqual(teams);
     expect(await order(ada), 'Ada keeps the order she chose').toEqual(flipped);
     // A bot made after she ordered hers takes its place in the team's order in her list too.
-    const created = await team.as(owner, 'POST', '/api/bots', { name: 'Atlas' });
+    const created = await team.as(owner, 'POST', '/api/bots', {
+      name: 'Atlas',
+      visibility: 'everyone',
+    });
     expect(created.status).toBe(201);
     const atlas = created.body.bot.id as string;
     const three = async (token: string) =>

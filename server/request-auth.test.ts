@@ -154,6 +154,30 @@ describe('scopes', () => {
       expect(requiredScope(method, path), `${method} ${path}`).toBe('admin');
   });
 
+  it("lets a client read a bot's Data and nothing that runs, changes or exports it", () => {
+    for (const [method, path] of [
+      ['GET', '/api/bots/bot-1/data'],
+      ['POST', '/api/bots/bot-1/data/page'],
+      ['GET', '/api/bots/bot-1/data/cards/c_12/image'],
+    ] as const)
+      expect(requiredScope(method, path), `${method} ${path}`).toBe('client');
+    for (const [method, path] of [
+      ['POST', '/api/bots/bot-1/data/run'],
+      ['POST', '/api/bots/bot-1/data/cancel'],
+      ['POST', '/api/bots/bot-1/data/export'],
+      ['PATCH', '/api/bots/bot-1/data/cards/c_12'],
+      ['DELETE', '/api/bots/bot-1/data/cards/c_12'],
+      ['GET', '/api/bots/bot-1/data/tables/orders/stats'],
+      ['GET', '/api/bots/bot-1/data/tables/orders/histogram'],
+      ['POST', '/api/bots/bot-1/data'],
+      ['GET', '/api/bots/bot-1/data/page'],
+      ['POST', '/api/bots/bot-1/data/cards/c_12/image'],
+      ['GET', '/api/bots/bot-1/data/cards/x/image'],
+      ['GET', '/api/bots/bot-1/data/cards/c_12/image/extra'],
+    ] as const)
+      expect(requiredScope(method, path), `${method} ${path}`).toBe('admin');
+  });
+
   it('keeps a card\'s "Use a saved one" an admin\'s, since picking one lets a bot use a Vault item', () => {
     for (const [method, path] of [
       ['GET', '/api/bots/bot-1/secret-cards/card-1/saved'],
@@ -273,6 +297,7 @@ describe('scopes', () => {
       ['GET', '/api/bots/x/memory'],
       ['PUT', '/api/bots/x/memory'],
       ['PUT', '/api/section-context'],
+      ['PUT', '/api/groups/order'],
       ['GET', '/api/threads/t/events'],
       ['GET', '/api/mcp/servers'],
       ['POST', '/api/mcp/servers'],
@@ -300,10 +325,10 @@ describe('scopes', () => {
       ['POST', '/api/logins/1password'],
       ['POST', '/api/logins/1password/refresh'],
       ['DELETE', '/api/logins/1password'],
-      ['GET', '/api/vault'],
       ['POST', '/api/vault/secrets'],
       ['PATCH', '/api/vault/secrets/s1'],
-      ['DELETE', '/api/vault/secrets/s1'],
+      ['GET', '/api/vault/secrets/s1'],
+      ['DELETE', '/api/vault/secrets'],
       ['POST', '/api/threads/t/messages/m/app'],
       ['GET', '/api/bots/x/apps/m/rpc'],
       ['POST', '/api/bots/x/apps/m/delete'],
@@ -327,6 +352,8 @@ describe('scopes', () => {
       ['POST', '/api/team/my-connections/mcp/mail/sign-in'],
       ['PUT', '/api/team/my-connections/mcp/mail/key'],
       ['DELETE', '/api/team/my-connections/mcp/mail'],
+      ['GET', '/api/vault'],
+      ['DELETE', '/api/vault/secrets/s1'],
     ] as const)
       expect(requiredScope(method, path), `${method} ${path}`).toBe('client');
     for (const [method, path] of [
@@ -613,7 +640,7 @@ describe('resolveRequestAuth', () => {
     );
     expect(csrf.error).toBe('forbidden: cross-origin request');
     expect(sessions.list()[0]?.expiresAt).toBe(session.expiresAt);
-    const overScope = resolve({ authorization: `Bearer ${token}` }, '/api/bots', 'POST');
+    const overScope = resolve({ authorization: `Bearer ${token}` }, '/api/webhooks', 'POST');
     expect(overScope.status).toBe(403);
     expect(sessions.list()[0]?.expiresAt).toBe(session.expiresAt);
     const { ticket } = sessions.issueStreamTicket(session.id);
@@ -682,6 +709,9 @@ describe('resolveRequestAuth', () => {
       '/api/setup-import/grok',
       '/api/local-computer',
       '/api/bots/bot-1/local-computer',
+      '/api/usb-phones/PHONE1/stream',
+      '/api/usb-phones/emulator-5554/stream',
+      '/api/usb-phones/SM.G991B/stream',
     ]) {
       expect(
         resolveRequestAuth(request({ host: '127.0.0.1:8799' }, 'GET'), options(path)).status,
@@ -702,6 +732,7 @@ describe('resolveRequestAuth', () => {
       '/api/webhooks',
       '/api/local-computer/instances',
       '/api/bots/bot-1/local-computer/screenshot',
+      '/api/usb-phones',
     ]) {
       expect(
         resolveRequestAuth(request({ host: '127.0.0.1:8799' }, 'GET'), options(path)).auth?.kind,

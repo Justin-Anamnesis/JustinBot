@@ -70,6 +70,9 @@ vi.mock('@/lib/interface-mode', () => ({
   useAdvancedMode: () => fixture.advanced,
   setAdvancedMode: () => {},
 }));
+vi.mock('@/state/store-select', async (importOriginal) =>
+  (await import('@/testing/plain-store-select')).plainStoreSelect(await importOriginal()),
+);
 vi.mock('@/state/store', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/state/store')>();
   return { ...original, useStore: () => ({ state: fixture.state, dispatch: fixture.dispatch }) };
@@ -92,6 +95,11 @@ import {
   setSidebarDensity,
 } from '@/lib/sidebar-preferences';
 import { Sidebar, TeamMenuItems } from './Sidebar';
+const drawSidebar = (
+  Sidebar as unknown as {
+    type: (props: import('react').ComponentProps<typeof Sidebar>) => import('react').ReactNode;
+  }
+).type;
 import { PinnedBotRoster } from './PinnedCircleThreads';
 import { SidebarFooter } from './SidebarFooter';
 import { SidebarResizeHandle } from './SidebarResizeHandle';
@@ -141,7 +149,11 @@ function nodes(value: ReactNode): ReactElement<Props>[] {
 function render(collapseToIcons = false) {
   fixture.index = 0;
   fixture.effects = [];
-  const root = Sidebar({ open: false, onClose: () => {}, collapseToIcons }) as ReactElement<Props>;
+  const root = drawSidebar({
+    open: false,
+    onClose: () => {},
+    collapseToIcons,
+  }) as ReactElement<Props>;
   return { root, tree: [root, ...nodes(root.props.children)] };
 }
 const sectionOrder = (tree: ReactElement<Props>[]) =>

@@ -669,10 +669,17 @@ export async function launchUi(
     mode: { type: 'string' },
     engine: { type: 'string' },
   });
-  if (values.engine !== undefined && values.engine !== 'codex') {
+  const extraEngines: Record<string, 'codex' | 'customAcp' | 'cline' | 'copilot' | 'opencode'> = {
+    codex: 'codex',
+    acp: 'customAcp',
+    cline: 'cline',
+    copilot: 'copilot',
+    opencode: 'opencode',
+  };
+  if (values.engine !== undefined && !Object.hasOwn(extraEngines, String(values.engine))) {
     throw new ControlOmbError(
       `unknown --engine ${JSON.stringify(values.engine)}`,
-      'the fake Claude CLI always runs; --engine codex adds the fake Codex app-server beside it',
+      'the fake Claude CLI always runs; --engine codex adds the fake Codex app-server beside it, --engine acp, cline or copilot a fake ACP agent, --engine opencode the OpenCode at OMB_VERIFY_OPENCODE_CLI',
     );
   }
   const entryName = typeof values.entry === 'string' ? values.entry : 'threads';
@@ -742,7 +749,7 @@ export async function launchUi(
       { binaryPath: binary, executablePath: chrome ?? '' },
       undefined,
       undefined,
-      values.engine === 'codex' ? ['codex'] : [],
+      values.engine === undefined ? [] : [extraEngines[String(values.engine)]!],
       fixtureOptions.boatFixtureApi,
     );
     checkpoint();

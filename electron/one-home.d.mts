@@ -10,6 +10,17 @@ export type OneHomeFailing = {
   errorParams?: Record<string, string | number>;
   items?: OneHomeNotCarried[];
 };
+/** How far the check of what arrived is. */
+export type OneHomeChecking = {
+  step: 'manifest' | 'files' | 'chats' | 'attachments' | 'credentials' | (string & {});
+  done: number;
+  total: number;
+  bots: number;
+};
+/** My Cloud did not answer, and is asked again at `until`. */
+export type OneHomeSlow = { until: number };
+/** Another computer moves into the same Cloud now, by its name ("" when it gave none): this one waits for it. */
+export type OneHomeQueued = { name: string };
 /** A connector that stayed on this computer. */
 export type OneHomeStayed = { name: string; needs?: string };
 type OneHomePhase =
@@ -21,6 +32,8 @@ type OneHomePhase =
       chats?: { done: number; total: number };
       failing?: OneHomeFailing;
       updating?: true;
+      slow?: OneHomeSlow;
+      queued?: OneHomeQueued;
     }
   /** `waitingFor`: the bot or room whose work holds the move ("" when it has no name), and `waitingWhat` what it is;
    * neither while it waits for a quiet moment or has not asked yet. */
@@ -29,8 +42,13 @@ type OneHomePhase =
       waitingFor?: string;
       waitingWhat?: 'bot' | 'room' | 'sign-in';
       failing?: OneHomeFailing;
+      queued?: OneHomeQueued;
     }
-  | { phase: 'finishing'; failing?: OneHomeFailing }
+  /** `checking`: the check of what arrived, at its step (`manifest`, `files`, `chats`, `attachments`, `credentials`), with
+   * `done` of `total` there and how many bots it checks. */
+  | { phase: 'finishing'; checking?: OneHomeChecking; slow?: OneHomeSlow; failing?: OneHomeFailing }
+  /** No move has started: the person is asked which bots go. */
+  | { phase: 'choose' }
   /** What arrived, checked on both sides; `at`: when the move was done; `phone`: a phone was paired with this computer; `held`: keys a trial's Cloud keeps unused while its Claude credit lasts; `left`: what My Cloud refused for good, which stayed where it was; `stayed`: connectors that work only on this computer (`needs`: a program My Cloud lacks). */
   | {
       phase: 'done';
@@ -92,6 +110,8 @@ export declare const QUIET_MS: number;
 export declare const CHECK_PASSES: number;
 export declare const FROZEN_RETRY_MS: number;
 export declare const COPY_RETRY_MS: number[];
+export declare const CHECK_RESUME_MS: number;
+export declare const QUEUE_POLL_MS: number;
 export declare const FAILING_LINE_MS: number;
 export declare const KEPT_MS: number;
 export function parseJournal(value: unknown): Record<string, any> | null;
@@ -119,8 +139,8 @@ export function createOneHome(deps: {
   journal: { read(): unknown; write(value: unknown): void };
   cloud(): OneHomeCloud | null;
   send: {
-    move(options?: { final?: boolean }): Promise<unknown>;
-    check(): Promise<{ ok: boolean }>;
+    move(options?: { final?: boolean; files?: boolean }): Promise<unknown>;
+    check(options?: { stopped?(): boolean }): Promise<{ ok: boolean }>;
     switches(): Record<string, boolean>;
     snapshot(): any;
   };
@@ -143,6 +163,10 @@ export function createOneHome(deps: {
   }>;
   /** My Cloud's session is no longer needed: the move is done, paused, or not this account's. */
   release?(): Promise<void>;
+  /** One computer at a time runs the heavy part of a move into My Cloud: `take()` is null once this one does, else who does. */
+  lease?: { take(): Promise<null | { name: string }>; release(): Promise<void> };
+  /** True while no first move should start, as the person is asked which bots go. */
+  choosing?(): Promise<boolean>;
   lend?(projects: string[]): Promise<unknown>;
   phone?: { paired(): boolean; stop(): Promise<void>; start(): Promise<void> };
   openHome?(): void;

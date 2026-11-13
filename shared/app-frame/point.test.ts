@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   APP_POINT_SOURCE,
+  marksMessage,
   POINT_ENDED_METHOD,
   POINT_LIMITS,
   POINTED_METHOD,
@@ -89,7 +90,10 @@ describe('readPointEvent', () => {
 describe("the page's point script", () => {
   type Listener = (event: { source: unknown; data: unknown }) => void;
   const posted: unknown[] = [];
+  // Point stays on after a pick, and every boot listens on the one window, so each test turns its scripts off after it.
+  const booted: Array<(data: unknown) => void> = [];
   afterEach(() => {
+    for (const say of booted.splice(0)) say(pointMessage(false));
     posted.length = 0;
     document.body.innerHTML = '';
     document.documentElement.style.cursor = '';
@@ -120,12 +124,13 @@ describe("the page's point script", () => {
     const say = (data: unknown, source: unknown = parent) => {
       for (const listener of messages) listener({ source, data });
     };
+    booted.push(say);
     return { say };
   }
   const click = (element: Element) =>
     element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 
-  it('describes the clicked element to its parent only while point mode is on, then turns itself off', () => {
+  it('describes each clicked element to its parent while point mode is on, and stays on until the parent turns it off', () => {
     const { say } = boot();
     const pro = document.querySelectorAll('button')[0]!;
     click(pro);
@@ -149,9 +154,62 @@ describe("the page's point script", () => {
         html: '<button>Choose Starter</button>',
       }),
     ]);
+    expect(document.documentElement.style.cursor).toBe('crosshair');
+    click(document.querySelector('a')!);
+    expect(posted).toHaveLength(2);
+    expect(posted.at(-1)).toMatchObject({ params: { tag: 'a', text: 'Terms' } });
+    say(pointMessage(false));
     expect(document.documentElement.style.cursor).toBe('');
     click(pro);
-    expect(posted).toHaveLength(1);
+    expect(posted).toHaveLength(2);
+  });
+
+  it("outlines the parts waiting in the composer with their numbers, only on the parent's word, and never picks an outline", () => {
+    const { say } = boot();
+    const outlines = () =>
+      Array.from(
+        document.querySelectorAll('[data-mausbot-point=mark]'),
+        (mark) => mark.textContent,
+      );
+    say(marksMessage(['#plans > div:nth-of-type(1) > button', '#gone', 'a:::bad', 'footer > a']), {
+      name: 'not the parent',
+    });
+    expect(outlines()).toEqual([]);
+    say(marksMessage(['#plans > div:nth-of-type(1) > button', '#gone', 'a:::bad', 'footer > a']));
+    expect(outlines()).toEqual(['1', '4']);
+    say(pointMessage(true));
+    const mark = document.querySelector('[data-mausbot-point=mark]')!;
+    mark.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    expect(posted).toEqual([]);
+    say(marksMessage([]));
+    expect(outlines()).toEqual([]);
+  });
+
+  it('hides an outline whose part has no box, and moves it when the page moves the part', async () => {
+    const { say } = boot();
+    const target = document.querySelector('footer > a')!;
+    let rect = { left: 0, top: 0, width: 0, height: 0 };
+    target.getBoundingClientRect = () =>
+      ({
+        ...rect,
+        right: rect.left + rect.width,
+        bottom: rect.top + rect.height,
+        x: rect.left,
+        y: rect.top,
+        toJSON: () => rect,
+      }) as DOMRect;
+    say(marksMessage(['footer > a']));
+    const mark = document.querySelector<HTMLElement>('[data-mausbot-point=mark]')!;
+    expect(mark.style.display).toBe('none');
+    rect = { left: 10, top: 40, width: 50, height: 20 };
+    document.querySelector('main')!.insertAdjacentHTML('afterbegin', '<p>opened</p>');
+    await new Promise((done) => setTimeout(done, 0));
+    await new Promise((done) => requestAnimationFrame(() => done(null)));
+    expect([mark.style.display, mark.style.top, mark.style.height]).toEqual([
+      'block',
+      '40px',
+      '20px',
+    ]);
   });
 
   it('keeps a space between a badge and the words after it, so the chip label reads as the page does', () => {

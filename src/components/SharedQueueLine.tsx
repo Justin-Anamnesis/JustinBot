@@ -7,7 +7,8 @@ import { useReactor } from '@/lib/cloud-guest';
 import { useOwnerOrAdmin } from '@/lib/use-owner-or-admin';
 import { cn } from '@/lib/cn';
 import { t } from '@/lib/i18n';
-import { useStore, type Bot } from '@/state/store';
+import type { Bot } from '@/state/store';
+import { useStoreDispatch, useStoreSelector } from '@/state/store-select';
 
 type Waiting = { queueId: string; text: string; sender?: ResolvedSender };
 
@@ -98,10 +99,12 @@ export function useSharedRun(
   bot: Bot,
   advanced: boolean,
 ): { label?: string; line: ReactNode; mayAct: (asker: ResolvedSender | undefined) => boolean } {
-  const { state, dispatch } = useStore();
+  const team = useStoreSelector((state) => Boolean(state.config?.team)),
+    waiting = useStoreSelector((state) => state.pendingQueued[bot.threadId]),
+    dispatch = useStoreDispatch();
   const viewer = useReactor();
   const mayAct = useMayAct();
-  const task = state.config?.team
+  const task = team
     ? bot.tasks?.find((one) => one.threadId === bot.threadId && !one.private)
     : undefined;
   if (!task) return { line: null, mayAct: () => true };
@@ -109,7 +112,7 @@ export function useSharedRun(
     label: workingForLabel(task.askedBy, viewer),
     line: (
       <SharedQueueLine
-        waiting={state.pendingQueued[bot.threadId] ?? []}
+        waiting={waiting ?? []}
         viewer={viewer}
         className={advanced ? 'ps-11' : 'ps-12'}
         onRemove={(queueId) =>

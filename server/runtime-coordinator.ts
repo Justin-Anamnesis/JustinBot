@@ -56,7 +56,8 @@ const ALREADY_COMPLETED =
 const ROOM_ANCESTOR =
   'A room request cannot return to an ancestor room; results are returned automatically';
 const DEPTH = 'Room handoff depth limit reached';
-const BUDGET = 'Room handoff budget exhausted';
+const budgetRefusal = (limit: number): string =>
+  `This request reached its limit of ${limit} hand-offs since any work last came back, so this one was not sent. The limit belongs to the request: nobody can reset it, the person included, so don't ask them to, and don't send it another way. If work is still out, end your turn: each result that comes back renews the limit and resumes you. If nothing is out, finish with what you have and say what is left undone.`;
 const NO_TURN = 'The requesting turn has no root (no turn)';
 /** A stop with no other cause is the person's own. */
 const STOPPED_BY_USER = 'Stopped by user';
@@ -76,6 +77,10 @@ const NEEDS_INPUT = /^needs input:/i;
 
 /** Per-turn stalls belong to the host's watchdog: this only keeps the runtime's window out of its way. */
 const TURN_STALL_MS = 24 * 60 * 60_000;
+
+/** Handed-off work parked on the person: a reminder after a day, closed after three. */
+const PARKED_REMIND_MS = 24 * 60 * 60_000;
+const PARKED_LIMIT_MS = 72 * 60 * 60_000;
 
 const REQUESTS_PER_ROOT = 64;
 const EXECUTIONS_PER_ROOT = 96;
@@ -172,6 +177,7 @@ export function view(a: Assignment, parent?: Assignment): HandoffView {
   if (a.parentId !== undefined) node.parentId = a.parentId;
   if (groupId !== undefined) node.groupId = groupId;
   if (a.batchKey !== undefined) node.requestBatchKey = a.batchKey;
+  if (a.statusOnly) node.statusOnly = true;
   if (a.startedAt !== undefined) node.startedAt = a.startedAt;
   const origin = legacyOrigin(a.origin);
   if (origin) node.origin = origin;
@@ -228,6 +234,8 @@ export class RuntimeCoordinator implements Coordinator {
   private readonly log: (line: string) => void;
   /** The person's stops, remembered: which bots' work on which request they stopped, and when. */
   private readonly stops: Array<{ at: number; request: string; bots: Set<string> }> = [];
+  /** The cause of the stop running now, if any (stopFor). */
+  private stopCause: string | undefined;
   private opened = false;
   private prunedAt: number | undefined;
 
@@ -251,6 +259,8 @@ export class RuntimeCoordinator implements Coordinator {
         requests: REQUESTS_PER_ROOT,
         executions: EXECUTIONS_PER_ROOT,
         turnStallMs: TURN_STALL_MS,
+        inputWaitMs: PARKED_LIMIT_MS,
+        inputRemindMs: PARKED_REMIND_MS,
         ...options.runtimeLimits,
       },
       ...(options.log ? { log: options.log } : {}),
@@ -331,7 +341,7 @@ export class RuntimeCoordinator implements Coordinator {
     options: HandoffOptions = {},
   ): { node: HandoffView; duplicate: boolean } {
     this.ready();
-    const { rework = false, requestBatchKey, thread } = options;
+    const { rework = false, requestBatchKey, fanOut, thread } = options;
     const mode = options.mode ?? 'work';
     const parent = parentId ? this.store.get(parentId) : this.store.get(generation);
     if (!parent) throw new Error(parentId ? NOT_RUNNING : NO_TURN);
@@ -435,9 +445,10 @@ export class RuntimeCoordinator implements Coordinator {
       levels: { own: level.level, ...(level.chief !== undefined ? { chief: level.chief } : {}) },
       ...(level.driverKind !== undefined ? { driverKind: level.driverKind } : {}),
       ...(target.groupId && requestBatchKey ? { batchKey: requestBatchKey } : {}),
+      ...(fanOut ? { fanOut } : {}),
     });
     if (!result.ok) {
-      if (result.outcome === 'budget') throw new Error(BUDGET);
+      if (result.outcome === 'budget') throw new Error(budgetRefusal(this.runtime.limits.requests));
       throw new Error(RUNTIME_DEPTH.test(result.reason) ? DEPTH : result.reason);
     }
     return { node: view(result.assignment, parent), duplicate: result.duplicate };
@@ -584,7 +595,8 @@ export class RuntimeCoordinator implements Coordinator {
   /** Nothing can answer what this parked turn waits on any more. */
   releaseParked(id: string, reason: string): void {
     this.ready();
-    if (this.store.get(id)?.status === 'needs_input') this.runtime.cancel(id, reason, 'stopped');
+    if (this.store.get(id)?.status === 'needs_input')
+      this.stopFor(reason, () => this.runtime.cancel(id, reason, 'stopped'));
   }
 
   parkedFor(botId: string): HandoffView[] {
@@ -632,38 +644,57 @@ export class RuntimeCoordinator implements Coordinator {
   cancelRoom(
     groupId: string,
     threadId?: string,
-    reason = 'Stopped by user',
+    reason = STOPPED_BY_USER,
     status: 'failed' | 'cancelled' = 'cancelled',
   ): void {
     this.ready();
-    for (const n of this.live()) {
-      if (
-        n.assignee.destination.groupId !== groupId ||
-        (threadId && n.assignee.destination.threadId !== threadId)
-      )
-        continue;
-      this.runtime.cancel(n.id, reason, status === 'failed' ? 'failed' : 'stopped');
-    }
+    this.stopFor(reason, () => {
+      for (const n of this.live()) {
+        if (
+          n.assignee.destination.groupId !== groupId ||
+          (threadId && n.assignee.destination.threadId !== threadId)
+        )
+          continue;
+        this.runtime.cancel(n.id, reason, status === 'failed' ? 'failed' : 'stopped');
+      }
+    });
   }
 
-  cancelDirect(threadId: string, reason = 'Stopped by user'): void {
+  cancelDirect(threadId: string, reason = STOPPED_BY_USER): void {
     this.ready();
-    for (const n of this.live())
-      if (this.direct(n, threadId)) this.runtime.cancel(n.id, reason, 'stopped');
+    this.stopFor(reason, () => {
+      for (const n of this.live())
+        if (this.direct(n, threadId)) this.runtime.cancel(n.id, reason, 'stopped');
+    });
   }
 
-  stopAwaitingDirect(threadId: string, reason = STOPPED_BY_USER): void {
+  /** With no reason given, the stop is the person's, unless it is part of a stop already under way: see stopFor. */
+  stopAwaitingDirect(threadId: string, reason?: string): void {
     this.ready();
+    const cause = reason ?? this.stopCause ?? STOPPED_BY_USER;
     const stopping =
-      reason === STOPPED_BY_USER
+      cause === STOPPED_BY_USER
         ? this.live().filter((n) => n.assignee.destination.threadId === threadId)
         : [];
     const trees = stopping.map((n) => ({
       root: this.store.get(n.rootId),
       work: this.subtree(n).filter((a) => !isTerminal(a)),
     }));
-    this.runtime.stopRequester({ threadId }, reason);
+    this.stopFor(cause, () => this.runtime.stopRequester({ threadId }, cause));
     for (const { root, work } of trees) if (root) this.rememberStop(root, work);
+  }
+
+  /** Runs a stop with its cause. A teammate's turn it ends stops that teammate's thread as well (the host's abort handler
+   * calls stopAwaitingDirect with no reason), and that is still this stop: a cut the system made (a waiting line going
+   * first, a restart, a deleted conversation) is never remembered as the person's stop. */
+  private stopFor(cause: string, stop: () => void): void {
+    const outer = this.stopCause;
+    this.stopCause = cause;
+    try {
+      stop();
+    } finally {
+      this.stopCause = outer;
+    }
   }
 
   /** The person's stop, remembered (scoped to that request): the bots whose work on it the stop ended don't take the same
@@ -840,6 +871,7 @@ export class RuntimeCoordinator implements Coordinator {
       },
       run: (a, input, signal) => this.run(a, input, signal),
       park: (a, question, restored) => host.park(this.project(a), question, restored),
+      remind: (a, closesAt) => host.remind?.(this.project(a), closesAt),
       report: (a, parent) => host.report(view(a, parent), parent && this.project(parent)),
       changed: (rows) => {
         const groups = new Set<string>();
@@ -944,6 +976,15 @@ export class RuntimeCoordinator implements Coordinator {
         cards: result.cards.ids,
         ...evidence(result),
       };
+    const question = root ? undefined : needsInputQuestion(result.text);
+    if (
+      !root &&
+      a.origin.kind === 'person' &&
+      result.approvalAsk &&
+      !result.stalled &&
+      question === undefined
+    )
+      return { kind: 'needs_input', question: result.approvalAsk, ...evidence(result) };
     if (!result.ok)
       return {
         kind: 'failed',
@@ -951,7 +992,6 @@ export class RuntimeCoordinator implements Coordinator {
         text: result.text,
         ...evidence(result),
       };
-    const question = root ? undefined : needsInputQuestion(result.text);
     if (question === undefined)
       return {
         kind: 'completed',

@@ -4,7 +4,7 @@
 // My Cloud takes a file in parts (POST, owner's session only), resumable from the bytes it holds, and never writes over
 // a file it has: a file there that is not the one the move put there is a conflict, and the sender keeps both.
 import { createHash, randomUUID } from 'node:crypto';
-import { createReadStream } from 'node:fs';
+import { createReadStream, type Stats } from 'node:fs';
 import { link, lstat, mkdir, open, readdir, rename, stat, unlink } from 'node:fs/promises';
 import { statfsSync } from 'node:fs';
 import type { IncomingMessage } from 'node:http';
@@ -52,15 +52,20 @@ export function movedFilePath(path: string): boolean {
 }
 
 const hashes = new Map<string, string>();
-async function fileSha256(full: string, size: number, mtimeMs: number): Promise<string> {
-  const key = `${full}\0${size}\0${mtimeMs}`;
-  const known = hashes.get(key);
+async function fileSha256(full: string, info: Stats): Promise<string> {
+  const key = `${full}\0${info.dev}\0${info.ino}\0${info.size}\0${info.mtimeMs}\0${info.ctimeMs}`;
+  // A restored mtime does not restore ctime; recent writes can still share a coarse filesystem timestamp.
+  const settled = Date.now() - Math.max(info.mtimeMs, info.ctimeMs) >= 2_000;
+  const known = settled ? hashes.get(key) : undefined;
   if (known) return known;
   const hash = createHash('sha256');
   for await (const chunk of createReadStream(full)) hash.update(chunk as Buffer);
   const digest = hash.digest('hex');
-  if (hashes.size > 50_000) hashes.clear();
-  hashes.set(key, digest);
+  if (settled) {
+    // As many as one listing holds, oldest out first: a listing never pushes out what it hashed itself.
+    if (hashes.size >= MAX_FILES) hashes.delete(hashes.keys().next().value!);
+    hashes.set(key, digest);
+  }
   return digest;
 }
 
@@ -85,11 +90,7 @@ export async function listBotFiles(dataDir: string, botIds: readonly string[]): 
         continue;
       }
       if (info.isFile() && movedFilePath(path))
-        out.push({
-          path,
-          size: info.size,
-          sha256: await fileSha256(join(dataDir, path), info.size, info.mtimeMs),
-        });
+        out.push({ path, size: info.size, sha256: await fileSha256(join(dataDir, path), info) });
     }
   };
   for (const id of botIds) {
@@ -225,7 +226,7 @@ async function takePart(
   const bytes = await rawBody(req, Math.min(FILE_PART_BYTES, size - held));
   if (!bytes)
     return { status: 413, body: { error: "the part runs past the file's size", received: held } };
-  if (bytes.length) {
+  if (bytes.length || size === 0) {
     const handle = await open(partial, 'a', 0o600);
     try {
       await handle.write(bytes);

@@ -208,7 +208,7 @@ export function buildApplicationMenu({
     submenu: [
       role(t, 'about', 'native.role.about', { app: app.name }),
       {
-        label: t('native.menu.preferences'),
+        label: t('native.menu.settings'),
         accelerator: 'CmdOrCtrl+,',
         click: () => onOpenSettings(),
       },

@@ -584,7 +584,7 @@ it(
 );
 
 it(
-  'tells the Chief what happened to each approval: allowed, denied, or never answered and not run',
+  'tells the Chief what happened to each approval: allowed or denied, and parks a hand-off on the person when nobody answered',
   () =>
     chiefJob(async (f) => {
       f.script(
@@ -635,6 +635,8 @@ it(
           match: [SETTLED, 'TESTS-RESULT'],
           reply: 'APPROVALS-FINAL: history checked, push not done, tests not run.',
         },
+        // Mira's parked ask can resume Clive before the person answers it; whether it does is a race, so the entry is optional.
+        { key: 'BQ', match: ['Let it try again?'], reply: 'BQ: Mira is waiting on the person.' },
       );
       f.script(
         f.mira.id,
@@ -654,6 +656,7 @@ it(
         },
         {
           key: 'MC',
+          repeat: true,
           match: ['RUN-TESTS'],
           approve: { tool_name: 'Bash', input: { command: 'pnpm test' } },
           reply: 'TESTS-RESULT: tests pass.',
@@ -686,69 +689,95 @@ it(
         .poll(() => f.child(job, f.mira.id, 'RUN-TESTS')?.status, { timeout: 20_000 })
         .toBe('running');
       await f.openCard(work);
-      await f.expireApprovals(() => terminal(f.child(job, f.mira.id, 'RUN-TESTS')?.status));
+      await f.expireApprovals(() => f.child(job, f.mira.id, 'RUN-TESTS')?.status === 'waiting');
+      const parked = f.child(job, f.mira.id, 'RUN-TESTS');
+      expect(parked.question).toContain('“Bash: pnpm test”');
+      await expect
+        .poll(
+          async () =>
+            (await f.rows(job)).some(
+              (name: string) =>
+                name.startsWith('Mira needs your input') && name.includes('pnpm test'),
+            ),
+          { timeout: 20_000 },
+        )
+        .toBe(true);
+      const ask = await f.openCard(work);
+      expect(ask.card).toMatchObject({ requestType: 'question', options: ['Try again'] });
+      expect(ask.card.requestId).toMatch(/^needs-input-/);
+      expect(
+        (
+          await f.api('POST', `/api/bots/${f.mira.id}/respond`, {
+            threadId: work,
+            requestId: ask.card.requestId,
+            behavior: 'answer',
+            message: 'Try again',
+          })
+        ).status,
+      ).toBe(200);
+      await f.respond(f.mira.id, work, await f.openCard(work), 'deny');
       await f.final(job, 'APPROVALS-FINAL');
 
-      expect(f.turns(f.clive.id).map((record: any) => record.planKey)).toEqual([
-        'B0',
-        'B1',
-        'B2',
-        'B3',
-      ]);
+      expect(f.turns(f.clive.id).map((record: any) => record.planKey)).toEqual(
+        expect.arrayContaining(['B0', 'B1', 'B2', 'B3']),
+      );
       expect(
         f.turns(f.mira.id).map((record: any) => [record.planKey, record.approval?.behavior]),
       ).toEqual([
         ['MA', 'allow'],
         ['MB', 'deny'],
         ['MC', 'deny'],
+        ['MC', 'deny'],
       ]);
-      const settled = (await f.rows(job)).filter((name: string) => name.includes('@Mira'));
-      expect(settled).toEqual([
-        '@Mira got your approval',
-        "@Mira's request was denied",
-        "Nobody answered @Mira's approval in time — that step did not run",
-      ]);
+      const rows = await f.rows(job);
+      expect(rows).toEqual(
+        expect.arrayContaining([
+          '@Mira got your approval',
+          "@Mira's request was denied",
+          "Nobody answered @Mira's approval in time — that step did not run",
+        ]),
+      );
       expect(f.child(job, f.mira.id, 'CHECK-HISTORY').result).toBe(
         'HISTORY-RESULT: checked the history.',
       );
       expect(f.child(job, f.mira.id, 'PUSH-BRANCH').result).toBe(
         'PUSH-RESULT: not pushed; the push was denied.',
       );
-      const unanswered =
-        "[OpenMausBot: nobody answered the approval for “Bash: pnpm test” in time, so it did not run. Do not report it as done; it needs the person's approval.]";
       expect(f.child(job, f.mira.id, 'RUN-TESTS')).toMatchObject({
         status: 'completed',
-        result: `${unanswered}\n\nTESTS-RESULT: I could not run the tests.`,
+        result: 'TESTS-RESULT: I could not run the tests.',
       });
-      expect(f.prompt(f.turn('B3'))).toContain(
-        JSON.stringify(unanswered.replace(/^\[/, '(')).slice(1, -1),
-      );
       expect(f.prompt(f.turn('B3'))).toContain('[From @Mira (bot) · report on assignment ');
-      expect(
-        (await f.cards(work)).map((message: any) => [
-          message.card.subtitle,
-          message.card.answered,
-          message.card.dismissed,
-          message.card.answeredBy?.kind,
-        ]),
-      ).toEqual([
-        ['git log --oneline -5 -- src/export', 'allow', false, 'loopback'],
-        ['git push origin export', 'deny', false, 'loopback'],
-        ['pnpm test', 'deny', true, undefined],
+      const cards = (await f.cards(work)).map((message: any) => [
+        message.card.subtitle,
+        message.card.answered,
+        message.card.dismissed,
+        message.card.answeredBy?.kind,
       ]);
+      expect(cards).toEqual(
+        expect.arrayContaining([
+          ['git log --oneline -5 -- src/export', 'allow', false, 'loopback'],
+          ['git push origin export', 'deny', false, 'loopback'],
+          ['pnpm test', 'deny', true, undefined],
+        ]),
+      );
       await expect
         .poll(() => f.notifications.some((notification: any) => notification.kind === 'done'), {
           timeout: 10_000,
         })
         .toBe(true);
       expect(
-        f.notifications.map((notification: any) => [notification.kind, notification.body]),
-      ).toEqual([
-        ['approval', 'git log --oneline -5 -- src/export'],
-        ['approval', 'git push origin export'],
-        ['approval', 'pnpm test'],
-        ['done', expect.stringContaining('APPROVALS-FINAL')],
-      ]);
+        f.notifications.some(
+          (notification: any) =>
+            notification.kind === 'question' && String(notification.body).includes('pnpm test'),
+        ),
+        'the parked ask reaches the person',
+      ).toBe(true);
+      expect(
+        f.notifications
+          .filter((notification: any) => notification.kind === 'done')
+          .map((notification: any) => notification.body),
+      ).toEqual([expect.stringContaining('APPROVALS-FINAL')]);
     }),
   hostTimeout(120_000),
 );

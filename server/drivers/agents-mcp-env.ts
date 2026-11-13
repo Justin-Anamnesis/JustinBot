@@ -21,6 +21,7 @@ export const AGENTS_MCP_ENV = [
   'OMB_ROOM',
   'OMB_IMAGE_GENERATION',
   'OMB_MEETINGS',
+  'OMB_APP_HOSTING',
   TOOL_BRIDGE_ENV,
   TOOL_LIMIT_ENV,
 ] as const;

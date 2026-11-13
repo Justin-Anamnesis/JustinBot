@@ -15,6 +15,7 @@ import {
   type PackageDocument,
 } from '../bot-package.ts';
 import { parseVisibility } from '../bot-visibility.ts';
+import { teamCreator } from '../new-bot-sharing.ts';
 import type { AppConfig } from '../config.ts';
 import type { ModelSelection } from '../contracts.ts';
 import type { OrgLibrary } from '../org-library.ts';
@@ -361,7 +362,10 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
           error: "This package is not in your organization's library.",
           code: 'not_listed',
         });
-      const outcome = orgLibrary.add(packageId, packageImportDeps(await defaultSelection()));
+      const outcome = orgLibrary.add(packageId, {
+        ...packageImportDeps(await defaultSelection()),
+        ...teamCreator(auth),
+      });
       if (!outcome.ok)
         return json(res, outcome.status, { error: outcome.error, code: outcome.code });
       if (outcome.value.alreadyAdded) return json(res, 200, outcome.value);
@@ -462,6 +466,7 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
         try {
           const imported = importTeamBackup(store, routines!, body, await defaultSelection(), {
             visibility: importVisibility,
+            ...teamCreator(auth),
           });
           // A restore writes transcripts without store events: these frames carry the restored pages to other clients.
           const bots = imported.bots.map((bot) => publicBot(bot));
@@ -486,7 +491,7 @@ export function createTeamRoutes(deps: TeamRouteDeps): RouteHandler {
           error: error instanceof Error ? error.message : 'Invalid bot package',
         });
       }
-      const deps = packageImportDeps(await defaultSelection());
+      const deps = { ...packageImportDeps(await defaultSelection()), ...teamCreator(auth) };
       const options = {
         mode: importMode as 'add' | 'project',
         cwd: projectCwd,

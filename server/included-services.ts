@@ -4,6 +4,7 @@
 //   OMB_CLOUD_DECIDER_URL + OMB_CLOUD_DECIDER_TOKEN  the Jev relay, a Jev base URL
 //   OMB_CLOUD_AI_URL      + OMB_CLOUD_AI_TOKEN       the trial's Claude credit, an OpenAI-compatible base URL
 //   OMB_CLOUD_X_URL       + OMB_CLOUD_X_TOKEN        the X research relay (a desktop gets its own over the parent port)
+//   OMB_CLOUD_HOSTING_URL + OMB_CLOUD_HOSTING_TOKEN  the app hosting relay, ending in /api/cloud/services/hosting/v1
 // The person's own key always wins and is resolved per request; an included token goes only to its relay and is never
 // written to config.json or reported to a client.
 import { JEV_DEFAULT_BASE_URL } from './decider/jev.ts';
@@ -17,6 +18,7 @@ export const INCLUDED_TOKEN_ENV = [
   'OMB_CLOUD_DECIDER_TOKEN',
   'OMB_CLOUD_AI_TOKEN',
   'OMB_CLOUD_X_TOKEN',
+  'OMB_CLOUD_HOSTING_TOKEN',
 ] as const;
 
 export interface ServiceCredential {
@@ -32,6 +34,7 @@ interface Included {
   decider: ServiceCredential | null;
   ai: ServiceCredential | null;
   x: ServiceCredential | null;
+  hosting: ServiceCredential | null;
 }
 
 function includedService(
@@ -49,15 +52,16 @@ const includedFrom = (env: NodeJS.ProcessEnv): Included => ({
   decider: includedService(env.OMB_CLOUD_DECIDER_URL, env.OMB_CLOUD_DECIDER_TOKEN),
   ai: trialCreditService(env.OMB_CLOUD_AI_URL, env.OMB_CLOUD_AI_TOKEN),
   x: includedService(env.OMB_CLOUD_X_URL, env.OMB_CLOUD_X_TOKEN),
+  hosting: relayOnlyService(env.OMB_CLOUD_HOSTING_URL, env.OMB_CLOUD_HOSTING_TOKEN),
 });
 
-/** The token is a key the chat engine sends here, so the address must be HTTPS (loopback for tests) and the token the Admin's shape. */
-function trialCreditService(
+/** Security: the token is sent to this address, so it must be HTTPS (loopback for tests) with nothing else in it. */
+function relayOnlyService(
   url: string | undefined,
   token: string | undefined,
 ): ServiceCredential | null {
   const credential = includedService(url, token);
-  if (!credential || !/^omb_ai_[A-Za-z0-9_-]{43}$/.test(credential.token)) return null;
+  if (!credential) return null;
   try {
     const parsed = new URL(credential.api);
     const loopback =
@@ -72,6 +76,15 @@ function trialCreditService(
   } catch {
     return null;
   }
+}
+
+/** The token is a key the chat engine sends here, so it must also be the Admin's shape. */
+function trialCreditService(
+  url: string | undefined,
+  token: string | undefined,
+): ServiceCredential | null {
+  const credential = relayOnlyService(url, token);
+  return credential && /^omb_ai_[A-Za-z0-9_-]{43}$/.test(credential.token) ? credential : null;
 }
 
 let held: Included | null = null;
@@ -118,6 +131,11 @@ export function trialCreditCredential(
   env: NodeJS.ProcessEnv = process.env,
 ): ServiceCredential | null {
   return (held ?? includedFrom(env)).ai;
+}
+
+/** The plan's app hosting relay (a Cloud home only): null wherever the Admin gave none. */
+export function hostingCredential(env: NodeJS.ProcessEnv = process.env): ServiceCredential | null {
+  return (held ?? includedFrom(env)).hosting;
 }
 
 export function deciderCredential(

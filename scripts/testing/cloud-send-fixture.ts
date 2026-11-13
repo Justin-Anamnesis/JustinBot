@@ -529,6 +529,18 @@ await import(${JSON.stringify(pathToFileURL(join(SERVER_DIR, 'testing', 'fake-cl
         true,
       );
     let teamServer = await startTeam();
+    const teamFetch = (path: string, init: RequestInit) =>
+      fetch(`${teamBase}${path}`, init).catch(async (error: unknown) => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const state =
+          teamServer.exitCode === null && teamServer.signalCode === null
+            ? 'is still running'
+            : `exited (${teamServer.exitCode ?? teamServer.signalCode})`;
+        throw new Error(
+          `${init.method ?? 'GET'} ${path} on the Team Cloud got no answer, and the Team Cloud ${state}. The servers' output:\n${logs.slice(-8_000)}`,
+          { cause: error },
+        );
+      });
     const as: CloudTeamFixture['as'] = async (token, method, path, body, headers = {}) => {
       const init: RequestInit = {
         method,
@@ -542,7 +554,7 @@ await import(${JSON.stringify(pathToFileURL(join(SERVER_DIR, 'testing', 'fake-cl
         },
       };
       if (body !== undefined) init.body = body instanceof Uint8Array ? body : JSON.stringify(body);
-      const response = await remember(await fetch(`${teamBase}${path}`, init));
+      const response = await remember(await teamFetch(path, init));
       return { status: response.status, body: parse(await response.text()) };
     };
     // A new Team Cloud's Chief gets a name at random, so one run in 64 it would share a name with a bot the test makes.
@@ -607,7 +619,7 @@ await import(${JSON.stringify(pathToFileURL(join(SERVER_DIR, 'testing', 'fake-cl
         const timestamp = String(Math.floor(Date.now() / 1000)),
           nonce = randomBytes(16).toString('base64url');
         const minted = await remember(
-          await fetch(`${teamBase}/api/cloud/pairing`, {
+          await teamFetch('/api/cloud/pairing', {
             method: 'POST',
             headers: {
               ...EDGE,
@@ -622,7 +634,7 @@ await import(${JSON.stringify(pathToFileURL(join(SERVER_DIR, 'testing', 'fake-cl
         const grant = parse(await minted.text());
         if (minted.status !== 200) return { status: minted.status, body: grant, token: null };
         const paired = await remember(
-          await fetch(`${teamBase}/api/auth/pair`, {
+          await teamFetch('/api/auth/pair', {
             method: 'POST',
             headers: { ...EDGE, 'content-type': 'application/json' },
             body: JSON.stringify({ code: grant.code }),
@@ -794,6 +806,7 @@ await import(${JSON.stringify(pathToFileURL(join(SERVER_DIR, 'testing', 'fake-cl
       localOrigin: () => desktopBase,
       fetch: throughEdge(null) as typeof fetch,
       engineWaitMs: 2_000,
+      patience: { stallMs: 0, waits: [0], blips: [] },
       ...(space ? { space } : {}),
       account: () => ({
         state: () => account.state,
@@ -1013,6 +1026,7 @@ await import(${JSON.stringify(pathToFileURL(join(SERVER_DIR, 'testing', 'fake-cl
         localOrigin: () => base,
         fetch: throughEdge(null) as typeof fetch,
         engineWaitMs: 2_000,
+        patience: { stallMs: 0, waits: [0], blips: [] },
         account: () => ({
           state: () => deskAccount.state,
           pairHome: async () => ({

@@ -25,6 +25,7 @@ import { parseAllowList } from './account-signin.ts';
 import { appendAdminAction, flushAdminActivity, sharedSignIn } from './admin-activity.ts';
 import { bindDecisionRetention, decisionRetentionDays } from './decision-log.ts';
 import { hostedWorkspaceConfigured } from './enterprise.ts';
+import { reportableServerVersion, serverVersion } from './environment.ts';
 import { resolveLoopbackTrust } from './request-auth.ts';
 import { restartPolicy } from './restart.ts';
 import { writeFileAtomic } from './atomic.ts';
@@ -37,6 +38,7 @@ import { fleetLayout } from './fleet.ts';
 import {
   clearLeftoverTailscaleServe,
   explainTailscaleFailure,
+  tailnetListenFallback,
   tailscaleServe,
   tailscaleStatus,
   type TailscaleStatus,
@@ -50,6 +52,7 @@ import {
 } from './cli-phone-setup.ts';
 import {
   browserSignInLines,
+  desktopOwnedRefusal,
   formatSessions,
   pairingBlock,
   RELAY_NOT_WITH_TUNNEL,
@@ -393,17 +396,6 @@ export function defaultIo(): CliIo {
   };
 }
 
-export function serverVersion(here = HERE): string {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(resolve(here, '..', 'package.json'), 'utf8'));
-    const version =
-      typeof parsed === 'object' && parsed !== null ? Reflect.get(parsed, 'version') : undefined;
-    return typeof version === 'string' && version ? version : '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-}
-
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** On a service-trust server: the secret `serve` handed the server it started, which opens its pairing route. */
@@ -625,10 +617,13 @@ async function mintPairing(
     method: 'POST',
     body: JSON.stringify(request),
   });
-  if (refusedAsService(status, body)) throw new Error(SERVICE_TRUST_HELP);
-  if (status !== 200)
+  const refusal = refusedAsService(status, body)
+    ? SERVICE_TRUST_HELP
+    : desktopOwnedRefusal(status, body);
+  if (refusal || status !== 200)
     throw new Error(
-      `server refused to mint a pairing code: ${typeof body?.error === 'string' ? body.error : status}`,
+      refusal ??
+        `server refused to mint a pairing code: ${typeof body?.error === 'string' ? body.error : status}`,
     );
   const reachable =
     options.publicUrl && !isLoopbackHost(new URL(options.publicUrl).hostname)
@@ -793,7 +788,7 @@ export async function runStatus(options: CliOptions, io: CliIo = defaultIo()): P
     : describeTunnelAccount(
         createTunnelAccount({
           dataDir: options.dataDir,
-          version: serverVersion(),
+          version: reportableServerVersion(),
         }).credentials.read(),
       );
   if (!options.json && fleetCredential())
@@ -908,7 +903,7 @@ export async function runAccess(options: CliOptions, io: CliIo = defaultIo()): P
 export async function runLogin(options: CliOptions, io: CliIo = defaultIo()): Promise<number> {
   const account = createTunnelAccount({
     dataDir: options.dataDir,
-    version: serverVersion(),
+    version: reportableServerVersion(),
     relayOnly: options.relay === true,
   });
   if (fleetCredential())
@@ -967,7 +962,10 @@ export async function runLogin(options: CliOptions, io: CliIo = defaultIo()): Pr
 }
 
 export async function runLogout(options: CliOptions, io: CliIo = defaultIo()): Promise<number> {
-  const account = createTunnelAccount({ dataDir: options.dataDir, version: serverVersion() });
+  const account = createTunnelAccount({
+    dataDir: options.dataDir,
+    version: reportableServerVersion(),
+  });
   const before = describeTunnelAccount(account.credentials.read());
   if (!before.email) {
     io.log('this machine is not signed in');
@@ -1098,14 +1096,14 @@ async function planTunnel(
   if (credential) {
     log(`tunnel: using the installation credential from ${FLEET_CREDENTIAL_ENV}`);
     try {
-      access = await fleetAccess({ credential, version: serverVersion() });
+      access = await fleetAccess({ credential, version: reportableServerVersion() });
     } catch (error) {
       return { error: `--tunnel: ${message(error)}` };
     }
   } else {
     account = createTunnelAccount({
       dataDir: options.dataDir,
-      version: serverVersion(),
+      version: reportableServerVersion(),
       recovery,
       log: (line) => log(`tunnel: ${line}`),
     });
@@ -1247,13 +1245,23 @@ export async function runServe(
         dataDir: options.dataDir,
         otherServer: answersAsMausBot,
       });
-      if (!('failure' in served)) tailscaleShare = served;
-      if (startupCancelled) throw new SetupCancelled();
-      if ('failure' in served)
-        throw new Error(`--tailscale: ${explainTailscaleFailure(served.failure)}`);
-      publicUrl = served.origin;
+      const listening =
+        'failure' in served ? tailnetListenFallback(served.failure, tailscale, options.port) : null;
+      tailscaleShare =
+        'failure' in served
+          ? listening && { origin: listening.origin, stop: async () => {} }
+          : served;
+      if (startupCancelled || !tailscaleShare)
+        throw startupCancelled
+          ? new SetupCancelled()
+          : new Error(
+              `--tailscale: ${explainTailscaleFailure('failure' in served ? served.failure : 'unknown')}`,
+            );
+      Object.assign(env, listening?.env);
+      publicUrl = tailscaleShare.origin;
       log(
-        `tailscale: serving https://${tailscale.dnsName} → http://127.0.0.1:${options.port} (only your tailnet can reach it)`,
+        listening?.line ??
+          `tailscale: serving https://${tailscale.dnsName} → http://127.0.0.1:${options.port} (only your tailnet can reach it)`,
       );
     }
     if (startupCancelled) throw new SetupCancelled();
@@ -1537,7 +1545,7 @@ export async function runOnboardingCommand(
           !!describeTunnelAccount(
             createTunnelAccount({
               dataDir: value.dataDir,
-              version: serverVersion(),
+              version: reportableServerVersion(),
             }).credentials.read(),
           ).email,
         login: (value, ui) =>

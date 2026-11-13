@@ -77,9 +77,12 @@ function harness(caps?: Record<string, { driverKind: string; agentsMcp: boolean 
       ),
   };
   let sourceExists = true;
+  const deletionRefusal = vi.fn((_id: string): string | null => null);
   const deleteBot = vi.fn(
     async (id: string, revalidate: () => void, request?: TeamSetupRequest) => {
       revalidate();
+      const refusal = deletionRefusal(id);
+      if (refusal) throw new TeamSetupError(refusal, 409);
       const target = bots.find((item) => item.id === id)!;
       if (request)
         chief.lastTeamSetupReceipt = {
@@ -109,6 +112,7 @@ function harness(caps?: Record<string, { driverKind: string; agentsMcp: boolean 
     ownsThread: () => sourceExists,
     targetBusy,
     deleteBot,
+    deletionRefusal,
     autoApply,
     validateChange,
     validateModel: (selection, current) => {
@@ -151,6 +155,7 @@ function harness(caps?: Record<string, { driverKind: string; agentsMcp: boolean 
     resolve,
     apply,
     deleteBot,
+    deletionRefusal,
     messages,
     autoApply,
     targetBusy,
@@ -273,7 +278,7 @@ describe('reviewed Chief team setup', () => {
     h.peer.section = 'Private';
     expect(() =>
       h.propose([{ action: 'update', botId: h.peer.id, fields: { chiefOfStaff: true } }]),
-    ).toThrow(/authorized/);
+    ).toThrow(/Private department, which Clive is not in charge of/);
     h.peer.section = 'Engineering';
     h.chief.chiefOfStaff = false;
     expect(() =>
@@ -404,7 +409,9 @@ describe('reviewed Chief team setup', () => {
     expect(() =>
       h.propose([specialist('Mira', 'Engineering', { instanceId: 'codex', model: 'made-up' })]),
     ).toThrow(/catalog/);
-    expect(() => h.propose([specialist('Mira', 'Private')])).toThrow(/authorized/);
+    expect(() => h.propose([specialist('Mira', 'Private')])).toThrow(
+      /Private department, which Clive is not in charge of/,
+    );
     expect(() => h.propose([specialist('Mira', 'Private')], ['Private'])).toThrow(/exists/);
     expect(() => h.propose([specialist('Mira', 'Engineering')], ['Growth'])).toThrow(
       /needs a specialist/,
@@ -907,10 +914,39 @@ describe('team setup that applies on its own', () => {
     expect(h.apply).toHaveBeenCalledTimes(1);
   });
 
+  it("names the department and the setting that unlocks it when a bot is outside the Chief's departments", async () => {
+    const h = harness();
+    h.autoApply.mockReturnValue('full-access');
+    const outsider = h.bot('Rex', { section: 'Private' });
+    const unlock =
+      'which Clive is not in charge of. Only the person can add a department, in Clive\'s bot settings, Permissions, "Also in charge of".';
+    await expect(
+      h.submit([{ action: 'update', botId: outsider.id, fields: { title: 'Must not apply' } }]),
+    ).rejects.toThrow(`@Rex is in the Private department, ${unlock}`);
+    await expect(
+      h.submit([{ action: 'update', botId: h.peer.id, fields: { section: 'Private' } }]),
+    ).rejects.toThrow(`That is the Private department, ${unlock}`);
+    await expect(
+      h.service.submitDeletion({
+        botId: h.chief.id,
+        threadId: h.chief.threadId,
+        targetBotId: outsider.id,
+        reason: 'remove',
+      }),
+    ).rejects.toThrow(`@Rex is in the Private department, ${unlock}`);
+    expect(outsider.title).toBe('');
+    expect(h.peer.section).toBe('Work');
+    expect(h.messages).toHaveLength(0);
+    expect(h.apply).not.toHaveBeenCalled();
+    expect(h.deleteBot).not.toHaveBeenCalled();
+  });
+
   it('retains model, scope, source, permission-field and deletion safety checks', async () => {
     const h = harness();
     h.autoApply.mockReturnValue('full-access');
-    await expect(h.submit([specialist('Mira', 'Private')])).rejects.toThrow(/authorized/);
+    await expect(h.submit([specialist('Mira', 'Private')])).rejects.toThrow(
+      /Private department, which Clive is not in charge of/,
+    );
     await expect(
       h.submit([specialist('Mira', 'Work', { instanceId: 'claude', model: 'unknown' })]),
     ).rejects.toThrow(/catalog/);
@@ -1100,6 +1136,25 @@ describe('team setup below Full access', () => {
     h.messages.push({ id: 'person-line', role: 'user' });
     expect(await undo(h, created.requestId)).toMatchObject({ state: 'invalid', stale: true });
     expect(h.deleteBot).not.toHaveBeenCalled();
+  });
+
+  it('refuses Undo up front, deleting none of the bots it created, while one of them may not be deleted, and undoes it all once it may', async () => {
+    const h = harness();
+    h.autoApply.mockReturnValue('level');
+    const response = await h.submit([specialist('Mira', 'Work'), specialist('Noor', 'Work')]);
+    const noor = h.store.bots.find((bot) => bot.name === 'Noor')!;
+    h.deletionRefusal.mockImplementation((id) =>
+      id === noor.id ? "Hand back control of this bot's computer before deleting it" : null,
+    );
+    expect(await undo(h, response.requestId)).toMatchObject({
+      state: 'invalid',
+      error: "Hand back control of this bot's computer before deleting it",
+    });
+    expect(h.deleteBot).not.toHaveBeenCalled();
+    expect(h.store.bots.filter((bot) => ['Mira', 'Noor'].includes(bot.name))).toHaveLength(2);
+    h.deletionRefusal.mockImplementation(() => null);
+    expect(await undo(h, response.requestId)).toEqual({ claimed: true, state: 'undone' });
+    expect(h.store.bots.some((bot) => ['Mira', 'Noor'].includes(bot.name))).toBe(false);
   });
 
   it('deletes a teammate at Ask with no card and no Undo', async () => {

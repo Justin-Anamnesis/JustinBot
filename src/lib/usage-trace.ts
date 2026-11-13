@@ -9,6 +9,7 @@ import type {
   TraceGroup,
   TraceList,
   TraceNode,
+  TraceRootSummary,
   TraceStep,
   TraceTokens,
   TraceTool,
@@ -346,4 +347,22 @@ export function threadsOf(turns: readonly TraceTurn[]): Set<string> {
 
 export function isStep(node: TraceNode): node is TraceStep {
   return node.kind === 'step';
+}
+
+type NamedBot = { id: string; name: string };
+
+/** Usage rows keep the name a bot had when they were booked; a bot that still exists shows under its current name. */
+export function currentBotName(bots: readonly NamedBot[], id: string, booked: string): string {
+  return bots.find((bot) => bot.id === id)?.name ?? booked;
+}
+
+/** A run's title: its own, or "A message to <first bot>" under that bot's current name. */
+export function runTitle(root: TraceRootSummary, bots: readonly NamedBot[]): string {
+  const first = root.bots[0];
+  return (
+    root.title ||
+    t(`trace.source.${root.source}`, {
+      bot: first ? currentBotName(bots, first.id, first.name) : '',
+    })
+  );
 }

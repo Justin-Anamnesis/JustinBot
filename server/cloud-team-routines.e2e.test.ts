@@ -162,7 +162,8 @@ beforeAll(async () => {
   admin = (await team.pair(ADMIN)).token!;
   bob = (await team.pair(BOB)).token!;
   ben = (await team.pair(BEN)).token!;
-  scout = (await team.as(owner, 'POST', '/api/bots', { name: 'Scout' })).body.bot;
+  scout = (await team.as(owner, 'POST', '/api/bots', { name: 'Scout', visibility: 'everyone' }))
+    .body.bot;
   bobThread = (await team.as(bob, 'POST', `/api/bots/${scout.id}/tasks`, { title: "Bob's plans" }))
     .body.task.threadId;
   benThread = (await team.as(ben, 'POST', `/api/bots/${scout.id}/tasks`, { title: "Ben's notes" }))
@@ -205,7 +206,8 @@ beforeAll(async () => {
   expect(shared.status, JSON.stringify(shared.body)).toBe(201);
   standup = shared.body.routine.id;
   // Ledger: only Bob and Ben added, and Bob looks after it.
-  ledger = (await team.as(owner, 'POST', '/api/bots', { name: 'Ledger' })).body.bot;
+  ledger = (await team.as(owner, 'POST', '/api/bots', { name: 'Ledger', visibility: 'everyone' }))
+    .body.bot;
   expect(
     (
       await team.as(owner, 'PUT', `/api/bots/${ledger.id}/access`, {

@@ -760,8 +760,9 @@ it.each([
           await api('PUT', '/api/config', {
             automaticRecovery: { enabled: true, backup: bot.modelSelection },
           });
+        // The fixture's starter bot is on the same Claude with no backup too, so the one notice names both as bots that can't run.
         const told =
-          'Verification fixture is signed out on this computer. Sign in again in Settings → AI to keep using it.';
+          "Verification fixture is signed out on this computer. Sign in again in Settings → AI to keep using it. Until then Kai and Fixture Starter can't run: they have no backup.";
         await control(
           'send',
           '--bot',

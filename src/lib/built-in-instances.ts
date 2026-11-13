@@ -29,5 +29,6 @@ export const BUILT_IN_INSTANCE_DRIVERS: Readonly<Record<string, string>> = {
   hermes: 'hermesAgent',
   cline: 'clineAgent',
   pi: 'piAgent',
+  omp: 'ompAgent',
   gemini: 'geminiAgent',
 };

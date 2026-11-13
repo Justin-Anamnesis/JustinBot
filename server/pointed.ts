@@ -21,6 +21,10 @@ const part = z
       .min(1)
       .max(POINT_LIMITS.selector * 2),
     html: z.string().max(POINT_LIMITS.html * 2),
+    note: z
+      .string()
+      .max(POINT_LIMITS.note * 2)
+      .optional(),
   })
   .strict();
 const parts = z.array(part).min(1).max(POINT_LIMITS.perMessage);
@@ -42,8 +46,11 @@ export function preparePointed(
   if (value === undefined || value === null) return null;
   const parsed = parts.safeParse(value);
   if (!parsed.success) return { ok: false, status: 400, error: BAD };
-  const byPage = new Map<string, Array<z.infer<typeof part>>>();
-  for (const each of parsed.data) byPage.set(each.appId, [...(byPage.get(each.appId) ?? []), each]);
+  // Numbered across the whole message, as the composer's chips and the page's outlines are.
+  const byPage = new Map<string, Array<{ pick: z.infer<typeof part>; number: number }>>();
+  parsed.data.forEach((pick, index) =>
+    byPage.set(pick.appId, [...(byPage.get(pick.appId) ?? []), { pick, number: index + 1 }]),
+  );
   const blocks: string[] = [];
   for (const [appId, picks] of byPage) {
     const row = appRow(store, threadId, appId);
@@ -51,17 +58,22 @@ export function preparePointed(
       return { ok: false, status: 404, ...userError('serverError.page.notHere') };
     const title = clean(row.app.title, 80);
     const current = (row.app.rev ?? 0) + 1;
-    const versions = [...new Set(picks.map((pick) => pick.rev + 1))]
+    const versions = [...new Set(picks.map(({ pick }) => pick.rev + 1))]
       .map((version) => `version ${version}`)
       .join(' and ');
     const lines = picks.map(
-      (pick, index) =>
-        `${index + 1}. <${pick.tag}>${pick.role ? ` role ${pick.role}` : ''}; text: ${pick.text || '(none)'}; selector: ${pick.selector}; html: ${pick.html}`,
+      ({ pick, number }) =>
+        `${number}. <${pick.tag}>${pick.role ? ` role ${pick.role}` : ''}; text: ${pick.text || '(none)'}; selector: ${pick.selector}; html: ${pick.html}`,
+    );
+    // The notes are the person's own words, typed beside each chip, so they sit outside the page's records.
+    const notes = picks.flatMap(({ pick, number }) =>
+      pick.note?.trim() ? [`${number}. ${clean(pick.note, POINT_LIMITS.note)}`] : [],
     );
     blocks.push(
       [
         `Page app_id "${appId}" (now version ${current}); the person was looking at ${versions}.`,
         recordsBlock(`the page "${title}", describing what the person pointed at`, lines),
+        ...(notes.length ? ["The person's notes on those parts, by number:", ...notes] : []),
       ].join('\n'),
     );
   }

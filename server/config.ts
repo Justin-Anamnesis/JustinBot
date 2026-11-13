@@ -52,6 +52,7 @@ import { postizKeyHeaders } from './postiz/connection.ts';
 import { parseJson, schemaIssue, type JsonObject, type JsonValue } from './schema.ts';
 import { deciderConfigSchema, type DeciderConfig } from './decider/config.ts';
 import {
+  fishKeyFromLiveKey,
   liveConfigSchema,
   liveConfigWithEnv,
   liveSettingEnv,
@@ -305,7 +306,12 @@ const featureConfigSchema = z
     parallelRoomJobs: z.boolean().optional(),
     acpPlanLines: z.boolean().optional(), // An ACP agent's plan as activity lines. Off unless true.
   })
-  .extend({ agentsToolBridge: z.boolean().optional(), savedSteps: z.boolean().optional() }); // agentsToolBridge: the find_tool / use_tool bridge, off unless true; savedSteps: repeat a computer task from its saved steps, on unless false
+  .extend({
+    agentsToolBridge: z.boolean().optional(),
+    savedSteps: z.boolean().optional(),
+    usbPhoneTakeover: z.boolean().optional(),
+    cloudComputerAutoReplace: z.boolean().optional(),
+  }); // cloudComputerAutoReplace: delete and replace a dead cloud computer by itself, off unless true (OMB_CLOUD_COMPUTER_AUTO_REPLACE wins); agentsToolBridge: the find_tool / use_tool bridge, off unless true; savedSteps: repeat a computer task from its saved steps, on unless false; usbPhoneTakeover: watch and take over the bots' USB phone, off unless true
 const onboardingConfigSchema = z
   .object({
     completedAt: z.string().trim().max(40).optional(),
@@ -541,6 +547,11 @@ const appConfigSchema = z.object({
     .strict()
     .optional(),
   threads: threadsConfigSchema.optional(),
+  /** Burst mode on an open-source install; a Cloud's plan sets it instead. `maxParallel`: burst threads running at once (default 10). */ burst:
+    z
+      .object({ maxParallel: z.number().int().min(1).max(100).optional() })
+      .strict()
+      .optional(),
   /** Minimum days of decision-log month files kept; OMB_DECISION_RETENTION_DAYS wins. */
   decisions: z
     .object({ retentionDays: z.number().int().min(1).max(3650).optional() })
@@ -664,6 +675,7 @@ export interface AppConfig extends HelperConfig {
     eventLogMaxBytes?: number;
     eventLogRetentionDays?: number;
   };
+  burst?: { maxParallel?: number };
   context?: {
     rebuildBytes?: number;
     compactAt?: number;
@@ -700,6 +712,8 @@ export interface AppConfig extends HelperConfig {
     acpPlanLines?: boolean;
     agentsToolBridge?: boolean;
     savedSteps?: boolean;
+    usbPhoneTakeover?: boolean;
+    cloudComputerAutoReplace?: boolean;
   };
   onboarding?: {
     completedAt?: string;
@@ -1068,6 +1082,7 @@ export function loadConfig(): AppConfig {
   if (process.env.OMB_WORKERS_AI_TOKEN !== undefined)
     cfg.decider.workersAiToken = process.env.OMB_WORKERS_AI_TOKEN;
   cfg.live = liveConfigWithEnv(cfg.live);
+  fishKeyFromLiveKey(cfg);
   cfg.imageGen = { ...cfg.imageGen };
   if (process.env.OMB_OPENAI_IMAGE_KEY !== undefined)
     cfg.imageGen.key = process.env.OMB_OPENAI_IMAGE_KEY;

@@ -5,7 +5,9 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  renameSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -52,6 +54,33 @@ describe('which bot files a move carries', () => {
   });
 });
 
+describe('bot-file digests after a timestamp-preserving edit', () => {
+  it.each(['overwrite', 'replace'])(
+    'rechecks a same-size file after %s with its old mtime',
+    async (operation) => {
+      const data = mkdtempSync(join(tmpdir(), 'omb-files-digest-'));
+      const path = 'workspaces/b1/notes.md';
+      const full = join(data, path);
+      const old = new Date('2020-01-01T00:00:00Z');
+      mkdirSync(join(data, 'workspaces', 'b1'), { recursive: true });
+      writeFileSync(full, 'first');
+      utimesSync(full, old, old);
+      expect(await listBotFiles(data, ['b1'])).toEqual([{ path, size: 5, sha256: sha('first') }]);
+      if (operation === 'replace') {
+        const replacement = join(data, 'replacement.md');
+        writeFileSync(replacement, 'later');
+        utimesSync(replacement, old, old);
+        renameSync(replacement, full);
+      } else {
+        writeFileSync(full, 'later');
+        utimesSync(full, old, old);
+      }
+      expect(await listBotFiles(data, ['b1'])).toEqual([{ path, size: 5, sha256: sha('later') }]);
+      expect(await listBotFiles(data, ['b1'])).toEqual([{ path, size: 5, sha256: sha('later') }]);
+    },
+  );
+});
+
 describe('My Cloud takes a file', () => {
   const data = mkdtempSync(join(tmpdir(), 'omb-files-'));
   const owner = { person: 'p_owner', name: 'Amit' };
@@ -89,6 +118,40 @@ describe('My Cloud takes a file', () => {
     sha256: sha(text),
     mode,
     ...extra,
+  });
+
+  it('stores an empty file and accepts a retry without losing it', async () => {
+    const f = file('task-workspaces/b1/empty/.gitkeep', '');
+    expect(await send({ ...f, offset: 0 }, '')).toEqual({ status: 201, body: { stored: true } });
+    expect(readFileSync(join(data, f.path))).toEqual(Buffer.alloc(0));
+    expect(await send({ ...f, offset: 0 }, '')).toEqual({ status: 201, body: { stored: false } });
+    expect(await listBotFiles(data, ['b1'])).toContainEqual({
+      path: f.path,
+      size: 0,
+      sha256: sha(''),
+    });
+    expect(
+      readdirSync(join(data, 'tmp', 'move-files')).filter((name) => name.endsWith('.partial')),
+    ).toEqual([]);
+  });
+
+  it('only replaces a file with an empty one when its expected hash still matches', async () => {
+    const path = 'workspaces/b1/cleared.txt';
+    mkdirSync(join(data, 'workspaces', 'b1'), { recursive: true });
+    writeFileSync(join(data, path), 'keep until the sender agrees');
+    const f = file(path, '');
+    expect(await send({ ...f, offset: 0 }, '')).toEqual({ status: 409, body: { conflict: true } });
+    expect(
+      await send({ ...f, mode: 'replace', expect: sha('another version'), offset: 0 }, ''),
+    ).toEqual({ status: 409, body: { conflict: true } });
+    expect(readFileSync(join(data, path), 'utf8')).toBe('keep until the sender agrees');
+    expect(
+      await send(
+        { ...f, mode: 'replace', expect: sha('keep until the sender agrees'), offset: 0 },
+        '',
+      ),
+    ).toEqual({ status: 201, body: { stored: true } });
+    expect(readFileSync(join(data, path))).toEqual(Buffer.alloc(0));
   });
 
   it('in parts, from where its copy ends, and only whole and as sent', async () => {

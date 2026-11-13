@@ -18,7 +18,12 @@ export interface MenuEngine {
   displayName: string | undefined;
   models: {
     default: string;
-    options: ReadonlyArray<{ id: string; label: string; orgBlocked?: true }>;
+    options: ReadonlyArray<{
+      id: string;
+      label: string;
+      orgBlocked?: true;
+      needsCliUpdate?: string;
+    }>;
   };
   adapter: { capabilities: { effortLevels?: readonly string[] } };
 }
@@ -65,7 +70,7 @@ export function modelMenu(input: {
     const name = engine.displayName || engine.driverKind;
     const labels = new Map(
       engine.models.options
-        .filter((option) => !option.orgBlocked)
+        .filter((option) => !option.orgBlocked && !option.needsCliUpdate)
         .map((option) => [option.id, option.label]),
     );
     const ids = [

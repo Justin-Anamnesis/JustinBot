@@ -62,10 +62,18 @@ const definitionSchema = z
     filter: filterSchema.optional(),
     config: z.record(z.string(), z.unknown()).optional(),
     runOn: z.enum(['maus', 'cloud']).optional(),
+    sameConversation: z.boolean().optional(),
   })
   .strict();
 const changesSchema = definitionSchema
-  .pick({ name: true, instructions: true, filter: true, config: true, runOn: true })
+  .pick({
+    name: true,
+    instructions: true,
+    filter: true,
+    config: true,
+    runOn: true,
+    sameConversation: true,
+  })
   .partial()
   .strict()
   .refine(
@@ -250,6 +258,7 @@ export class AppTriggerRequestService {
                 enabled: before.enabled,
                 config: before.config,
                 ...(before.filter ? { filter: before.filter } : {}),
+                ...(before.sameConversation ? { sameConversation: true } : {}),
               },
             }
           : {}),
@@ -340,6 +349,7 @@ export class AppTriggerRequestService {
                     enabled: before.enabled,
                     filter: before.filter ?? null,
                     restoreConfig: before.config,
+                    sameConversation: before.sameConversation === true,
                   }
                 : undefined
               : { enabled: operation.action === 'pause' };

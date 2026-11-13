@@ -116,6 +116,7 @@ export function agentWebhook(webhook: WebhookTrigger, latestRun?: RoutineRun) {
     enabled: webhook.enabled,
     runOn: webhook.runOn,
     eventTypes: webhook.eventTypes ?? [],
+    ...(webhook.payloadFilter ? { payloadFilter: webhook.payloadFilter } : {}),
     calls: webhook.deliveryCount,
     lastCalledAt: timestamp(webhook.lastReceivedAt),
     latestRun: latestRun ? agentRun(latestRun) : null,
@@ -271,8 +272,22 @@ const triggerRequestSchema = z.union([
     .strict(),
 ]);
 
-const WEBHOOK_FIELDS = new Set(['name', 'instructions', 'runOn', 'eventTypes']);
-const APP_FIELDS = new Set(['name', 'instructions', 'runOn', 'filter', 'config']);
+const WEBHOOK_FIELDS = new Set([
+  'name',
+  'instructions',
+  'runOn',
+  'eventTypes',
+  'payloadFilter',
+  'sameConversation',
+]);
+const APP_FIELDS = new Set([
+  'name',
+  'instructions',
+  'runOn',
+  'filter',
+  'config',
+  'sameConversation',
+]);
 
 export type ParsedTriggerRequest =
   | { ok: false; error: string }
@@ -325,14 +340,17 @@ export function parseTriggerRequest(
           operation: { action: 'create', webhook: request.webhook },
         };
   }
-  const changes = request.action === 'update' ? request.changes : undefined;
   const kind = kindOf(request.triggerId);
+  const asked = request.action === 'update' ? request.changes : undefined;
+  // A null payload filter clears a webhook's; on another kind it changes nothing.
+  const { payloadFilter, ...rest } = asked ?? {};
+  const changes = asked && kind !== 'webhook' && payloadFilter === null ? rest : asked;
   if (kind === 'app') {
     const misplaced = changes && Object.keys(changes).find((key) => !APP_FIELDS.has(key));
     if (misplaced)
       return {
         ok: false,
-        error: `An app-event trigger has no ${misplaced} to change. Change name, instructions, run_on, filter or event_config; to watch another app, event or account, delete it and create a new one.`,
+        error: `An app-event trigger has no ${misplaced} to change. Change name, instructions, run_on, filter, event_config or same_conversation; to watch another app, event or account, delete it and create a new one.`,
       };
     return {
       ok: true,
@@ -348,8 +366,15 @@ export function parseTriggerRequest(
   if (kind === 'schedule') {
     if (changes && 'eventTypes' in changes)
       return { ok: false, error: 'webhook_event_types applies only to webhook triggers' };
+    if (changes && 'payloadFilter' in changes)
+      return { ok: false, error: 'webhook_payload_filter applies only to webhook triggers' };
     if (changes && ('filter' in changes || 'config' in changes))
       return { ok: false, error: 'filter and event_config apply only to app-event triggers' };
+    if (changes && 'sameConversation' in changes)
+      return {
+        ok: false,
+        error: 'same_conversation applies only to app-event and webhook triggers',
+      };
     return {
       ok: true,
       kind: 'schedule',
@@ -365,7 +390,7 @@ export function parseTriggerRequest(
   if (misplaced)
     return {
       ok: false,
-      error: `A webhook trigger has no ${misplaced}; it fires when its link is called. Change name, instructions, run_on or webhook_event_types.`,
+      error: `A webhook trigger has no ${misplaced}; it fires when its link is called. Change name, instructions, run_on, webhook_event_types, webhook_payload_filter or same_conversation.`,
     };
   return {
     ok: true,

@@ -13,6 +13,7 @@ import {
   skillReviewEnabled,
   skillReviewSteps,
   skillReviewUnavailableEngines,
+  usbPhoneTakeoverEnabled,
 } from './feature-flags';
 
 describe('experimental feature flags', () => {
@@ -110,6 +111,13 @@ describe('experimental feature flags', () => {
     expect(roomMemoryCaptureEnabled(null)).toBe(false);
     expect(roomMemoryCaptureEnabled({ features: {} })).toBe(false);
     expect(roomMemoryCaptureEnabled({ features: { roomMemoryCapture: true } })).toBe(true);
+  });
+
+  it("keeps the USB phone's screen and takeover off until switched on", () => {
+    expect(usbPhoneTakeoverEnabled(null)).toBe(false);
+    expect(usbPhoneTakeoverEnabled({ features: {} })).toBe(false);
+    expect(usbPhoneTakeoverEnabled({ features: { usbPhoneTakeover: false } })).toBe(false);
+    expect(usbPhoneTakeoverEnabled({ features: { usbPhoneTakeover: true } })).toBe(true);
   });
 
   it('offers sharing learned skills only with the skills library, asking by default', () => {

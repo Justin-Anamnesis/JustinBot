@@ -155,7 +155,7 @@ export function WelcomeBring({
       <StepHeading
         headingRef={headingRef}
         title={t('cloudWelcome.bring.title', { name })}
-        sub={t(team ? 'cloudWelcome.bring.subTeamShared' : 'cloudWelcome.bring.sub', { name })}
+        sub={t(team ? 'cloudWelcome.bring.subTeamYours' : 'cloudWelcome.bring.sub', { name })}
       />
       {older && (
         <p role='note' data-bring-update className='text-[13px] leading-relaxed text-ink'>
@@ -178,7 +178,7 @@ export function WelcomeBring({
           <div data-bring-choice='fresh' className={cn(CARD, CARD_PICKED)}>
             {freshBody}
           </div>
-          {!desktop && (
+          {!desktop && !team && (
             <div
               data-bring-desktop
               className={cn(CARD, 'border-dashed border-hairline/60 bg-transparent')}>

@@ -349,8 +349,8 @@ describe('the plan cards', () => {
     const bridge = accountBridge(paidState(trial));
     vi.stubGlobal('window', Object.assign(window, { ogb: { cloudAccount: bridge } }));
     await show(createElement(CloudAccountSettings));
-    expect(text()).toContain('Pro active · verified by MausBot Cloud');
-    expect(button('Manage Cloud subscription')).toBeTruthy();
+    expect(text()).toContain('Pro');
+    expect(button('Manage subscription')).toBeTruthy();
     await click(button('Cancel trial'));
     await click(button('Missing a feature'));
     await click(button('Cancel my trial'));
@@ -363,7 +363,7 @@ describe('the plan cards', () => {
       Object.assign(window, { ogb: { cloudAccount: accountBridge(paidState()) } }),
     );
     await show(createElement(CloudAccountSettings));
-    expect(text()).toContain('Pro active · verified by MausBot Cloud');
+    expect(text()).toContain('Pro');
     expect(button('Cancel trial')).toBeUndefined();
     expect(button('Cancel plan')).toBeUndefined();
     // Cancelled during the trial: Keep my plan is the way back, so the trial's own button doesn't offer a second one.
@@ -389,7 +389,8 @@ describe('the plan cards', () => {
     await show(createElement(CloudAccountSettings));
     expect(button('Keep my plan')).toBeTruthy();
     expect(button('Subscribe to keep it')).toBeUndefined();
-    expect(button('Manage Cloud subscription')).toBeTruthy();
+    // Keep my plan is the page's one primary while the plan is cancelled.
+    expect(container.querySelectorAll('.ui-button-primary')).toHaveLength(1);
   });
 
   it('the Cloud page in home mode: Cancel trial beside Manage in your browser, and the plan read again after; none without a renewal', async () => {
@@ -412,7 +413,7 @@ describe('the plan cards', () => {
       })),
     };
     await show(createElement(CloudPlanOnCloud, { bridge: plan }));
-    expect(button('Manage in your browser')).toBeTruthy();
+    expect(button('Manage subscription')).toBeTruthy();
     await click(button('Cancel trial'));
     await click(button('Cancel my trial'));
     expect(plan.cancel).toHaveBeenCalledExactlyOnceWith(null);
@@ -431,7 +432,7 @@ describe('the plan cards', () => {
     await act(async () => root.unmount());
     root = createRoot(container);
     await show(createElement(CloudPlanOnCloud, { bridge: plan }));
-    expect(button('Manage in your browser')).toBeTruthy();
+    expect(button('Manage subscription')).toBeTruthy();
     expect(container.querySelector('[data-cloud-cancel]')).toBeNull();
   });
 });

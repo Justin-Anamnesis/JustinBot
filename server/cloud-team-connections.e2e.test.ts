@@ -70,7 +70,10 @@ beforeAll(async () => {
   admin = (await team.pair(ADMIN)).token!;
   ada = (await team.pair(ADA)).token!;
   cleo = (await team.pair(CLEO)).token!;
-  const created = await team.as(owner, 'POST', '/api/bots', { name: 'Scout' });
+  const created = await team.as(owner, 'POST', '/api/bots', {
+    name: 'Scout',
+    visibility: 'everyone',
+  });
   expect(created.status, JSON.stringify(created.body)).toBe(201);
   bot = created.body.bot;
   // The Team Cloud registered its own installation as it started: the team's Gmail is connected there.
@@ -442,7 +445,10 @@ it(
 it(
   "gives work her own message hands to another bot her own Gmail, and never work Cleo's message hands on",
   async () => {
-    const created = await team.as(owner, 'POST', '/api/bots', { name: 'Helper' });
+    const created = await team.as(owner, 'POST', '/api/bots', {
+      name: 'Helper',
+      visibility: 'everyone',
+    });
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     const helper = created.body.bot as { id: string; mainThreadId: string };
     const handOn = (who: string) => ({
@@ -553,7 +559,10 @@ it(
       JSON.stringify({ 'Brief from @Scout:': `Ada's latest email: ${SECRET}.` }),
     );
     try {
-      const created = await team.as(owner, 'POST', '/api/bots', { name: 'Clerk' });
+      const created = await team.as(owner, 'POST', '/api/bots', {
+        name: 'Clerk',
+        visibility: 'everyone',
+      });
       expect(created.status, JSON.stringify(created.body)).toBe(201);
       const clerk = created.body.bot as { id: string; mainThreadId: string };
       const clerkWork = () =>

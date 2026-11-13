@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { personKey } from '../person-key.ts';
+import { TEAM_READER, VaultStore } from '../vault-store.ts';
 import { createUploadOwners } from './member-uploads.ts';
 import { createTeamMemberLeft, type TeamMemberLeftDeps } from './team-member-left.ts';
 
@@ -37,6 +38,7 @@ function fixture() {
   }> = [];
   const handed: Array<[string, string, string | null]> = [];
   const rows: unknown[] = [];
+  const vault = new VaultStore({ dataDir });
   const deps: TeamMemberLeftDeps = {
     dataDir,
     store: {
@@ -72,6 +74,9 @@ function fixture() {
     deleteAttachment: (file) => deleted.push(file),
     eraseBrowsers: async () => true,
     forgetConnections: () => {},
+    forgetSecrets: (person) => {
+      vault.forgetPerson(person);
+    },
     routines: () => routines,
     deleteRoutine: (id) => {
       routines.splice(
@@ -105,6 +110,7 @@ function fixture() {
     routines,
     handed,
     rows,
+    vault,
   };
 }
 
@@ -216,5 +222,35 @@ describe('createTeamMemberLeft', () => {
     expect(fx.deleted).toEqual([unsent]);
     expect(result.files).toBe(1);
     expect(existsSync(join(fx.dataDir, 'people', bob))).toBe(false);
+  });
+
+  it("deletes the secrets they typed into cards in their own chats, and nobody else's, and says nothing of them", async () => {
+    const fx = fixture();
+    const ada = personKey({ id: '', email: 'ada@acme.test' });
+    const own = (person: string) =>
+      fx.vault.saveSecret({
+        name: 'Stripe secret key',
+        value: `sk_test_fake-${person}`,
+        source: 'card',
+        bots: ['scout'],
+        person,
+      });
+    const theirs = own(bob),
+      hers = own(ada);
+    const team = fx.vault.saveSecret({
+      name: 'Stripe secret key',
+      value: 'sk_test_fake-team',
+      source: 'settings',
+      bots: 'all',
+    });
+    await createTeamMemberLeft(fx.deps)(BOB);
+    expect(fx.vault.secret(theirs.id)).toBeNull();
+    expect(fx.vault.secret(hers.id)).not.toBeNull();
+    expect(fx.vault.listSecrets(TEAM_READER).map((one) => one.id)).toEqual([team.id]);
+    expect(
+      new VaultStore({ dataDir: fx.dataDir }).secret(theirs.id),
+      'and from the disk',
+    ).toBeNull();
+    expect(JSON.stringify(fx.rows)).not.toContain('Stripe');
   });
 });

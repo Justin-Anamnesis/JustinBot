@@ -73,18 +73,17 @@ export function isExpired(
 }
 
 export function withoutExpired(text: string, today: string): { text: string; hidden: number } {
-  const expired = new Set(
-    parseMemoryEntries(text)
-      .filter((e) => isExpired(e, today))
-      .map((e) => e.line),
-  );
-  if (!expired.size) return { text, hidden: 0 };
+  const expired = parseMemoryEntries(text).filter((e) => isExpired(e, today));
+  if (!expired.length) return { text, hidden: 0 };
+  const dropped = new Set<number>();
+  for (const entry of expired)
+    for (let line = entry.line; line < entry.end; line++) dropped.add(line);
   return {
     text: text
       .split('\n')
-      .filter((_, index) => !expired.has(index))
+      .filter((_, index) => !dropped.has(index))
       .join('\n'),
-    hidden: expired.size,
+    hidden: expired.length,
   };
 }
 

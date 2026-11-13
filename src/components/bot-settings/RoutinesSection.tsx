@@ -49,6 +49,7 @@ export function RoutinesSection({
       <RoutineList
         routines={routines}
         runs={runs}
+        pausedBots={state.config?.pausedBots}
         loading={state.routinesLoadState === 'loading' && routines.length === 0}
         error={state.routinesLoadState === 'error'}
         onOpen={setEditing}

@@ -26,7 +26,10 @@ it(
       const team = fixture.team!;
       const owner = await team.pair({ email: 'ada@notifications.test', role: 'owner' });
       const member = await team.pair({ email: 'bob@notifications.test', role: 'member' });
-      const created = await team.as(owner.token!, 'POST', '/api/bots', { name: 'Scout' });
+      const created = await team.as(owner.token!, 'POST', '/api/bots', {
+        name: 'Scout',
+        visibility: 'everyone',
+      });
       expect(created.status).toBe(201);
       const bot = created.body.bot;
       const opened = await team.as(owner.token!, 'POST', `/api/bots/${bot.id}/tasks`, {
@@ -98,7 +101,10 @@ it(
       const team = fixture.team!;
       const owner = await team.pair({ email: 'ada@notifications.test', role: 'owner' });
       const member = await team.pair({ email: 'bob@notifications.test', role: 'member' });
-      const created = await team.as(owner.token!, 'POST', '/api/bots', { name: 'Scout' });
+      const created = await team.as(owner.token!, 'POST', '/api/bots', {
+        name: 'Scout',
+        visibility: 'everyone',
+      });
       expect(created.status).toBe(201);
       const bot = created.body.bot;
       const channel = await team.as(owner.token!, 'POST', '/api/groups', {

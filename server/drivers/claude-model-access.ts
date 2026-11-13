@@ -65,8 +65,11 @@ export function withOrgBlocks(catalog: ModelCatalog, blocked: ReadonlySet<string
         ? { ...option, orgBlocked: true as const }
         : option,
   );
-  const usable = (id: string) => options.some((option) => option.id === id && !option.orgBlocked);
-  const fallback = options.find((option) => !option.orgBlocked && !option.custom)?.id;
+  const usable = (id: string) =>
+    options.some((option) => option.id === id && !option.orgBlocked && !option.needsCliUpdate);
+  const fallback = options.find(
+    (option) => !option.orgBlocked && !option.needsCliUpdate && !option.custom,
+  )?.id;
   return {
     ...catalog,
     default: usable(catalog.default) ? catalog.default : (fallback ?? catalog.default),

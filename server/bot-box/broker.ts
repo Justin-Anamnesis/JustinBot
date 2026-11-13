@@ -15,6 +15,7 @@ import { request as httpsRequest } from 'node:https';
 import type { Socket } from 'node:net';
 
 import { MAX_REFUSABLE_CALL_BYTES, refusedCallAnswer } from './broker-mcp-refusal.ts';
+import type { McpServerApp } from '../mcp-server-app.ts';
 
 export const BROKER_TOKEN_PREFIX = 'omb_t0_';
 /** A token minted for a process lives this long at most; the process's exit ends it sooner. */
@@ -31,6 +32,8 @@ export interface BrokerGrant {
   headers: Record<string, string>;
   /** On an MCP server's grant for a turn: its name, so a tool call it refuses with HTTP 401 is answered in words (broker-mcp-refusal.ts). */
   mcpServer?: string;
+  /** With `mcpServer`: the connected app that refusal points the bot to instead. */
+  mcpApp?: McpServerApp;
 }
 
 export interface BrokerToken {
@@ -162,6 +165,7 @@ export function openCredentialBroker(options: CredentialBrokerOptions): Promise<
           upstream: grant.upstream,
           headers: { ...grant.headers },
           ...(grant.mcpServer ? { mcpServer: grant.mcpServer } : {}),
+          ...(grant.mcpApp ? { mcpApp: { ...grant.mcpApp } } : {}),
         },
       ]),
     );
@@ -260,7 +264,12 @@ export function openCredentialBroker(options: CredentialBrokerOptions): Promise<
           );
           const refusal =
             sentBytes <= MAX_REFUSABLE_CALL_BYTES
-              ? refusedCallAnswer(mcpServer, sentCredentials, Buffer.concat(sent).toString('utf8'))
+              ? refusedCallAnswer(
+                  mcpServer,
+                  sentCredentials,
+                  Buffer.concat(sent).toString('utf8'),
+                  verdict.grant.mcpApp,
+                )
               : null;
           if (refusal === null) return relay(answer);
           answer.resume();

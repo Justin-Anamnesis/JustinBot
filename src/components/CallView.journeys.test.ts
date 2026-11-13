@@ -230,7 +230,7 @@ async function firstLiveCall() {
   expect(text()).not.toContain('Call unavailable');
   expect(container.querySelector('input')).toBeNull();
   const openApiKeys = Array.from(container.querySelectorAll('button')).find(
-    (item) => item.textContent?.trim() === 'Open API keys',
+    (item) => item.textContent?.trim() === 'Open AI › Other services',
   );
   press(openApiKeys ?? null);
   expect(text()).not.toContain(KEY_NEEDED);

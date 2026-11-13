@@ -35,7 +35,7 @@ export function streamedPage(panel: PageSize): PageSize {
 const key = (size: PageSize) => `${size.width}x${size.height}`;
 
 export interface PageSizeHost {
-  /** Sizes the session's running page; resolves once the engine answered or gave up. */
+  /** Sizes the session's running page; false means the engine gave up. */
   apply(session: string, size: PageSize): Promise<unknown>;
   /** Runs `work` in the session's browser lane, after the bot's call running now; null when that call outlasted the wait. */
   lane(session: string, work: () => Promise<void>): Promise<void | null>;
@@ -105,12 +105,15 @@ export class PageSizes {
   ): Promise<void> {
     try {
       while (this.#behind(session, entry)) {
-        await this.#host.lane(session, async () => {
+        let applied = false;
+        const ran = await this.#host.lane(session, async () => {
           const wanted = entry.wanted;
           if (!this.#behind(session, entry)) return;
-          await this.#host.apply(session, wanted).catch(() => undefined);
+          if ((await this.#host.apply(session, wanted).catch(() => false)) === false) return;
           entry.applied = key(wanted);
+          applied = true;
         });
+        if (ran === null || !applied) return;
       }
     } finally {
       entry.applying = null;
@@ -122,8 +125,8 @@ export class PageSizes {
     const entry = this.#entry(session);
     const wanted = entry.wanted;
     if (entry.applied === key(wanted)) return false;
-    await this.#host.apply(session, wanted).catch(() => undefined);
-    entry.applied = key(wanted);
+    if ((await this.#host.apply(session, wanted).catch(() => false)) !== false)
+      entry.applied = key(wanted);
     return true;
   }
 

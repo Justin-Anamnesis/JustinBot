@@ -24,7 +24,9 @@ export default function MarkdownFileContent({
 }) {
   const [attempt, setAttempt] = useState(0);
   const [source, setSource] = useState<string | null>(null);
-  const [error, setError] = useState<'size' | 'load' | null>(null);
+  const [error, setError] = useState<'size' | 'load' | 'encoding' | { reason: string } | null>(
+    null,
+  );
   const [showSource, setShowSource] = useState(false);
   const save = useLocalFileSave(path, name, message);
   useEffect(() => {
@@ -32,17 +34,29 @@ export default function MarkdownFileContent({
     setError(null);
     setSource(null);
     void (async () => {
+      let answered = false;
       try {
         const response = await requestMessageFile(path, message, controller.signal);
+        answered = true;
+        // Notes saved by Windows apps are often Windows-1252, not UTF-8.
         const text = await readTableResponse(
           response,
           controller.signal,
           MARKDOWN_PREVIEW_MAX_BYTES,
+          'windows-1252',
         );
         if (!controller.signal.aborted) setSource(text);
       } catch (reason) {
-        if (!controller.signal.aborted)
-          setError(reason instanceof Error && reason.message === 'size' ? 'size' : 'load');
+        if (controller.signal.aborted) return;
+        // A refusal from the server says why; only a request that got no answer (TypeError) is the connection.
+        if (!answered && reason instanceof Error && !(reason instanceof TypeError))
+          setError({ reason: reason.message });
+        else
+          setError(
+            reason instanceof Error && (reason.message === 'size' || reason.message === 'encoding')
+              ? reason.message
+              : 'load',
+          );
       }
     })();
     return () => controller.abort();
@@ -77,7 +91,15 @@ export default function MarkdownFileContent({
     return (
       <div className='p-8 text-center text-sm'>
         <p role='alert' className='text-ink-secondary'>
-          {t(error === 'size' ? 'markdown.tooLarge' : 'markdown.loadFailed')}
+          {typeof error === 'object'
+            ? t('markdown.refused', { reason: error.reason })
+            : t(
+                error === 'size'
+                  ? 'markdown.tooLarge'
+                  : error === 'encoding'
+                    ? 'markdown.notText'
+                    : 'markdown.loadFailed',
+              )}
         </p>
         {recovery}
       </div>

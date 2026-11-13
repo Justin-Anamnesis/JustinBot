@@ -28,6 +28,8 @@ export function createStarterCaps(deps: {
   awake: StarterAwake;
   /** Whether this thread's running turn waits on hand-offs it made. */
   waitsOnOthers(threadId: string): boolean;
+  /** Whether a burst's lane runs this thread: it has a limit of its own. */
+  laneOwned?(threadId: string): boolean;
   botName(botId: string): string | undefined;
   /** The paused bot's line in this language. */
   pausedLine(language: string | undefined, limit: number): string;
@@ -46,6 +48,7 @@ export function createStarterCaps(deps: {
     engine: {
       most: () => (deps.starter() ? STARTER_RUNNING_TURNS : undefined),
       waitsOnOthers: deps.waitsOnOthers,
+      ...(deps.laneOwned ? { laneOwned: deps.laneOwned } : {}),
     },
     handoffs: {
       refusal(botId, open) {

@@ -88,6 +88,7 @@ export function createMcpHealth(deps: McpHealthDeps) {
     }
   };
   const running = new Map<string, Promise<void>>();
+  const generations = new Map<string, number>();
   const waiting: Array<() => void> = [];
   let active = 0;
   const slot = async <T>(work: () => Promise<T>): Promise<T> => {
@@ -119,9 +120,18 @@ export function createMcpHealth(deps: McpHealthDeps) {
     name: string,
     server: CommandServer,
     botId: string,
+    key: string,
+    generation: number,
     result: { ok: true } | { ok: false; error: string },
   ) => {
-    const key = startKey(server);
+    const current = deps.servers()[name];
+    if (
+      !current ||
+      (generations.get(name) ?? 0) !== generation ||
+      current.bot !== server.bot ||
+      startKey(current) !== key
+    )
+      return;
     const health =
       state[name]?.key === key && state[name]!.checks
         ? state[name]!
@@ -138,7 +148,9 @@ export function createMcpHealth(deps: McpHealthDeps) {
   };
 
   const check = (name: string, server: CommandServer, botId: string): Promise<void> => {
-    const id = `${name}\u0000${standsFor(server, botId)}`;
+    const key = startKey(server);
+    const generation = generations.get(name) ?? 0;
+    const id = `${name}\u0000${standsFor(server, botId)}\u0000${key}\u0000${generation}`;
     const pending = running.get(id);
     if (pending) return pending;
     const work = slot(() => deps.start(name, server, botId))
@@ -146,7 +158,7 @@ export function createMcpHealth(deps: McpHealthDeps) {
         ok: false as const,
         error: error instanceof Error ? error.message : String(error),
       }))
-      .then((result) => record(name, server, botId, result))
+      .then((result) => record(name, server, botId, key, generation, result))
       .finally(() => running.delete(id));
     running.set(id, work);
     return work;
@@ -210,6 +222,7 @@ export function createMcpHealth(deps: McpHealthDeps) {
     },
     /** A server was added, changed or turned on: checked again now. */
     changed(name: string): void {
+      generations.set(name, (generations.get(name) ?? 0) + 1);
       delete state[name];
       save();
       checkUsers(name, true);

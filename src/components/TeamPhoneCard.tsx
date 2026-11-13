@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 
+import { productName } from '@/lib/brand';
 import { t } from '@/lib/i18n';
 import { codeUntil, lastSeen } from '@/lib/pairing-time';
 import { api } from '@/state/store';
@@ -136,7 +137,11 @@ export function TeamPhoneCard({ team, blocked }: { team: string; blocked?: strin
                 <div className='mt-1 text-[13px] text-ink-secondary'>
                   {codeUntil(offer.expiresAt)}
                 </div>
-                {offer.url ? null : (
+                {offer.url ? (
+                  <p className='mt-2 text-[12px] text-ink-tertiary'>
+                    {t('phone.code.notCamera', { app: productName() })}
+                  </p>
+                ) : (
                   <p className='mt-3 text-[13px] text-ink-secondary'>
                     {offer.hint ?? t('remote.serverPairing.noLink')}
                   </p>

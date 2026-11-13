@@ -257,7 +257,7 @@ export function createEmailHost(deps: EmailHostDeps) {
             to: args.to,
             subject: args.subject,
             text: args.text,
-            ...pick(args, ['cc', 'bcc']),
+            ...pick(args, ['cc', 'bcc', 'html', 'inline_images']),
             ...threading,
           })),
         });

@@ -8,6 +8,9 @@ import { createAcpDriver, type AcpSupport } from './core.ts';
 import { CURSOR_STANDALONE } from './cursor-release.ts';
 import type { DeviceSignIn, DeviceSignInState } from '../device-auth.ts';
 import { discoverAcpModels } from './custom-model-catalog.ts';
+import { bundledEngineCatalog } from '../../model-manifest/bundled.ts';
+import { currentEngineCatalog } from '../../model-manifest/manifest.ts';
+import { ENGINE_MODEL_ID } from '../../model-manifest/schema.ts';
 import type { AcpQuestionRequest } from './question-requests.ts';
 import {
   capAnswerEcho,
@@ -101,22 +104,14 @@ export function matchCursorAcpModel(
   return null;
 }
 
-export const STATIC_CURSOR_MODELS: ModelCatalog = {
-  default: 'auto',
-  options: [
-    { id: 'auto', label: 'Auto' },
-    { id: 'composer-2.5', label: 'Composer 2.5' },
-    { id: 'composer-2.5-fast', label: 'Composer 2.5 Fast' },
-    { id: 'gpt-5.3-codex', label: 'Codex 5.3' },
-    { id: 'claude-sonnet-5-thinking-high', label: 'Claude Sonnet 5 1M Thinking' },
-  ],
-};
+export const STATIC_CURSOR_MODELS: ModelCatalog = bundledEngineCatalog('cursor');
+const currentCursorModels = () => currentEngineCatalog('cursor');
 
 /** Without parameterizedModelPicker Cursor (CLI 2026.10.19) offers only `composer-2.5[fast=true]`, so a
  * `composer-2.5` bot bills as Fast; with it, Fast is a separate `fast` config option. */
 const CURSOR_CLIENT_META = { parameterizedModelPicker: true };
 
-const SLUG = /^[a-z0-9][a-z0-9._:+-]*$/i;
+const SLUG = ENGINE_MODEL_ID.cursor;
 const EXEC_TIMEOUT_MS = 8_000;
 
 const nonBlank = (value: string | undefined): boolean => Boolean(value?.trim());
@@ -214,9 +209,9 @@ export function decodeCursorModelCatalog(payload: unknown): ModelCatalog | null 
     seen.has(asRecord(payload)!.default as string)
       ? (asRecord(payload)!.default as string)
       : undefined) ??
-    (seen.has(STATIC_CURSOR_MODELS.default) ? STATIC_CURSOR_MODELS.default : options[0]!.id);
+    (seen.has(currentCursorModels().default) ? currentCursorModels().default : options[0]!.id);
 
-  return { default: defaultId, options: withUnseen(STATIC_CURSOR_MODELS.options, options) };
+  return { default: defaultId, options: withUnseen(currentCursorModels().options, options) };
 }
 
 function stripModelMarkers(label: string): {
@@ -268,8 +263,8 @@ export function decodeCursorModelText(text: string): ModelCatalog | null {
   const defaultId =
     (markedDefault && seen.has(markedDefault) ? markedDefault : undefined) ??
     (markedCurrent && seen.has(markedCurrent) ? markedCurrent : undefined) ??
-    (seen.has(STATIC_CURSOR_MODELS.default) ? STATIC_CURSOR_MODELS.default : options[0]!.id);
-  return { default: defaultId, options: withUnseen(STATIC_CURSOR_MODELS.options, options) };
+    (seen.has(currentCursorModels().default) ? currentCursorModels().default : options[0]!.id);
+  return { default: defaultId, options: withUnseen(currentCursorModels().options, options) };
 }
 
 function truthyAuthFlag(value: unknown): boolean | null {
@@ -383,7 +378,7 @@ export function cursorCatalogFromSession(advertised: ModelCatalog['options']): M
   const bases = new Set<string>();
   for (const model of advertised) {
     const raw = model.id.split('[')[0]!.trim();
-    const id = raw.toLowerCase() === 'default' ? STATIC_CURSOR_MODELS.default : raw;
+    const id = raw.toLowerCase() === 'default' ? currentCursorModels().default : raw;
     pushModel(
       discovered,
       bases,
@@ -394,11 +389,11 @@ export function cursorCatalogFromSession(advertised: ModelCatalog['options']): M
     );
   }
   if (!discovered.length) return null;
-  const offered = STATIC_CURSOR_MODELS.options.filter(
+  const offered = currentCursorModels().options.filter(
     (option) =>
-      option.id === STATIC_CURSOR_MODELS.default || bases.has(option.id.replace(/-fast$/, '')),
+      option.id === currentCursorModels().default || bases.has(option.id.replace(/-fast$/, '')),
   );
-  return { default: STATIC_CURSOR_MODELS.default, options: withUnseen(offered, discovered) };
+  return { default: currentCursorModels().default, options: withUnseen(offered, discovered) };
 }
 
 /** `cursor-agent models` (2026.10.22) lists only `auto` while session/new lists every model the account can use, so the
@@ -425,7 +420,7 @@ export async function fetchCursorModels(
     const fromJson = decodeCursorModelCatalog(firstJsonValue(stdout));
     if (fromJson) return fromJson;
   }
-  return STATIC_CURSOR_MODELS;
+  return currentCursorModels();
 }
 
 export function classifyCursorError(error: unknown): ProviderErrorCode | undefined {
@@ -548,7 +543,9 @@ const support = (run: typeof execCli): AcpSupport => ({
   askTool: 'AskQuestion',
   displayName: 'Cursor',
   cliVersion: CURSOR_CLI_VERSION,
-  models: STATIC_CURSOR_MODELS,
+  get models() {
+    return currentCursorModels();
+  },
   // Other coding agents can install a generic `agent` shim; `cursor-agent` is unambiguous.
   defaultCli: 'cursor-agent',
   nativeSource: 'cursor.acp',

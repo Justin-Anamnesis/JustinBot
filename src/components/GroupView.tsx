@@ -30,6 +30,7 @@ import { StatusActivityRow } from '@/components/StatusActivityRow';
 import { BugReportNote } from '@/components/BugReportNote';
 import { normalizeState } from '@/lib/mascot';
 import { botTextShowsSpeaker, laterTextOwns, runShowsSpeaker } from '@/lib/room-speaker';
+import { roomAddressees } from '@/lib/room-addressees';
 import { defaultResponderName, groupResponseHint, jevRoomRoutingOn } from '@/lib/group-routing';
 import { ChatMarkdown } from './ChatMarkdown';
 import { FailedTurnRow, MessageBoundary } from './ChatView';
@@ -99,6 +100,12 @@ import { GlassBar, GlassScrollFrame } from './GlassScrollFrame';
 import { awaitedMemberId, showWorkingDots } from '@/lib/turn-tail';
 import { turnNowPhrases } from '@/lib/live-activity';
 import { useTurnLive } from '@/state/turn-status';
+import {
+  isLiveReply,
+  StreamingReplyContext,
+  streamedReply,
+  useLiveTranscript,
+} from '@/state/live-reply';
 import { splitTranscriptAttachments } from '@/lib/composer-attachments';
 import { useTranscriptViewport } from '@/hooks/use-transcript-viewport';
 import { useUnreadDivider } from '@/hooks/use-unread-divider';
@@ -263,8 +270,11 @@ function RoomTextMessage({
     pin,
   });
   const replyGroup = useMemo(
-    () => (!user && botText.trim() ? replyAttachmentGroup(botText, m.attachments) : null),
-    [user, botText, m.attachments],
+    () =>
+      !user && !isLiveReply(m) && botText.trim()
+        ? replyAttachmentGroup(botText, m.attachments)
+        : null,
+    [user, m, botText],
   );
   const blocks = useMemo(
     () => (simple && !user && !viewRaw && botText.trim() ? splitReplyBlocks(botText) : null),
@@ -315,7 +325,7 @@ function RoomTextMessage({
             simple
               ? cn(!tabled && SIMPLE_BUBBLE_MAX, SIMPLE_BUBBLE_TEXT)
               : 'max-w-[min(var(--chat-bubble-max),var(--chat-bubble-pct))] rounded-2xl text-[15px] leading-relaxed',
-            !user && emerging && 'turn-answer',
+            !user && emerging && !streamedReply(m.id) && 'turn-answer',
             tabled || (!user && !m.text?.trim() && !m.replyToId && m.attachments?.length)
               ? 'text-ink'
               : !simple && !user && isFormattedReply(m.text ?? '')
@@ -525,7 +535,7 @@ export const Transcript = memo(function Transcript({
   group,
   members,
   locale,
-  messages,
+  messages: saved,
   transcript,
   emergingId,
   unreadDividerId = null,
@@ -546,7 +556,15 @@ export const Transcript = memo(function Transcript({
   const showThreads = useShowThreads();
   const showToolCalls = showToolCallsEnabled(state.config);
   const canReact = useCanReact(group.threadId);
+  const teammatePeers = useTeammates().peers;
   const memberOf = (id?: string) => members.find((b) => b.id === id);
+  const messages = useLiveTranscript(
+    group.threadId,
+    saved,
+    transcript,
+    members,
+    roomThreadSpeakerId(group, group.threadId),
+  );
   const folds = useMemo(() => roomTurnFolds(messages), [messages, locale]);
   const items = useMemo(
     () =>
@@ -804,6 +822,11 @@ export const Transcript = memo(function Transcript({
                   bot={memberOf(m.from.botId)}
                   name={m.from.name}
                   color={m.from.color}
+                  to={
+                    m.kind === 'text'
+                      ? roomAddressees(m, members, transcript, teammatePeers)
+                      : undefined
+                  }
                 />
               )}
             {fold && (
@@ -826,7 +849,7 @@ export const Transcript = memo(function Transcript({
                 ))}
               </TurnNarrationRun>
             )}
-            {row}
+            {isLiveReply(m) ? <StreamingReplyContext value>{row}</StreamingReplyContext> : row}
           </div>
         );
       })}
@@ -1337,6 +1360,7 @@ export function GroupView({ group }: { group: Group }) {
     topSentinelRef,
     transcriptKey,
     following,
+    showJumpToLatest,
     windowedMessages,
     hiddenCount,
     laterCount,
@@ -1606,7 +1630,7 @@ export function GroupView({ group }: { group: Group }) {
 
         <TranscriptAnnouncer threadKey={transcriptKey} snapshot={announcement} />
 
-        {!following && (
+        {showJumpToLatest && (
           <JumpToLatestButton onClick={jumpToLatest} style={{ bottom: composerDock.height }} />
         )}
 

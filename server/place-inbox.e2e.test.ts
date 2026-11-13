@@ -385,6 +385,21 @@ describe.each([
         'the work to go on',
       );
       expect((await h.listed()).some((one) => one.id === row.id)).toBe(false);
+      // The finished work leaves one news line, which Mira's summary replaces once she reports back; reading it clears it.
+      const results = async () =>
+        (await h.listed()).filter(
+          (one) =>
+            one.kind === 'result' && (one.from.name === mira.name || one.from.name === eli.name),
+        );
+      await until(
+        async () => (await results()).some((one) => one.from.name === mira.name),
+        "Mira's summary in the inbox",
+      );
+      const news = await results();
+      expect(news).toHaveLength(1);
+      expect(news[0]!.unread).toBe(true);
+      expect((await call('POST', `/api/inbox/${news[0]!.id}/read`)).status).toBe(200);
+      expect(await h.count()).toBe(0);
     },
     hostTimeout(180_000),
   );

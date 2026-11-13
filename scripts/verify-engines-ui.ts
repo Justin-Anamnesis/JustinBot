@@ -31,6 +31,7 @@ const instances: InstanceInfo[] = [
   ['hermes', 'hermesAgent', 'Hermes', false, ''],
   ['qwen', 'qwenAgent', 'Qwen', false, ''],
   ['pi', 'piAgent', 'Pi', false, ''],
+  ['omp', 'ompAgent', 'OMP', false, ''],
   ['deepseek', 'deepseekAgent', 'DeepSeek Harness', false, ''],
   ['githubCopilot', 'copilotAgent', 'GitHub Copilot', true, '1.0.103'],
   ['commandCode', 'commandCodeAgent', 'Command Code', true, '1.88.4'],
@@ -55,6 +56,7 @@ const instances: InstanceInfo[] = [
     },
   },
 }));
+instances.find((instance) => instance.instanceId === 'omp')!.access = 'custom';
 instances[0].snapshot.account = { email: 'personal@example.test' };
 instances[0].claudeAccount = {
   configDir: '',

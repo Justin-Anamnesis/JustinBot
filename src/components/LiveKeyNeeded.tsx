@@ -1,7 +1,7 @@
-import { useEffect, useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { KeyRound } from 'lucide-react';
 
-import { liveDisclosure } from '@/lib/call-mode';
+import { liveDisclosure, liveKeyCopy } from '@/lib/call-mode';
 import { dismissLiveNotice } from '@/lib/live-call-media';
 import { t } from '@/lib/i18n';
 import { useStore } from '@/state/store';
@@ -14,8 +14,12 @@ export function LiveKeyNeeded() {
   const titleId = useId();
   const live = state.config?.live;
   const azure = live?.provider === 'azure';
+  const fish = live?.provider === 'fish';
+  const copy = liveKeyCopy(live?.provider);
   // A key is tied to the endpoint it is saved for, so the endpoint comes first.
-  const keyForm = azure && Boolean(live?.azureEndpoint) && live?.keySource !== 'live';
+  const keyForm =
+    (azure && Boolean(live?.azureEndpoint) && live?.keySource !== 'live') ||
+    (fish && live?.keySource !== 'fishAudio');
   return (
     <section
       aria-labelledby={titleId}
@@ -23,13 +27,12 @@ export function LiveKeyNeeded() {
       <div className='flex items-start gap-2.5'>
         <KeyRound size={16} className='mt-0.5 shrink-0 text-ink-secondary' aria-hidden='true' />
         <h2 id={titleId} className='text-[14px] font-medium leading-[1.4] text-ink'>
-          {t(azure ? 'call.live.needsAzure' : 'call.live.needsKey')}
+          {t(copy.needs)}
         </h2>
       </div>
-      <LiveProviderSettings />
-      {azure && <DismissWhenReady ready={live?.configured === true} />}
-      {keyForm && <LiveKeySetup compact onSaved={() => {}} />}
-      {!azure && (
+      <ProviderAndKey provider={live?.provider ?? 'openai'} keyForm={keyForm} />
+      {(azure || fish) && <DismissWhenReady ready={live?.configured === true} />}
+      {!azure && !fish && (
         <button
           type='button'
           className='ui-button ui-button-primary self-start'
@@ -41,10 +44,30 @@ export function LiveKeyNeeded() {
         </button>
       )}
       <p className='text-[12px] leading-[1.45] text-ink-tertiary'>
-        {!keyForm && `${liveDisclosure({ cloudHome: state.config?.cloudHome === true, azure })} `}
-        {t(azure ? 'call.live.azureCost' : 'call.live.cost')}
+        {!keyForm &&
+          `${liveDisclosure({ cloudHome: state.config?.cloudHome === true, azure, fish })} `}
+        {t(copy.cost)}
       </p>
     </section>
+  );
+}
+
+function ProviderAndKey({ provider, keyForm }: { provider: string; keyForm: boolean }) {
+  const [keySaving, setKeySaving] = useState(false);
+  const [providerSaving, setProviderSaving] = useState(false);
+  return (
+    <>
+      <LiveProviderSettings locked={keySaving} onSaving={setProviderSaving} />
+      {keyForm && (
+        <LiveKeySetup
+          key={provider}
+          compact
+          locked={providerSaving}
+          onSaving={setKeySaving}
+          onSaved={() => {}}
+        />
+      )}
+    </>
   );
 }
 

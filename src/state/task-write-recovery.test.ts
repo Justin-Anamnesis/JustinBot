@@ -10,7 +10,7 @@ import {
   type BotAnnouncement,
 } from './store';
 
-const SNAPSHOT = `/api/bots?messages=${MESSAGE_PAGE_SIZE}`;
+const SNAPSHOT = `/api/bots/bot?messages=${MESSAGE_PAGE_SIZE}`;
 
 const bot: BotAnnouncement = {
   id: 'bot',
@@ -117,7 +117,7 @@ describe('thread setting save recovery', () => {
     controls.send();
     await flush();
     expect(requests.mock.calls.some(([path]) => path === '/api/bots/bot')).toBe(true);
-    reconciled.resolve(response({ bots: [bot] }));
+    reconciled.resolve(response({ bot }));
     await flush();
     profileSave.resolve(response({ bot }));
     await flush();
@@ -145,7 +145,7 @@ describe('thread setting save recovery', () => {
       '/api/bots/bot/tasks/thread',
       SNAPSHOT,
     ]);
-    reconcile.resolve(response({ bots: [bot] }));
+    reconcile.resolve(response({ bot }));
     await flush();
     expect(requests).toHaveBeenCalledTimes(2);
     controls.send();
@@ -161,7 +161,10 @@ describe('thread setting save recovery', () => {
     async (failure) => {
       const requests = vi.fn<typeof fetch>(async (path) =>
         path === SNAPSHOT
-          ? response({ bots: [], error: 'Offline' }, failure === 'unreachable' ? 503 : 200)
+          ? response(
+              failure === 'unreachable' ? { error: 'Offline' } : {},
+              failure === 'unreachable' ? 503 : 200,
+            )
           : response({ error: 'Save failed' }, 500),
       );
       const controls = mount(requests);
@@ -180,7 +183,7 @@ describe('thread setting save recovery', () => {
     let reachable = false;
     const requests = vi.fn<typeof fetch>(async (path) => {
       if (path === SNAPSHOT)
-        return reachable ? response({ bots: [bot] }) : response({ error: 'Offline' }, 503);
+        return reachable ? response({ bot }) : response({ error: 'Offline' }, 503);
       if (path === '/api/bots/bot/tasks/thread') return response({ error: 'Save failed' }, 500);
       return response({});
     });
@@ -222,7 +225,7 @@ describe('thread setting save recovery', () => {
     await flush();
     controls.update();
     await flush();
-    reconcile.resolve(response({ bots: [bot] }));
+    reconcile.resolve(response({ bot }));
     await flush();
     controls.send();
     await flush();

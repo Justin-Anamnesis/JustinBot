@@ -26,6 +26,7 @@ export const TOOL_SCOPE_SUPPORT = {
   copilotAgent: 'mcp',
   commandCodeAgent: 'mcp',
   kiroAgent: 'mcp',
+  ompAgent: 'mcp',
   deepseekAgent: 'mcp',
   customAcp: 'mcp',
   antigravityAgent: 'mcp',

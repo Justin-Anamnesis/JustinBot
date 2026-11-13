@@ -7,6 +7,7 @@ import type {
 } from '../../electron/updates-consent.mjs';
 import { t } from '@/lib/i18n';
 import { Layer } from './Layer';
+import { productName } from '@/lib/brand';
 import { SettingRow, Switch } from './SettingsPrimitives';
 
 export const UPDATES_CONSENT_POPUP = '[data-updates-consent-popup]';
@@ -188,7 +189,7 @@ export function UpdatesConsentRow() {
   );
   return (
     <SettingRow
-      title={t('settings.updatesConsent.title')}
+      title={t('settings.account.getUpdates', { app: productName() })}
       subtitle={subtitle}
       message={
         failed ? (

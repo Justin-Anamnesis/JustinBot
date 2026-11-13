@@ -183,10 +183,10 @@ describe('DeepSeek ACP support', () => {
   });
 
   it('resolves the turn model to the wire pair', () => {
-    expect(deepseekSupport.resolveTurnModel?.('deepseek-official/deepseek-v4-pro', {})).toBe(
-      '["deepseek-official","deepseek-v4-pro"]',
-    );
-    expect(deepseekSupport.resolveTurnModel?.(undefined, {})).toBeUndefined();
+    expect(
+      deepseekSupport.resolveTurnModel?.('deepseek-official/deepseek-v4-pro', {}, DEEPSEEK_MODELS),
+    ).toBe('["deepseek-official","deepseek-v4-pro"]');
+    expect(deepseekSupport.resolveTurnModel?.(undefined, {}, DEEPSEEK_MODELS)).toBeUndefined();
   });
 
   it("falls back to the catalog default when offered, else the session's current model", () => {
@@ -274,15 +274,32 @@ describe('DeepSeek live catalog', () => {
         id: 'deepseek-official/deepseek-v4-flash',
         label: 'deepseek-v4-flash',
         provider: 'DeepSeek',
+        variants: [
+          { id: 'off', label: 'Off' },
+          { id: 'high', label: 'High' },
+        ],
       },
       { id: 'deepseek-official/deepseek-v4-pro', label: 'DeepSeek-V4-Pro', provider: 'DeepSeek' },
       { id: 'anthropic/claude-opus-4.6', label: 'Claude Opus 4.6', provider: 'Anthropic' },
     ],
   };
+  const DISCOVERED = {
+    ...PARSED,
+    options: PARSED.options.map((model) => ({ ...model, variants: PARSED.options[0].variants })),
+  };
 
   describe('parseDeepSeekCatalog', () => {
     it("flattens provider groups into picker ids with dsh's names as labels", () => {
       expect(parseDeepSeekCatalog(SESSION_NEW)).toEqual(PARSED);
+    });
+    it('keeps reasoning choices only on the model the session actually confirmed', () => {
+      const catalog = parseDeepSeekCatalog(SESSION_NEW);
+      expect(catalog.options[0].variants).toEqual([
+        { id: 'off', label: 'Off' },
+        { id: 'high', label: 'High' },
+      ]);
+      expect(catalog.options[1]).not.toHaveProperty('variants');
+      expect(catalog.options[2]).not.toHaveProperty('variants');
     });
     it('falls back to the first model when the current one is not offered', () => {
       const session = {
@@ -331,6 +348,17 @@ process.stdin.on("data", (chunk) => {
         authMethods: [] });
     } else if (msg.method === "session/new") {
       reply(msg.id, JSON.parse(process.env.FAKE_DSH_SESSION));
+    } else if (msg.method === "session/set_config_option") {
+      const result = JSON.parse(process.env.FAKE_DSH_SESSION);
+      const model = result.configOptions.find(option => option.id === "model");
+      if (mode !== "refuse-model") model.currentValue = msg.params.value;
+      const choices = JSON.parse(process.env.FAKE_DSH_VARIANTS || "null");
+      if (choices) {
+        result.configOptions = result.configOptions.filter(option => option.id !== "reasoning_effort");
+        const options = choices[msg.params.value];
+        if (options) result.configOptions.push({ id: "reasoning_effort", category: "thought_level", type: "select", options });
+      }
+      reply(msg.id, result);
     } else if (msg.method === "session/close") {
       reply(msg.id, {});
     }
@@ -373,12 +401,41 @@ process.stdin.on("data", (chunk) => {
     const { cli, env, dump } = fakeCli({});
     const cwd = mkdtempSync(join(tmpdir(), 'omb-dsh-ws-'));
     dirs.push(cwd);
-    await expect(fetchDeepSeekCatalog(cli, env, cwd)).resolves.toEqual(PARSED);
+    await expect(fetchDeepSeekCatalog(cli, env, cwd)).resolves.toEqual(DISCOVERED);
     const calls = JSON.parse(readFileSync(dump, 'utf8')) as Array<{ method: string; params: any }>;
-    expect(calls.map((c) => c.method)).toEqual(['initialize', 'session/new', 'session/close']);
+    expect(calls.map((c) => c.method)).toEqual([
+      'initialize',
+      'session/new',
+      'session/set_config_option',
+      'session/set_config_option',
+      'session/close',
+    ]);
     expect(calls[0]!.params).toMatchObject({ protocolVersion: 1 });
     expect(calls[1]!.params).toEqual({ cwd, mcpServers: [] });
-    expect(calls[2]!.params).toEqual({ sessionId: 's1' });
+    expect(calls[2]!.params).toEqual({
+      sessionId: 's1',
+      configId: 'model',
+      value: '["deepseek-official","deepseek-v4-pro"]',
+    });
+    expect(calls[4]!.params).toEqual({ sessionId: 's1' });
+  });
+
+  it('discovers different choices per model and leaves models without reasoning unmarked', async () => {
+    const { cli, env } = fakeCli({
+      FAKE_DSH_VARIANTS: JSON.stringify({
+        '["deepseek-official","deepseek-v4-pro"]': [{ value: 'max', name: 'Max' }],
+      }),
+    });
+    const catalog = await fetchDeepSeekCatalog(cli, env, tmpdir());
+    expect(catalog.options[0].variants).toEqual(PARSED.options[0].variants);
+    expect(catalog.options[1].variants).toEqual([{ id: 'max', label: 'Max' }]);
+    expect(catalog.options[2]).not.toHaveProperty('variants');
+  });
+
+  it("leaves a model whose switch was not confirmed without choices instead of assigning another model's", async () => {
+    const { cli, env } = fakeCli({ FAKE_DSH_MODE: 'refuse-model' });
+    const catalog = await fetchDeepSeekCatalog(cli, env, tmpdir());
+    expect(catalog.options[1]).not.toHaveProperty('variants');
   });
 
   it('rejects within the timeout when dsh never answers', async () => {
@@ -403,7 +460,7 @@ process.stdin.on("data", (chunk) => {
     async (timeout) => {
       expect(DEEPSEEK_MODELS_DEFAULT_TIMEOUT_MS).toBe(60_000);
       const { cli, env } = fakeCli({ [DEEPSEEK_MODELS_TIMEOUT_ENV]: timeout });
-      await expect(fetchDeepSeekCatalog(cli, env, tmpdir())).resolves.toEqual(PARSED);
+      await expect(fetchDeepSeekCatalog(cli, env, tmpdir())).resolves.toEqual(DISCOVERED);
     },
   );
 
@@ -411,7 +468,7 @@ process.stdin.on("data", (chunk) => {
     const { cli, env } = fakeCli({});
     await expect(
       deepseekSupport.resolveModels!(env, { cli, fullAuto: false }, 'deepseek'),
-    ).resolves.toEqual(PARSED);
+    ).resolves.toEqual(DISCOVERED);
   });
 });
 

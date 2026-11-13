@@ -180,6 +180,34 @@ describe('provider key check', () => {
     ).toEqual({ ok: false, reason: 'unreachable' });
   });
 
+  it.each([
+    {},
+    { error: { message: 'invalid key' } },
+    { data: null },
+    { data: {} },
+    { models: 'unavailable' },
+  ])('does not report a successful model check for HTTP 200 with %j', async (body) => {
+    const provider: typeof fetch = async () => Response.json(body);
+    expect(
+      await checkProviderKey(
+        { provider: 'openaiCompat', key: 'fixture', url: 'https://models.example.test/v1' },
+        provider,
+      ),
+    ).toEqual({ ok: false, reason: 'unexpected', status: 200 });
+  });
+
+  it.each([[], { data: [] }, { models: [] }])(
+    'accepts a structurally valid empty catalog %j',
+    async (body) => {
+      const provider: typeof fetch = async () => Response.json(body);
+      expect(await checkProviderKey({ provider: 'mistral', key: 'fixture' }, provider)).toEqual({
+        ok: true,
+        check: 'models',
+        models: [],
+      });
+    },
+  );
+
   it("never approves an absent key even when a provider's catalog is public", async () => {
     let calls = 0;
     const publicCatalog: typeof fetch = async () => {

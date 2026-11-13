@@ -5,6 +5,7 @@ import { CREDENTIAL_TARGETS, isCredentialTargetId } from '../../shared/credentia
 import { rankSkills } from '../../shared/skill-fit.ts';
 import { isSkillSwitchAction, skillSwitchVerb } from '../../shared/skill-request.ts';
 import { EMAIL_CREDENTIAL } from '../../shared/email.ts';
+import { noCloudComputerNote } from '../../shared/team-setup.ts';
 
 import { peerName } from '../peer-roster.ts';
 import { callCardTool, CARD_TOOL_NAMES } from './agents-call-cards.ts';
@@ -23,9 +24,12 @@ import { dropBlankArguments } from './agents-blank-arguments.ts';
 import { callResearchTool, RESEARCH_TOOL_NAMES } from './agents-research-tools.ts';
 import { callHelperTool, HELPER_TOOL_NAMES } from './agents-helper-tools.ts';
 import { callUsageLimitsTool, USAGE_LIMITS_TOOL } from './agents-usage-tool.ts';
+import { callThreadPostTool, THREAD_POST_TOOL } from './agents-thread-post-tool.ts';
 import { callWaitTool, WAIT_TOOL_NAMES } from './agents-wait-tools.ts';
+import { callBurstTool } from './agents-burst-tool.ts';
 import { callComputerAskTool, COMPUTER_ASK_TOOL_NAMES } from './agents-computer-ask-tool.ts';
 import { callImageTool, IMAGE_TOOL_NAMES } from './agents-image-tools.ts';
+import { callHostingTool, HOSTING_TOOL_NAMES } from './agents-hosting-tools.ts';
 import { callMeetingTool, MEETING_TOOL_NAMES } from './agents-meeting-tools.ts';
 import { callMausBotTool, MAUSBOT_TOOL_NAMES } from './agents-mausbot-tools.ts';
 import { callPageTool, PAGE_TOOL_NAMES } from './agents-pages-tools.ts';
@@ -336,6 +340,7 @@ export async function callTool(
   if (RESEARCH_TOOL_NAMES.has(name)) return callResearchTool(name, args, context);
   if (HELPER_TOOL_NAMES.has(name)) return callHelperTool(name, args, context);
   if (IMAGE_TOOL_NAMES.has(name)) return callImageTool(name, args, context);
+  if (HOSTING_TOOL_NAMES.has(name)) return callHostingTool(name, args, context);
   if (MEETING_TOOL_NAMES.has(name)) return callMeetingTool(name, args, context);
   if (MAUSBOT_TOOL_NAMES.has(name)) return callMausBotTool(name, args, context);
   if (PAGE_TOOL_NAMES.has(name)) return callPageTool(name, args, context);
@@ -590,6 +595,7 @@ export async function callTool(
       text: `Posted in ${r.roomName ?? 'the room'}${r.attachedVoiceNote ? ' with the voice note attached' : ''}. Nobody's turn was started, so expect no reply — tell the user it is posted.`,
     };
   }
+  if (name === THREAD_POST_TOOL) return callThreadPostTool(args, context);
   if (name === 'select_computer') {
     if (
       args.surface !== undefined &&
@@ -611,6 +617,19 @@ export async function callTool(
           },
     );
     return { text: JSON.stringify(result) };
+  }
+  if (name === 'reset_cloud_computer') {
+    const forBotId = String(args.for_bot_id ?? '').trim();
+    const r = await apiResponse('/api/internal/cloud-computer/reset', {
+      method: 'POST',
+      body: JSON.stringify({ why: args.why, ...(forBotId ? { targetBotId: forBotId } : {}) }),
+    });
+    if (!r.ok)
+      return {
+        text: String(r.body.error ?? `reset_cloud_computer failed (HTTP ${r.status}).`),
+        isError: true,
+      };
+    return { text: String(r.body.text ?? '') };
   }
   if (name === 'list_threads') {
     const query = new URLSearchParams({ fromBotId: BOT_ID, fromThreadId: THREAD_ID });
@@ -752,6 +771,7 @@ export async function callTool(
       text: `${opened}${timing}${approval} Its result will be delivered to this conversation automatically (assignment id: ${assignmentId || 'unknown'}). Acknowledge it, mention it to the person as #${threadTitle}, and finish your turn; do not check or wait for it in this turn.`,
     };
   }
+  if (name === 'burst') return callBurstTool(args, api);
   if (name === 'list_models') {
     const search = typeof args.search === 'string' ? args.search.trim() : '';
     const r = await api(
@@ -792,8 +812,12 @@ export async function callTool(
     const botName = String(args.name ?? '').trim();
     const role = String(args.role ?? '').trim();
     const instructions = String(args.instructions ?? '').trim();
-    if (!botName || !role || !instructions) {
-      return { text: 'create_bot needs name, role, and instructions.', isError: true };
+    const copyFrom = typeof args.copy_from_bot_id === 'string' ? args.copy_from_bot_id.trim() : '';
+    if (!botName || (!copyFrom && (!role || !instructions))) {
+      return {
+        text: 'create_bot needs name, role, and instructions, or name and copy_from_bot_id.',
+        isError: true,
+      };
     }
     const r = await api(`/api/internal/create-bot`, {
       method: 'POST',
@@ -803,6 +827,7 @@ export async function callTool(
         name: botName,
         role,
         instructions,
+        ...(copyFrom ? { copyFromBotId: copyFrom } : {}),
         ...(args.modelSelection !== undefined ? { modelSelection: args.modelSelection } : {}),
         ...(typeof args.cwd === 'string' ? { cwd: args.cwd.trim() } : {}),
       }),
@@ -819,8 +844,10 @@ export async function callTool(
           isError: true,
         }
       );
+    const created = r.name ?? botName;
+    const noComputer = r.noCloudComputerYet === true ? noCloudComputerNote(String(created)) : '';
     return {
-      text: `Created @${r.name ?? botName} in ${r.section ?? 'General'} [id: ${r.id}].${r.modelSelection ? ` Model: ${JSON.stringify(r.modelSelection)}.` : ''} Assign work with coordinate_bots.`,
+      text: `Created @${created} in ${r.section ?? 'General'} [id: ${r.id}].${r.modelSelection ? ` Model: ${JSON.stringify(r.modelSelection)}.` : ''} Assign work with coordinate_bots.${noComputer}`,
     };
   }
   if (member === 'create_room') {

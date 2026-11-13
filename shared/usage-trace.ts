@@ -199,7 +199,10 @@ const BUILT_IN_ICONS: ReadonlyArray<[RegExp, TraceToolIcon]> = [
     /^(?:routine|routines|schedule|cron)(?:_[a-z_]+)?$|^[a-z_]*(?:routine|trigger)[a-z_]*$/,
     'routine',
   ],
-  [/^(?:publish_page|unpublish_page|[a-z_]*page_publish[a-z_]*|pages?_[a-z_]+)$/, 'page'],
+  [
+    /^(?:publish_app|publish_page|unpublish_page|[a-z_]*page_publish[a-z_]*|pages?_[a-z_]+)$/,
+    'page',
+  ],
   [
     /^(?:show_html|show_widget|render_widget|show_chart|show_table|show_card|widget|[a-z_]*_card)$/,
     'widget',

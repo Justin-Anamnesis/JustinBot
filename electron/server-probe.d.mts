@@ -8,7 +8,12 @@ export type ServerProbeProblem =
   | 'notMausBot'
   | 'desktopApp'
   | 'loopback'
-  | 'localNetwork';
+  | 'localNetwork'
+  | 'desktopAppTailnet'
+  | 'tailscaleOff'
+  | 'otherTailnet'
+  | 'tailnetBlocked'
+  | 'tailnetSilent';
 export type ServerProbe =
   | {
       outcome: 'found';
@@ -38,6 +43,7 @@ export declare function probeServer(input: {
   ownEnvironmentId?: () => Promise<string | null>;
   timeoutMs?: number;
   platform?: string;
+  tailnet?: () => boolean;
 }): Promise<ServerProbe>;
 
 export declare const CONNECT_PROBLEM_KEYS: Readonly<
@@ -50,6 +56,8 @@ export declare function createServerConnect(deps: {
   ask: (found: Extract<ServerProbe, { outcome: 'found' }>) => Promise<boolean>;
   open: (found: Extract<ServerProbe, { outcome: 'found' }>, name?: string) => void;
   t: (key: string, params?: Record<string, string>) => string;
+  /** Whether this computer is on a tailnet; assumed so when absent. */
+  tailnet?: () => boolean;
 }): {
   probe: (address: string, code?: string) => Promise<ServerProbe>;
   connect: (address: string, code?: string) => Promise<ConnectOutcome>;

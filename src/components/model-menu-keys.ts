@@ -63,6 +63,28 @@ export function modelMenuKey(
     }
     return;
   }
+  // A model's star sits beside its row: the arrow away from the start of the line moves to it, the other one back.
+  const forward = rtl ? 'ArrowLeft' : 'ArrowRight';
+  const star = target.matches('[data-model-favorite]') ? target : null;
+  const starRow = star?.parentElement?.querySelector<HTMLElement>('[data-menu-row]') ?? null;
+  if (star) {
+    if (!starRow || event.key === 'Enter' || event.key === ' ') return;
+    if (event.key === (rtl ? 'ArrowRight' : 'ArrowLeft')) {
+      handled();
+      starRow.focus({ preventScroll: true });
+      return;
+    }
+  } else if (event.key === forward && target.matches('[data-menu-row]')) {
+    const besideRow = target.parentElement?.querySelector<HTMLElement>(
+      ':scope > [data-model-favorite]',
+    );
+    if (besideRow) {
+      handled();
+      besideRow.focus({ preventScroll: true });
+      return;
+    }
+  }
+  const at = starRow ?? target;
   const search = menu.querySelector<HTMLInputElement>('[data-menu-search]');
   if (target instanceof HTMLInputElement && target !== search) return;
   const rows = [...menu.querySelectorAll<HTMLElement>('[data-menu-row]:not(:disabled)')];
@@ -89,17 +111,17 @@ export function modelMenuKey(
     }
     return;
   }
-  const index = rows.indexOf(target);
-  if (index < 0 && target !== menu) return;
+  const index = rows.indexOf(at);
+  if (index < 0 && at !== menu) return;
   if (event.key === 'Enter' && index >= 0) {
     handled();
-    target.click();
+    at.click();
     return;
   }
   if (
     search &&
-    ((event.key === 'ArrowUp' && target === below[0]) ||
-      (event.key === 'ArrowDown' && target === above.at(-1)))
+    ((event.key === 'ArrowUp' && at === below[0]) ||
+      (event.key === 'ArrowDown' && at === above.at(-1)))
   )
     return goTo(search);
   const next = nextMenuIndex(event.key, index, rows.length);

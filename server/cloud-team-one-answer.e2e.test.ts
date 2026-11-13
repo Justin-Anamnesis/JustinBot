@@ -51,7 +51,7 @@ const turns = (): Turn[] =>
         .map((line) => JSON.parse(line) as Turn)
     : [];
 const create = async (body: Record<string, unknown>) => {
-  const created = await team.as(olive, 'POST', '/api/bots', body);
+  const created = await team.as(olive, 'POST', '/api/bots', { visibility: 'everyone', ...body });
   expect(created.status, JSON.stringify(created.body)).toBe(201);
   return created.body.bot as Bot;
 };

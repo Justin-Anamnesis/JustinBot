@@ -15,6 +15,7 @@ import {
   parseClaudeUsage,
   parseCodexUsage,
   parseOpenCodeUsage,
+  planAccountsFromInstances,
   type PlanProviderRow,
   type PlanUsageReport,
   type PlanWindows,
@@ -77,8 +78,26 @@ const report = (...providers: PlanProviderRow[]): PlanUsageReport => ({
   providers,
 });
 
-describe('a Claude account whose usage is not read', () => {
-  it("stops a full reading from holding it, even one saved before an update stopped reading it, and keeps a refusal's hold", () => {
+describe("a Claude account's usage", () => {
+  it("reaches the app's limits for a Claude instance with no setting, beside the other engines", () => {
+    const accounts = planAccountsFromInstances({
+      claude: { driver: 'claudeAgent' },
+      codex: { driver: 'codex' },
+    });
+    const instance = new LimitResetClock({ accounts: () => accounts, now: () => NOW });
+    instance.noteUsage(
+      report(
+        claude([38, NOW + 2 * HOUR], [12, NOW + 50 * HOUR]),
+        codex([20, NOW + HOUR], [5, NOW + 90 * HOUR]),
+      ),
+    );
+    expect(instance.report().engines.map((limit) => [limit.engine, limit.usedPercent])).toEqual([
+      ['claude', 38],
+      ['codex', 20],
+    ]);
+  });
+
+  it("stops a full reading from holding it once its config sets usageMeter to false, and keeps a refusal's hold", () => {
     const account = { id: 'claude', name: 'Claude', driver: 'claude' as const, environment: {} };
     let accounts: Array<typeof account & { noUsage?: true }> = [account];
     const instance = new LimitResetClock({ accounts: () => accounts, now: () => NOW });

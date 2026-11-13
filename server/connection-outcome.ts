@@ -73,6 +73,14 @@ const classify = (text: string): ConnectionOutcome | null =>
       ? { ok: false, error: 'refused' }
       : null;
 
+function explicitErrorWords(value: unknown, depth = 0): string[] {
+  if (depth > 5) return [];
+  if (typeof value === 'string') return [value];
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  const { error, message } = value as Record<string, unknown>;
+  return [...explicitErrorWords(error, depth + 1), ...explicitErrorWords(message, depth + 1)];
+}
+
 /** What a connected-apps tool call's answer through the relay showed: the account works, needs connecting again or was
  * refused, or the service could not be reached. Null: it says nothing about the account. A tool's own error (a message
  * not found) is the account working. Only a failed call's own error words are read, never what the tool returned. */
@@ -95,14 +103,15 @@ export function appCallOutcome(
       )
     : [];
   const errors: string[] = [];
-  let parsed = false;
   for (const text of texts) {
     try {
-      failedErrors(JSON.parse(text), 0, errors);
-      parsed = true;
-    } catch {}
+      const value: unknown = JSON.parse(text);
+      failedErrors(value, 0, errors);
+      if (frame.result.isError === true) errors.push(...explicitErrorWords(value));
+    } catch {
+      if (frame.result.isError === true) errors.push(text);
+    }
   }
-  if (!parsed && frame.result.isError === true) errors.push(...texts);
   if (!errors.length) return { ok: true };
   return classify(errors.join('\n').slice(0, 4_000)) ?? { ok: true };
 }

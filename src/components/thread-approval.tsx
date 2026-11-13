@@ -1,7 +1,8 @@
 import { useState, type ComponentProps, type ReactNode } from 'react';
 
 import { useOwnerOrAdmin } from '@/lib/use-owner-or-admin';
-import { useStore, type Bot } from '@/state/store';
+import type { Bot } from '@/state/store';
+import { useStoreDispatch, useStoreSelector } from '@/state/store-select';
 import { approvalModeFor, type ApprovalMode } from '../../shared/approval-mode';
 import type { ApprovalModeSelector } from './ApprovalModeSelector';
 import { CommandAllowlistDialog } from './CommandAllowlistDialog';
@@ -16,7 +17,8 @@ export function useThreadApproval(bot: Bot | undefined): {
   choice: ApprovalChoice | undefined;
   dialogs: ReactNode;
 } {
-  const { state, dispatch } = useStore();
+  const dispatch = useStoreDispatch(),
+    instances = useStoreSelector((state) => state.instances);
   const { capabilities } = useDesktopCapabilities();
   const ownerOrAdmin = useOwnerOrAdmin();
   const remoteClient = window.ogb?.remoteClient?.active === true;
@@ -27,7 +29,7 @@ export function useThreadApproval(bot: Bot | undefined): {
     threadId: string;
   } | null>(null);
   const engine = bot
-    ? state.instances.find((instance) => instance.instanceId === bot.modelSelection.instanceId)
+    ? instances.find((instance) => instance.instanceId === bot.modelSelection.instanceId)
     : undefined;
   const trusted = Boolean(!remoteClient && window.ogb?.approvals && capabilities.host.packaged);
   const onSelect = (mode: ApprovalMode) => {

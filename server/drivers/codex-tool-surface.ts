@@ -9,6 +9,10 @@ export function codexToolSurfaceArgs(): string[] {
     'features.browser_use_external=false',
     '-c',
     'features.computer_use=false',
+    // Plugins the ChatGPT account installed reach every Codex home signed in to it (codex-cli 0.167.0): their skills join
+    // the bot's list and `request_plugin_install` its tools, whatever the bot's own switches say.
+    '-c',
+    'features.plugins=false',
     // An inline table: some CLIs read quoted dotted keys literally.
     '-c',
     'plugins={ "browser@openai-bundled" = { enabled = false }, "computer-use@openai-bundled" = { enabled = false }, "unified-computer-use@openai-bundled" = { enabled = false } }',

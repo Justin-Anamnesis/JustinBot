@@ -43,6 +43,9 @@ describe('isOutboundTool', () => {
       // A raw API call can place a call, send a text or buy a number.
       'mcp__telnyx__invoke_api_endpoint',
       'mcp__telnyx-2__invoke_api_endpoint',
+      // Publishing an app puts it on the public web.
+      'mcp__agents__publish_app',
+      'publish_app',
     ]) {
       expect(isOutboundTool(name), name).toBe(true);
     }
@@ -77,6 +80,7 @@ describe('isOutboundTool', () => {
       'mcp__agentphone__list_numbers',
       'mcp__telnyx__list_api_endpoints',
       'mcp__telnyx__get_api_endpoint_schema',
+      'mcp__agents__check_app_hosting',
       'Bash',
       'Read',
       'Edit',
@@ -93,6 +97,7 @@ describe('isReadOnlyTool', () => {
       'mcp__linear__list_comments',
       'mcp__linear__get_issue',
       'GMAIL_SEARCH_MESSAGES',
+      'mcp__agents__check_app_hosting',
     ])
       expect(isReadOnlyTool(name), name).toBe(true);
 

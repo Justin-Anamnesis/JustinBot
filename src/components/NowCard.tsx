@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { LocaleKey } from '@/locales';
-import { useStore, type Bot, type Message } from '@/state/store';
+import type { Bot, Message } from '@/state/store';
+import { useStoreDispatch } from '@/state/store-select';
 import type { TurnLive } from '@/state/turn-status';
 import { cn } from '@/lib/cn';
 import { focusActivityRun } from '@/lib/activity-focus';
@@ -85,7 +86,7 @@ export function useTurnNow(
   live: TurnLive,
   advanced: boolean,
 ) {
-  const { dispatch } = useStore();
+  const dispatch = useStoreDispatch();
   const status = live.status;
   const exact = turnNowPhrases(status, lastMessage);
   const shown = advanced ? exact : friendlyNowPhrases(status, lastMessage);

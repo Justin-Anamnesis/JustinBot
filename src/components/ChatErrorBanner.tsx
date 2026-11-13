@@ -2,6 +2,7 @@ import { X } from 'lucide-react';
 import { t } from '@/lib/i18n';
 import { plainErrorLine } from '@/lib/plain-error';
 import type { AppState } from '@/state/store';
+import { useTeamPeople } from '@/state/team-people';
 
 export function ChatNotice({ notice }: { notice: AppState['notice'] }) {
   if (!notice) return null;
@@ -31,8 +32,11 @@ export function ChatErrorBanner({
   message: string | null;
   onDismiss: () => void;
 }) {
+  const member = useTeamPeople()?.admin === false;
   if (!message) return null;
-  const plain = plainErrorLine(message);
+  const plain =
+    plainErrorLine(message) ??
+    (member && message.startsWith('forbidden:') ? t('serverError.chat.ownerOrAdmin') : undefined);
   return (
     <div className='w-full px-5'>
       <div

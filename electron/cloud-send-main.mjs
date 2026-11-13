@@ -3,7 +3,7 @@
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { BACKGROUND_HEADERS } from './cloud-power.mjs';
 import { createLoginHandoffClient } from './cloud-logins.mjs';
-import { MOVE_LINE, TEAM_MOVE_LINE, resultKey } from './cloud-send-parts.mjs';
+import { BOT_MOVE_LINE, MOVE_LINE, TEAM_MOVE_LINE, resultKey } from './cloud-send-parts.mjs';
 import { createCloudSend, sendNotice } from './cloud-send.mjs';
 
 const SESSION_LABEL = 'Send to My Cloud';
@@ -12,9 +12,15 @@ const record = (value) => value !== null && typeof value === 'object' && !Array.
 const sentence = (value) =>
   typeof value === 'string' && value.trim() ? value.trim().slice(0, 300) : null;
 
+/** The most of an answer main reads: a big workspace's manifest of a Cloud, which holds every computer's bots that moved
+ * there, runs to tens of megabytes. */
+const ANSWER_MAX = 64 * 1024 * 1024;
+/** How long a request to My Cloud may take unless its caller sized it to its work. */
+const REQUEST_MS = 120_000;
+
 async function answer(response) {
   const text = await response.text();
-  if (text.length > 8 * 1024 * 1024) return { status: response.status, ok: false, body: null };
+  if (text.length > ANSWER_MAX) return { status: response.status, ok: false, body: null };
   try {
     return { status: response.status, ok: response.ok, body: text ? JSON.parse(text) : null };
   } catch {
@@ -63,13 +69,13 @@ export async function openOwnerSession(
       status: paired.status,
     });
   const token = paired.body.token;
-  const request = (method, route, init) =>
+  const request = (method, route, { timeoutMs = REQUEST_MS, ...init }) =>
     fetchImpl(`${target.origin}${route}`, {
       method,
       redirect: 'error',
       credentials: 'omit',
       cache: 'no-store',
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(timeoutMs),
       ...init,
       headers: {
         accept: 'application/json',
@@ -79,15 +85,15 @@ export async function openOwnerSession(
       },
     });
   return {
-    call: async (method, route, body) =>
+    /** `timeoutMs`: how long this request may take, sized to the work it asks for; REQUEST_MS otherwise. */
+    call: async (method, route, body, options) =>
       answer(
-        await request(
-          method,
-          route,
-          body === undefined
+        await request(method, route, {
+          ...(options?.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
+          ...(body === undefined
             ? { headers: {} }
-            : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) },
-        ),
+            : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+        }),
       ),
     upload: async (route, bytes, type) =>
       answer(await request('POST', route, { headers: { 'content-type': type }, body: bytes })),
@@ -121,11 +127,13 @@ export async function openOwnerSession(
  *   space?: { disk(): unknown, grow(sizeGb: number): Promise<unknown> },
  *   move?: () => { view(): unknown, seen(): unknown, retry(): Promise<unknown> } | null,
  *   teamMove?: () => { view(): unknown, seen(): unknown } | null,
+ *   botMove?: () => { view(): unknown, seen(): unknown } | null,
  *   moveSession?: { open(target: { origin: string, grant(): Promise<{ origin: string, code: string }> }): Promise<any> },
  * }} deps `engineWaitMs`: how long a
  * move waits for My Cloud's engines (cloud-connections.mjs). `space`: My Cloud's plan disk and the Admin's grow, so a
  * move makes room for the files it carries. `move`: the one-time move (one-home.mjs), whose line either page shows.
  * `teamMove`: a bot moving from My Cloud into a team (team-move-main.mjs), whose line My Cloud's page shows.
+ * `botMove`: some of this computer's bots moving to My Cloud (bot-move-main.mjs), whose line this computer's page shows.
  * `moveSession`: the one session every pass of the move uses (move-session.mjs); without it each pass opens its own.
  */
 export function installCloudSend({
@@ -142,9 +150,11 @@ export function installCloudSend({
   localOrigin,
   fetch: fetchImpl = globalThis.fetch,
   engineWaitMs,
+  patience,
   space,
   move = () => null,
   teamMove = () => null,
+  botMove = () => null,
   moveSession = null,
   t,
 }) {
@@ -163,11 +173,13 @@ export function installCloudSend({
   /** The notice either page gets, with the one-time move's line when there is one. */
   const notice = (snapshot) => {
     const line = moving(),
-      team = pageOf() === 'cloud' ? (teamMove()?.view() ?? null) : null;
+      team = pageOf() === 'cloud' ? (teamMove()?.view() ?? null) : null,
+      bots = pageOf() === 'local' ? (botMove()?.view() ?? null) : null;
     return {
       ...sendNotice(snapshot),
       ...(line ? { move: line } : {}),
       ...(team ? { teamMove: team } : {}),
+      ...(bots ? { botMove: bots } : {}),
     };
   };
   const deliver = (snapshot) => {
@@ -222,6 +234,7 @@ export function installCloudSend({
     },
     onChange: deliver,
     engineWaitMs,
+    ...(patience ? { patience } : {}),
     space,
     t,
   });
@@ -242,6 +255,10 @@ export function installCloudSend({
     onPage('cloud-send:dismiss', (_event, signature) => {
       if (String(signature) === TEAM_MOVE_LINE) {
         teamMove()?.seen();
+        return notice(send.snapshot());
+      }
+      if (String(signature) === BOT_MOVE_LINE) {
+        botMove()?.seen();
         return notice(send.snapshot());
       }
       if (String(signature) === MOVE_LINE) {
@@ -267,9 +284,15 @@ export function installCloudSend({
     /** This computer's server's private port, asked as a send asks it: another move's sends share it. */
     handoff: (what) => handoff.request(server(), what),
     /** The one-time move to My Cloud (cloud-send.mjs): a pass that carries everything, `final` the one after this computer
-     * stops, and the check of what arrived. */
-    move: (options) => send.send({ reason: 'move', final: options?.final === true }),
-    check: () => send.check(),
+     * stops, and the check of what arrived. `files: false` leaves the bots' files. */
+    move: (options) =>
+      send.send({
+        reason: 'move',
+        final: options?.final === true,
+        ...(options?.scope ? { scope: options.scope } : {}),
+        ...(options?.files === false ? { files: false } : {}),
+      }),
+    check: (options) => send.check(options),
     /** Each automation the move carried, and whether it was on here when it went. */
     switches: () => send.switches(),
     snapshot: () => send.snapshot(),

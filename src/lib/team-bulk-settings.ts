@@ -75,7 +75,9 @@ export function teamModelChoices(
     seen.add(engine.instanceId);
     const ids = [
       engine.models.default,
-      ...engine.models.options.filter((option) => !option.orgBlocked).map((option) => option.id),
+      ...engine.models.options
+        .filter((option) => !option.orgBlocked && !option.needsCliUpdate)
+        .map((option) => option.id),
     ].filter((id) => id.trim());
     for (const id of new Set(ids)) {
       const label = engine.models.options.find((option) => option.id === id)?.label ?? id;
@@ -152,7 +154,9 @@ export function planTeamChange(
     const model = change.model ?? current.model;
     const offered =
       model === engine.models.default ||
-      engine.models.options.some((option) => option.id === model && !option.orgBlocked);
+      engine.models.options.some(
+        (option) => option.id === model && !option.orgBlocked && !option.needsCliUpdate,
+      );
     if (!offered)
       return {
         bot,

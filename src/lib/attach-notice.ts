@@ -30,8 +30,6 @@ function problemText(problem: AttachProblem): string {
       return t('attach.tooLarge', { name: problem.name, limit: numberText(problem.limitMb) });
     case 'unsupported':
       return t('attach.unsupported', { names: problem.names.join(', ') });
-    case 'archives':
-      return t('attach.archivesUnsupported', { names: problem.names.join(', ') });
     case 'image-limit':
       return t(
         problem.names.length === 1 ? 'attach.imagesLeftOutOne' : 'attach.imagesLeftOutMany',
@@ -51,8 +49,9 @@ export function attachNoticeText(problems: readonly AttachProblem[]): string | n
     .filter((problem) => problem.kind === 'image-limit')
     .map(problemText)
     .join(' ');
-  const rejected = ['unsupported', 'archives']
-    .flatMap((kind) => problems.filter((problem) => problem.kind === kind).map(problemText))
+  const rejected = problems
+    .filter((problem) => problem.kind === 'unsupported')
+    .map(problemText)
     .join(' ');
   const failed = problems
     .filter((problem) => problem.kind === 'too-large' || problem.kind === 'upload-failed')

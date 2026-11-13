@@ -343,6 +343,7 @@ export interface AcpSupport {
   resolveTurnModel?(
     model: string | undefined,
     env: Record<string, string | undefined>,
+    catalog: ModelCatalog,
   ): string | undefined;
   /** Map a saved selection onto the live session's catalog (a retired model id), once session/new or load answers. */
   normalizeSessionSelection?(turn: SendTurnInput, offeredModels: readonly string[]): SendTurnInput;
@@ -1499,7 +1500,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
             return { turnId };
           }
         }
-        const resolvedModel = support.resolveTurnModel?.(turn.model, env);
+        const resolvedModel = support.resolveTurnModel?.(turn.model, env, catalog.models);
         const toolLimitKey = JSON.stringify([instanceId, resolvedModel ?? null]);
         const mcpServers = acpMcpServers(turn, {
           http: support.ownMcpOverHttp === true,

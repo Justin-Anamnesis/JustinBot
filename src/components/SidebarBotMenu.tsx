@@ -32,14 +32,16 @@ import { allThreadRows, BotDeleteMenuItem, useDeleteAllThreads } from './BotMenu
 import { HideDefaultBotItem } from './DefaultBotControls';
 import { navigateThreadMenu } from './BotProjects';
 import { useOwnerOrAdmin } from '@/lib/use-owner-or-admin';
+import { userBotMenu } from '@/lib/own-team-bot';
 import { botUnreadThreadIds, markBotRead } from '@/lib/folder-read';
 import { ownerMenuLabel, pickOwnerOf } from './TeamOwner';
-import { mayChangeOwner, useTeamPeople } from '@/state/team-people';
+import { mayChangeOwner, mayRename, useTeamPeople } from '@/state/team-people';
 import { MENU_ITEM, MENU_ITEM_SEPARATOR, MENU_SHEET } from './menu-recipe';
 import { useShowThreads } from '@/lib/thread-preferences';
 import { submenuPosition } from './SidebarPopoverMenu';
 import { submenuIntent, type SubmenuIntent } from '@/lib/submenu-intent';
 import { useAdvancedMode } from '@/lib/interface-mode';
+import { useMoveToMyCloud } from './MoveToMyCloud';
 import { useMoveToTeam } from './MoveToTeam';
 import type { MenuState } from './Sidebar';
 import { departmentNames, moveBotsToSection, useMayMoveBots } from './bot-sections';
@@ -109,6 +111,7 @@ export function BotContextMenu({
               ? t('teamMove.blockedLast')
               : undefined,
     });
+  const moveToCloud = useMoveToMyCloud();
   const remoteClient = window.ogb?.remoteClient?.active === true;
   const bot = shown ? state.bots.find((b) => b.id === shown.botId) : undefined;
   const team = useTeamPeople();
@@ -207,6 +210,7 @@ export function BotContextMenu({
       <>
         {clearThreads.dialog}
         {moveToTeam.dialog}
+        {moveToCloud.dialog}
       </>
     );
   const deleting = state.deletingBots[bot.id] === true;
@@ -221,6 +225,30 @@ export function BotContextMenu({
     : visibleBotCount <= 1
       ? t('sidebar.bot.archiveBlockedLast')
       : undefined;
+  const user = userBotMenu(bot, team?.me?.email),
+    ownEdit = Boolean(team) && user.duplicate;
+  const ownDelete = () =>
+    !team || !user.delete
+      ? []
+      : user.delete === 'shared'
+        ? [
+            item(<Trash2 size={16} />, t('common.delete'), undefined, {
+              danger: true,
+              disabled: true,
+              hint: t('sidebar.bot.deleteSharedAdminOnly'),
+            }),
+          ]
+        : [
+            <BotDeleteMenuItem
+              key='delete'
+              deleting={deleting}
+              className={MENU_ITEM}
+              onClick={() => {
+                onClose();
+                onDelete(bot);
+              }}
+            />,
+          ];
   const chiefItem = () =>
     item(
       <Crown size={16} className={bot.chiefOfStaff ? 'text-accent' : 'text-ink-secondary'} />,
@@ -363,6 +391,7 @@ export function BotContextMenu({
       : null;
     const rename =
       onRename &&
+      (team ? mayRename(bot, team) : !state.config?.team) &&
       item(<SquarePen size={16} className='text-ink-secondary' />, t('sidebar.bot.rename'), () =>
         onRename(bot.id),
       );
@@ -377,7 +406,7 @@ export function BotContextMenu({
     const owner =
       team && mayChangeOwner(bot, team)
         ? item(<Users size={16} className='text-ink-secondary' />, ownerMenuLabel(bot, team), () =>
-            pickOwnerOf([bot], team, shown),
+            pickOwnerOf(bot, team, shown),
           )
         : null;
     const deleteAll =
@@ -418,7 +447,7 @@ export function BotContextMenu({
       : [
           editProfile,
           team ? null : chiefItem(),
-          member
+          member && !ownEdit
             ? null
             : item(
                 <Copy size={16} className='text-ink-secondary' />,
@@ -427,6 +456,7 @@ export function BotContextMenu({
               ),
           owner,
           ...moveToTeam.items(bot, item),
+          ...moveToCloud.items(bot, item),
           ...deleteAll,
         ];
     // Simple view hides the thread list: start one, see them all (the panel's Conversations), and choose the one it opens.
@@ -479,7 +509,7 @@ export function BotContextMenu({
     const leave = bot.defaultBot
       ? [<HideDefaultBotItem key='hide' bot={bot} onDone={onClose} className={MENU_ITEM} />]
       : member
-        ? []
+        ? ownDelete()
         : [
             item(
               <Archive size={16} className='text-ink-secondary' />,
@@ -501,6 +531,7 @@ export function BotContextMenu({
       <>
         {clearThreads.dialog}
         {moveToTeam.dialog}
+        {moveToCloud.dialog}
         {createPortal(
           <div
             ref={menuRef}
@@ -631,6 +662,7 @@ export function BotContextMenu({
     <>
       {clearThreads.dialog}
       {moveToTeam.dialog}
+      {moveToCloud.dialog}
       {createPortal(
         <div
           ref={menuRef}
@@ -674,7 +706,7 @@ export function BotContextMenu({
             item(
               <Users size={16} className='text-ink-secondary' />,
               ownerMenuLabel(bot, team),
-              () => pickOwnerOf([bot], team, shown),
+              () => pickOwnerOf(bot, team, shown),
             )}
           {remoteClient
             ? [
@@ -755,7 +787,7 @@ export function BotContextMenu({
                     if (!state.settingsOpen) dispatch({ type: 'toggleSettings', open: true });
                   },
                 ),
-                !member &&
+                (!member || ownEdit) &&
                   item(
                     <Copy size={16} className='text-ink-secondary' />,
                     t('sidebar.bot.duplicate'),
@@ -771,6 +803,7 @@ export function BotContextMenu({
                 ),
                 divider('d3'),
                 ...moveToTeam.items(bot, item),
+                ...moveToCloud.items(bot, item),
                 ...(bot.defaultBot
                   ? [
                       <HideDefaultBotItem
@@ -781,7 +814,7 @@ export function BotContextMenu({
                       />,
                     ]
                   : member
-                    ? []
+                    ? ownDelete()
                     : [
                         item(
                           <Archive size={16} className='text-ink-secondary' />,

@@ -222,6 +222,7 @@ export function WelcomeFiles({
 export function WelcomeDone({
   name,
   bot,
+  team = false,
   headingRef,
   onSayHi,
   onJob,
@@ -232,6 +233,8 @@ export function WelcomeDone({
   headingRef: Ref<HTMLHeadingElement>;
   onSayHi: () => void;
   onJob: () => void;
+  /** A Team Cloud: its first bot is named, never called anyone's Chief of Staff. */
+  team?: boolean;
   /** The team's People page on MausBot Cloud, for its Owner: the last step is bringing people in. */
   invite?: string | null;
 }) {
@@ -267,9 +270,9 @@ export function WelcomeDone({
       )}
       <Footer>
         <button type='button' className={PRIMARY} onClick={onSayHi}>
-          {bot?.chiefOfStaff || !bot
-            ? t('cloudWelcome.done.chief')
-            : t('cloudWelcome.done.bot', { name: bot.name })}
+          {bot && (team || !bot.chiefOfStaff)
+            ? t('cloudWelcome.done.bot', { name: bot.name })
+            : t('cloudWelcome.done.chief')}
         </button>
         {bot && (
           <button type='button' className={SECONDARY} onClick={onJob}>

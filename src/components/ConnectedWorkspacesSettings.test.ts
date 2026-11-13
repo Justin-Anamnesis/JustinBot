@@ -43,6 +43,11 @@ const config = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
 vi.mock('@/state/store', () => ({
   useStore: () => ({ state: { config: config.value }, dispatch: () => {} }),
 }));
+// This computer's environments are an Advanced section.
+vi.mock('@/lib/interface-mode', async (original) => ({
+  ...(await original<typeof import('@/lib/interface-mode')>()),
+  useAdvancedMode: () => true,
+}));
 import { ConnectedWorkspacesSettings } from './ConnectedWorkspacesSettings';
 
 type Node = ReactElement<{
@@ -164,15 +169,16 @@ const textButton = (label: string) =>
 const forms = () => render().nodes.filter((n) => n.type === 'form');
 const envFormFields = () => nodes(forms()[0]!.props.children).filter((n) => n.type === 'input');
 
-it('lists local environments with their folders above the servers, marking a missing one', async () => {
+it('lists the servers, then local environments (Advanced) with their folders, marking a missing one', async () => {
   await stubEnvironments();
   await mount();
   const { html } = render();
   expect(html).toContain('Environments on this computer');
-  expect(html).toContain('Your servers');
-  expect(html.indexOf('Environments on this computer')).toBeLessThan(html.indexOf('Your servers'));
+  expect(html.indexOf('bots.example.test')).toBeLessThan(
+    html.indexOf('Environments on this computer'),
+  );
   expect(html).toContain('/home/me/.openmausbot-work');
-  expect(html.match(/>missing</g)).toHaveLength(1);
+  expect(html.match(/ · missing/g)).toHaveLength(1);
   expect(html).toContain('bots.example.test · HTTPS');
 });
 
@@ -214,6 +220,10 @@ it('creates an environment with the chosen folder — and without one when the f
 it('"Choose…" fills the folder field from the native picker', async () => {
   stubEnvironments({}, { pickDir: vi.fn().mockResolvedValue({ ok: true, path: '/picked/dir' }) });
   await mount();
+  (
+    render().nodes.find((n) => (n.props as { id?: string }).id === 'new-environment')!
+      .props as unknown as { onToggle: () => void }
+  ).onToggle();
   textButton('Choose…')!.props.onClick!();
   await flush();
   expect(render().html).toContain('value="/picked/dir"');
@@ -236,9 +246,8 @@ it('asks what to do with the folder when forgetting a local environment, and del
   expect(environments.forget.mock.calls).toEqual([['env-1']]);
   rowButton('Forget Old')!.props.onClick!();
   await mount();
-  render().nodes.find((n) => n.type === 'input' && n.props.type === 'checkbox')!.props.onChange!({
-    target: { checked: true },
-  });
+  render().nodes.find((n) => n.props['aria-label']?.startsWith('Also delete this folder'))!.props
+    .onClick!();
   await mount();
   textButton('Forget')!.props.onClick!();
   await flush();

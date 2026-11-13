@@ -76,7 +76,7 @@ describe('compileChart: reductions per chart type and column class', () => {
       method: 'topN',
       sql: [
         'kept AS ( SELECT CAST("region" AS VARCHAR) AS x FROM src GROUP BY ALL ORDER BY sum("amount") DESC NULLS LAST, x LIMIT 20 )',
-        `CASE WHEN CAST("region" AS VARCHAR) IN (SELECT x FROM kept) THEN CAST("region" AS VARCHAR) ELSE 'other' END AS x`,
+        `CASE WHEN CAST("region" AS VARCHAR) IN (SELECT x FROM kept) THEN CAST("region" AS VARCHAR) ELSE (SELECT label FROM other_bucket) END AS x`,
         'sum("amount") AS y FROM src GROUP BY ALL ORDER BY x',
       ],
       check: (vl) => {
@@ -285,7 +285,7 @@ describe('compileChart: reductions per chart type and column class', () => {
       method: 'topN',
       sql: [
         'LIMIT 20 )',
-        "ELSE 'other' END AS x",
+        'ELSE (SELECT label FROM other_bucket) END AS x',
         'sum("amount") AS y FROM src GROUP BY ALL ORDER BY y DESC',
       ],
       check: (vl) => {

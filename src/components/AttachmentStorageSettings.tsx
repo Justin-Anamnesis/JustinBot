@@ -79,9 +79,7 @@ export function AttachmentStorageSettings() {
               max: size(usage.maxBytes),
             })}
           </span>
-          <span className='block'>
-            {t(confirming ? 'settings.attachments.confirmText' : 'settings.attachments.help')}
-          </span>
+          {confirming && <span className='block'>{t('settings.attachments.confirmText')}</span>}
         </>
       }
       message={
@@ -107,13 +105,14 @@ export function AttachmentStorageSettings() {
               type='button'
               onClick={() => void clear()}
               disabled={clearing}
-              className='ui-button text-danger'>
+              className='ui-button !bg-danger !text-danger-ink'>
               {clearing ? t('settings.attachments.clearing') : t('settings.attachments.confirm')}
             </button>
           </>
         ) : (
           <button
             type='button'
+            title={t('settings.attachments.help')}
             onClick={() => {
               setResult(null);
               setConfirming(true);

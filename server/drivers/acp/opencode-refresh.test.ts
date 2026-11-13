@@ -275,7 +275,10 @@ describe("OpenCode provider's own model list", () => {
 describe('OpenCode model typed by hand', () => {
   const listed: ModelCatalog = {
     default: 'opencode/big-pickle',
-    options: [{ id: 'opencode/big-pickle', label: 'Zen · Big Pickle' }],
+    options: [
+      { id: 'opencode/big-pickle', label: 'Zen · Big Pickle' },
+      { id: 'venice/deepseek-v4-flash', label: 'Venice · DeepSeek V4 Flash' },
+    ],
   };
   const typed = 'typed::venice/deepseek-v4-1-flash-uncensored';
 
@@ -313,7 +316,9 @@ describe('OpenCode model typed by hand', () => {
         provider: { venice: { options: { timeout: 1 }, models: { mine: { name: 'Mine' } } } },
       }),
     };
-    expect(declareTypedOpenCodeModel(env, typed)).toBe('venice/deepseek-v4-1-flash-uncensored');
+    expect(declareTypedOpenCodeModel(env, typed, listed.options)).toBe(
+      'venice/deepseek-v4-1-flash-uncensored',
+    );
     expect(JSON.parse(env.OPENCODE_CONFIG_CONTENT!)).toEqual({
       theme: 'dark',
       provider: {
@@ -329,9 +334,51 @@ describe('OpenCode model typed by hand', () => {
       'not a model',
     ]) {
       const untouched: Record<string, string | undefined> = {};
-      expect(declareTypedOpenCodeModel(untouched, model)).toBeUndefined();
+      expect(declareTypedOpenCodeModel(untouched, model, listed.options)).toBeUndefined();
       expect(untouched).toEqual({});
     }
+  });
+
+  it('is never declared under a provider OpenCode lists no model of, which OpenCode 2.2.5 has no package for', () => {
+    for (const model of [
+      'chutes/deepseek-ai/DeepSeek-V4.1-Flash-1017',
+      'deepseek-ai/DeepSeek-V4.1-Flash-1017',
+    ]) {
+      const untouched: Record<string, string | undefined> = {};
+      expect(declareTypedOpenCodeModel(untouched, `typed::${model}`, listed.options)).toBe(model);
+      expect(untouched).toEqual({});
+    }
+    const unlisted: Record<string, string | undefined> = {};
+    expect(declareTypedOpenCodeModel(unlisted, typed, [])).toBe(
+      'venice/deepseek-v4-1-flash-uncensored',
+    );
+    expect(unlisted).toEqual({});
+  });
+
+  it("runs a model under a provider OpenCode lists none of on OpenCode's own model, never on itself", async () => {
+    const { env, scratch } = home(
+      'opencode/big-pickle\nvenice/deepseek-v4-flash',
+      'opencode/big-pickle\nvenice/deepseek-v4-flash',
+    );
+    const dump = join(scratch, 'dump.json');
+    const { run } = await start(
+      'opencode-typed-unroutable',
+      { ...env, FAKE_ACP_DUMP: dump },
+      async () => listed,
+    );
+    const turn = await run('t-unroutable', 'typed::chutes/deepseek-ai/DeepSeek-V4.1-Flash-1017');
+    expect(turn.done).toMatchObject({ ok: true });
+    expect(turn.events.find((event) => event.type === 'session.started')).toMatchObject({
+      model: 'opencode/big-pickle',
+    });
+    expect(turn.events.find((event) => event.type === 'runtime.notice')).toMatchObject({
+      message: expect.stringContaining(
+        'no longer offers chutes/deepseek-ai/DeepSeek-V4.1-Flash-1017, so this conversation uses opencode/big-pickle',
+      ),
+    });
+    expect(
+      String(JSON.parse(readFileSync(dump, 'utf8')).env.OPENCODE_CONFIG_CONTENT ?? ''),
+    ).not.toContain('chutes');
   });
 
   it('runs on OpenCode instead of being swapped for the default', async () => {

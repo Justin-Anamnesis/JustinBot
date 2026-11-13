@@ -15,6 +15,7 @@ import { cn } from '@/lib/cn';
 import { useCopyFeedback } from '@/lib/copy-text';
 import { t } from '@/lib/i18n';
 import { MENU_ITEM, MENU_SHEET } from './menu-recipe';
+import { StreamingReplyContext } from '@/state/live-reply';
 
 export const ACTION_ICON = { size: 17, strokeWidth: 1.5 } as const;
 
@@ -78,7 +79,8 @@ export function MessageActions({
   const [menuAbove, setMenuAbove] = useState(false);
   const [menuFlipped, setMenuFlipped] = useState(false);
   const mirrored = side === 'user';
-  const shown = forceOpen || menuOpen || hovered || keyboardFocus || tapped;
+  const streaming = use(StreamingReplyContext);
+  const shown = !streaming && (forceOpen || menuOpen || hovered || keyboardFocus || tapped);
 
   useEffect(() => {
     const row = rootRef.current?.closest<HTMLElement>(`[${MESSAGE_ROW}]`) ?? rootRef.current;
@@ -211,6 +213,7 @@ export function MessageActions({
         className,
       )}
       data-testid='message-actions'
+      inert={streaming || undefined}
       data-shown={shown ? 'true' : undefined}
       onKeyDown={(event) => {
         if (menuOpen || forceOpen || !popoverClosesOnKey(event.nativeEvent) || !keyboardFocus)

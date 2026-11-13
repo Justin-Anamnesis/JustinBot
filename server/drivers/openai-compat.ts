@@ -1,10 +1,10 @@
 // Transcript-replay driver for OpenRouter, Groq, Together, llama.cpp, and
 // other endpoints that speak the OpenAI chat-completions contract.
-import type { ModelCatalog, ProviderDriver } from '../contracts.ts';
+import { titleCaseModelId, type ModelCatalog, type ProviderDriver } from '../contracts.ts';
 import { operatorEnvKey } from '../credential-env.ts';
 import { isLoopback } from '../provider-key-check.ts';
 import { lmStudioV1Catalog } from './local-inject.ts';
-import { isContextName, isOllama, serveWithWindow } from './ollama-context.ts';
+import { isContextName, isOllama, pickedName, serveWithWindow } from './ollama-context.ts';
 import {
   isOllamaServer,
   OLLAMA_PLACEHOLDER_KEY,
@@ -12,6 +12,7 @@ import {
   ollamaUnavailable,
   onOllamaPort,
   probeOllama,
+  thinkingEffort,
   type OllamaModel,
   type OllamaStatus,
 } from './ollama.ts';
@@ -68,6 +69,15 @@ const DEFAULT_MODELS: ModelCatalog = {
 
 const NO_MODELS: ModelCatalog = { default: '', options: [] };
 const OLLAMA_STATUS_MS = 5_000;
+const OLLAMA_FIRST_LIST_MS = 2_000;
+
+const withEffort = (effort: string | undefined) => (effort ? { reasoning_effort: effort } : {});
+const EFFORT_CHOICES = ['low', 'medium', 'high'].map((id) => ({
+  id,
+  label: titleCaseModelId(id, /[-_ ]+/),
+}));
+/** OpenAI's reasoning models, gpt-5 onward. o1-mini, o1-preview and the chat aliases refuse `reasoning_effort`. */
+const OPENAI_REASONING = /^(?:o1(?!-mini|-preview)|o[3-9]|gpt-(?:[5-9]|[1-9]\d)(?![\d.]*-chat))/i;
 
 const localFacts = ({ bytes, parameters, quantization, tools, vision }: OllamaModel) => ({
   ...(bytes ? { bytes } : {}),
@@ -322,11 +332,40 @@ export const OpenAICompatDriver: ProviderDriver<OpenAICompatConfig> = {
         label: model.name,
         custom: true,
         local: localFacts(model),
+        ...(model.thinking
+          ? {
+              variants: model.thinking.choices.map((id) => ({
+                id,
+                label: titleCaseModelId(id, /[-_ ]+/),
+              })),
+            }
+          : {}),
       }));
       if (config.model && !options.some((model) => model.id === config.model))
         options.unshift({ id: config.model, label: config.model, custom: true });
       catalog = { default: config.model ?? options[0]?.id ?? '', options };
       return true;
+    };
+
+    const takesEffort = (id: string, row: OpenRouterModelRow) =>
+      config.catalog === 'openai'
+        ? OPENAI_REASONING.test(id)
+        : openRouter &&
+          Array.isArray(row.supported_parameters) &&
+          row.supported_parameters.includes('reasoning');
+    const apiEffort = (model: string, variant: string | undefined) => {
+      if (
+        !variant ||
+        !catalog.options
+          .find((option) => option.id === model)
+          ?.variants?.some((choice) => choice.id === variant)
+      )
+        return {};
+      return config.catalog === 'openai'
+        ? { reasoning_effort: variant }
+        : openRouter
+          ? { reasoning: { effort: variant } }
+          : {};
     };
 
     const fetchModels = async () => {
@@ -397,6 +436,7 @@ export const OpenAICompatDriver: ProviderDriver<OpenAICompatConfig> = {
             id,
             label: openRouter ? freeLabel(label, row) : label,
             ...(contextWindow ? { contextWindow } : {}),
+            ...(takesEffort(id, row) ? { variants: EFFORT_CHOICES } : {}),
             ...(config.catalog === 'openai' ? {} : { custom: true }),
           });
         }
@@ -459,6 +499,15 @@ export const OpenAICompatDriver: ProviderDriver<OpenAICompatConfig> = {
         }
       : undefined;
 
+    // The first list says which models can call tools, and is what the engine list shows right after adding Ollama.
+    if (loading && isOllamaServer(config))
+      await Promise.race([
+        loading,
+        new Promise((done) => {
+          setTimeout(done, OLLAMA_FIRST_LIST_MS).unref();
+        }),
+      ]);
+
     const runtime = createOpenAIChatRuntime({
       input,
       driverKind: DRIVER_KIND,
@@ -475,15 +524,30 @@ export const OpenAICompatDriver: ProviderDriver<OpenAICompatConfig> = {
       ...(ollamaCandidate
         ? {
             serverUnavailable: async () => {
-              return isOllamaServer(config) ? ollamaUnavailable(await checkOllama()) : null;
+              if (!isOllamaServer(config)) return null;
+              const status = await checkOllama();
+              const reason = ollamaUnavailable(status, config.catalog === 'ollama');
+              return reason
+                ? {
+                    reason,
+                    ollama: {
+                      state: status.state,
+                      url: status.url,
+                      ...(status.problem ? { problem: status.problem } : {}),
+                    },
+                  }
+                : null;
             },
           }
         : {}),
-      requestBody: (model, messages, stream) => ({
+      modelVariants: ollamaCandidate || config.catalog === 'openai' || openRouter,
+      requestBody: (model, messages, stream, variant) => ({
         model,
         messages,
         stream,
         stream_options: stream ? { include_usage: true } : undefined,
+        ...withEffort(thinkingEffort(fact(pickedName(model))?.thinking, variant)),
+        ...apiEffort(model, variant),
         ...(config.provider && isOpenRouterUrl(config.url)
           ? { provider: { order: [config.provider], allow_fallbacks: false } }
           : {}),
@@ -498,6 +562,7 @@ export const OpenAICompatDriver: ProviderDriver<OpenAICompatConfig> = {
       reasoning: true,
       billing: 'metered',
       includeUsageInCompleted: true,
+      retryScale: Number(process.env.FAKE_OPENAI_COMPAT_RETRY_SCALE ?? '1'),
       nativeLog: {
         source: 'openai-compat.chat.completions',
         outgoing: (_turn, messages, model, tools) => ({
@@ -512,6 +577,13 @@ export const OpenAICompatDriver: ProviderDriver<OpenAICompatConfig> = {
         }),
       },
     });
+    if (loading && isOllamaServer(config)) {
+      const send = runtime.adapter.sendTurn;
+      runtime.adapter.sendTurn = async (turn) => {
+        await loading;
+        return send(turn);
+      };
+    }
     return openRouter && loading ? withOpenRouterTurns(runtime, loading) : runtime;
   },
 };

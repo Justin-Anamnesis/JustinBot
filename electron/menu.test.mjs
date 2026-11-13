@@ -80,10 +80,10 @@ describe('buildApplicationMenu', () => {
     },
   );
 
-  it('macOS app menu wires an explicit Preferences item to the settings callback', () => {
+  it('macOS app menu wires an explicit Settings item to the settings callback', () => {
     const onOpenSettings = vi.fn();
     const template = build('darwin', { onOpenSettings });
-    const item = template[0].submenu.find((entry) => entry.label === 'Preferences…');
+    const item = template[0].submenu.find((entry) => entry.label === 'Settings…');
     expect(item).toBeDefined();
     expect(item.accelerator).toBe('CmdOrCtrl+,');
     expect(item.click).toBeTypeOf('function');

@@ -6,7 +6,13 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { teamRoleScopes, type TeamRole } from './cloud-team.ts';
-import { azureLiveCallRefusal, LIVE_AZURE_REFUSAL, liveScopeRefusal } from './live-access.ts';
+import {
+  azureLiveCallRefusal,
+  fishLiveCallRefusal,
+  LIVE_AZURE_REFUSAL,
+  LIVE_FISH_REFUSAL,
+  liveScopeRefusal,
+} from './live-access.ts';
 import {
   requiredScope,
   resolveRequestAuth,
@@ -39,7 +45,7 @@ afterEach(() => {
 interface Place {
   resolve?: Partial<ResolveOptions>;
   othersOnLoopback?: boolean;
-  provider?: 'azure' | 'openai';
+  provider?: 'azure' | 'openai' | 'fish';
 }
 
 /** "gets a call", or the words the person reads and who said them. */
@@ -57,7 +63,8 @@ function verdict(headers: Record<string, string>, place: Place = {}): string {
     },
   );
   if (!auth) return `sign-in gate ${status}: ${error}`;
-  const refusal = azureLiveCallRefusal(auth, { othersOnLoopback: place.othersOnLoopback ?? false });
+  const refuse = place.provider === 'fish' ? fishLiveCallRefusal : azureLiveCallRefusal;
+  const refusal = refuse(auth, { othersOnLoopback: place.othersOnLoopback ?? false });
   return refusal ? `limit: ${refusal}` : 'gets a call';
 }
 
@@ -276,6 +283,8 @@ describe('the words for a session without the admin scope', () => {
       liveScopeRefusal({ live: { provider: 'azure' } }, 'PATCH', '/api/live/settings'),
     ).toBeNull();
     expect(liveScopeRefusal({}, 'POST', LIVE)).toBeNull();
+    expect(liveScopeRefusal({ live: { provider: 'fish' } }, 'POST', LIVE)).toBe(LIVE_FISH_REFUSAL);
+    expect(liveScopeRefusal({ live: { provider: 'fish' } }, 'POST', '/api/live/relay')).toBeNull();
   });
   it("change no one's scope: every Live route stays closed to a client session", () => {
     for (const [method, path] of [
@@ -284,8 +293,37 @@ describe('the words for a session without the admin scope', () => {
       ['GET', '/api/live/call'],
       ['PATCH', '/api/live/settings'],
       ['POST', '/api/live/device-revoked'],
+      ['POST', '/api/live/relay'],
     ] as const) {
       expect(requiredScope(method, path), `${method} ${path}`).toBe('admin');
     }
+  });
+});
+
+describe('a Fish Audio Live call', () => {
+  const FISH = { provider: 'fish' as const };
+  const TEAM = { ...FISH, ...SERVICE, othersOnLoopback: true };
+
+  it("goes to the desktop app's own window, the owner, and a team admin, as on Azure", () => {
+    expect(
+      verdict(
+        { ...LOCAL, 'x-openmausbot-desktop-owner': 'desktop-secret' },
+        { ...FISH, resolve: DESKTOP },
+      ),
+    ).toBe(CALL);
+    expect(verdict(LOCAL, FISH)).toBe(CALL);
+    expect(verdict(device(['admin', 'client']), FISH)).toBe(CALL);
+    expect(verdict(teamMember('admin'), TEAM)).toBe(CALL);
+  });
+
+  it('is refused in its own words to a chat-only session, a team User and a local request others share', () => {
+    expect(verdict(device(['client']), FISH)).toBe(`sign-in gate 403: ${LIVE_FISH_REFUSAL}`);
+    expect(verdict(teamMember('member'), TEAM)).toBe(`sign-in gate 403: ${LIVE_FISH_REFUSAL}`);
+    expect(verdict(LOCAL, { ...FISH, othersOnLoopback: true })).toBe(`limit: ${LIVE_FISH_REFUSAL}`);
+    const unknown = {
+      kind: 'something-new',
+      scopes: ['admin', 'client'],
+    } as unknown as RequestAuth;
+    expect(fishLiveCallRefusal(unknown, { othersOnLoopback: false })).toBe(LIVE_FISH_REFUSAL);
   });
 });

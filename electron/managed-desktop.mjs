@@ -275,7 +275,8 @@ export function createManagedDesktopClient({
     lastRenewAttempt = 0,
     renewalSupported = false,
     reportedPolicyVersion = null;
-  let policyLifted = false;
+  let policyLifted = false,
+    policyRead = false;
   let issuedGrant = null,
     cleanupGrant = null,
     cleanupNeeded = false,
@@ -895,6 +896,7 @@ export function createManagedDesktopClient({
       await Promise.resolve()
         .then(() => library.restore(libraryIdentity(grant)))
         .catch(() => {});
+    policyRead = true;
     markRestored();
     await sendIdentity(grant);
     return refresh();
@@ -989,6 +991,8 @@ export function createManagedDesktopClient({
     /** Main-process only. Never expose this method through the renderer bridge. */
     connection: () => (connection ? structuredClone(connection) : null),
     whenRestored: () => restored,
+    /** The saved policy has been read; until then, and while it can't be read, `policy()` is null without meaning "none". */
+    policyKnown: () => policyRead,
     policy: () =>
       !policyLifted && grant?.policy && grant.expiresAt > now()
         ? structuredClone(grant.policy)

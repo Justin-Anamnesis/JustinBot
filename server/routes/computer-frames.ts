@@ -1,4 +1,5 @@
 import * as boat from '../boat.ts';
+import { boatHealth } from '../boat-health.ts';
 import type { ComputerControl } from '../computer-control.ts';
 import type { MapComputer, MapComputersPayload } from '../../shared/map-computer.ts';
 import {
@@ -143,7 +144,16 @@ export function createComputerFramesRoutes(
         if (!inventory.available) return null;
         return inventory.instances.flatMap((instance) =>
           instance.ownerBotId && instance.state !== 'removing'
-            ? [{ owner: instance.ownerBotId, boxId: instance.boxId, state: instance.state }]
+            ? [
+                {
+                  owner: instance.ownerBotId,
+                  boxId: instance.boxId,
+                  state:
+                    boatHealth.notRespondingSince(instance.boxId) === null
+                      ? instance.state
+                      : 'error',
+                },
+              ]
             : [],
         );
       },

@@ -16,6 +16,7 @@ export interface FeatureFlagConfig {
     roomMemoryCapture?: boolean;
     savedSteps?: boolean;
     savedStepsHere?: boolean;
+    usbPhoneTakeover?: boolean;
   };
   browserEngine?: {
     kind: 'engine' | 'unavailable';
@@ -132,4 +133,8 @@ export function savedStepsEnabled(config: FeatureFlagConfig | null | undefined):
 /** The server can run saved steps (a Mac, not Windows or a Cloud home); unsaid counts as no. */
 export function savedStepsHere(config: FeatureFlagConfig | null | undefined): boolean {
   return config?.features?.savedStepsHere === true;
+}
+
+export function usbPhoneTakeoverEnabled(config: FeatureFlagConfig | null | undefined): boolean {
+  return config?.features?.usbPhoneTakeover === true;
 }

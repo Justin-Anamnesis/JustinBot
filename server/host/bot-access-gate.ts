@@ -44,7 +44,7 @@ export function levelNeeded(method: string, path: string): Exclude<BotAccessLeve
   if (/^\/api\/routines\/[\w-]+$/.test(path)) return null;
   if (
     /^\/api\/(?:bots|groups)\/[\w-]+\/read$/.test(path) ||
-    /^\/api\/bots\/[\w-]+\/access-request$/.test(path)
+    /^\/api\/bots\/[\w-]+\/(?:access-request|data\/page)$/.test(path)
   )
     return 'view';
   if (verb === 'POST' && OPEN_CONVERSATION.test(path)) return 'view';

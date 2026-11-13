@@ -39,6 +39,7 @@ export function createCompanionE2E({
   setTimer = setInterval,
   clearTimer = clearInterval,
   log = () => {},
+  onState = () => {},
 }) {
   let identity = readE2EIdentity(readCredentials());
   let lastState = null;
@@ -73,6 +74,7 @@ export function createCompanionE2E({
 
   async function reconcile() {
     lastState = await companionState().catch(() => null);
+    onState(lastState);
     const need = relayNeed(lastState);
     if (need === true) tokens.start();
     else if (need === false) tokens.stop();

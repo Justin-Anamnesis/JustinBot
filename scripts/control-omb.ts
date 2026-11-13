@@ -35,7 +35,7 @@ export interface ControlOmbDependencies {
 }
 
 export const HELP_UI = `renderer (needs a ui launch handle; every verb takes --ui HANDLE, never discovery):
-  node --experimental-strip-types scripts/control-omb.ts ui launch [--entry threads] [--tool-calls JSON] [--mode happy] [--engine codex]
+  node --experimental-strip-types scripts/control-omb.ts ui launch [--entry threads] [--tool-calls JSON] [--mode happy] [--engine codex|acp|cline|copilot|opencode]
   ui snapshot --ui HANDLE [--interactive]
   ui click --ui HANDLE (--ref @eN | --name NAME)
   ui type --ui HANDLE (--ref @eN | --name NAME) --text TEXT
@@ -175,6 +175,8 @@ export function verificationServerEnvironment(
     // Without it the server also scans /opt/homebrew/bin, /usr/local/bin and the
     // login shell's PATH, finding a developer's own engine CLIs that CI lacks.
     OMB_TEST_SEALED_PATH: '1',
+    // The project's live announcement cards would sit over the corner the UI tests click in.
+    OMB_DISABLE_ANNOUNCEMENTS: '1',
   });
   // The fake engines' knobs are the one thing a caller may script into the child.
   for (const [key, value] of Object.entries(parentEnv)) {
@@ -183,6 +185,7 @@ export function verificationServerEnvironment(
       (key.startsWith('FAKE_CLAUDE_') ||
         key.startsWith('FAKE_CODEX_TEXT_') ||
         key.startsWith('FAKE_CODEX_COMMAND') ||
+        key.startsWith('FAKE_STREAM_') ||
         key === 'FAKE_ACP_HANG_ON') &&
       key !== 'FAKE_CLAUDE_DUMP' &&
       value
@@ -197,6 +200,9 @@ export function verificationServerEnvironment(
     childEnv.OMB_TEST_INTERNAL_CAPABILITY_KEY = parentEnv.OMB_TEST_INTERNAL_CAPABILITY_KEY;
   // One log line per browser call and preview frame.
   if (parentEnv.OMB_BROWSER_TIMING === '1') childEnv.OMB_BROWSER_TIMING = '1';
+  // A share on the tailnet (server/tailnet-listener.ts): a test names one of this machine's own addresses as its stand-in.
+  for (const key of ['OMB_TAILNET_NAME', 'OMB_TAILNET_ADDRESSES', 'OMB_TEST_TAILNET_STAND_IN'])
+    if (parentEnv[key]) childEnv[key] = parentEnv[key];
   // Warm summaries' minutes as seconds (server/warm-summary.ts), and the switch that turns them off.
   for (const key of ['OMB_WARM_SUMMARY_TIME_SCALE', 'OMB_WARM_SUMMARY'])
     if (parentEnv[key]) childEnv[key] = parentEnv[key];
@@ -209,6 +215,11 @@ export function verificationServerEnvironment(
   // A loopback stand-in for Postiz Cloud only (server/testing/fake-postiz.ts): no test signs in to the real one.
   const postizUrl = parentEnv.OMB_POSTIZ_CLOUD_URL?.trim() ?? '';
   if (/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(postizUrl)) childEnv.OMB_POSTIZ_CLOUD_URL = postizUrl;
+  // A loopback stand-in for Netlify only (server/testing/fake-netlify.ts): the Published apps page then lists and
+  // deletes sites there, never on Netlify.
+  const netlifyUrl = parentEnv.OMB_NETLIFY_API_URL?.trim() ?? '';
+  if (/^http:\/\/127\.0\.0\.1:\d{1,5}\/api\/v1$/.test(netlifyUrl))
+    childEnv.OMB_NETLIFY_API_URL = netlifyUrl;
   // A loopback connected-apps service only (server/testing/broker-fake.ts): its token never reaches the real one.
   const brokerUrl = parentEnv.OMB_COMPOSIO_BROKER_URL?.trim() ?? '';
   if (/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(brokerUrl) && parentEnv.OMB_COMPOSIO_BROKER_TOKEN) {
@@ -221,6 +232,15 @@ export function verificationServerEnvironment(
   if (/^http:\/\/127\.0\.0\.1:\d{1,5}(?:\/[A-Za-z0-9_-]+)*$/.test(xUrl)) {
     childEnv.OMB_CLOUD_X_URL = xUrl;
     if (parentEnv.OMB_CLOUD_X_TOKEN) childEnv.OMB_CLOUD_X_TOKEN = parentEnv.OMB_CLOUD_X_TOKEN;
+  }
+  // Included app hosting against a loopback stand-in only (server/testing/fake-app-hosting.ts): its token crosses only with it.
+  const hostingUrl = parentEnv.OMB_CLOUD_HOSTING_URL?.trim() ?? '';
+  if (
+    /^http:\/\/127\.0\.0\.1:\d{1,5}(?:\/[A-Za-z0-9_-]+)*$/.test(hostingUrl) &&
+    parentEnv.OMB_CLOUD_HOSTING_TOKEN
+  ) {
+    childEnv.OMB_CLOUD_HOSTING_URL = hostingUrl;
+    childEnv.OMB_CLOUD_HOSTING_TOKEN = parentEnv.OMB_CLOUD_HOSTING_TOKEN;
   }
   // @devs reports reach a loopback fake only, else a closed port: never the MausBot team.
   const bugReportUrl = parentEnv.OMB_BUG_REPORT_URL?.trim() ?? '';
@@ -270,6 +290,8 @@ export function verificationServerEnvironment(
     childEnv.OMB_DESKTOP_PARENT = '1';
     if (parentEnv.OMB_TEST_DESKTOP_PAGES_ACCESS)
       childEnv.OMB_TEST_DESKTOP_PAGES_ACCESS = parentEnv.OMB_TEST_DESKTOP_PAGES_ACCESS;
+    if (parentEnv.OMB_TEST_DESKTOP_TAILNET_SHARE)
+      childEnv.OMB_TEST_DESKTOP_TAILNET_SHARE = parentEnv.OMB_TEST_DESKTOP_TAILNET_SHARE;
   }
   // The driver record the app hands its own server: without it, no server may use this computer.
   if (parentEnv.OMB_TEST_DESKTOP_CUA_CONNECTION)
@@ -308,7 +330,7 @@ export async function launchVerificationServer(
   enterprise?: { dir: string; licenseKey: string },
   room?: { scripted: boolean },
   /** Optional repository-owned fake providers for multi-engine setup checks. */
-  extraProviders: Array<'codex' | 'cline' | 'copilot' | 'customAcp'> = [],
+  extraProviders: Array<'codex' | 'cline' | 'copilot' | 'customAcp' | 'opencode'> = [],
   /** Programmatic tests only: an owned loopback Boat provider, never a live account. */
   boatFixtureApi?: string,
   /** Programmatic web UI qualification against the fixture's static server. */
@@ -416,6 +438,16 @@ export async function launchVerificationServer(
                     FAKE_ACP_REJECT_STDIO_MCP: '1',
                     FAKE_ACP_DUMP: join(dataDir, 'copilot-launch.json'),
                   },
+                },
+              }
+            : {}),
+          // A real OpenCode the recipe downloaded and verified itself; it runs in this fixture's temporary home.
+          ...(extraProviders.includes('opencode') && parentEnv.OMB_VERIFY_OPENCODE_CLI
+            ? {
+                opencode: {
+                  driver: 'opencodeGo',
+                  displayName: 'Verification OpenCode',
+                  config: { cli: parentEnv.OMB_VERIFY_OPENCODE_CLI },
                 },
               }
             : {}),

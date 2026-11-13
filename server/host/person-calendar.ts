@@ -21,13 +21,14 @@ export interface PersonCalendarDeps<Access = PersonAppsAccess> {
   ): ReturnType<ConnectedReadDeps['relay']>;
 }
 
-/** Busy times, merged where they touch: every event the person did not decline and that is not cancelled. A day-long
+/** Busy times, merged where they touch: events that block time, are not declined and are not cancelled. A day-long
  * event marks a day, not busy hours, so it is left out, as calendars count it free. */
 export function busyTimes(events: readonly CalendarEvent[]): Busy[] {
   const slots = events
     .filter(
       (event) =>
         !event.allDay &&
+        !event.transparent &&
         event.status !== 'cancelled' &&
         !event.selfDeclined &&
         event.end > event.start,

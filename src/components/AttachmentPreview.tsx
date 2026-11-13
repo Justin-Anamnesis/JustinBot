@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/cn';
 import { t } from '@/lib/i18n';
 import { serverErrorText } from '@/lib/server-error';
+import { CopyImageButton } from './CopyImageButton';
 import { FilePreviewButton } from './FilePreviewButton';
 import { chipNameAction, SaveIconButton, useHtmlPreview } from './HtmlFilePreview';
 import { ImageLoading } from './ImageLoading';
@@ -220,7 +221,7 @@ export async function requestMessageFile(
   filePath: string,
   message: MessageAttachmentContext,
   signal: AbortSignal,
-  folder?: { entry?: string; list?: boolean },
+  options?: { entry?: string; list?: boolean; mediaLink?: boolean },
 ): Promise<Response> {
   const response = await fetch(
     `/api/threads/${encodeURIComponent(message.threadId)}/messages/${encodeURIComponent(message.messageId)}/file`,
@@ -229,11 +230,13 @@ export async function requestMessageFile(
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         path: filePath,
-        ...(folder?.entry !== undefined
-          ? { entry: folder.entry }
-          : folder?.list
+        ...(options?.entry !== undefined
+          ? { entry: options.entry }
+          : options?.list
             ? { listFolder: true }
-            : {}),
+            : options?.mediaLink
+              ? { media: true }
+              : {}),
       }),
       signal,
     },
@@ -621,15 +624,13 @@ export function AttachmentPreviewDialog({
             </div>
           </div>
           <div className='flex shrink-0 items-center gap-1'>
+            <CopyImageButton key={current.src} src={current.src} name={current.name} />
             {current.downloadUrl && (
               <a
                 href={current.downloadUrl}
                 download={
                   current.downloadName ??
-                  canonicalDownloadFilename({
-                    fallback: current.name,
-                    source: current.downloadUrl,
-                  })
+                  canonicalDownloadFilename({ fallback: current.name, source: current.downloadUrl })
                 }
                 className='flex size-9 items-center justify-center rounded-lg text-white/65 hover:bg-white/10 hover:text-white'
                 aria-label={t('attach.downloadAria', { name: current.name })}

@@ -36,6 +36,8 @@ export function installOneHome(
       reportMoveStatus?(report: import('./move-status.mjs').MoveStatusReport): Promise<boolean>;
       pairTeam(teamId: string): Promise<{ origin: string; code: string; expiresAt?: number }>;
     } | null;
+    /** The person is asked which bots go before the first move starts. */
+    chooses?: boolean;
     journalFile(): string;
     tempRoot(): string;
     lend?(projects: string[]): Promise<unknown>;

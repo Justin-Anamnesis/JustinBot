@@ -70,16 +70,26 @@ async function page(
     uploadBanner: pictures.upload,
     removeBanner: pictures.remove,
   }));
-  let changed: () => void = () => {};
+  const heard = new Set<() => void>();
   const workspaces = {
+    state: vi.fn(async () => ({ local: own, name: start?.name ?? 'This computer' })),
     look: vi.fn(async () => start),
     color: vi.fn(async (swatch: string | null) => answer(swatch)),
     onChanged: vi.fn((callback: () => void) => {
-      changed = callback;
-      return () => {};
+      heard.add(callback);
+      return () => {
+        heard.delete(callback);
+      };
     }),
   };
-  Object.assign(window, { ogb: { app: { version: '0.1.131', ownPage: own }, workspaces } });
+  // This computer's own page has its phone link (the place-name source reads it), a Cloud's page does not.
+  Object.assign(window, {
+    ogb: {
+      app: { version: '0.1.131', ownPage: own },
+      workspaces,
+      ...(own ? { companion: {} } : {}),
+    },
+  });
   const { setLocale } = await import('@/lib/i18n');
   setLocale('en');
   const { PlaceLookCard } = await import('./PlaceLookCard');
@@ -93,7 +103,13 @@ async function page(
   await act(async () => {
     await Promise.resolve();
   });
-  return { workspaces, pictures, changed: () => changed() };
+  return {
+    workspaces,
+    pictures,
+    changed: () => {
+      for (const callback of heard) callback();
+    },
+  };
 }
 const swatch = (name: string) => host.querySelector(`[data-swatch="${name}"]`) as HTMLButtonElement;
 const checked = () =>
@@ -126,24 +142,23 @@ it("the tint: a place's colour in the skin's own tone; no colour, or one this ap
 
 it('this computer, by default: plain, nothing chosen, in plain words with no picture yet', async () => {
   await page(COMPUTER, { own: true });
+  // With no colour, None is the choice: the first swatch, ringed.
   expect(
     [checked(), tint(), host.querySelector('[data-place-banner]')],
     'no colour, no tint, no picture: the sidebar as it always was',
-  ).toEqual([[], null, null]);
+  ).toEqual([['slate'], null, null]);
   expect(host.querySelector('[data-place-picture]')?.getAttribute('data-place-picture')).toBe(
     'none',
   );
   const words = host.querySelector('[data-sidebar-look]')!.textContent!;
   for (const said of [
     'Sidebar color',
-    'Tints the top of the sidebar.',
+    'Tints the top of the sidebar and',
     'Sidebar picture',
-    'Your own image, faded into the top of the sidebar.',
+    'An image faded into the top of the sidebar.',
   ])
     expect(words).toContain(said);
-  expect(words, "no Cloud's words on this computer").not.toMatch(
-    /This computer|place|workspace|Everyone here|admins/i,
-  );
+  expect(words, "no Cloud's words on this computer").not.toMatch(/workspace|Everyone here|admins/i);
   expect(host.querySelector("[role='radiogroup']")?.getAttribute('aria-label')).toBe(
     'Sidebar color',
   );
@@ -169,7 +184,10 @@ it('this computer takes a colour and a picture, both shown at once; None and Rem
   expect(tint(), 'the sidebar takes it at once').toContain('var(--identity-teal)');
   await click(swatch('slate'));
   expect(workspaces.color).toHaveBeenLastCalledWith('slate');
-  expect([checked(), tint()], 'None: no tint, and nothing chosen, as at first').toEqual([[], null]);
+  expect([checked(), tint()], 'None: no tint, and None chosen, as at first').toEqual([
+    ['slate'],
+    null,
+  ]);
 
   const input = host.querySelector('[data-place-picture-input]') as HTMLInputElement;
   const file = new File(['png'], 'beach.png', { type: 'image/png' });
@@ -209,10 +227,9 @@ it('this computer takes a colour and a picture, both shown at once; None and Rem
 
 it("a solo Cloud's owner changes both its colour (on the Admin) and its picture", async () => {
   const { workspaces } = await page(look({ name: 'My Cloud', color: null, swatch: null }));
-  expect(host.textContent).toContain(
-    'My Cloud shows in this color at the top of the sidebar and on its icon on the left of the app.',
-  );
-  expect(host.textContent).toContain('Everyone who uses these bots sees it.');
+  // One line per row on every place (the same words as This computer's).
+  expect(host.textContent).toContain("Tints the top of the sidebar and My Cloud's circle.");
+  expect(host.textContent).toContain('An image faded into the top of the sidebar.');
   expect([swatch('rose').disabled, button('Use an image')?.disabled]).toEqual([false, false]);
   await click(swatch('rose'));
   expect(workspaces.color).toHaveBeenCalledWith('rose');
@@ -224,9 +241,7 @@ it('choosing a swatch saves it through main, and the tint follows at once', asyn
   const { workspaces } = await page(look());
   expect(tint()).toContain('var(--identity-teal)');
   expect(swatch('green').getAttribute('aria-checked')).toBe('true');
-  expect(host.textContent).toContain(
-    'Client A shows in this color at the top of the sidebar and on its icon on the left of the app.',
-  );
+  expect(host.textContent).toContain("Tints the top of the sidebar and Client A's circle.");
   await click(swatch('rose'));
   expect(workspaces.color).toHaveBeenCalledWith('rose');
   expect(swatch('rose').getAttribute('aria-checked')).toBe('true');
@@ -290,14 +305,12 @@ it("a browser or an older app: no colour and no tint, only the place's picture",
   expect(host.querySelector('[data-swatch]')).toBeNull();
   expect(host.querySelector('[data-place-tint]')).toBeNull();
   expect(host.querySelector('[data-place-picture]')).toBeTruthy();
-  expect(host.textContent).toContain(
-    'An image faded into the top of the sidebar. Everyone who uses these bots sees it.',
-  );
+  expect(host.textContent).toContain('An image faded into the top of the sidebar.');
   await act(async () => root?.unmount());
   vi.resetModules();
   vi.doMock('@/state/store', () => ({ useStore: () => ({ state: { config: {} } }) }));
   vi.doMock('@/lib/use-owner-or-admin', () => ({ useOwnerOrAdmin: () => true }));
-  Object.assign(window, { ogb: { workspaces: { state: vi.fn() } } });
+  Object.assign(window, { ogb: { workspaces: { state: vi.fn(async () => null) } } });
   const { PlaceLookCard } = await import('./PlaceLookCard');
   root = createRoot(host);
   await act(async () => {
@@ -318,4 +331,11 @@ it("main's word that the place changed (another window, the Admin, the rail): th
   });
   expect(swatch('violet').getAttribute('aria-checked')).toBe('true');
   expect(tint()).toContain('var(--identity-purple)');
+});
+
+it('names this computer by the one place-name source: a rail entry still called This Mac reads This computer', async () => {
+  await page({ ...COMPUTER, name: 'This Mac' }, { own: true });
+  const words = host.querySelector('[data-sidebar-look]')!.textContent!;
+  expect(words).toContain("Tints the top of the sidebar and This computer's circle.");
+  expect(words).not.toContain('This Mac');
 });

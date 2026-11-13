@@ -9,6 +9,7 @@ import {
   clearLeftoverTailscaleServe,
   explainTailscaleFailure,
   parseTailscaleStatus,
+  tailnetListenFallback,
   tailscaleMarker,
   tailscaleServe,
   type TailscaleStatus,
@@ -37,6 +38,12 @@ describe('tailscale helpers', () => {
     expect(
       parseTailscaleStatus('t', JSON.stringify({ BackendState: 'Running' }))?.httpsEnabled,
     ).toBe(false);
+    expect(
+      parseTailscaleStatus(
+        't',
+        JSON.stringify({ BackendState: 'Running', Self: { CapMap: { https: null } } }),
+      )?.httpsEnabled,
+    ).toBe(true);
     expect(parseTailscaleStatus('t', '{}')?.dnsName).toBeNull();
     expect(parseTailscaleStatus('t', 'not json')).toBeNull();
   });
@@ -71,6 +78,41 @@ describe('tailscale helpers', () => {
       expect(explainTailscaleFailure(reason).length).toBeGreaterThan(20);
       expect(explainTailscaleFailure(reason)).not.toContain('tskey');
     }
+  });
+});
+
+describe('serve --tailscale without HTTPS', () => {
+  const status: TailscaleStatus = {
+    cli: '/usr/bin/tailscale',
+    dnsName: 'nuc.tail1234.ts.net',
+    addresses: ['100.70.0.9', 'fd7a:115c:a1e0::9'],
+    backendState: 'Running',
+    httpsEnabled: false,
+  };
+  const interfaces = {
+    eth0: [{ address: '192.168.1.30' }],
+    tailscale0: [{ address: '100.70.0.9' }, { address: 'fd7a:115c:a1e0::9' }],
+  };
+
+  it("listens on this machine's own tailnet addresses at http://<name>:<port>, and says how to get https", () => {
+    const fallback = tailnetListenFallback('https-not-enabled', status, 8799, interfaces);
+    expect(fallback?.origin).toBe('http://nuc.tail1234.ts.net:8799');
+    // The name alone: the server follows Tailscale's interface, so a restart of Tailscale needs no restart here.
+    expect(fallback?.env).toEqual({ OMB_TAILNET_NAME: 'nuc.tail1234.ts.net' });
+    expect(fallback?.line).toContain('login.tailscale.com/admin/dns');
+    expect(tailnetListenFallback('needs-operator', status, 8799, interfaces)?.line).toContain(
+      '--operator=$USER',
+    );
+  });
+
+  it('fails as before where listening would not help: another failure, no name, or no Tailscale interface', () => {
+    expect(tailnetListenFallback('not-running', status, 8799, interfaces)).toBeNull();
+    expect(
+      tailnetListenFallback('https-not-enabled', { ...status, dnsName: null }, 8799, interfaces),
+    ).toBeNull();
+    expect(
+      tailnetListenFallback('https-not-enabled', status, 8799, { eth0: interfaces.eth0 }),
+    ).toBeNull();
   });
 });
 

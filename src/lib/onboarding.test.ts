@@ -133,6 +133,14 @@ describe('welcomeViewer', () => {
       hosted: false,
       canSave: false,
     });
+    expect(
+      welcomeViewer({
+        kind: 'session',
+        scopes: ['admin', 'client'],
+        cloudHome: true,
+        team: { id: 't', name: 'Acme', role: 'admin' },
+      }),
+    ).toEqual({ hosted: false, canSave: true, cloudHome: true, teamRole: 'admin' });
     expect(welcomeViewer({ kind: 'loopback', scopes: ['client'], trust: 'service' })).toEqual({
       hosted: false,
       canSave: false,

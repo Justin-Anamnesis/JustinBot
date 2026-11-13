@@ -23,6 +23,18 @@ export const DESKTOP_NOTICES = Object.freeze([
   'modelgo-offer-2026-11',
 ]);
 const WHATS_NEW = DESKTOP_NOTICES[0];
+/** A card from the project's announcements file someone closed (src/lib/announcements.ts), and the last day a sponsor's
+ * card was shown: kept beside the fixed notices, the newest few only. */
+const ANNOUNCEMENT_SEEN = /^announcement:[a-z0-9][a-z0-9-]{2,39}$/;
+const ANNOUNCEMENT_SPONSOR_DAY = /^announcement-sponsor:\d{4}-\d{2}-\d{2}$/;
+const MAX_ANNOUNCEMENTS_SEEN = 40;
+const keptAnnouncements = (list) => {
+  const marks = list.filter((id) => typeof id === 'string' && ANNOUNCEMENT_SEEN.test(id));
+  const days = list
+    .filter((id) => typeof id === 'string' && ANNOUNCEMENT_SPONSOR_DAY.test(id))
+    .sort();
+  return [...new Set(marks)].slice(-MAX_ANNOUNCEMENTS_SEEN).concat(days.slice(-1));
+};
 /** A locale code such as "de" or "pt-br", or "" for following the system. */
 const LANGUAGE = /^(?:[a-z]{2,3}(?:-[a-z0-9]{2,8}){0,2})?$/i;
 const isLanguage = (value) =>
@@ -63,7 +75,10 @@ const parseChat = (value) =>
 function parse(raw) {
   const record = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
   const seen = Array.isArray(record.seen)
-    ? DESKTOP_NOTICES.filter((id) => record.seen.includes(id))
+    ? [
+        ...DESKTOP_NOTICES.filter((id) => record.seen.includes(id)),
+        ...keptAnnouncements(record.seen),
+      ]
     : [];
   const updatesConsent = parseUpdatesConsent(record.updatesConsent);
   const quickAsks =
@@ -134,8 +149,15 @@ export function createDesktopPrefs({ read, write }) {
     seen: () => [...current().seen],
     markSeen(id) {
       const saved = current();
-      if (DESKTOP_NOTICES.includes(id) && !saved.seen.includes(id))
-        save({ ...saved, seen: [...saved.seen, id] });
+      if (saved.seen.includes(id)) return;
+      if (DESKTOP_NOTICES.includes(id)) save({ ...saved, seen: [...saved.seen, id] });
+      else if (
+        typeof id === 'string' &&
+        (ANNOUNCEMENT_SEEN.test(id) || ANNOUNCEMENT_SPONSOR_DAY.test(id))
+      ) {
+        const fixed = saved.seen.filter((seen) => DESKTOP_NOTICES.includes(seen));
+        save({ ...saved, seen: [...fixed, ...keptAnnouncements([...saved.seen, id])] });
+      }
     },
     /** null until a choice is saved. */
     analytics: () => current().analytics ?? null,

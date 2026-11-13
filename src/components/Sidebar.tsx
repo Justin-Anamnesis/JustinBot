@@ -33,9 +33,12 @@ import {
   Users,
   X,
 } from 'lucide-react';
+import { sidebarState } from './sidebar-state';
+import { sameFields, useStoreDispatch, useStoreSelector } from '@/state/store-select';
+import { useStoreRef } from '@/state/store-ref';
+import { sameDrawnBots } from '@/lib/drawn-bots';
 import {
   api,
-  useStore,
   formatTime,
   visibleMessages,
   currentTaskBot,
@@ -132,6 +135,7 @@ import {
 } from '@/lib/sidebar-layout';
 import { stepKey, type BotDropPlace } from '@/lib/sidebar-bot-drop';
 import { BotDropLine, botRowDropClass, useSidebarBotDrag, type BotRowDrag } from './SidebarBotDrag';
+import { useSidebarRoomDrag } from './SidebarRoomDrag';
 import { useSidebarSections } from './SidebarSections';
 import { departmentNames, moveBotsToSection } from './bot-sections';
 import { sidebarSectionAttention } from '@/lib/sidebar-attention';
@@ -147,17 +151,16 @@ import { PlaceTint } from './PlaceTint';
 import { ChromeRailToggle } from './ChromeRailToggle';
 import { useCloudOwner } from './CloudOwner';
 import { SidebarSectionHeader } from './SidebarSectionHeader';
-import { NeedsYouButton, OwnerPickerHost, pickOwnerOf } from './TeamOwner';
+import { NeedsYouButton, OwnerPickerHost } from './TeamOwner';
 import { SidebarPeople } from './SidebarPeople';
 import { SidebarInboxRow } from './SidebarInboxRow';
 import { TeamSideSwitch, useTeamSideLists } from './TeamSideSwitch';
 import { SidebarActiveThreads } from './SidebarActiveThreads';
 import { setAttentionPinned, useAttentionPinned } from './inbox/attention-pinned';
 import { useInboxSupport } from '@/state/inbox';
-import { showWhoReportsToWhom, TeamMenuItems } from './SidebarTeamMenu';
+import { TeamMenuItems } from './SidebarTeamMenu';
 import { MENU_ITEM, MENU_ITEM_SEPARATOR, MENU_SHEET } from './menu-recipe';
 import { ELEVATED_CONTROL } from './elevated';
-import { useTeamPeople } from '@/state/team-people';
 export { TeamMenuItems };
 import { SidebarResizeHandle, useSidebarWidth } from './SidebarResizeHandle';
 import {
@@ -200,6 +203,7 @@ import { PinnedBotRoster, PinnedCircleThreadSection } from './PinnedCircleThread
 import { archiveBotWithNotice, onArchiveNotice } from './bot-archive';
 import { ArchivedBotsPanel, botConfirmProps, type BotConfirmKind } from './ArchivedBotsPanel';
 import { MovedBotRows } from './MoveToTeam';
+import { MovedToMyCloudRow } from './MoveToMyCloud';
 import { NewRoomPanel } from './SidebarNewRoomPanel';
 import { SectionPicker } from './SidebarSectionPicker';
 
@@ -248,7 +252,7 @@ export function openBotContextMenu(
   onMenu({ botId, x: event.clientX, y: event.clientY });
 }
 
-export function GroupListItem({
+export const GroupListItem = memo(function GroupListItem({
   group,
   density,
   query = '',
@@ -259,9 +263,11 @@ export function GroupListItem({
   query?: string;
   onMenu: (menu: { groupId: string; x: number; y: number }) => void;
 }) {
-  const { state, dispatch } = useStore();
+  const dispatch = useStoreDispatch(),
+    bots = useStoreSelector((s) => s.bots, sameDrawnBots),
+    instances = useStoreSelector((s) => s.instances);
   const advanced = useAdvancedMode();
-  const selected = state.activeView === 'chat' && state.selectedId === group.id;
+  const selected = useStoreSelector((s) => s.activeView === 'chat' && s.selectedId === group.id);
   const [threadsOpen, setThreadsOpen] = useSearchDisclosure(
     `group:${group.id}`,
     query ?? '',
@@ -279,7 +285,7 @@ export function GroupListItem({
   const railTile = !advanced && density === 'icons';
   const roomBusy = Boolean(group.busyBotId) || Boolean(group.working);
   const members = group.memberIds
-    .map((id) => state.bots.find((b) => b.id === id))
+    .map((id) => bots.find((b) => b.id === id))
     .filter((b): b is Bot => Boolean(b));
   const last = group.messages.at(-1);
   return (
@@ -355,7 +361,7 @@ export function GroupListItem({
                     'truncate text-ink-secondary',
                     simpleRow ? 'text-[13px] leading-[18px]' : 'text-[11px]',
                   )}>
-                  {group.description || groupPreview(group, state.bots, state.instances, advanced)}
+                  {group.description || groupPreview(group, bots, instances, advanced)}
                 </span>
                 {!simpleRow && group.unread && (
                   <span className='size-2 shrink-0 rounded-full bg-accent' />
@@ -413,7 +419,7 @@ export function GroupListItem({
       )}
     </>
   );
-}
+});
 
 function RoomContextMenu({
   menu,
@@ -428,9 +434,12 @@ function RoomContextMenu({
 }) {
   const motion = useHeldMenuMotion(menu);
   const shown = motion.value;
-  const { state, dispatch } = useStore();
+  const dispatch = useStoreDispatch(),
+    store = useStoreRef();
   const remoteClient = window.ogb?.remoteClient?.active === true;
-  const group = shown ? state.groups.find((g) => g.id === shown.groupId) : undefined;
+  const group = useStoreSelector((s) =>
+    shown ? s.groups.find((g) => g.id === shown.groupId) : undefined,
+  );
   const [renaming, setRenaming] = useState(false);
   const [describing, setDescribing] = useState(false);
   const [draft, setDraft] = useState(group?.name ?? '');
@@ -438,8 +447,9 @@ function RoomContextMenu({
 
   useEffect(() => {
     if (!menu) return;
-    setDraft(state.groups.find((g) => g.id === menu.groupId)?.name ?? '');
-    setDescriptionDraft(state.groups.find((g) => g.id === menu.groupId)?.description ?? '');
+    const named = store.state().groups.find((g) => g.id === menu.groupId);
+    setDraft(named?.name ?? '');
+    setDescriptionDraft(named?.description ?? '');
     setRenaming(false);
     setDescribing(false);
   }, [menu]);
@@ -650,6 +660,7 @@ export function BotThreadList({
   selected,
   query,
   pendingQueued,
+  routineRuns,
   reveal,
   locale,
   generatedTitles,
@@ -703,7 +714,14 @@ export function BotThreadList({
     ? { own: tasks, helpers: [] }
     : partitionHelperThreads(tasks, bot.threadId, query, projects);
   const visibleTasks = orderedThreadList(
-    visibleSidebarThreads(ownTasks, bot.threadId, query, projects, showAll || bulk.active),
+    visibleSidebarThreads(
+      ownTasks,
+      bot.threadId,
+      query,
+      projects,
+      showAll || bulk.active,
+      routineRuns,
+    ),
   );
   const visibleProjectIndex = (projectId: string) =>
     visibleTasks.findIndex((task) => task.projectId === projectId);
@@ -1120,6 +1138,7 @@ export interface BotRowProps {
   mascotMotion: AppState['mascotMotion'];
   reveal: AppState['revealThread'];
   pendingQueued: AppState['pendingQueued'];
+  routineRuns?: AppState['routineRuns'];
   instances: InstanceInfo[];
   liveCall: AppState['liveCall'];
   locale: string;
@@ -1134,8 +1153,22 @@ export interface BotRowProps {
   botDragging?: boolean;
 }
 
-export function botRowProps(
-  state: AppState,
+export function botRowProps<
+  State extends Pick<
+    AppState,
+    | 'activeView'
+    | 'selectedId'
+    | 'revealThread'
+    | 'deletingBots'
+    | 'mascotMotion'
+    | 'pendingQueued'
+    | 'routineRuns'
+    | 'instances'
+    | 'liveCall'
+    | 'config'
+  >,
+>(
+  state: State,
   dispatch: Dispatch<Action>,
   bot: Bot,
   layout: Pick<
@@ -1158,6 +1191,7 @@ export function botRowProps(
         ? reveal
         : null,
     pendingQueued: state.pendingQueued,
+    routineRuns: state.routineRuns,
     instances: state.instances,
     liveCall: state.liveCall,
     locale: activeLocale(),
@@ -1639,7 +1673,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
   );
 });
 
-export function Sidebar({
+export const Sidebar = memo(function Sidebar({
   open,
   onClose,
   collapseToIcons = false,
@@ -1648,9 +1682,9 @@ export function Sidebar({
   onClose: () => void;
   collapseToIcons?: boolean;
 }) {
-  const { state, dispatch } = useStore();
+  const state = useStoreSelector(sidebarState, sameFields),
+    dispatch = useStoreDispatch();
   const now = useRelativeNow();
-  const teamPeople = useTeamPeople();
   const cloudOwner = useCloudOwner(state.config?.cloudHome === true);
   const endHowTo = useCallback(() => endCloudHowTo(dispatch), [dispatch]);
   const showThreads = useShowThreads();
@@ -1845,13 +1879,19 @@ export function Sidebar({
     sidebarRef,
   });
   const botDrag = useSidebarBotDrag({
-    dispatch,
-    announce: sections.announce,
-    onNamed: sections.focusHeader,
-    onRenamed: sections.renamed,
-    onError: (text) => setTeamFeedback({ error: true, text }),
-    onCancelled: () => sidebarRef.current?.focus(),
-  });
+      dispatch,
+      announce: sections.announce,
+      onNamed: sections.focusHeader,
+      onRenamed: sections.renamed,
+      onError: (text) => setTeamFeedback({ error: true, text }),
+      onCancelled: () => sidebarRef.current?.focus(),
+    }),
+    roomDrag = useSidebarRoomDrag({
+      dispatch,
+      announce: sections.announce,
+      enabled: (sections.interactive || density === 'icons') && !phone && !q,
+      groups: state.groups,
+    });
 
   const sideLists = useTeamSideLists(state),
     matchingBots = sideLists.bots
@@ -2030,7 +2070,7 @@ export function Sidebar({
                 <div role='separator' className={MENU_ITEM_SEPARATOR} />
               </>
             )}
-            {teamSettingsAllowed !== false && (
+            {(teamSettingsAllowed !== false || state.config?.team) && (
               <button
                 onClick={() => {
                   setPlusOpen(false);
@@ -2438,14 +2478,15 @@ export function Sidebar({
               const sectionChiefItems = sectionName
                 ? sectionChiefs.filter((bot) => bot.section === sectionName)
                 : [];
-              const sectionGroupItems =
+              const sectionGroupItems = roomDrag.list(
                 id === CHANNELS_SECTION_ID
                   ? unsectionedRooms
                   : id === BOT_CHATS_SECTION_ID
                     ? botChats
                     : sectionName
                       ? sectionedRooms.filter((group) => group.section === sectionName)
-                      : [];
+                      : [],
+              );
               const sectionBotItems =
                 id === PINNED_SECTION_ID
                   ? pinnedBots
@@ -2545,15 +2586,18 @@ export function Sidebar({
                       {sectionChiefItems.map((bot) => (
                         <BotListItem key={bot.id} {...botRow(bot)} />
                       ))}
-                      {sectionGroupItems.map((group) => (
-                        <GroupListItem
-                          key={group.id}
-                          group={group}
-                          density={density}
-                          query={q}
-                          onMenu={setRoomMenu}
-                        />
-                      ))}
+                      {sectionGroupItems.map((group) =>
+                        roomDrag.wrap(
+                          group.id,
+                          <GroupListItem
+                            key={group.id}
+                            group={group}
+                            density={density}
+                            query={q}
+                            onMenu={setRoomMenu}
+                          />,
+                        ),
+                      )}
                       {id === PINNED_SECTION_ID ? (
                         <PinnedBotRoster
                           bots={sectionBotItems}
@@ -2602,6 +2646,7 @@ export function Sidebar({
               );
             })}
             <MovedBotRows bots={state.bots} />
+            <MovedToMyCloudRow bots={state.bots} />
             <SearchResults
               query={query}
               onLanded={() => {
@@ -2767,29 +2812,6 @@ export function Sidebar({
                       }
                     : undefined
                 }
-                onSetOwner={
-                  teamPeople?.admin
-                    ? () => {
-                        closeTeamMenu();
-                        pickOwnerOf(
-                          state.bots.filter(
-                            (bot) =>
-                              !bot.hidden && (bot.section?.trim() || '') === teamMotion.value!.name,
-                          ),
-                          teamPeople,
-                          teamMotion.value!,
-                        );
-                      }
-                    : undefined
-                }
-                onSeeReports={
-                  teamPeople
-                    ? () => {
-                        closeTeamMenu();
-                        showWhoReportsToWhom(dispatch);
-                      }
-                    : undefined
-                }
               />
             </div>
           </div>,
@@ -2893,7 +2915,7 @@ export function Sidebar({
             style={windowNoDragStyle}
             onClose={() => setNewChatOpen(false)}
             onNewBot={
-              teamSettingsAllowed === false
+              teamSettingsAllowed === false && !state.config?.team
                 ? undefined
                 : () => {
                     setNewChatOpen(false);
@@ -2965,4 +2987,4 @@ export function Sidebar({
         )}
     </aside>
   );
-}
+});

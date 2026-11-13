@@ -143,7 +143,7 @@ beforeAll(async () => {
   ] as const)
     expect((await team.as(token, 'PUT', '/api/me', { name })).status).toBe(200);
   const create = async (body: Record<string, unknown>) => {
-    const created = await team.as(olive, 'POST', '/api/bots', body);
+    const created = await team.as(olive, 'POST', '/api/bots', { visibility: 'everyone', ...body });
     expect(created.status, JSON.stringify(created.body)).toBe(201);
     return created.body.bot as Bot;
   };

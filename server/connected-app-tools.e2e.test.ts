@@ -51,6 +51,22 @@ async function ask(bridge: Bridge, call: { name: string; arguments: Record<strin
   }
 }
 
+/** The app's HTTP API at `url`, expecting `expected` back. */
+const apiOn =
+  (url: string) =>
+  async (method: string, path: string, body?: unknown, expected = 200) => {
+    const response = await fetch(url + path, {
+      method,
+      headers: { 'content-type': 'application/json', origin: url },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    const result = (await response.json()) as any;
+    expect(response.status, `${method} ${path}: ${JSON.stringify(result).slice(0, 400)}`).toBe(
+      expected,
+    );
+    return result;
+  };
+
 const acpBridge = (entry: {
   command: string;
   args: string[];
@@ -89,18 +105,7 @@ it('a bot given Gmail by its app switch reaches gmail.search_emails by name on C
     undefined,
     ['cline'],
   );
-  const api = async (method: string, path: string, body?: unknown, expected = 200) => {
-    const response = await fetch(fixture.info.url + path, {
-      method,
-      headers: { 'content-type': 'application/json', origin: fixture.info.url },
-      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    });
-    const result = (await response.json()) as any;
-    expect(response.status, `${method} ${path}: ${JSON.stringify(result).slice(0, 400)}`).toBe(
-      expected,
-    );
-    return result;
-  };
+  const api = apiOn(fixture.info.url);
   try {
     const bot = (await api('POST', '/api/bots', { name: 'Paul' }, 201)).bot;
     // The record an Apps switch left before it also wrote the tool list: Gmail on by scope, no tool granted.
@@ -191,6 +196,73 @@ it('a bot given Gmail by its app switch reaches gmail.search_emails by name on C
     expect(JSON.parse(onAcp.answer.result.content[0].text).messages[0]).toMatchObject({
       messageId: 'm-ada',
     });
+  } finally {
+    await fixture.close();
+    await apps.close();
+    rmSync(scratch, { recursive: true, force: true });
+  }
+}, 120_000);
+
+it("a bot with HighLevel read only runs HighLevel's reads, which name the resource before the verb, and is refused its writes", async () => {
+  const apps = await startFakeConnectedApps();
+  apps.connected = { highlevel_mcp: true };
+  const scratch = mkdtempSync(join(tmpdir(), 'omb-app-tools-'));
+  const gate = join(scratch, 'finish');
+  const fixture = await launchVerificationServer({
+    ...process.env,
+    OMB_COMPOSIO_BROKER_URL: apps.url,
+    OMB_COMPOSIO_BROKER_TOKEN: apps.token,
+    FAKE_CLAUDE_MODE: 'slow',
+    FAKE_CLAUDE_SLOW_FINISH_GATE: gate,
+  });
+  const api = apiOn(fixture.info.url);
+  try {
+    const bot = (await api('POST', '/api/bots', { name: 'Boomer' }, 201)).bot;
+    await api('PATCH', `/api/bots/${bot.id}`, {
+      composio: true,
+      connectorTools: { highlevel_mcp: { tools: '*' } },
+      connectorScopes: { apps: { highlevel_mcp: 'read' } },
+    });
+    await api(
+      'POST',
+      `/api/bots/${bot.id}/messages`,
+      { threadId: bot.threadId, text: 'List the pipelines', sendId: 'highlevel-read-e2e-0001' },
+      202,
+    );
+    let dump: any;
+    await expect
+      .poll(
+        () => {
+          try {
+            dump = JSON.parse(readFileSync(fixture.fixtureDumpPath, 'utf8'));
+          } catch {
+            return false;
+          }
+          return Boolean(dump.mcpConfig?.mcpServers?.composio);
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
+    const run = (tool_slug: string) =>
+      ask(dump.mcpConfig.mcpServers.composio, {
+        name: 'COMPOSIO_MULTI_EXECUTE_TOOL',
+        arguments: { tools: [{ tool_slug, arguments: {} }] },
+      });
+    for (const slug of [
+      'HIGHLEVEL_MCP_CONTACTS_GET_CONTACTS',
+      'HIGHLEVEL_MCP_OPPORTUNITIES_GET_PIPELINES',
+      'HIGHLEVEL_MCP_OPPORTUNITIES_SEARCH_OPPORTUNITY',
+    ]) {
+      const { answer } = await run(slug);
+      expect(JSON.stringify(answer), slug).not.toContain('would write');
+      expect(apps.calls.at(-1)).toMatchObject({ tool: slug });
+    }
+    const before = apps.calls.length;
+    const { answer } = await run('HIGHLEVEL_MCP_CONTACTS_UPDATE_CONTACT');
+    expect(answer.result.isError).toBe(true);
+    expect(answer.result.content[0].text).toContain('would write to it');
+    expect(apps.calls.length, 'the write never reached the app').toBe(before);
+    writeFileSync(gate, '');
   } finally {
     await fixture.close();
     await apps.close();

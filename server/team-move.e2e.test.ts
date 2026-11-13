@@ -225,12 +225,25 @@ it(
       phase: 'done',
     });
 
-    // Everyone in Acme has Scout.
-    for (const who of ['olive', 'ben', 'ada', 'cleo'])
+    // Scout is Ada's until she shares it: she and Acme's admins have it, and another User does not.
+    for (const who of ['olive', 'ben', 'ada'])
       expect(
         (await teamBots(who)).some((bot) => bot.id === scout.bot.id && bot.name === 'Scout'),
         who,
       ).toBe(true);
+    expect(
+      ((await teamBots('ada')).find((bot) => bot.id === scout.bot.id) as { access?: unknown })
+        .access,
+    ).toEqual({ everyone: 'none', people: {} });
+    expect(
+      (await teamBots('cleo')).some((bot) => bot.id === scout.bot.id),
+      'cleo',
+    ).toBe(false);
+    expect(
+      (await onTeam('cleo')('POST', `/api/bots/${scout.bot.id}/messages`, { text: 'hello' }))
+        .status,
+      'nor reaches it by id',
+    ).toBe(404);
     // Its two chats are Ada's own there: private, never the team's main chat, with her lines as hers.
     const there = (await teamBots('ada')).find((bot) => bot.id === scout.bot.id)!;
     expect(
@@ -261,7 +274,7 @@ it(
       ).toBe(404);
     }
     expect(
-      (await teamBots('cleo'))
+      (await teamBots('ben'))
         .find((bot) => bot.id === scout.bot.id)!
         .tasks?.some((task) => [scout.main, scout.budget].includes(task.threadId)),
     ).toBe(false);
@@ -484,8 +497,8 @@ it(
     await say(bot, bot.threadId, 'Hello, second Scout.');
     await move(bot);
     expect(phaseOf(bot.id)?.phase).toBe('done');
-    expect((await teamBots('cleo')).find((entry) => entry.id === bot.id)?.name).toBe('Scout (Ada)');
-    expect((await teamBots('cleo')).find((entry) => entry.id === scout.bot.id)?.name).toBe('Scout');
+    expect((await teamBots('ben')).find((entry) => entry.id === bot.id)?.name).toBe('Scout (Ada)');
+    expect((await teamBots('ben')).find((entry) => entry.id === scout.bot.id)?.name).toBe('Scout');
   },
   hostTimeout(180_000),
 );

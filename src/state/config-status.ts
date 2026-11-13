@@ -202,6 +202,7 @@ export interface ConfigStatus {
     roomMemoryCapture?: boolean;
     savedSteps?: boolean;
     savedStepsHere?: boolean;
+    usbPhoneTakeover?: boolean;
   };
   /** First-run progress: whether the welcome tour was finished and which
    * one-time hints were dismissed. Server-owned so it follows the workspace. */

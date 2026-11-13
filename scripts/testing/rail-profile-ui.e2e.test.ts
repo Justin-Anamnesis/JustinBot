@@ -301,7 +301,7 @@ function harness(get: () => { world: HomeWorld; shots: string }) {
           {
             id: 'profile:default',
             label:
-              'This Mac: a separate place on this computer, with its own bots. The bots on My Cloud stay there.',
+              'This computer: a separate place on this computer, with its own bots. The bots on My Cloud stay there.',
             current: false,
             cloud: false,
             local: false,
@@ -356,7 +356,7 @@ function harness(get: () => { world: HomeWorld; shots: string }) {
         await click(MAC);
         await until(
           lineOf,
-          (text) => Boolean(text?.startsWith('This Mac starts fresh')),
+          (text) => Boolean(text?.startsWith('This computer starts fresh')),
           90_000,
           "This Mac's page",
         );
@@ -602,7 +602,7 @@ function harness(get: () => { world: HomeWorld; shots: string }) {
           () => tiles(),
           (seen) =>
             seen.find((tile) => tile.id === 'profile:default')?.label ===
-            `This Mac opens once ${busy} finishes`,
+            `This computer opens once ${busy} finishes`,
           15_000,
           "This Mac's circle saying it waits",
         );

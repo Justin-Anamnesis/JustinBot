@@ -329,7 +329,7 @@ function emptyStatus(botId: string, alias: string | null): VpsComputerStatus {
     ready: false,
     problem: alias
       ? 'Docker over SSH is not reachable'
-      : 'Configure a VPS SSH alias in Settings → API keys',
+      : 'Configure a VPS SSH alias in AI › Other services',
     image_ref: VPS_IMAGE,
     base_image_ref: BASE_IMAGE,
     driver_version: CUA_DRIVER_VERSION,
@@ -405,7 +405,7 @@ function hasNoPublishedPorts(
 }
 
 function statusProblem(status: VpsComputerStatus): string | null {
-  if (!status.configured) return 'Configure a VPS SSH alias in Settings → API keys';
+  if (!status.configured) return 'Configure a VPS SSH alias in AI › Other services';
   if (!status.daemonUp)
     return 'Docker over SSH could not reach the VPS; check the SSH alias and Docker on the VPS';
   if (!status.image)

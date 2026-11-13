@@ -51,6 +51,7 @@ function world({
     },
     server: { frozen: false, freezes: 0, unfreezes: 0, forgot: 0 },
     passes: [],
+    moveAsks: [],
     checked: 0,
     cloudCalls: [],
     localCalls: [],
@@ -90,8 +91,8 @@ function world({
         cloud: () => (w.cloud ? { ...w.cloud } : null),
         send: {
           async move(options) {
-            const kind = options?.final ? 'final' : 'copy';
-            w.passes.push(kind);
+            w.passes.push(options?.final ? 'final' : 'copy');
+            w.moveAsks.push(options ?? {});
             const failure = moves.shift();
             if (failure) throw failure;
           },
@@ -208,6 +209,9 @@ function world({
           },
         },
       });
+    },
+    failNext(error) {
+      moves.push(error);
     },
     relaunch() {
       w.home?.close();
@@ -868,6 +872,48 @@ test('a newer app tops up once from the frozen copy, which is deleted 30 days af
   assert.equal(w.server.forgot, 1);
   await w.home.kick();
   assert.equal(w.server.forgot, 1);
+});
+
+test('a top-up after the move is done never sends workspace files, and a failed one retries the same way', async () => {
+  const w = world();
+  await w.home.kick();
+  assert.deepEqual(w.moveAsks, [{}, { final: true }], 'the move itself still carries the files');
+
+  w.version = '0.1.122';
+  await w.relaunch().kick();
+  assert.deepEqual(w.moveAsks.at(-1), { final: true, files: false });
+  assert.equal(w.journal.version, '0.1.122');
+  await w.relaunch().kick();
+  assert.equal(w.moveAsks.length, 3, 'once per version');
+
+  w.cloud.paid = false;
+  w.advance(KEPT_MS);
+  w.version = '0.1.123';
+  await w.relaunch().kick();
+  assert.equal(
+    w.server.forgot,
+    0,
+    "an unpaid copy, and a server of the person's own, is never deleted",
+  );
+  assert.deepEqual(
+    w.moveAsks.at(-1),
+    { final: true, files: false },
+    'the old files are still not sent',
+  );
+
+  const again = world();
+  await again.home.kick();
+  again.version = '0.1.122';
+  again.failNext(new Error('offline'));
+  await again.relaunch().kick();
+  assert.equal(again.journal.version, '0.1.121', 'a failed top-up does not count as made');
+  again.advance(60 * 60_000);
+  await again.tick();
+  assert.equal(again.journal.version, '0.1.122');
+  assert.deepEqual(again.moveAsks.slice(-2), [
+    { final: true, files: false },
+    { final: true, files: false },
+  ]);
 });
 
 test("one home reads the Admin's word: a ready Cloud the account may move to, and a held one that ended", () => {

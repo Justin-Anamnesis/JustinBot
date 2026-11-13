@@ -180,7 +180,12 @@ try {
     })
   ).bot as { id: string; threadId: string };
   const helpdesk = (
-    await as('ada', 'POST', '/api/bots', { name: 'Helpdesk', title: 'IT questions', color: 'blue' })
+    await as('ada', 'POST', '/api/bots', {
+      name: 'Helpdesk',
+      title: 'IT questions',
+      color: 'blue',
+      visibility: 'everyone',
+    })
   ).bot as { id: string };
   if (before)
     await as('ada', 'PATCH', `/api/bots/${payroll.id}`, {
@@ -837,6 +842,7 @@ try {
         name: `Bot ${String(i).padStart(2, '0')} with quite a long name for the list`,
         title: 'Filler',
         color: 'teal',
+        visibility: 'everyone',
       });
   }
   let serving: Who | null = null;

@@ -107,6 +107,7 @@ it("the welcome's one action, a chat with a bot, is the person's own private cha
   const made = await team.as(ada, 'POST', '/api/bots', {
     name: 'Research',
     description: 'Briefs before a call.',
+    visibility: 'everyone',
   });
   expect(made.status, JSON.stringify(made.body)).toBe(201);
   const botId = made.body.bot.id as string;
@@ -124,7 +125,10 @@ it("the welcome's one action, a chat with a bot, is the person's own private cha
 
 it("a User's copy of a team bot carries what the welcome's one line reads, and a removed person's page is told why", async () => {
   const ada = (await team.pair(ADA)).token!;
-  const made = await team.as(ada, 'POST', '/api/bots', { name: 'Seedling' });
+  const made = await team.as(ada, 'POST', '/api/bots', {
+    name: 'Seedling',
+    visibility: 'everyone',
+  });
   await team.as(ada, 'PATCH', `/api/bots/${made.body.bot.id}`, {
     soul: "You look after the team's plants.",
   });

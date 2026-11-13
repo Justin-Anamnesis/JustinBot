@@ -554,3 +554,11 @@ test("a move's check finds what only a move carries: memory pieces, journal rows
     "a journal showing its latest 500 rows of My Cloud's own may no longer show older ones",
   );
 });
+
+test('an answer about the attachments that names no list is never read as nothing missing', async () => {
+  const session = { call: async () => ({ ok: true, status: 200, body: {} }) };
+  await assert.rejects(
+    missingAttachments(session, ['00000001.png']),
+    /did not check the attachments/u,
+  );
+});

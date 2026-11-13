@@ -230,6 +230,7 @@ describe('which engines a turn is bridged on', () => {
     ['opencodeGo'],
     ['antigravityAgent'],
     ['customAcp'],
+    ['ompAgent'],
     // not shown to qualify, and anything nobody has heard of
     ['museCode'],
     ['someFutureDriver'],

@@ -20,11 +20,13 @@ import {
   Trash2,
 } from 'lucide-react';
 import type { Action, AppState, BotProject, Task } from '@/state/store';
+import type { RoutineRun } from '@/lib/routines';
 import { cn } from '@/lib/cn';
 import { MENU_SHEET } from './menu-recipe';
 import { useHeldMenuMotion } from './MenuMotion';
 import { intlLocale, t } from '@/lib/i18n';
 import { nextRename } from '@/lib/rename';
+import { imeComposing } from '@/lib/send-key';
 import { isTickable, opensRowMenuFromKey } from '@/lib/bulk-select';
 import { threadRefUrl } from '@/lib/thread-refs';
 import { copyText } from '@/lib/copy-text';
@@ -35,6 +37,7 @@ import { Select } from './Select';
 import { WorkingTimer } from './WorkingIndicator';
 import { useHeldText } from './SidebarWorkingStep';
 import { localizedTaskTitle } from '@/lib/task-title';
+import { ShareRowItems } from './conversation-share/ShareRowItems';
 
 export { isSnoozed, orderedThreadList };
 
@@ -43,6 +46,9 @@ type ThreadRowTask = Pick<
   | 'threadId'
   | 'title'
   | 'sharedChat'
+  | 'private'
+  | 'shared'
+  | 'sharedWith'
   | 'projectId'
   | 'busy'
   | 'activity'
@@ -196,12 +202,14 @@ export function HelperThreadGroup<T>({
   );
 }
 
+/** Default list shows each routine's newest run only; older runs stay under "Show all". */
 export function visibleSidebarThreads<T extends ThreadRowTask>(
   tasks: T[],
   activeId: string,
   query = '',
   folders: BotProject[] = [],
   showAll = false,
+  routineRuns: readonly Pick<RoutineRun, 'routineId' | 'threadId' | 'createdAt'>[] = [],
 ): T[] {
   const needle = query.trim().toLowerCase();
   if (needle) {
@@ -215,9 +223,25 @@ export function visibleSidebarThreads<T extends ThreadRowTask>(
   }
   if (showAll) return tasks;
   let open = 0;
+  const runOf = new Map(
+    routineRuns.flatMap((run) => (run.threadId ? [[run.threadId, run] as const] : [])),
+  );
+  // Newest by the run's start, not sidebar order (an older run that finished later sorts first), among runs the list can show.
+  const newestRun = new Map<string, Pick<RoutineRun, 'routineId' | 'createdAt'>>();
+  for (const task of tasks) {
+    const run = runOf.get(task.threadId);
+    if (!run || task.pinned === true || task.openedBy?.burstId || isArchived(task)) continue;
+    if ((task.closedBy || isSnoozed(task)) && !demandsAttention(task, activeId)) continue;
+    const seen = newestRun.get(run.routineId);
+    if (!seen || run.createdAt > seen.createdAt) newestRun.set(run.routineId, run);
+  }
   return orderedThreadList(tasks).filter((task) => {
     if (task.pinned === true) return true;
+    if (task.openedBy?.burstId)
+      return task.threadId === activeId || demandsAttention(task, activeId);
     if (isArchived(task)) return task.threadId === activeId;
+    const run = runOf.get(task.threadId);
+    if (run && newestRun.get(run.routineId) !== run) return demandsAttention(task, activeId);
     return task.closedBy || isSnoozed(task)
       ? demandsAttention(task, activeId)
       : open++ < 6 || demandsAttention(task, activeId);
@@ -520,7 +544,11 @@ export const SidebarThreadRow = memo(function SidebarThreadRow({
             onChange={(event) => setDraft(event.target.value)}
             onBlur={() => finishRename(true)}
             onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+              if (imeComposing(event.nativeEvent)) {
+                event.stopPropagation();
+                return;
+              }
+              if (event.key === 'Enter') {
                 event.preventDefault();
                 finishRename(true);
               } else if (event.key === 'Escape') {
@@ -744,6 +772,7 @@ export const SidebarThreadRow = memo(function SidebarThreadRow({
                 {t('task.renameAria')}
               </button>
             )}
+            <ShareRowItems botId={ownerId} task={task} onPicked={() => setMenu(null)} />
             {onRegenerateTitle && !task.sharedChat && (
               <button
                 type='button'

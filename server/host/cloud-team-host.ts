@@ -24,6 +24,7 @@ import { personKey } from '../person-key.ts';
 import { ensureWorkspace, loadMemory, workspaceDir } from '../workspace.ts';
 import type { EngineHomes } from '../engine-homes/engine-homes.ts';
 import { storeThreads, type StoreBotThreads } from '../engine-homes/migrate.ts';
+import type { ConversationShares } from './conversation-shares.ts';
 
 export interface CloudTeamHostDeps {
   team: CloudTeam | null;
@@ -35,6 +36,8 @@ export interface CloudTeamHostDeps {
   starters: { get(threadId: string): string | undefined };
   /** Keys that name no person (nobody, outside). */
   markers: ReadonlySet<string>;
+  /** Conversations their people shared (host/conversation-shares.ts). */
+  shares?: Pick<ConversationShares, 'audienceOf' | 'readers' | 'isShareKey'>;
   language?: () => string | undefined;
   /** config.json's one profile. On a team it is nobody's: it is handed to the member whose address it names, then
    * cleared. */
@@ -74,11 +77,17 @@ export function createCloudTeamHost(deps: CloudTeamHostDeps) {
   const team = deps.team;
   const people: PeopleAbout = createPeopleAbout(deps.dataDir);
   const audienceOf = (threadId: string): Audience =>
+    (team ? deps.shares?.audienceOf(threadId) : null) ??
     threadAudienceFrom({
       room: deps.store.groupByThread(threadId)?.id,
       starter: deps.starters.get(threadId),
       markers: deps.markers,
     });
+  /** The person an audience is private to; a conversation shared with one person is nobody's own. */
+  const ownPerson = (audience: Audience): string | null => {
+    const person = audienceMember(audience);
+    return person && !deps.shares?.isShareKey(person) ? person : null;
+  };
   if (team)
     deps.engineHomes?.start({
       dataDir: deps.dataDir,
@@ -157,7 +166,7 @@ export function createCloudTeamHost(deps: CloudTeamHostDeps) {
       layerOrBotId: string,
       plan: (current: string) => { next: string; count: number } | null,
     ): number {
-      const person = team ? audienceMember(layerAudience(layerOrBotId)) : null;
+      const person = team ? ownPerson(layerAudience(layerOrBotId)) : null;
       if (!person) return 0;
       const planned = plan(people.read(person));
       if (!planned) return 0;
@@ -184,7 +193,7 @@ export function createCloudTeamHost(deps: CloudTeamHostDeps) {
       serverProfile: T | undefined,
     ): T | { aboutMe: string; person?: string } | undefined {
       if (!team) return serverProfile;
-      const person = audienceMember(audienceOf(threadId));
+      const person = ownPerson(audienceOf(threadId));
       if (!person) return undefined;
       const name = personName(person);
       return { aboutMe: people.read(person), ...(name ? { person: name } : {}) };
@@ -240,11 +249,11 @@ export function createCloudTeamHost(deps: CloudTeamHostDeps) {
     },
     /** The person whose "About you" a layer's captured facts belong to; null for the team's and a room's. */
     aboutPerson(layerOrBotId: string): string | null {
-      return team ? audienceMember(layerAudience(layerOrBotId)) : null;
+      return team ? ownPerson(layerAudience(layerOrBotId)) : null;
     },
     /** A turn's captured facts are the member's own when the conversation is theirs. */
     ownTurn(threadId: string): boolean {
-      return team !== null && audienceMember(audienceOf(threadId)) !== null;
+      return team !== null && ownPerson(audienceOf(threadId)) !== null;
     },
     people,
     baseBotId,
@@ -257,6 +266,7 @@ export function createCloudTeamHost(deps: CloudTeamHostDeps) {
       return {
         of: audienceOf,
         person: viewer.email ? personKey({ id: '', email: viewer.email }) : null,
+        ...(deps.shares ? { readers: deps.shares.readers } : {}),
       };
     },
     /** Whose browser a conversation's turns use: on a team its audience's (the member's, the group chat's or the team's),
@@ -283,7 +293,9 @@ export function createCloudTeamHost(deps: CloudTeamHostDeps) {
         : null;
     },
     /** The person a conversation is private to on a team (theirs alone, audience.ts); null for the team's, a room's and
-     * anywhere off a team. */
+     * anywhere off a team. Security invariant: a conversation shared with one person answers its share key, which no
+     * session holds, so whatever follows this alone (a routine's home, an ask's person) reaches nobody rather than either
+     * of its two readers. */
     privateTo(threadId: string): string | null {
       return team ? audienceMember(audienceOf(threadId)) : null;
     },

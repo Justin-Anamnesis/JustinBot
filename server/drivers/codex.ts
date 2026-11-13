@@ -110,8 +110,9 @@ import { codexDeveloperInstructions, syncCodexInstructions } from './codex-instr
 import { volatileContextNote, withContextNote } from './prompt-split.ts';
 import type { ApprovalMode } from '../../shared/approval-mode.ts';
 import { CodexDeviceAuthController } from './codex-device-auth.ts';
+import { messageItem } from '../harness/text-items.ts';
 import { codexAccountEmail, codexHome } from './codex-identity.ts';
-import { linkSharedCodexHome } from './codex-shared-home.ts';
+import { keepChatsOutOfCodexHistory, linkSharedCodexHome } from './codex-shared-home.ts';
 import {
   containsControlCharacter,
   mcpAppApprovalForm,
@@ -135,7 +136,7 @@ import {
   missingNativeCodexThread,
   type CodexRoute,
 } from './codex-errors.ts';
-import { codexLoginCheck, codexLoginStatus, storedCodexLogin } from './codex-login.ts';
+import { codexLoginCheck, readCodexLogin, storedCodexLogin } from './codex-login.ts';
 import { keyRejected, noteKeyAccepted, noteKeyRejected } from '../key-rejections.ts';
 import {
   classifyResumeFailure,
@@ -758,9 +759,11 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
               },
             )
           : null;
+      let turnConfigArgs: string[];
       try {
         assertPlanCurrent();
         if (active.has(threadId)) throw new Error('a turn is already running on this thread');
+        turnConfigArgs = codexTurnConfigArgs(turn, childEnv());
       } catch (error) {
         authBridge?.close();
         throw error;
@@ -822,6 +825,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
       const launchAttempt = async (attempt: number): Promise<void> => {
         const env = childEnv();
         const launchedLogin = chatgptTurn ? storedCodexLogin(env) : null;
+        if (ownLogin) keepChatsOutOfCodexHistory(env, instanceId);
         if (authBridge) Object.assign(env, authBridge.env);
         else if (planToken) env.OPENMAUSBOT_CHATGPT_TOKEN = planToken;
         const appServerArgs = [
@@ -839,7 +843,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
             ? []
             : ['-c', 'features.shell_snapshot=false']),
           // A guest-driven turn: no shell, no file reads (-c wins over config files).
-          ...codexTurnConfigArgs(turn),
+          ...turnConfigArgs,
         ];
         const codexConfig = codexConfigMcp(env),
           declaredInCodexConfig = codexConfig.names;
@@ -1253,8 +1257,19 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
           }
           await interruptibleDelay(Math.max(1, Math.round(delayMs * retryScale)), stopSignal.signal)
             .promise;
-          if (!stopRequested) void launchAttempt(attempt).catch(() => authBridge?.close());
-          else await settle(false, 'interrupted');
+          if (!stopRequested) {
+            try {
+              turnConfigArgs = codexTurnConfigArgs(turn, childEnv());
+            } catch (error) {
+              emit({
+                ...base(threadId, turnId),
+                type: 'runtime.error',
+                message: error instanceof Error ? error.message : String(error),
+              });
+              return settle(false, 'rpc_error');
+            }
+            void launchAttempt(attempt).catch(() => authBridge?.close());
+          } else await settle(false, 'interrupted');
         };
 
         const steerActiveTurn = async (text: string): Promise<SteerOutcome> => {
@@ -1630,6 +1645,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
                 state.sawStreamDelta = true;
                 emit({
                   ...base(threadId, turnId),
+                  ...messageItem({ id: p.itemId }),
                   type: 'content.delta',
                   streamKind: 'assistant_text',
                   delta,
@@ -1711,6 +1727,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
                   if (!state.sawStreamDelta) {
                     emit({
                       ...base(threadId, turnId),
+                      ...messageItem(item),
                       type: 'content.delta',
                       streamKind: 'assistant_text',
                       delta: item.text,
@@ -1719,6 +1736,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
                   state.sawStreamDelta = false;
                   emit({
                     ...base(threadId, turnId),
+                    ...messageItem(item),
                     type: 'item.completed',
                     itemType: 'assistant_text',
                     text: item.text,
@@ -2103,7 +2121,11 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
           // Codex's `never` means "do not ask to escalate", not "grant every requested permission":
           // only Full may synthesize approvals.
           autoAcceptPermissions = approvalMode === 'full';
-          const selection = routed
+          const selection: {
+            model?: string | null;
+            modelProvider: string | null;
+            serviceTier?: string;
+          } = routed
             ? { model: turn.model, modelProvider: routedProvider }
             : config.authMode === 'chatgpt-plan'
               ? { model: turn.model, modelProvider: 'openai_chatgpt_plan' }
@@ -2247,6 +2269,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
               // Spread, not `effort ?? null`: codex-cli 0.146.0 treats null as absent (the thread keeps
               // its effort), rejects "", and thread/start takes no effort, so a thread keeps its last level.
               ...(turn.effort ? { effort: turn.effort } : {}),
+              ...(selection.serviceTier ? { serviceTierForTurn: selection.serviceTier } : {}),
             });
           };
           const waitNames = supportsMcpStartup(initialized?.userAgent)
@@ -2382,7 +2405,8 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
       const previousCliVersion = modelsCliVersion;
       modelsCliVersion = version;
       if (previousCliVersion !== null && previousCliVersion !== version) await refreshModels();
-      const authenticated = (await codexLoginStatus(config.cli, env)) === 'signed-in';
+      const login = await readCodexLogin(config.cli, env),
+        authenticated = login.status === 'signed-in';
       if (authenticated && loginRejected()) {
         return {
           state: 'available',
@@ -2393,12 +2417,17 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
           billing: 'subscription',
         };
       }
-      const email = authenticated ? await codexAccountEmail(config.cli, env) : null;
+      const email =
+        authenticated && !login.apiKey ? await codexAccountEmail(config.cli, env) : null;
       return {
         state: 'available',
         version,
         authenticated,
-        ...(email ? { account: { email } } : {}),
+        ...(login.apiKey
+          ? { account: { method: 'api-key' as const } }
+          : email
+            ? { account: { email } }
+            : {}), // no ChatGPT sign-out
         update: await codexReleaseUpdate(version, config.cli),
         billing: 'subscription',
       };

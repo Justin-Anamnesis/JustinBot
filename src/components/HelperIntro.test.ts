@@ -300,7 +300,7 @@ describe('in the chat (Simple mode)', () => {
       host.querySelector<HTMLElement>('[data-helper-step="phone"]')!.click();
     });
     expect(f.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'toggleAppSettings', section: 'companion' }),
+      expect.objectContaining({ type: 'toggleAppSettings', section: 'phone' }),
     );
     expect(chips()).toEqual(['ai', 'apps', 'cloud']);
   });
@@ -366,7 +366,7 @@ describe('in the chat (Simple mode)', () => {
     expect(chipAction('apps')).toEqual({ type: 'togglePlugins', open: true, surface: 'apps' });
     expect(chipAction('phone')).toMatchObject({
       type: 'toggleAppSettings',
-      section: 'companion',
+      section: 'phone',
       phonePairing: true,
     });
     expect(chipAction('cloud')).toEqual({ type: 'openCloudAdd', source: 'app_onboarding' });
@@ -467,7 +467,7 @@ describe('in Advanced mode', () => {
     expect(setupAction('apps')).toEqual({ type: 'togglePlugins', open: true, surface: 'apps' });
     expect(setupAction('phone')).toMatchObject({
       type: 'toggleAppSettings',
-      section: 'companion',
+      section: 'phone',
       phonePairing: true,
     });
     expect(setupAction('cloud')).toEqual({ type: 'openCloudAdd', source: 'app_onboarding' });

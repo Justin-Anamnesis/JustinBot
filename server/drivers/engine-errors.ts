@@ -6,7 +6,7 @@ import { chatNotice, noticeFailure } from '../chat-notices.ts';
 import { redactSecretsInText } from '../redact.ts';
 import { hostTimeZone } from '../turn-clock.ts';
 import { toolCountLimitFromError } from '../tool-count-limit.ts';
-import { USAGE_LIMIT } from './retry.ts';
+import { MODEL_NO_ROUTE, USAGE_LIMIT } from './retry.ts';
 import { usageLimitWait } from './acp/quiet-status.ts';
 
 export type EngineFailureKind =
@@ -17,6 +17,7 @@ export type EngineFailureKind =
   | 'server'
   | 'tool_schema'
   | 'tool_count'
+  | 'model_no_route'
   | 'refused';
 
 /** A provider refusing for want of credit or payment, in its own words (402 is read from the status). */
@@ -31,6 +32,10 @@ const TOOL_SCHEMA =
   /moonshot flavou?red json schema|schema exceeds maximum allowed size|invalid schema for function\b|\btools\.\d+\.custom\.input_schema\b|function_declarations\[\d+\]\.parameters|\btoolSpec\.inputSchema\b/i;
 const SCHEMA_TOOL_NAME = /\b(?:function|tool) ['"`]([\w.:-]{1,128})['"`]/i;
 const SCHEMA_TOO_LARGE = /exceeds maximum allowed size|\btoo (?:large|long|big)\b/i;
+/** The model OpenCode 2.2.5 names in a no-route refusal ("Unsupported package for <id>: <package>", "Model unavailable:
+ * <id>", "Cannot initialize <id>: …"); an id may hold a colon ("ollama-cloud/deepseek-v4.1-flash:1017"). */
+const NO_ROUTE_MODEL =
+  /\b(?:Unsupported package for|Variant unavailable for|Cannot initialize|Model unavailable:) (\S+?)[:.]?(?=\s|$)/i;
 
 /** Grok Build's "API error (status 402 Payment Required): …" (inside ACP's "Internal error: …"), the chat-completions
  * drivers' "xAI HTTP 402: …", and Claude Code's "API Error: 529 …". */
@@ -98,6 +103,7 @@ export function engineFailureKind(
   if (status === 429) return 'rate_limit';
   if (TOOL_SCHEMA.test(text)) return 'tool_schema';
   if (toolCountLimitFromError(text) !== undefined) return 'tool_count';
+  if (MODEL_NO_ROUTE.test(text)) return 'model_no_route';
   if (status !== null) return status >= 500 ? 'server' : 'refused';
   return null;
 }
@@ -194,6 +200,12 @@ export function engineFailure(
       return limit == null
         ? noticeFailure('chat.notice.toolCountUnknown', { provider })
         : noticeFailure('chat.notice.toolCount', { provider, limit: String(limit) });
+    }
+    case 'model_no_route': {
+      const model = NO_ROUTE_MODEL.exec(text)?.[1];
+      return model
+        ? noticeFailure('chat.notice.modelNoRoute', { provider, model })
+        : noticeFailure('chat.notice.modelNoRouteUnnamed', { provider });
     }
     case 'refused':
       return { message: `${provider} stopped with an error${detail(code, says)}.` };
