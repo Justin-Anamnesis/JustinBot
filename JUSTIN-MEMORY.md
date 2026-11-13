@@ -104,7 +104,22 @@ git switch justin-main && git merge main-fmt
 - 明昊的打算（2026-11-11）：本地跑通后卸载现在装的 OpenMausBot，换成我们打的包。所以 `appId`、应用名、数据目录 `~/.openmausbot` 都保持上游的，他的 bot 和历史记录直接沿用。
 - 自动更新已关（2026-11-11）：更新源是上游的 GitHub releases，我们的包会被更新回上游版本。`electron/main.mjs` 改从 `electron/fork-updater.mjs` 导入一个空的 `startUpdater`，上游的 `electron/updater.mjs` 没改。更新器不启动，菜单里的检查更新与安装更新没有动作。
 - 服务端的版本检查（`server/update-check.ts`）没关：它只提示上游有新版本，不替换应用。
-- 打包还没试过。`pnpm package:mac` 默认打 arm64 和 x64 两套、dmg 和 zip 各一份，并下载内置浏览器等二进制；自用只需要 arm64 的目录版。
+- 打包实测可用（2026-11-13，0.1.155）。`pnpm package:mac` 默认打 arm64 和 x64 两套、dmg 和 zip 各一份；自用只打 arm64 的目录版，约 5 分钟，产物 `release/mac-arm64/OpenMausBot.app`（804M，未签名，只有链接器的临时签名）。在仓根依次运行：
+
+  ```
+  pnpm build && pnpm build:server && pnpm build:companion && pnpm build:updater
+  node scripts/prepare-android-tools.mjs
+  node scripts/prepare-cloudflared.mjs --current
+  node scripts/prepare-browser.mjs --current
+  OMB_DUCKDB_ARCH=arm64 node scripts/prepare-duckdb.mjs
+  pnpm build:speech && pnpm build:cua
+  CSC_IDENTITY_AUTO_DISCOVERY=false pnpm exec electron-builder --mac dir --arm64 --publish never
+  ```
+
+- 不碰已装应用地试跑打出来的包：`OMB_DATA_DIR=<临时目录> release/mac-arm64/OpenMausBot.app/Contents/MacOS/OpenMausBot --user-data-dir=<另一个临时目录>`。实测能启动、建出默认 bot、服务端起在 18799；带自定义 `--user-data-dir` 时钥匙串查询报 -25320（凭据库不可用），正式安装后是否还报没测过。
+- 打包后的服务端冒烟测试 `node scripts/smoke-packaged-server.mjs` 通过。
+- 目录版的包里没有 `app-update.yml`（更新源配置），加上上面关掉的更新器，是两层保险；以后若改打 dmg 或 zip，这个文件会出现，关更新的代码仍然生效。
+- 不要用开发模式单独起 Electron 壳（`pnpm dev:desktop`）同时开着已装应用：开发模式下壳写死连 8799，那是已装应用的服务端，用户数据目录和单实例锁也相同。
 
 ## 改动约定
 
