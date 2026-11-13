@@ -132,6 +132,7 @@
 | 2026-11-11 | 28 个 `*.test.*` 文件 | 查找源码文本的字符串与正则改成能匹配格式化后的写法 | 上游测试把源码当文本读，格式化后 49 个失败；清单见 `git log` 里的 `test: match formatted source text` 提交 |
 | 2026-11-11 | `scripts/testing/file-size-ratchet.test.ts` | `LINES` 表按格式化后的行数重算（30 → 103 个文件） | 折行使行数增加；同步上游时这张表必冲突，重算即可 |
 | 2026-11-11 | `shared/mascot-bodies.ts`、`shared/carved-bodies.ts` | 不格式化，保持上游原样 | 生成器产物，上游测试逐字比对 |
+| 2026-11-14 | `server/testing/memory-gate-hooks.mjs`、`server/testing/limit-clock-hooks.mjs` | 3 处源码锚点改成格式化后的写法（单引号、跨行） | e2e 夹具启动时按文本给源码打补丁，锚点对不上就整台测试服务器起不来（18 个 e2e 用例） |
 | 2026-11-11 | `electron/main.mjs`、`electron/fork-updater.mjs` | `startUpdater` 改从新文件导入，是个空函数 | 关掉自动更新，否则会被换回上游版本；`main.mjs` 受体积棘轮约束，行数不能增 |
 | 2026-11-11 | 28 个 `electron/*.node-test.mjs` | 同上面的测试修复，针对 node 测试运行器那一套 | 格式化后 53 个失败 |
 

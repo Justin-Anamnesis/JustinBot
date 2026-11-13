@@ -15,7 +15,7 @@ const seams = new Map([
   [
     new URL('../routines.ts', import.meta.url).href,
     [
-      'startDueTimer({ run: () => this.tick(),',
+      'startDueTimer({\n      run: () => this.tick(),',
       'startDueTimer({ retryMs: 250, run: () => this.tick(),',
     ],
   ],

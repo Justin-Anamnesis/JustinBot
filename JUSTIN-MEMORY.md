@@ -96,7 +96,8 @@ git switch justin-main && git merge main-fmt
 - broker 测试（`pnpm broker:test`）121 个全过。打包后服务端的冒烟测试（`pnpm test:packaged-server`）还没跑。
 - 从源码跑通（2026-11-11）：`OMB_PORT=8899 OMB_DATA_DIR=<临时目录> pnpm dev:server` 加 `OMB_PORT=8899 pnpm dev`，浏览器开 `http://127.0.0.1:5199`，走完引导并收到 bot 的真实回复。已装的应用占着 8799，所以换端口。一句「收到」的回合用了 6.9 万输入 token。Electron 桌面壳没单独启动过。
 - 同步上游后的固定动作：跑 `pnpm exec vitest run --exclude '**/*e2e*'`（设 `OMB_VITEST_WORKERS=4`）和 `pnpm test:electron`，新冒出来的「读源码文本」失败照上面三类处理。每次会新增多少没测过，第一次同步时记下数字。
-- e2e 测试（378 个文件）没跑。上游默认一次只跑一个文件，全量串行要 2 小时以上。
+- e2e 测试（2026-11-13，`OMB_VITEST_WORKERS=4 pnpm exec vitest run e2e`，393 个文件 1955 个测试，43 分钟）：7 个文件 20 个测试失败。18 个是格式化造成的：`server/testing/*-hooks.mjs` 在夹具启动时按文本给源码打补丁，3 处锚点对不上，改锚点后通过。剩 2 个在未格式化的 `main` 上同样失败，属本机环境：`verification-fixture`（本机装了 `pi`）和 `hostile-pages`（浏览器自己发出的 `clients2.google…` 请求先被记录）。
+- 同步上游后要多做一步：`server/testing/*-hooks.mjs` 里的每个锚点在目标源码中必须恰好出现一次。大多数钩子对不上会报「seam changed」，`group-local-vm-hooks.mjs` 里的替换不报错，只能靠 e2e 发现。
 - 未格式化的基线 worktree 在 `/Users/mac/Desktop/Study/.tmp/worktrees/JustinBot/main`，`node_modules` 软链到主工作区，用来对照「格式化前是否就失败」。
 
 ## 打包与自动更新

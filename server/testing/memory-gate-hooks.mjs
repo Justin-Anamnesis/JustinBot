@@ -17,7 +17,7 @@ registerHooks({
   load(url, context, nextLoad) {
     const result = nextLoad(url, context);
     if (url === plan) {
-      const anchor = 'starter: () => tier === "starter",';
+      const anchor = "starter: () => tier === 'starter',";
       if (!String(result.source).includes(anchor)) throw new Error('Plan seam changed');
       return {
         ...result,
@@ -29,7 +29,7 @@ registerHooks({
     }
     if (url !== gate) return result;
     const source = String(result.source);
-    const anchor = /export const engineMemory = new EngineMemory\(\{ enabled: [^\n]*\}\);/;
+    const anchor = /export const engineMemory = new EngineMemory\(\{\s*enabled:[^;]*\}\);/;
     if (!anchor.test(source)) throw new Error('Memory gate seam changed');
     return {
       ...result,
